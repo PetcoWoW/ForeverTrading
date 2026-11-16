@@ -49,8 +49,8 @@ local function Rows()
     end
     if key == "name" then
         table.sort(out, function(a, b)
-            local na = (FT.Item(a.r.output) or a.r.name or ""):lower()
-            local nb = (FT.Item(b.r.output) or b.r.name or ""):lower()
+            local na = (FT.Name(a.r.output) or a.r.name or ""):lower()
+            local nb = (FT.Name(b.r.output) or b.r.name or ""):lower()
             if na ~= nb then
                 if desc then return na > nb end
                 return na < nb

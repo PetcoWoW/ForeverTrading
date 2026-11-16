@@ -1,5 +1,13 @@
 # ForeverTrading
 
+## v1.0.1
+
+- Fixed: searching the Market list no longer freezes the game or makes the list jump. Item names are kept in a saved name book, and the ones the game hasn't loaded yet arrive quietly in the background while you search.
+- The release package now holds only the addon's files.
+
+- Исправлено: поиск в списке рынка больше не вызывает фризы и «прыжки» списка. Названия предметов запоминаются, а недостающие тихо подгружаются в фоне, пока вы ищете.
+- В архиве релиза теперь только файлы аддона.
+
 ## v1.0.0
 
 First release.

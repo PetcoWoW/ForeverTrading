@@ -587,7 +587,16 @@ FT.On("FT_WATCH_CHANGED", function()
     Later()
     if FT.IsShown() then FT.UpdateTicker() end
 end)
-FT.On("FT_ITEMS_LOADED", Later)
+FT.On("FT_ITEMS_LOADED", function()
+    if not FT.IsShown() then return end
+    local tab, page = FT.Tabs[FT.currentTab], pages[FT.currentTab]
+    if tab and tab.OnItems and page then
+        local ok, err = pcall(tab.OnItems, page)
+        if not ok then geterrorhandler()(err) end
+    else
+        FT.Debounce("uiRefresh", 1.5, RefreshVisible)
+    end
+end)
 FT.On("FT_SCAN_START", function()
     if FT.IsShown() then
         FT.UpdateStatus()

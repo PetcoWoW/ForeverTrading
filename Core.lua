@@ -337,14 +337,52 @@ end
 local GetInfo = (C_Item and C_Item.GetItemInfo) or GetItemInfo
 local GetInstant = (C_Item and C_Item.GetItemInfoInstant) or GetItemInfoInstant
 
--- name, quality, icon, sellPrice, link (name nil while the game hasn't loaded the item yet)
+-- Item names we have seen, saved per game language: searching thousands of items needs their names
+-- without asking the server for each one
+local nameBook
+local function NameBook()
+    if not nameBook then
+        FT.db.names = FT.db.names or {}
+        local lang = GetLocale()
+        FT.db.names[lang] = FT.db.names[lang] or {}
+        nameBook = FT.db.names[lang]
+    end
+    return nameBook
+end
+
+function FT.RememberName(itemID, name)
+    if itemID and type(name) == "string" and name ~= "" and FT.db then NameBook()[itemID] = name end
+end
+
+-- the name of an item without asking the server (nil when the game hasn't loaded it and we never saw it).
+-- GetItemInfo itself asks the server for an item it doesn't have: only called for items the game has.
+local IsCached = C_Item and C_Item.IsItemDataCachedByID
+function FT.Name(itemID)
+    if not itemID then return nil end
+    if IsCached and not IsCached(itemID) then return NameBook()[itemID] end
+    local name = GetInfo(itemID)
+    if name then
+        local book = NameBook()
+        if book[itemID] ~= name then book[itemID] = name end
+        return name
+    end
+    return NameBook()[itemID]
+end
+
+-- name, quality, icon, sellPrice, link (name from our book while the game hasn't loaded the item yet)
 function FT.Item(itemID)
     if not itemID then return nil end
     local name, link, quality, _, _, _, _, _, _, icon, sellPrice = GetInfo(itemID)
     if not icon and GetInstant then
         icon = select(5, GetInstant(itemID))
     end
-    if not name then FT.RequestItem(itemID) end
+    if name then
+        local book = NameBook()
+        if book[itemID] ~= name then book[itemID] = name end
+    else
+        FT.RequestItem(itemID)
+        name = NameBook()[itemID]
+    end
     return name, quality, icon, sellPrice, link
 end
 

@@ -66,7 +66,7 @@ local function Filtered()
             if state.cls == "other" then ok = not KNOWN[r.cls] else ok = r.cls == state.cls end
         end
         if ok and search then
-            local name = FT.Item(r.id)
+            local name = FT.Name(r.id)
             ok = name ~= nil and name:lower():find(search, 1, true) ~= nil
         end
         if ok then out[#out + 1] = r end
@@ -74,7 +74,7 @@ local function Filtered()
     local key, desc = state.sort, state.desc
     if key == "name" then
         local names = {}
-        for _, r in ipairs(out) do names[r.id] = (FT.Item(r.id) or "~"):lower() end
+        for _, r in ipairs(out) do names[r.id] = (FT.Name(r.id) or "~"):lower() end
         table.sort(out, function(a, b)
             if names[a.id] ~= names[b.id] then
                 if desc then return names[a.id] > names[b.id] end
@@ -95,6 +95,35 @@ local function Filtered()
         end)
     end
     return out
+end
+
+-- names the game hasn't loaded yet, asked for a few at a time while you search (no flood of requests)
+local loader
+function T.LoadMissingNames()
+    if loader then return end
+    local missing = {}
+    for _, r in ipairs(FT.Market.Rows() or {}) do
+        if not FT.Name(r.id) then missing[#missing + 1] = r.id end
+    end
+    if #missing == 0 then return end
+    local i = 1
+    loader = C_Timer.NewTicker(0.5, function()
+        if state.search == "" or i > #missing then
+            loader:Cancel()
+            loader = nil
+            return
+        end
+        for k = i, math.min(i + 39, #missing) do FT.RequestItem(missing[k]) end
+        i = i + 40
+    end)
+end
+
+-- names arrived: the rows on screen show them; a search takes the new matches in now and then
+function T.OnItems()
+    if list then list:Refresh() end
+    if state.search ~= "" then
+        FT.Debounce("marketSearchMore", 1.5, function() T.RefreshList(true) end)
+    end
 end
 
 function T.RefreshList(keepOffset)
@@ -138,7 +167,10 @@ local function BuildList(parent)
 
     local search = UI.Input(panel, LEFT_W - 20, 26, L["Search item..."], function(text)
         state.search = text or ""
-        FT.Debounce("marketSearch", 0.25, function() T.RefreshList() end)
+        FT.Debounce("marketSearch", 0.25, function()
+            T.RefreshList()
+            if state.search ~= "" then T.LoadMissingNames() end
+        end)
     end)
     search:SetPoint("TOPLEFT", 10, -10)
 
