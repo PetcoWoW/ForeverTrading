@@ -148,6 +148,40 @@ function S.SaveFull(acc, t, source, done)
     end)
 end
 
+-- What the last full scan found listed, and under which key (gear: its item level and version), is kept in
+-- the saved data for your items: after a /reload or the next login "my items" goes on from there instead of
+-- reading the whole auction house again.
+local function KeyText(key)
+    if type(key) == "table" then return (key.itemLevel or 0) .. ":" .. (key.itemSuffix or 0) end
+    return "0:0"
+end
+
+function S.SaveListed(t)
+    local saved = {}
+    for id, key in pairs(S.listed or {}) do
+        if FT.Hist.Tracked(id) then saved[id] = KeyText(key) end
+    end
+    local r = FT.R()
+    r.listed, r.meta.listedAt = saved, t
+end
+
+function S.LoadListed()
+    if S.listed then return end
+    local r = FT.R()
+    if type(r.listed) ~= "table" or not r.meta.listedAt then return end
+    local listed = {}
+    for id, text in pairs(r.listed) do
+        local lvl, suffix = tostring(text):match("^(%d+):(%d+)$")
+        lvl, suffix = tonumber(lvl) or 0, tonumber(suffix) or 0
+        if lvl ~= 0 or suffix ~= 0 then
+            listed[id] = { itemID = id, itemLevel = lvl, itemSuffix = suffix, battlePetSpeciesID = 0 }
+        else
+            listed[id] = true
+        end
+    end
+    S.listed, S.listedAt = listed, r.meta.listedAt
+end
+
 -- the browse list: per item the lowest price and how many are listed (gear versions merged)
 function S.NewSummary()
     return { items = {}, count = 0 }
@@ -194,6 +228,7 @@ function S.SaveSummary(sum, t, source, done)
             MarkGone(sum.items, t)
             S.listed, S.listedAt = {}, t
             for id, e in pairs(sum.items) do S.listed[id] = e.key or true end
+            S.SaveListed(t)
             FT.Hist.LogScan({ t = t, items = #ids, value = value, source = source, summary = true })
             FT.Hist.MarkScan("full", t)
             if done then done(#ids) end
@@ -622,7 +657,8 @@ function S.StartMine(quiet, ids)
         return false
     end
     -- without a recent full scan: one first (a few seconds) - it tells which items are listed at all and
-    -- under which key, so "my items" asks only for those, once each
+    -- under which key, so "my items" asks only for those, once each (also one from before a /reload)
+    S.LoadListed()
     local now = time()
     local fresh = S.listedAt and now - S.listedAt < LISTED_FRESH
     if not ids and not fresh and not (S.fullTried and now - S.fullTried < 120) then

@@ -172,7 +172,7 @@ ru["Sort: price"] = "Сорт.: цена"
 ru["Sort: listed"] = "Сорт.: предложение"
 ru["Sort: name"] = "Сорт.: название"
 ru["Item"] = "Предмет"
-ru["Click: chart · Right-click: watchlist · Shift-click: link"] = "ЛКМ: график · ПКМ: в избранное · Shift: ссылка в чат"
+ru["Click: chart || Right-click: watchlist || Shift-click: link"] = "ЛКМ: график || ПКМ: в избранное || Shift: ссылка в чат"
 ru["Market overview"] = "Обзор рынка"
 ru["Pick an item on the left to see its chart"] = "Выберите предмет слева, чтобы открыть его график"
 ru["Items on the market"] = "Позиций на рынке"
@@ -241,7 +241,7 @@ ru["What one craft brings in at the auction house after its 5% cut (or at a vend
 ru["Profit"] = "Прибыль"
 ru["Margin"] = "Маржа"
 ru["How the crafted item's price moved in 7 days."] = "Как изменилась цена результата крафта за 7 дней."
-ru["Click: details · Right-click: price chart"] = "ЛКМ: подробности · ПКМ: график цены"
+ru["Click: details || Right-click: price chart"] = "ЛКМ: подробности || ПКМ: график цены"
 ru["No recipes yet. Open each profession window once (or let Mastercraft learn them) and they show up here."] =
     "Рецептов пока нет. Откройте окно каждой профессии хотя бы раз (или дайте Mastercraft их запомнить) — и они появятся здесь."
 ru["AH"] = "АХ"
@@ -258,7 +258,7 @@ ru["dip"] = "просадка"
 ru["no price"] = "нет цены"
 ru["Cheaper to craft yourself (%s)"] = "Дешевле скрафтить самому (%s)"
 ru["Searches the item and all its materials: in Auctionator's Shopping tab when it is installed, otherwise with ForeverTrading's scanner. The auction house must be open; fresh prices and order books follow."] =
-    "Ищет предмет и все его материалы: во вкладке «Покупки» Auctionator, если он установлен, иначе сканером ForeverTrading. Аукцион должен быть открыт; свежие цены и стаканы подтянутся сами."
+    "Ищет предмет и все его материалы: во вкладке \"Покупки\" Auctionator, если он установлен, иначе сканером ForeverTrading. Аукцион должен быть открыт; свежие цены и стаканы подтянутся сами."
 ru["Price chart"] = "График цены"
 ru["Pick a recipe"] = "Выберите рецепт"
 ru["Its costs, profit and materials show here."] = "Здесь появятся его себестоимость, прибыль и материалы."
@@ -361,7 +361,7 @@ ru["Full scan: saving..."] = "Полный скан: сохранение..."
 ru["Full scan done: %s items, %s auctions."] = "Полный скан готов: %s предметов, %s лотов."
 ru["My items: %d / %d"] = "Мои товары: %d / %d"
 ru["(paused: you are searching)"] = "(пауза: вы ищете сами)"
-ru["My items scanned: %d."] = "«Мои товары» просканированы: %d."
+ru["My items scanned: %d."] = "\"Мои товары\" просканированы: %d."
 ru["Nothing to scan: your items were all seen in the last 10 minutes (or no recipes are known yet)."] =
     "Нечего сканировать: все ваши товары проверены за последние 10 минут (или рецепты ещё неизвестны)."
 ru["Scan stopped: the auction house closed."] = "Скан остановлен: аукцион закрыт."
@@ -369,19 +369,19 @@ ru["Full scan stopped: the server didn't answer."] = "Полный скан ос
 ru["Scan stopped."] = "Скан остановлен."
 ru["Only what matters to you: what your recipes make and use, your watchlist and what you own - one search each, cheapest first. Any time; it pauses while you search yourself."] =
     "Только то, что важно вам: результаты и материалы ваших рецептов, избранное и ваши запасы — по одному поиску на предмет, от самых дешёвых лотов. В любое время; встаёт на паузу, пока вы ищете сами."
-ru["No market data yet: open the auction house and press Full scan."] = "Данных о рынке пока нет: откройте аукцион и нажмите «Полный скан»."
+ru["No market data yet: open the auction house and press Full scan."] = "Данных о рынке пока нет: откройте аукцион и нажмите \"Полный скан\"."
 ru["No prices for it yet: scan My items or run a full scan at the auction house."] =
-    "Цен на него пока нет: просканируйте «Мои товары» или сделайте полный скан на аукционе."
+    "Цен на него пока нет: просканируйте \"Мои товары\" или сделайте полный скан на аукционе."
 ru["Each full scan (yours or Auctionator's) adds a point: the total buyout of everything listed."] =
     "Каждый полный скан (ваш или Auctionator) добавляет точку: суммарный выкуп всех лотов."
 ru["seen in scans"] = "встречено в сканах"
-ru["press Full scan at the auction house"] = "нажмите «Полный скан» на аукционе"
+ru["press Full scan at the auction house"] = "нажмите \"Полный скан\" на аукционе"
 ru["Shows once there are a few days of prices for what you own."] = "Появится, когда накопится несколько дней цен на ваши предметы."
-ru["Scan My items when the auction house opens"] = "Сканировать «Мои товары» при открытии аукциона"
+ru["Scan My items when the auction house opens"] = "Сканировать \"Мои товары\" при открытии аукциона"
 ru["When they haven't been seen for 30 minutes. It pauses while you search yourself."] =
     "Если они не проверялись 30 минут. Встаёт на паузу, пока вы ищете сами."
 ru["Full scan when the auction house opens"] = "Полный скан при открытии аукциона"
-ru["My items: pages per item"] = "«Мои товары»: страниц на предмет"
+ru["My items: pages per item"] = "\"Мои товары\": страниц на предмет"
 ru["Auctions read per item, cheapest first (50 a page). More pages: a deeper order book, a slower scan."] =
     "Сколько лотов читать на предмет, от самых дешёвых (50 на страницу). Больше страниц — глубже стакан, но дольше скан."
 ru["Its full scans and searches go into ForeverTrading's history, and the days you haven't scanned yourself come from its price database."] =
@@ -399,7 +399,7 @@ ru["Prices come from ForeverTrading's own scans (and Auctionator's and Mastercra
     "Цены — из собственных сканов ForeverTrading (и Auctionator с Mastercraft, если включены); рецепты — из окон ваших профессий и Mastercraft."
 
 ru["Full scan stopped: another search was made in the auction house before it finished. Press Full scan again."] =
-    "Полный скан остановлен: до его окончания на аукционе был сделан другой поиск. Нажмите «Полный скан» ещё раз."
+    "Полный скан остановлен: до его окончания на аукционе был сделан другой поиск. Нажмите \"Полный скан\" ещё раз."
 ru["A deep scan is allowed once every 15 minutes (next in %s): reading the browse list instead."] =
     "Глубокий скан разрешён раз в 15 минут (следующий через %s): вместо него читается обзор аукциона."
 ru["At most once an hour."] = "Не чаще раза в час."
@@ -449,6 +449,12 @@ ru["Classic"] = "Классический"
 ru["Dark: an exchange terminal at night. Light: the same by day. Classic: the game's own look. Takes effect after a reload."] =
     "Тёмный — биржевой терминал ночью. Светлый — то же днём. Классический — в духе интерфейса игры. Применяется после перезагрузки интерфейса."
 ru["The new style shows after the interface reloads. Reload now?"] = "Новый стиль появится после перезагрузки интерфейса. Перезагрузить сейчас?"
+
+ru["The new language shows after the interface reloads. Reload now?"] = "Новый язык появится после перезагрузки интерфейса. Перезагрузить сейчас?"
+ru["This change shows after the interface reloads. Reload now?"] = "Изменение применится после перезагрузки интерфейса. Перезагрузить сейчас?"
+
+ru["Too little price history yet: sell and buy signals need at least 3 days of prices before today. A full scan every day fills it."] =
+    "Пока мало истории цен: сигналам продажи и закупки нужно хотя бы 3 дня цен до сегодняшнего. Полный скан каждый день их накопит."
 
 -- minimap, auction house, tooltips
 ru["Click: open / close"] = "ЛКМ: открыть / закрыть"

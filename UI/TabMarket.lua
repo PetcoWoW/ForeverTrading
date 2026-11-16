@@ -238,7 +238,7 @@ local function BuildList(parent)
             GameTooltip:SetOwner(row, "ANCHOR_RIGHT")
             if GameTooltip.SetItemByID then GameTooltip:SetItemByID(r.id) end
             GameTooltip:AddLine(" ")
-            GameTooltip:AddLine(L["Click: chart · Right-click: watchlist · Shift-click: link"], 0.52, 0.56, 0.61)
+            GameTooltip:AddLine(L["Click: chart || Right-click: watchlist || Shift-click: link"], 0.52, 0.56, 0.61)
             GameTooltip:Show()
         end,
     })
@@ -697,14 +697,14 @@ function T.ShowItem(id, keepView)
     if rs and rs[1] then parts[#parts + 1] = FT.C("up", L["you can craft it"]) end
     local own = FT.Port.Count(id)
     if own > 0 then parts[#parts + 1] = FT.C("text", string.format(L["you have %s"], FT.Num(own))) end
-    v.sub:SetText(table.concat(parts, FT.C("dim", "  ·  ")))
+    v.sub:SetText(table.concat(parts, FT.C("dim", "  ||  ")))
     v.craft:SetShown(rs ~= nil and rs[1] ~= nil)
 
     local s = FT.An.Stats(id)
     v.price:SetText(s.price and FT.Money(s.price) or "—")
     v.change:SetText(FT.Pct(s.ch1) .. FT.C("dim", " " .. L["24h"]))
     local src = FT.SourceName(s.source)
-    v.priceAge:SetText(s.t and (src .. " · " .. FT.Ago(s.t)) or "")
+    v.priceAge:SetText(s.t and (src .. " || " .. FT.Ago(s.t)) or "")
 
     for _, p in ipairs(v.pairs) do
         local val = s[p.key]
@@ -736,8 +736,8 @@ function T.ShowItem(id, keepView)
     v.dev:SetText(FT.Pct(s.dev))
     v.vol:SetText(s.vol and string.format("%.1f%%", s.vol * 100) or FT.C("dim", "—"))
     local liq = FT.An.Liquidity(s)
-    local liqNames = { high = L["high"], medium = L["medium"], low = L["low"] }
-    local liqColors = { high = "up", medium = "accent", low = "down" }
+    local liqNames = { high = L["high"], medium = L["medium"], low = L["low"], unknown = L["no data"] }
+    local liqColors = { high = "up", medium = "accent", low = "down", unknown = "dim" }
     v.liq:SetText(FT.C(liqColors[liq], liqNames[liq]))
 
     -- signals

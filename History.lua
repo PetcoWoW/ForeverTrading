@@ -469,7 +469,8 @@ end
 -- forget all of our history of this server
 function H.ClearAll()
     local r = FT.R()
-    r.snaps, r.books, r.scans, r.days, r.today = {}, {}, {}, {}, {}
+    r.snaps, r.books, r.scans, r.days, r.today, r.listed = {}, {}, {}, {}, {}, nil
+    r.meta.listedAt = nil
     wipe(cache)
     wipe(latest)
     wipe(books)

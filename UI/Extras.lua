@@ -264,7 +264,7 @@ local function AddLines(tt, itemID)
         if sig ~= "NODATA" then
             parts[#parts + 1] = FT.C(FT.SIGNAL_COLORS[sig] or "muted", FT.SignalText(sig))
         end
-        if #parts > 0 then tt:AddLine(table.concat(parts, FT.C("dim", "  ·  ")), 0.8, 0.82, 0.86) end
+        if #parts > 0 then tt:AddLine(table.concat(parts, FT.C("dim", "  ||  ")), 0.8, 0.82, 0.86) end
         if rs and rs[1] then
             local e = FT.Craft.Eval(rs[1])
             if e.profit then

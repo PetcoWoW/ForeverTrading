@@ -87,7 +87,7 @@ local function UpdateSummary(rows)
     if best then
         parts[#parts + 1] = L["Best"] .. ": " .. FT.ItemText(best.r.output, 32) .. " " .. FT.C("up", "+" .. FT.Money(best.e.profit, "short"))
     end
-    summary:SetText(table.concat(parts, FT.C("dim", "   ·   ")))
+    summary:SetText(table.concat(parts, FT.C("dim", "   ||   ")))
 end
 
 ---------------------------------------------------------------------------
@@ -263,7 +263,7 @@ local function BuildTable(p)
             GameTooltip:AddLine(FT.ItemText(x.r.output))
             GameTooltip:AddLine(x.e.reason or "", 0.85, 0.87, 0.9, true)
             GameTooltip:AddLine(" ")
-            GameTooltip:AddLine(L["Click: details · Right-click: price chart"], 0.52, 0.56, 0.61)
+            GameTooltip:AddLine(L["Click: details || Right-click: price chart"], 0.52, 0.56, 0.61)
             GameTooltip:Show()
         end,
     })
@@ -444,7 +444,7 @@ function T.ShowDetail()
     local e = FT.Craft.Eval(r)
     d.icon:SetItem(r.output)
     d.name:SetText(FT.ItemText(r.output, 36) .. (r.outputQty > 1 and FT.C("dim", string.format(" x%g", r.outputQty)) or ""))
-    d.sub:SetText(ProfName(r.prof) .. FT.C("dim", "  ·  ") .. FT.Craft.KnownByText(r))
+    d.sub:SetText(ProfName(r.prof) .. FT.C("dim", "  ||  ") .. FT.Craft.KnownByText(r))
     d.badge:Set(e.signal, nil, e.strength)
     d.reason:SetText(e.reason or "")
 
@@ -460,8 +460,8 @@ function T.ShowDetail()
         d.cells.margin:SetText(FT.C("dim", "—"))
     end
     d.cells.price:SetText((e.sellUnit and FT.Money(e.sellUnit, "short") or "—") .. "  " .. FT.Pct(e.stats.ch7) .. FT.C("dim", " 7d"))
-    local liqNames = { high = L["high"], medium = L["medium"], low = L["low"] }
-    d.cells.sell:SetText(FT.C(FT.SIGNAL_COLORS[e.sell] or "muted", FT.SignalText(e.sell)) .. FT.C("dim", "  ·  " .. L["liquidity"] .. " " .. liqNames[e.liquidity]))
+    local liqNames = { high = L["high"], medium = L["medium"], low = L["low"], unknown = L["no data"] }
+    d.cells.sell:SetText(FT.C(FT.SIGNAL_COLORS[e.sell] or "muted", FT.SignalText(e.sell)) .. FT.C("dim", "  ||  " .. L["liquidity"] .. " " .. liqNames[e.liquidity]))
 
     d.chart:SetData({
         candles = FT.Hist.Daily(r.output, 30),

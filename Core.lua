@@ -6,6 +6,7 @@ local GetMeta = (C_AddOns and C_AddOns.GetAddOnMetadata) or GetAddOnMetadata
 FT.VERSION = (GetMeta and GetMeta(ADDON, "Version")) or "dev"
 -- a copy straight from the repository (not packaged): the packager hasn't put the version in yet
 if FT.VERSION:find("@", 1, true) then FT.VERSION = "dev" end
+FT.VERSION_TEXT = FT.VERSION:match("^%d") and ("v" .. FT.VERSION) or FT.VERSION
 FT.MEDIA = "Interface\\AddOns\\" .. ADDON .. "\\media\\"
 FT.URL_SUPPORT = "https://boosty.to/andrewwoolfi"
 FT.URL_GITHUB = "https://github.com/thewoolfi/ForeverTrading"
@@ -469,7 +470,11 @@ SlashCmdList.FOREVERTRADING = function(msg)
         FT.Show(cmd)
     elseif cmd == "lang" and (rest == "ru" or rest == "en" or rest == "auto") then
         FT.S.lang = rest
-        FT.Print(L["Language changed. Type /reload to apply."])
+        if FT.AskReload then
+            FT.AskReload(L["The new language shows after the interface reloads. Reload now?"])
+        else
+            FT.Print(L["Language changed. Type /reload to apply."])
+        end
     elseif cmd == "reset" then
         FT.db.frame = {}
         if FT.ResetWindow then FT.ResetWindow() end

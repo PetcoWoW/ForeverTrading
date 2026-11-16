@@ -72,10 +72,13 @@ end
 ---------------------------------------------------------------------------
 local function Collect()
     local sell, craft, buy, hold = {}, {}, {}, {}
+    local judged, early = 0, 0 -- items with a sell / buy signal, and those without enough history for one
 
     -- what you own
     local rows = FT.Port.Rows()
     for _, h in ipairs(rows) do
+        judged = judged + 1
+        if h.signal == "NODATA" then early = early + 1 end
         if h.signal == "SELL" then
             sell[#sell + 1] = { id = h.id, signal = "SELL", strength = h.strength, reason = h.reason,
                 value = FT.Num(h.qty) .. FT.C("dim", " x ") .. FT.Money(h.price, "short"), sortV = h.value * h.strength,
@@ -92,7 +95,7 @@ local function Collect()
         local e = FT.Craft.Eval(r)
         if e.signal == "CRAFT" then
             local reason = e.reason
-            if e.sell == "SELL" then reason = reason .. "  ·  " .. FT.C("up", L["price is high now"]) end
+            if e.sell == "SELL" then reason = reason .. "  ||  " .. FT.C("up", L["price is high now"]) end
             craft[#craft + 1] = { id = r.output, recipe = r.key, signal = "CRAFT", strength = e.strength, reason = reason,
                 value = FT.C("up", "+" .. FT.Money(e.profit, "short")), sortV = e.profit * (e.sell == "SELL" and 1.5 or 1),
                 tip = FT.Craft.KnownByText(r) }
@@ -108,6 +111,8 @@ local function Collect()
     for id in pairs(materials) do
         local s = FT.An.Stats(id)
         local signal, strength, reason = FT.An.BuySignal(s)
+        judged = judged + 1
+        if signal == "NODATA" then early = early + 1 end
         if signal == "BUY" then
             buy[#buy + 1] = { id = id, signal = "BUY", strength = strength, reason = reason,
                 value = FT.Money(s.price, "short"), sortV = -(s.dev or 0) * 100 + (strength or 0) }
@@ -116,7 +121,7 @@ local function Collect()
 
     local function Sort(t) table.sort(t, function(a, b) return (a.sortV or 0) > (b.sortV or 0) end) end
     Sort(sell); Sort(craft); Sort(buy); Sort(hold)
-    return sell, craft, buy, hold
+    return sell, craft, buy, hold, judged > 0 and early >= judged * 0.8
 end
 
 ---------------------------------------------------------------------------
@@ -164,7 +169,11 @@ end
 function T.Refresh()
     T.rules:SetText(string.format(L["Sell: %d%% above the %d-day average or RSI 70+.  Buy: %d%% below or RSI 30-.  Craft: profit from %s and margin from %d%%."],
         FT.S.sellAbove, FT.S.avgDays, FT.S.buyBelow, FT.Money(FT.S.minProfit, "short"), FT.S.minMargin))
-    local sell, craft, buy, hold = Collect()
+    local sell, craft, buy, hold, tooEarly = Collect()
+    -- selling and buying compare today with the days before: without them, say so
+    local early = L["Too little price history yet: sell and buy signals need at least 3 days of prices before today. A full scan every day fills it."]
+    cols[1].list:SetEmptyText(tooEarly and early or L["Nothing you own is priced high right now."])
+    cols[3].list:SetEmptyText(tooEarly and early or L["None of your materials is on a dip."])
     local lists = { sell, craft, buy, hold }
     for i, c in ipairs(cols) do
         c.list:SetItems(lists[i], true)

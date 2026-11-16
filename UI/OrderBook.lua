@@ -38,10 +38,13 @@ function UI.OrderBook(parent)
     f.sep:SetPoint("BOTTOMRIGHT", -1, 148)
     f.best = UI.Text(f, 12, "muted")
     f.best:SetPoint("BOTTOMLEFT", 12, 124)
+    f.best:SetPoint("RIGHT", f, "RIGHT", -12, 0)
     f.listed = UI.Text(f, 11, "muted")
     f.listed:SetPoint("BOTTOMLEFT", 12, 106)
+    f.listed:SetPoint("RIGHT", f, "RIGHT", -12, 0)
     f.updated = UI.Text(f, 11, "dim")
     f.updated:SetPoint("BOTTOMLEFT", 12, 89)
+    f.updated:SetPoint("RIGHT", f, "RIGHT", -12, 0)
 
     f.calcTitle = UI.Text(f, 11, "muted")
     f.calcTitle:SetPoint("BOTTOMLEFT", 12, 62)
@@ -147,11 +150,15 @@ function UI.OrderBook(parent)
             self.best:SetText(L["Best price"] .. ":  " .. FT.Money(levels[1][1]))
             -- partial: more auctions than the pages read (the cheapest were read): at least this many
             local qtyText = FT.Num(book.qty or total) .. (book.partial and "+" or "")
+            -- two short lines that fit the narrow panel: how many / in how many auctions, then sellers / when
             local parts = { string.format(L["%s pcs listed"], qtyText) }
             if book.auctions and book.auctions > 0 then parts[#parts + 1] = string.format(L["%d auctions"], book.auctions) end
-            if book.sellers and book.sellers > 0 then parts[#parts + 1] = string.format(L["%d sellers"], book.sellers) end
-            self.listed:SetText(table.concat(parts, "  ·  "))
-            self.updated:SetText(string.format(L["Updated %s"], FT.Ago(book.t)) .. "  ·  " .. FT.SourceName(book.source))
+            self.listed:SetText(table.concat(parts, "  ||  "))
+            local when = string.format(L["Updated %s"], FT.Ago(book.t))
+            if book.sellers and book.sellers > 0 then
+                when = string.format(L["%d sellers"], book.sellers) .. "  ||  " .. when
+            end
+            self.updated:SetText(when)
         else
             self.best:SetText("")
             self.listed:SetText("")

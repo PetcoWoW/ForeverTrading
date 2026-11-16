@@ -119,6 +119,11 @@ local function Number(s, key, text, suffix, tip, money, min, max)
     return e
 end
 
+-- "reload now?" after a change that only shows after a reload (language, style, ticker tape)
+function FT.AskReload(text)
+    StaticPopup_Show("FOREVERTRADING_RELOAD", text or L["This change shows after the interface reloads. Reload now?"])
+end
+
 StaticPopupDialogs["FOREVERTRADING_RELOAD"] = {
     text = "%s",
     button1 = YES,
@@ -155,11 +160,11 @@ function T.Build(p)
     local g = Section(left, L["General"], 8)
     Choice(g, "lang", L["Language"], { { "auto", L["Game language"] }, { "ru", "Русский" }, { "en", "English" } },
         L["Takes effect after /reload."], function()
-            FT.Print(L["Language changed. Type /reload to apply."])
+            FT.AskReload(L["The new language shows after the interface reloads. Reload now?"])
         end)
     Choice(g, "theme", L["Style"], { { "dark", L["Dark"] }, { "light", L["Light"] }, { "classic", L["Classic"] } },
         L["Dark: an exchange terminal at night. Light: the same by day. Classic: the game's own look. Takes effect after a reload."],
-        function() StaticPopup_Show("FOREVERTRADING_RELOAD", L["The new style shows after the interface reloads. Reload now?"]) end)
+        function() FT.AskReload(L["The new style shows after the interface reloads. Reload now?"]) end)
     Choice(g, "scale", L["Window scale"], { { 0.8, "80%" }, { 0.9, "90%" }, { 1.0, "100%" }, { 1.1, "110%" }, { 1.2, "120%" } },
         nil, function(v)
             local w = FT.Window()
@@ -168,7 +173,8 @@ function T.Build(p)
                 FT.ResetWindow()
             end
         end)
-    Check(g, "ticker", L["Ticker tape under the header"], L["Your watchlist and the day's biggest movers, scrolling. Takes effect after /reload."])
+    Check(g, "ticker", L["Ticker tape under the header"], L["Your watchlist and the day's biggest movers, scrolling. Takes effect after /reload."],
+        function() FT.AskReload() end)
     Check(g, "minimap", L["Minimap button"], nil, function() if FT.UpdateMinimap then FT.UpdateMinimap() end end)
     Check(g, "ahButton", L["Button on the auction house"], L["Opens ForeverTrading next to the auction house window."])
     Check(g, "tooltip", L["Lines in item tooltips"], L["Price change, RSI, the signal and the craft profit of the item."])
@@ -283,11 +289,11 @@ function T.Refresh()
     local items, size = FT.Hist.Footprint()
     T.footprint:SetText(string.format(L["%d items, about %s KB saved"], items, FT.Num(math.ceil(size / 1024))))
     local lines = {
-        "ForeverTrading v" .. FT.VERSION,
+        "ForeverTrading " .. FT.VERSION_TEXT,
         "Auctionator: " .. (FT.Atr.Loaded() and FT.C("up", L["connected"]) or FT.C("down", L["not loaded"])) ..
             "    Mastercraft: " .. (FT.MC.Loaded() and FT.C("up", L["connected"]) or FT.C("down", L["not loaded"])),
         L["Prices come from ForeverTrading's own scans (and Auctionator's and Mastercraft's when they are on); recipes from your profession windows and Mastercraft."],
-        "/ft  ·  /ft scan  ·  /ft scan mine  ·  /ft stop  ·  /ft reset",
+        "/ft  ||  /ft scan  ||  /ft scan mine  ||  /ft stop  ||  /ft reset",
     }
     T.about:SetText(table.concat(lines, "\n"))
 end

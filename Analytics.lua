@@ -136,6 +136,8 @@ function An.Stats(itemID)
     s.dev = Change(s.price, s.avg)
     s.hi7, s.lo7, s.hi30, s.lo30 = hi7, lo7, hi30, lo30
     s.days = days14
+    -- how many days this item has history at all (liquidity can't be judged on a day or two)
+    s.span = #daily > 0 and (today - daily[1].day + 1) or 0
     local forRsi = {}
     for i = math.max(1, #closes - 29), #closes do forRsi[#forRsi + 1] = closes[i] end
     if s.price and #forRsi > 0 and daily[#daily].day ~= today then forRsi[#forRsi + 1] = s.price end
@@ -175,10 +177,13 @@ function An.DevSeries(itemID, days)
 end
 
 -- how easy it is to sell: "high" / "medium" / "low" (by how many of the last 14 days it was listed)
+-- "unknown" while the item has less than 5 days of history: too early to tell
 function An.Liquidity(s)
-    if not s or not s.days then return "low" end
-    if s.days >= 9 and (s.auctions == nil or s.auctions >= 4) then return "high" end
-    if s.days >= 4 then return "medium" end
+    if not s or not s.days or not s.span or s.span < 5 then return "unknown" end
+    -- the share of the days we know of on which it was listed
+    local cover = s.days / math.min(14, s.span)
+    if cover >= 0.6 and (s.auctions == nil or s.auctions >= 4) then return "high" end
+    if cover >= 0.3 then return "medium" end
     return "low"
 end
 

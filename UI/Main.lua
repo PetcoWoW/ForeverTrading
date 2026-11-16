@@ -276,7 +276,7 @@ function FT.UpdateStatus()
     parts[#parts + 1] = string.format(L["Tracked: %d"], FT.S.trackAll and #(FT.Market.Rows() or {}) or FT.Hist.UniverseSize())
     local rows = FT.Market.Rows()
     if rows then parts[#parts + 1] = string.format(L["Market: %s items"], FT.Num(#rows)) end
-    statusLeft:SetText(table.concat(parts, FT.C("dim", "   ·   ")))
+    statusLeft:SetText(table.concat(parts, FT.C("dim", "   ||   ")))
 end
 
 ---------------------------------------------------------------------------
@@ -453,7 +453,7 @@ local function Build()
     statusLeft:SetPoint("LEFT", 12, 0)
     statusRight = UI.Text(status, 10, "dim", "RIGHT")
     statusRight:SetPoint("RIGHT", -12, 0)
-    statusRight:SetText("v" .. FT.VERSION .. "   /ft")
+    statusRight:SetText(FT.VERSION_TEXT .. "   /ft")
     -- links: support the author, the project on GitHub
     local function StatusLink(text, color, onClick)
         local b = CreateFrame("Button", nil, status)
