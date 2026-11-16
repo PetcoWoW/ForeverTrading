@@ -2,6 +2,11 @@ package-as: ForeverTrading
 
 enable-nolib-creation: no
 
+# the release notes on CurseForge and GitHub come from CHANGELOG.md (written for players)
+manual-changelog:
+  filename: CHANGELOG.md
+  markup-type: markdown
+
 # the release holds the addon only: its .toc and .lua files
 ignore:
   - .github
@@ -10,3 +15,4 @@ ignore:
   - .pkgmeta
   - README.md
   - LICENSE
+  - CHANGELOG.md
