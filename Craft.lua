@@ -1,0 +1,270 @@
+-- ForeverTrading: what your recipes cost and bring in.
+-- Recipes come from Mastercraft (every character it knows) and from your own profession windows.
+local ADDON, FT = ...
+local L = FT.L
+
+local C = {}
+FT.Craft = C
+
+local recipes = nil   -- list of recipes (one per output item and name)
+local byOutput = nil  -- itemID -> recipes that make it
+local evalCache = {}
+
+local function Invalidate()
+    recipes, byOutput = nil, nil
+    wipe(evalCache)
+end
+FT.On("FT_RECIPES_CHANGED", Invalidate)
+FT.On("FT_SOURCES_CHANGED", Invalidate)
+FT.On("FT_PRICES_CHANGED", function() wipe(evalCache) end)
+FT.On("FT_SCAN_DONE", function() wipe(evalCache) end)
+FT.On("FT_SETTINGS_CHANGED", function() wipe(evalCache) end)
+
+local function Build()
+    local byKey = {}
+    recipes, byOutput = {}, {}
+    local function Add(prof, r, charName)
+        if type(r) ~= "table" or not r.output or type(r.reagents) ~= "table" or #r.reagents == 0 then return end
+        local key = r.output .. ":" .. tostring(r.name)
+        local e = byKey[key]
+        if not e then
+            e = {
+                key = key, name = r.name, icon = r.icon, prof = FT.ProfKey(prof), output = r.output,
+                outputQty = (type(r.outputQty) == "number" and r.outputQty > 0) and r.outputQty or 1,
+                reagents = r.reagents, incomplete = r.incomplete, knownBy = {},
+            }
+            byKey[key] = e
+            recipes[#recipes + 1] = e
+            byOutput[r.output] = byOutput[r.output] or {}
+            table.insert(byOutput[r.output], e)
+        elseif e.incomplete and not r.incomplete then
+            e.reagents, e.incomplete = r.reagents, nil
+        end
+        if charName then e.knownBy[charName] = true end
+    end
+    if FT.MC.Loaded() then
+        FT.MC.EachRecipe(function(_, prof, r, c) Add(prof, r, c.name) end)
+    end
+    for guid, profs in pairs(FT.db.recipes) do
+        local c = FT.db.chars[guid]
+        if c and c.side == FT.sideKey and type(profs) == "table" then
+            for prof, data in pairs(profs) do
+                for _, r in ipairs(type(data) == "table" and data.list or {}) do Add(prof, r, c.name) end
+            end
+        end
+    end
+end
+
+function C.List()
+    if not recipes then Build() end
+    return recipes
+end
+
+function C.ByOutput(itemID)
+    if not recipes then Build() end
+    return byOutput[itemID]
+end
+
+-- every item your recipes make or use
+function C.EachItem(fn)
+    for _, r in ipairs(C.List()) do
+        fn(r.output)
+        for _, rg in ipairs(r.reagents) do
+            if rg.itemID then fn(rg.itemID) end
+        end
+    end
+end
+
+-- professions present, sorted
+function C.Professions()
+    local seen, out = {}, {}
+    for _, r in ipairs(C.List()) do
+        if not seen[r.prof] then
+            seen[r.prof] = true
+            out[#out + 1] = r.prof
+        end
+    end
+    table.sort(out)
+    return out
+end
+
+---------------------------------------------------------------------------
+-- Cost
+---------------------------------------------------------------------------
+local RecipeCost
+
+-- the cheapest way to get one: auction house, vendor or crafting it yourself
+-- returns unit cost, source ("ah", "vendor", "vendor~", "craft"), the recipe when crafted
+local function UnitCost(itemID, depth, visiting)
+    local best, src, via
+    local p = FT.Price(itemID)
+    if p then best, src = p, "ah" end
+    local v, how = FT.VendorBuy(itemID)
+    if v and (not best or v < best) then best, src = v, (how == "estimate") and "vendor~" or "vendor" end
+    if FT.S.cheapestWay and depth < 2 then
+        for _, r in ipairs(byOutput[itemID] or {}) do
+            if not visiting[r.key] then
+                visiting[r.key] = true
+                local cost, complete = RecipeCost(r, depth + 1, visiting)
+                visiting[r.key] = nil
+                if complete and cost then
+                    local unit = cost / r.outputQty
+                    if not best or unit < best then best, src, via = unit, "craft", r end
+                end
+            end
+        end
+    end
+    return best, src, via
+end
+
+-- total cost of one craft, complete (every material has a price), parts, the first missing material
+RecipeCost = function(r, depth, visiting)
+    local total, complete, parts, missing = 0, not r.incomplete, {}, nil
+    for _, rg in ipairs(r.reagents) do
+        local unit, src, via = UnitCost(rg.itemID, depth, visiting)
+        local qty = rg.qty or 1
+        parts[#parts + 1] = { itemID = rg.itemID, qty = qty, unit = unit, source = src, via = via,
+            total = unit and unit * qty or nil }
+        if unit then
+            total = total + unit * qty
+        else
+            complete = false
+            missing = missing or rg.itemID
+        end
+    end
+    return total, complete, parts, missing
+end
+
+function C.UnitCost(itemID)
+    if not recipes then Build() end
+    return UnitCost(itemID, 0, {})
+end
+
+local function Cut()
+    return FT.S.ahCut and 0.95 or 1
+end
+
+---------------------------------------------------------------------------
+-- One recipe, everything about it
+---------------------------------------------------------------------------
+-- { cost, complete, parts, missing, sellUnit, revenue, via ("ah"/"vendor"), profit, margin, roi, stats,
+--   liquidity, signal, strength, reason, sell (signal for the product), sellReason }
+function C.Eval(r)
+    local e = evalCache[r.key]
+    if e then return e end
+    if not recipes then Build() end
+    e = {}
+    local visiting = { [r.key] = true }
+    e.cost, e.complete, e.parts, e.missing = RecipeCost(r, 0, visiting)
+    e.stats = FT.An.Stats(r.output)
+    e.sellUnit = e.stats.price
+    local qty = r.outputQty
+    local ahRevenue = e.sellUnit and e.sellUnit * qty * Cut() or nil
+    local vendorUnit = FT.VendorSell(r.output)
+    local vendorRevenue = vendorUnit and vendorUnit * qty or nil
+    if ahRevenue and (not vendorRevenue or ahRevenue >= vendorRevenue) then
+        e.revenue, e.via = ahRevenue, "ah"
+    elseif vendorRevenue then
+        e.revenue, e.via = vendorRevenue, "vendor"
+    end
+    e.vendorRevenue = vendorRevenue
+    if e.complete and e.revenue then
+        e.profit = e.revenue - e.cost
+        e.margin = e.revenue > 0 and e.profit / e.revenue or nil
+        e.roi = e.cost > 0 and e.profit / e.cost or nil
+    end
+    e.liquidity = FT.An.Liquidity(e.stats)
+
+    if not e.complete then
+        e.signal, e.strength = "NODATA", 0
+        local name = e.missing and FT.Item(e.missing)
+        e.reason = string.format(L["No price for %s"], name or L["a material"])
+    elseif not e.revenue then
+        e.signal, e.strength, e.reason = "NODATA", 0, L["No price for the crafted item"]
+    elseif e.profit <= 0 then
+        e.signal, e.strength = "AVOID", 3
+        e.reason = string.format(L["Loses %s per craft"], FT.Money(-e.profit, "short"))
+    elseif e.profit < FT.S.minProfit or (e.margin or 0) * 100 < FT.S.minMargin then
+        e.signal, e.strength = "WATCH", 1
+        e.reason = string.format(L["Small profit: %s (%d%%)"], FT.Money(e.profit, "short"), math.floor((e.margin or 0) * 100 + 0.5))
+    elseif e.via == "ah" and e.liquidity == "low" then
+        e.signal, e.strength = "RISKY", 2
+        e.reason = L["Rarely listed: it may not sell"]
+    elseif e.via == "ah" and e.stats.ch7 and e.stats.ch7 <= -0.10 then
+        e.signal, e.strength = "RISKY", 2
+        e.reason = string.format(L["Price falling: %s in 7 days"], FT.Pct(e.stats.ch7, true))
+    else
+        e.signal = "CRAFT"
+        e.strength = ((e.margin or 0) >= 0.3) and 3 or 2
+        e.reason = string.format(L["Profit %s (%d%%)"], FT.Money(e.profit, "short"), math.floor((e.margin or 0) * 100 + 0.5))
+    end
+    e.sell, e.sellStrength, e.sellReason = FT.An.SellSignal(e.stats)
+    evalCache[r.key] = e
+    return e
+end
+
+function C.Find(key)
+    for _, r in ipairs(C.List()) do
+        if r.key == key then return r end
+    end
+end
+
+function C.KnownByText(r)
+    local names = {}
+    for name in pairs(r.knownBy) do names[#names + 1] = name end
+    table.sort(names)
+    return table.concat(names, ", ")
+end
+
+---------------------------------------------------------------------------
+-- Margin history: what one craft cost and brought in, day by day
+---------------------------------------------------------------------------
+local function DayMap(itemID, days)
+    local map = {}
+    for _, c in ipairs(FT.Hist.Daily(itemID, days)) do map[c.day] = c.c end
+    return map
+end
+
+-- price on `day`, or the last one up to 3 days before
+local function At(map, day)
+    for d = day, day - 3, -1 do
+        if map[d] then return map[d] end
+    end
+end
+
+-- list of { t, day, revenue, cost, profit } (oldest first)
+function C.History(r, days)
+    days = days or 30
+    local today = FT.Day()
+    local productMap = DayMap(r.output, days + 3)
+    local reagentMaps, fixed = {}, {}
+    local now = C.Eval(r)
+    for i, rg in ipairs(r.reagents) do
+        reagentMaps[i] = DayMap(rg.itemID, days + 3)
+        local part = now.parts[i]
+        -- vendor and craft-it-yourself costs don't move with the auction house
+        if part and part.source and part.source ~= "ah" then fixed[i] = part.unit end
+    end
+    local out = {}
+    for day = today - days + 1, today do
+        local p = At(productMap, day)
+        if day == today and now.sellUnit then p = now.sellUnit end
+        if p then
+            local cost, ok = 0, true
+            for i, rg in ipairs(r.reagents) do
+                local unit = fixed[i] or At(reagentMaps[i], day)
+                if day == today and now.parts[i] and now.parts[i].unit then unit = now.parts[i].unit end
+                if not unit then
+                    ok = false
+                    break
+                end
+                cost = cost + unit * (rg.qty or 1)
+            end
+            if ok then
+                local revenue = p * r.outputQty * Cut()
+                out[#out + 1] = { t = FT.DayStart(day), day = day, revenue = revenue, cost = cost, profit = revenue - cost }
+            end
+        end
+    end
+    return out
+end

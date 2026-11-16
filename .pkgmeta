@@ -1,0 +1,12 @@
+package-as: ForeverTrading
+
+enable-nolib-creation: no
+
+# the release holds the addon only: its .toc and .lua files
+ignore:
+  - .github
+  - .gitattributes
+  - .gitignore
+  - .pkgmeta
+  - README.md
+  - LICENSE
