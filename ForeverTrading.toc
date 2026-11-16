@@ -3,6 +3,9 @@
 ## Notes: Exchange-style market analytics for WoW Forever with its own auction house scanner: price charts, order books, craft profit and sell/buy signals. Also reads Auctionator's and Mastercraft's data.
 ## Notes-ruRU: Биржевая аналитика рынка для WoW Forever со своим сканером аукциона: графики цен, стаканы, прибыль крафта и сигналы продажи/закупки. Также использует данные Auctionator и Mastercraft.
 ## Version: @project-version@
+## X-Website: https://github.com/thewoolfi/ForeverTrading
+## X-Donate: https://boosty.to/andrewwoolfi
+## X-Curse-Project-ID: 1810072
 ## SavedVariables: ForeverTradingDB
 ## OptionalDeps: Auctionator, Mastercraft
 ## IconTexture: Interface\Icons\INV_Misc_Coin_02
@@ -11,6 +14,7 @@
 
 Locale.lua
 Core.lua
+Version.lua
 Data\Vendor.lua
 Sources\Scanner.lua
 Sources\Auctionator.lua

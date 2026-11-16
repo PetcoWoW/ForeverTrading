@@ -119,6 +119,16 @@ local function Number(s, key, text, suffix, tip, money, min, max)
     return e
 end
 
+StaticPopupDialogs["FOREVERTRADING_RELOAD"] = {
+    text = "%s",
+    button1 = YES,
+    button2 = NO,
+    OnAccept = function() ReloadUI() end,
+    timeout = 0,
+    whileDead = true,
+    hideOnEscape = true,
+}
+
 StaticPopupDialogs["FOREVERTRADING_CLEAR"] = {
     text = "%s",
     button1 = YES,
@@ -142,11 +152,14 @@ function T.Build(p)
     local right = CreateFrame("Frame", nil, content)
 
     -- general
-    local g = Section(left, L["General"], 6)
+    local g = Section(left, L["General"], 8)
     Choice(g, "lang", L["Language"], { { "auto", L["Game language"] }, { "ru", "Русский" }, { "en", "English" } },
         L["Takes effect after /reload."], function()
             FT.Print(L["Language changed. Type /reload to apply."])
         end)
+    Choice(g, "theme", L["Style"], { { "dark", L["Dark"] }, { "light", L["Light"] }, { "classic", L["Classic"] } },
+        L["Dark: an exchange terminal at night. Light: the same by day. Classic: the game's own look. Takes effect after a reload."],
+        function() StaticPopup_Show("FOREVERTRADING_RELOAD", L["The new style shows after the interface reloads. Reload now?"]) end)
     Choice(g, "scale", L["Window scale"], { { 0.8, "80%" }, { 0.9, "90%" }, { 1.0, "100%" }, { 1.1, "110%" }, { 1.2, "120%" } },
         nil, function(v)
             local w = FT.Window()
@@ -159,6 +172,8 @@ function T.Build(p)
     Check(g, "minimap", L["Minimap button"], nil, function() if FT.UpdateMinimap then FT.UpdateMinimap() end end)
     Check(g, "ahButton", L["Button on the auction house"], L["Opens ForeverTrading next to the auction house window."])
     Check(g, "tooltip", L["Lines in item tooltips"], L["Price change, RSI, the signal and the craft profit of the item."])
+    Check(g, "versionCheck", L["Tell me about new versions"],
+        L["ForeverTrading users in your guild and group tell each other which version they have (a hidden addon message): a newer one shows in chat and in the status bar."])
 
     -- scanning
     local sc = Section(left, L["Scanning"], 4)
@@ -223,13 +238,19 @@ function T.Build(p)
     Next(dt)
 
     -- about
-    local ab = Section(right, L["About"], 4)
+    local ab = Section(right, L["About"], 5)
     T.about = UI.Text(ab, 11, "muted")
     T.about:SetPoint("TOPLEFT", 14, -40)
     T.about:SetPoint("RIGHT", ab, "RIGHT", -14, 0)
     if T.about.SetWordWrap then T.about:SetWordWrap(true) end
     T.about:SetJustifyV("TOP")
     T.about:SetHeight(4 * ROW)
+    local support = UI.Button(ab, L["Support on Boosty"], 10, 24, "primary", function() FT.ShowSupport() end)
+    support:FitText(28)
+    support:SetPoint("BOTTOMLEFT", 14, 12)
+    local gh = UI.Button(ab, "GitHub", 10, 24, "default", function() FT.ShowGitHub() end)
+    gh:FitText(28)
+    gh:SetPoint("LEFT", support, "RIGHT", 8, 0)
 
     local function Stack(col, sections)
         local y = 0

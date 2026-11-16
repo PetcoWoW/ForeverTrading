@@ -1,4 +1,5 @@
--- ForeverTrading: the look (an exchange terminal in the dark) and the basic pieces every window uses.
+-- ForeverTrading: the look and the basic pieces every window uses. Three styles (Settings > General):
+-- dark (an exchange terminal at night, the default), light (the same by day) and classic (the game's own look).
 local ADDON, FT = ...
 
 local UI = {}
@@ -22,6 +23,44 @@ UI.C = {
 }
 local C = UI.C
 
+-- the other styles: the same names, other colours
+local THEMES = {
+    light = {
+        bg0 = { 0.957, 0.961, 0.969 }, bg1 = { 1, 1, 1 }, bg2 = { 0.937, 0.945, 0.957 }, bg3 = { 0.890, 0.902, 0.922 },
+        line = { 0.851, 0.863, 0.886 }, text = { 0.118, 0.137, 0.161 }, muted = { 0.420, 0.459, 0.522 },
+        dim = { 0.600, 0.635, 0.686 }, up = { 0.012, 0.620, 0.408 }, down = { 0.812, 0.188, 0.290 },
+        accent = { 0.780, 0.565, 0.0 }, blue = { 0.145, 0.388, 0.922 }, purple = { 0.486, 0.227, 0.929 },
+    },
+    classic = {
+        bg0 = { 0.035, 0.032, 0.030 }, bg1 = { 0.075, 0.068, 0.060 }, bg2 = { 0.135, 0.118, 0.095 },
+        bg3 = { 0.200, 0.170, 0.125 }, line = { 0.420, 0.345, 0.205 }, text = { 1.0, 0.953, 0.855 },
+        muted = { 0.800, 0.725, 0.560 }, dim = { 0.560, 0.505, 0.400 }, up = { 0.118, 1.0, 0.118 },
+        down = { 1.0, 0.200, 0.200 }, accent = { 1.0, 0.820, 0.0 }, blue = { 0.400, 0.620, 1.0 },
+        purple = { 0.640, 0.210, 0.930 },
+    },
+}
+UI.theme = "dark"
+UI.INSET = 1 -- how far the window's content keeps from its edge
+
+local function Hex(c)
+    return string.format("%02x%02x%02x", math.floor(c[1] * 255 + 0.5), math.floor(c[2] * 255 + 0.5), math.floor(c[3] * 255 + 0.5))
+end
+
+-- once, when the saved settings are known, before any window is built
+function UI.ApplyTheme()
+    local name = FT.S and FT.S.theme or "dark"
+    local palette = THEMES[name]
+    if not palette then name = "dark" end
+    for k, v in pairs(palette or {}) do C[k] = v end
+    UI.theme = name
+    UI.INSET = (name == "classic") and 4 or 1
+    -- the colours of coloured text follow
+    for k in pairs(FT.HEX) do
+        if C[k] then FT.HEX[k] = Hex(C[k]) end
+    end
+end
+FT.On("FT_DB_READY", function() UI.ApplyTheme() end)
+
 function UI.RGB(name)
     local c = C[name] or C.text
     return c[1], c[2], c[3]
@@ -41,6 +80,10 @@ function UI.ResolveFont()
     if UI.fontResolved then return end
     UI.fontResolved = true
     local candidates = {}
+    -- classic: the game's own Friz Quadrata - when it has the letters of the language we show
+    if UI.theme == "classic" and (FT.Lang() ~= "ru" or GetLocale() == "ruRU") and STANDARD_TEXT_FONT then
+        candidates[#candidates + 1] = STANDARD_TEXT_FONT
+    end
     if AddonLoaded("Mastercraft") then
         candidates[#candidates + 1] = "Interface\\AddOns\\Mastercraft\\media\\NotoSans-Regular.ttf"
     end
@@ -110,10 +153,41 @@ function UI.Border(frame, color, alpha)
     return b
 end
 
+-- the edge of the game's tooltips, for the classic style
+local CLASSIC_EDGE = { edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border", edgeSize = 12,
+    insets = { left = 3, right = 3, top = 3, bottom = 3 } }
+
+-- frame with the classic style's edge; false when the style or the client doesn't do it
+function UI.ClassicEdge(f, color, edge)
+    if UI.theme ~= "classic" or not f.SetBackdrop then return false end
+    f:SetBackdrop(edge or CLASSIC_EDGE)
+    local c = type(color) == "table" and color or C[color or "line"]
+    f:SetBackdropBorderColor(c[1], c[2], c[3], 1)
+    function f:SetBorderColor(col, a)
+        local cc = type(col) == "table" and col or C[col] or C.line
+        self:SetBackdropBorderColor(cc[1], cc[2], cc[3], a or 1)
+    end
+    return true
+end
+
+-- a template that can carry the classic style's edge
+function UI.EdgeTemplate()
+    return (UI.theme == "classic" and BackdropTemplateMixin) and "BackdropTemplate" or nil
+end
+
 function UI.Panel(parent, color, border)
-    local f = CreateFrame("Frame", nil, parent)
+    local f = CreateFrame("Frame", nil, parent, border ~= false and UI.EdgeTemplate() or nil)
     UI.Fill(f, color or "bg1")
-    if border ~= false then UI.Border(f, border or "line") end
+    if border ~= false then
+        if UI.ClassicEdge(f, border or "line") then
+            -- the fill inside the edge
+            f.bg:ClearAllPoints()
+            f.bg:SetPoint("TOPLEFT", 3, -3)
+            f.bg:SetPoint("BOTTOMRIGHT", -3, 3)
+        else
+            UI.Border(f, border or "line")
+        end
+    end
     return f
 end
 
@@ -138,7 +212,8 @@ function UI.Text(parent, size, color, justify, layer)
     fs:SetJustifyH(justify or "LEFT")
     fs:SetJustifyV("MIDDLE")
     fs:SetShadowColor(0, 0, 0, 0.6)
-    fs:SetShadowOffset(1, -1)
+    -- a dark shadow only reads well on a dark background
+    if UI.theme == "light" then fs:SetShadowOffset(0, 0) else fs:SetShadowOffset(1, -1) end
     if fs.SetWordWrap then fs:SetWordWrap(false) end
     return fs
 end

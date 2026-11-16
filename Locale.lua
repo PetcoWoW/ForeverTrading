@@ -424,6 +424,32 @@ ru["Full screen"] = "Во весь экран"
 
 ru["A recipe with less profit gets WATCH instead of CRAFT."] = "Рецепт с меньшей прибылью получает СЛЕДИТЬ вместо КРАФТИТЬ."
 
+ru["Support the author"] = "Поддержать автора"
+ru["Support on Boosty"] = "Поддержать на Boosty"
+ru["Support ForeverTrading"] = "Поддержать ForeverTrading"
+ru["If the addon is useful to you - thank you for your support! Copy the link and open it in your browser:"] =
+    "Если аддон вам полезен — спасибо за поддержку! Скопируйте ссылку и откройте её в браузере:"
+ru["Source code, releases and bug reports. Copy the link and open it in your browser:"] =
+    "Исходный код, релизы и сообщения об ошибках. Скопируйте ссылку и откройте её в браузере:"
+ru["Ctrl+C to copy"] = "Ctrl+C — скопировать"
+ru["ForeverTrading on GitHub"] = "ForeverTrading на GitHub"
+ru["Close"] = "Закрыть"
+
+ru["A newer ForeverTrading is out: %s (you have %s). Get it on CurseForge or GitHub (/ft github)."] =
+    "Вышла новая версия ForeverTrading: %s (у вас %s). Скачайте на CurseForge или GitHub (/ft github)."
+ru["Update available: %s"] = "Доступна %s"
+ru["Tell me about new versions"] = "Сообщать о новых версиях"
+ru["ForeverTrading users in your guild and group tell each other which version they have (a hidden addon message): a newer one shows in chat and in the status bar."] =
+    "Пользователи ForeverTrading в гильдии и группе сообщают друг другу свою версию (скрытым сообщением аддона): о более новой вы узнаете в чате и в строке состояния."
+
+ru["Style"] = "Стиль"
+ru["Dark"] = "Тёмный"
+ru["Light"] = "Светлый"
+ru["Classic"] = "Классический"
+ru["Dark: an exchange terminal at night. Light: the same by day. Classic: the game's own look. Takes effect after a reload."] =
+    "Тёмный — биржевой терминал ночью. Светлый — то же днём. Классический — в духе интерфейса игры. Применяется после перезагрузки интерфейса."
+ru["The new style shows after the interface reloads. Reload now?"] = "Новый стиль появится после перезагрузки интерфейса. Перезагрузить сейчас?"
+
 -- minimap, auction house, tooltips
 ru["Click: open / close"] = "ЛКМ: открыть / закрыть"
 ru["Right-click: signals"] = "ПКМ: сигналы"

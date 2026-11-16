@@ -367,7 +367,7 @@ end
 ---------------------------------------------------------------------------
 local function Build()
     UI.ResolveFont()
-    win = CreateFrame("Frame", "ForeverTradingFrame", UIParent)
+    win = CreateFrame("Frame", "ForeverTradingFrame", UIParent, UI.EdgeTemplate())
     win:SetFrameStrata("HIGH")
     win:SetToplevel(true)
     win:SetClampedToScreen(true)
@@ -376,13 +376,16 @@ local function Build()
     win:SetScale(FT.S.scale or 1)
     PlaceWindow()
     UI.Fill(win, "bg0")
-    UI.Border(win, "line")
+    if not UI.ClassicEdge(win, "line", { edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border", edgeSize = 16,
+        insets = { left = 4, right = 4, top = 4, bottom = 4 } }) then
+        UI.Border(win, "line")
+    end
     table.insert(UISpecialFrames, "ForeverTradingFrame")
 
     -- header
     local header = CreateFrame("Frame", nil, win)
-    header:SetPoint("TOPLEFT", 1, -1)
-    header:SetPoint("TOPRIGHT", -1, -1)
+    header:SetPoint("TOPLEFT", UI.INSET, -UI.INSET)
+    header:SetPoint("TOPRIGHT", -UI.INSET, -UI.INSET)
     header:SetHeight(44)
     UI.Fill(header, "bg0")
     header:EnableMouse(true)
@@ -439,8 +442,8 @@ local function Build()
 
     -- status bar
     local status = CreateFrame("Frame", nil, win)
-    status:SetPoint("BOTTOMLEFT", 1, 1)
-    status:SetPoint("BOTTOMRIGHT", -1, 1)
+    status:SetPoint("BOTTOMLEFT", UI.INSET, UI.INSET)
+    status:SetPoint("BOTTOMRIGHT", -UI.INSET, UI.INSET)
     status:SetHeight(22)
     UI.Fill(status, "bg1")
     local sl = UI.HLine(status, "line")
@@ -451,6 +454,35 @@ local function Build()
     statusRight = UI.Text(status, 10, "dim", "RIGHT")
     statusRight:SetPoint("RIGHT", -12, 0)
     statusRight:SetText("v" .. FT.VERSION .. "   /ft")
+    -- links: support the author, the project on GitHub
+    local function StatusLink(text, color, onClick)
+        local b = CreateFrame("Button", nil, status)
+        b.text = UI.Text(b, 10, color)
+        b.text:SetPoint("CENTER")
+        b.text:SetText(text)
+        b:SetSize(math.ceil(b.text:GetStringWidth()) + 12, 20)
+        b:SetScript("OnEnter", function(self) UI.SetTextColor(self.text, "text") end)
+        b:SetScript("OnLeave", function(self) UI.SetTextColor(self.text, color) end)
+        b:SetScript("OnClick", onClick)
+        return b
+    end
+    local gh = StatusLink("GitHub", "muted", function() FT.ShowGitHub() end)
+    gh:SetPoint("RIGHT", statusRight, "LEFT", -12, 0)
+    local support = StatusLink(L["Support the author"], "accent", function() FT.ShowSupport() end)
+    support:SetPoint("RIGHT", gh, "LEFT", -4, 0)
+    -- a newer version was heard of: where to get it
+    local newer = StatusLink("", "up", function() FT.ShowGitHub() end)
+    newer:SetPoint("RIGHT", support, "LEFT", -8, 0)
+    local function ShowNewer()
+        local v = FT.Ver.Newest()
+        newer:SetShown(v ~= nil)
+        if v then
+            newer.text:SetText(string.format(L["Update available: %s"], v))
+            newer:SetWidth(math.ceil(newer.text:GetStringWidth()) + 12)
+        end
+    end
+    ShowNewer()
+    FT.On("FT_NEWER_VERSION", ShowNewer)
 
 
     -- pages

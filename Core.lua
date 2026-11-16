@@ -7,6 +7,8 @@ FT.VERSION = (GetMeta and GetMeta(ADDON, "Version")) or "dev"
 -- a copy straight from the repository (not packaged): the packager hasn't put the version in yet
 if FT.VERSION:find("@", 1, true) then FT.VERSION = "dev" end
 FT.MEDIA = "Interface\\AddOns\\" .. ADDON .. "\\media\\"
+FT.URL_SUPPORT = "https://boosty.to/andrewwoolfi"
+FT.URL_GITHUB = "https://github.com/thewoolfi/ForeverTrading"
 
 ---------------------------------------------------------------------------
 -- Events: game events and our own ("FT_*") share one dispatcher
@@ -68,6 +70,7 @@ end
 ---------------------------------------------------------------------------
 FT.DEFAULTS = {
     lang = "auto",          -- auto / ru / en
+    theme = "dark",         -- dark / light / classic (after a reload)
     useAuctionator = true,  -- its scans and searches go into our history; days we don't have come from it
     useMastercraft = true,  -- recipes and holdings of alts ForeverTrading hasn't seen yet
     autoMine = true,        -- scan "my items" when the auction house opens and they are old
@@ -83,6 +86,7 @@ FT.DEFAULTS = {
     buyBelow = 15,          -- percent below the average price -> BUY
     avgDays = 14,           -- days in the average price
     tooltip = true,
+    versionCheck = true,    -- tell guild and group which version we have, hear about newer ones
     minimap = true,
     minimapAngle = 205,
     alertSound = true,
@@ -364,6 +368,10 @@ FT.On("GET_ITEM_INFO_RECEIVED", function()
 end)
 
 function FT.QualityHex(q)
+    if FT.UI and FT.UI.theme == "light" then
+        if not q or q <= 1 then return "ff" .. FT.HEX.text end
+        if q == 2 then return "ff1a9e00" end -- a darker green than the game's, for white
+    end
     local c = q and ITEM_QUALITY_COLORS and ITEM_QUALITY_COLORS[q]
     if c and c.hex then return c.hex:gsub("^|c", "") end
     return "ffeaecef"
@@ -476,12 +484,16 @@ SlashCmdList.FOREVERTRADING = function(msg)
         else
             FT.Scanner.StartFull()
         end
+    elseif cmd == "support" or cmd == "donate" then
+        FT.ShowSupport()
+    elseif cmd == "github" or cmd == "git" then
+        FT.ShowGitHub()
     elseif cmd == "stop" then
         FT.Scanner.Stop("user")
     else
         FT.Print("/ft — " .. L["open / close"])
         FT.Print("/ft market | craft | signals | portfolio | settings")
         FT.Print("/ft scan — " .. L["full scan"] .. ",  /ft scan mine — " .. L["My items"] .. ",  /ft stop")
-        FT.Print("/ft lang ru | en | auto,  /ft reset")
+        FT.Print("/ft lang ru | en | auto,  /ft reset,  /ft github,  /ft support")
     end
 end

@@ -398,3 +398,78 @@ function FT.DebugReport()
     local rows = FT.Market.Rows()
     FT.Print("market rows " .. tostring(rows and #rows))
 end
+
+---------------------------------------------------------------------------
+-- A link to copy (the game can't open a browser): support the author, the project on GitHub
+---------------------------------------------------------------------------
+local linkDialog
+
+local function LinkDialog()
+    if linkDialog then return linkDialog end
+    UI.ResolveFont()
+    local d = CreateFrame("Frame", "ForeverTradingLinkDialog", UIParent)
+    d:SetSize(440, 150)
+    d:SetPoint("CENTER", 0, 120)
+    d:SetFrameStrata("DIALOG")
+    d:SetToplevel(true)
+    d:EnableMouse(true)
+    d:SetMovable(true)
+    d:RegisterForDrag("LeftButton")
+    d:SetScript("OnDragStart", d.StartMoving)
+    d:SetScript("OnDragStop", d.StopMovingOrSizing)
+    UI.Fill(d, "bg1")
+    UI.Border(d, "line")
+    local bar = UI.Tex(d, "ARTWORK", "accent", 1)
+    bar:SetHeight(2)
+    bar:SetPoint("TOPLEFT", 1, -1)
+    bar:SetPoint("TOPRIGHT", -1, -1)
+    d.title = UI.Text(d, 14, "text")
+    d.title:SetPoint("TOPLEFT", 16, -16)
+    d.body = UI.Text(d, 11, "muted")
+    d.body:SetPoint("TOPLEFT", 16, -40)
+    d.body:SetPoint("RIGHT", d, "RIGHT", -16, 0)
+    d.input = UI.Input(d, 408, 26, "")
+    d.input:SetPoint("TOPLEFT", 16, -64)
+    -- read only: whatever is typed, the link comes back, selected
+    d.input:SetScript("OnTextChanged", function(self, user)
+        if user then
+            self:SetText(d.url or "")
+            self:HighlightText()
+        end
+    end)
+    d.input:SetScript("OnEditFocusGained", function(self) self:HighlightText() end)
+    d.input:SetScript("OnEscapePressed", function() d:Hide() end)
+    d.input:SetScript("OnEnterPressed", function() d:Hide() end)
+    d.hint = UI.Text(d, 11, "dim")
+    d.hint:SetPoint("TOPLEFT", 16, -100)
+    d.hint:SetText(L["Ctrl+C to copy"])
+    d.close = UI.Button(d, L["Close"], 10, 24, "default", function() d:Hide() end)
+    d.close:FitText(28)
+    d.close:SetPoint("BOTTOMRIGHT", -16, 14)
+    tinsert(UISpecialFrames, "ForeverTradingLinkDialog")
+    d:Hide()
+    linkDialog = d
+    return d
+end
+
+function FT.ShowLink(title, body, url)
+    local d = LinkDialog()
+    d.url = url
+    d.title:SetText(title)
+    d.body:SetText(body)
+    d.input:SetText(url)
+    d:Show()
+    d:Raise()
+    d.input:SetFocus()
+    d.input:HighlightText()
+end
+
+function FT.ShowSupport()
+    FT.ShowLink(L["Support ForeverTrading"], L["If the addon is useful to you - thank you for your support! Copy the link and open it in your browser:"],
+        FT.URL_SUPPORT)
+end
+
+function FT.ShowGitHub()
+    FT.ShowLink(L["ForeverTrading on GitHub"], L["Source code, releases and bug reports. Copy the link and open it in your browser:"],
+        FT.URL_GITHUB)
+end
