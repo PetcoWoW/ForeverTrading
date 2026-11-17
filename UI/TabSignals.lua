@@ -182,3 +182,8 @@ function T.Refresh()
 end
 
 T.OnShow = T.Refresh
+
+-- item names and colours arrived: the rows on screen show them
+function T.OnItems()
+    for _, c in ipairs(cols) do c.list:Refresh() end
+end

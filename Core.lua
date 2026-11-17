@@ -74,7 +74,9 @@ FT.DEFAULTS = {
     theme = "dark",         -- dark / light / classic (after a reload)
     useAuctionator = true,  -- its scans and searches go into our history; days we don't have come from it
     useMastercraft = true,  -- recipes and holdings of alts ForeverTrading hasn't seen yet
-    autoMine = true,        -- scan "my items" when the auction house opens and they are old
+    liveRefresh = true,     -- the item you have open is searched again every few seconds at the auction house
+    shareAuto = true,       -- prices older than an hour: ask guild and group for fresher ones
+    shareSend = true,       -- give our fresh scan to guild and group members who ask
     autoFull = false,       -- full scan when the auction house opens (at most once an hour)
     deepFull = false,       -- full scan reads every auction (ReplicateItems, once every 15 minutes)
     scanPages = 2,          -- pages (50 auctions each, cheapest first) read per item in "my items"
@@ -82,6 +84,9 @@ FT.DEFAULTS = {
     ahCut = true,           -- 5% auction house cut in profits
     cheapestWay = true,     -- a material you can craft cheaper counts at its craft cost
     minProfit = 2000,       -- copper: below this a craft is not a "CRAFT" signal
+    spikeGuard = true,      -- a price blown up by a buyout (few lots far above the fair price) isn't counted on
+    spikeAbove = 50,        -- percent above the fair price that counts as a jump (a buyout)
+    fallBelow = 20,         -- percent below the fair price that counts as falling fast (crafts get RISKY)
     minMargin = 10,         -- percent
     sellAbove = 10,         -- percent above the average price -> SELL
     buyBelow = 15,          -- percent below the average price -> BUY
@@ -98,6 +103,8 @@ FT.DEFAULTS = {
     scale = 1.0,
     ticker = true,
     ahButton = true,
+    replaceAH = false,      -- talking to an auctioneer opens ForeverTrading in place of the game's window
+    sellDuration = 2,       -- posting: 1 short, 2 medium, 3 long (WoW Forever: 2, 8, 24 hours)
     dockAH = true,
     chartTF = "1D",
     showMA = false,
@@ -180,7 +187,11 @@ local function InitDB()
     end
     -- 1.2: "my items" reads the cheapest 100 auctions per item (was 250): a faster scan
     if (db.version or 1) < 3 and db.settings.scanPages == 5 then db.settings.scanPages = 2 end
-    db.version = 3
+    -- 1.3: "my items" only when you press it (it takes minutes)
+    db.settings.autoMine = nil
+    -- 1.4: the full scan at the auction house only when you press it (the setting starts switched off again)
+    if (db.version or 1) < 5 then db.settings.autoFull = false end
+    db.version = 5
     FT.db = db
     FT.S = db.settings
 end
@@ -217,7 +228,7 @@ local C_SUFFIX = FT.COIN.copper
 -- where a price came from, for people
 function FT.SourceName(source)
     local names = { full = L["full scan"], mine = L["My items"], auctionator = "Auctionator", mastercraft = "Mastercraft",
-        history = L["history"] }
+        history = L["history"], live = L["live search"], peer = L["exchange"] }
     return names[source] or L["scan"]
 end
 
@@ -350,6 +361,17 @@ local function NameBook()
     return nameBook
 end
 
+-- Their quality too: the game forgets items for a moment while the auction house loads thousands of others,
+-- and a name shown without it would flash white
+local qualityBook
+local function QualityBook()
+    if not qualityBook then
+        FT.db.quality = FT.db.quality or {}
+        qualityBook = FT.db.quality
+    end
+    return qualityBook
+end
+
 function FT.RememberName(itemID, name)
     if itemID and type(name) == "string" and name ~= "" and FT.db then NameBook()[itemID] = name end
 end
@@ -360,10 +382,11 @@ local IsCached = C_Item and C_Item.IsItemDataCachedByID
 function FT.Name(itemID)
     if not itemID then return nil end
     if IsCached and not IsCached(itemID) then return NameBook()[itemID] end
-    local name = GetInfo(itemID)
+    local name, _, quality = GetInfo(itemID)
     if name then
         local book = NameBook()
         if book[itemID] ~= name then book[itemID] = name end
+        if quality and QualityBook()[itemID] ~= quality then QualityBook()[itemID] = quality end
         return name
     end
     return NameBook()[itemID]
@@ -379,11 +402,26 @@ function FT.Item(itemID)
     if name then
         local book = NameBook()
         if book[itemID] ~= name then book[itemID] = name end
+        if quality and QualityBook()[itemID] ~= quality then QualityBook()[itemID] = quality end
     else
         FT.RequestItem(itemID)
         name = NameBook()[itemID]
+        quality = QualityBook()[itemID]
     end
     return name, quality, icon, sellPrice, link
+end
+
+-- quality and required level without asking the server (nil while the game hasn't loaded the item; the
+-- quality from our book then)
+function FT.ItemFacts(itemID)
+    if IsCached and not IsCached(itemID) then return QualityBook()[itemID], nil end
+    local name, _, quality, _, minLevel = GetInfo(itemID)
+    if name and quality and QualityBook()[itemID] ~= quality then QualityBook()[itemID] = quality end
+    return quality or QualityBook()[itemID], minLevel
+end
+
+function FT.ItemCached(itemID)
+    return not IsCached or IsCached(itemID)
 end
 
 -- classID, subClassID, icon without waiting for the item to load
@@ -477,6 +515,15 @@ FT.On("ADDON_LOADED", function(name)
     FT.Fire("FT_DB_READY")
 end)
 
+-- the game stopped one of our calls (one only allowed from its own code or right in a click): say which
+local function Blocked(addon, func)
+    if addon ~= ADDON then return end
+    FT.Debug("blocked:", tostring(func))
+    FT.Fire("FT_BLOCKED", tostring(func))
+end
+FT.On("ADDON_ACTION_BLOCKED", Blocked)
+FT.On("ADDON_ACTION_FORBIDDEN", Blocked)
+
 FT.On("PLAYER_LOGIN", function()
     FT.charKey = UnitGUID("player")
     FT.sideKey = FT.SideKey()
@@ -504,7 +551,7 @@ SlashCmdList.FOREVERTRADING = function(msg)
     local cmd, rest = msg:match("^(%S*)%s*(.-)$")
     if cmd == "" then
         FT.Toggle()
-    elseif cmd == "market" or cmd == "craft" or cmd == "signals" or cmd == "portfolio" or cmd == "settings" then
+    elseif cmd == "market" or cmd == "craft" or cmd == "signals" or cmd == "portfolio" or cmd == "sell" or cmd == "settings" then
         FT.Show(cmd)
     elseif cmd == "lang" and (rest == "ru" or rest == "en" or rest == "auto") then
         FT.S.lang = rest
@@ -519,11 +566,11 @@ SlashCmdList.FOREVERTRADING = function(msg)
         FT.Print(L["Window position reset."])
     elseif cmd == "debug" then
         FT.debug = not FT.debug
-        FT.Print("debug " .. tostring(FT.debug))
+        FT.Print("debug " .. tostring(FT.debug) .. (FT.debug and " - buying, posting and cancelling tell every step in chat" or ""))
         if FT.debug and FT.DebugReport then FT.DebugReport() end
     elseif cmd == "scan" then
         if rest == "mine" or rest == "my" then
-            FT.Scanner.StartMine()
+            FT.Scanner.AskMine()
         else
             FT.Scanner.StartFull()
         end
@@ -533,10 +580,13 @@ SlashCmdList.FOREVERTRADING = function(msg)
         FT.ShowGitHub()
     elseif cmd == "stop" then
         FT.Scanner.Stop("user")
+    elseif cmd == "share" or cmd == "exchange" then
+        FT.Share.Ask(true)
     else
         FT.Print("/ft — " .. L["open / close"])
-        FT.Print("/ft market | craft | signals | portfolio | settings")
+        FT.Print("/ft market | craft | signals | portfolio | sell | settings")
         FT.Print("/ft scan — " .. L["full scan"] .. ",  /ft scan mine — " .. L["My items"] .. ",  /ft stop")
+        FT.Print("/ft share — " .. L["ask guild and group for fresh prices"])
         FT.Print("/ft lang ru | en | auto,  /ft reset,  /ft github,  /ft support")
     end
 end

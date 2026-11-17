@@ -180,3 +180,8 @@ function T.Refresh()
 end
 
 T.OnShow = T.Refresh
+
+-- item names and colours arrived: the rows on screen show them
+function T.OnItems()
+    if list then list:Refresh() end
+end

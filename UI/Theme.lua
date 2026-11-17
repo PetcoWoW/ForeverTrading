@@ -317,6 +317,39 @@ function UI.Chevron(parent, size, color)
     return f
 end
 
+-- a gear drawn with lines (Settings), in the style's colours: a ring and eight teeth
+function UI.Gear(parent, size, color)
+    local f = CreateFrame("Frame", nil, parent)
+    f:SetSize(size, size)
+    f.lines = {}
+    function f:SetColor(c, alpha)
+        local s = self:GetWidth()
+        local cx, cy = s / 2, s / 2
+        local ring, tip = s * 0.27, s * 0.47
+        local i = 0
+        local function Line(x1, y1, x2, y2, w)
+            i = i + 1
+            local l = self.lines[i]
+            if not l then
+                l = UI.NewLine(self, "OVERLAY")
+                self.lines[i] = l
+            end
+            UI.PlaceLine(l, x1, y1, x2, y2, w, c, alpha or 1)
+        end
+        local n = 18
+        for k = 0, n - 1 do
+            local a1, a2 = k / n * 2 * math.pi, (k + 1) / n * 2 * math.pi
+            Line(cx + ring * math.cos(a1), cy + ring * math.sin(a1), cx + ring * math.cos(a2), cy + ring * math.sin(a2), s * 0.13)
+        end
+        for k = 0, 7 do
+            local a = (k + 0.5) / 8 * 2 * math.pi
+            Line(cx + ring * math.cos(a), cy + ring * math.sin(a), cx + tip * math.cos(a), cy + tip * math.sin(a), s * 0.17)
+        end
+    end
+    f:SetColor(color or "muted")
+    return f
+end
+
 -- pool of textures / font strings / lines that a widget redraws often
 function UI.Pool(owner, make)
     local pool = { items = {}, used = 0 }

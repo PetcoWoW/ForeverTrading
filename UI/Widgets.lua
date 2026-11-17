@@ -36,6 +36,11 @@ local function Paint(b, hover)
     end
 end
 
+-- a button style by name (for a button that changes its look)
+function UI.ButtonStyle(name)
+    return STYLES[name] or STYLES.default
+end
+
 function UI.Button(parent, text, w, h, style, onClick)
     local b = CreateFrame("Button", nil, parent)
     b:SetSize(w or 80, h or 24)
@@ -118,14 +123,14 @@ function UI.NavTabs(parent, items, onSelect)
         b.text = UI.Text(b, 13, "muted", "CENTER")
         b.text:SetPoint("CENTER", 0, 1)
         b.text:SetText(it[2])
-        local w = math.ceil(b.text:GetStringWidth()) + 24
+        local w = math.ceil(b.text:GetStringWidth()) + 18
         b:SetSize(w, 44)
         b:SetPoint("LEFT", x, 0)
         x = x + w
         b.line = UI.Tex(b, "OVERLAY", "accent", 1)
         b.line:SetHeight(2)
-        b.line:SetPoint("BOTTOMLEFT", 10, 0)
-        b.line:SetPoint("BOTTOMRIGHT", -10, 0)
+        b.line:SetPoint("BOTTOMLEFT", 7, 0)
+        b.line:SetPoint("BOTTOMRIGHT", -7, 0)
         b.line:Hide()
         b.key = it[1]
         b:SetScript("OnEnter", function(self) if f.value ~= self.key then UI.SetTextColor(self.text, "text") end end)
@@ -231,6 +236,126 @@ function UI.Input(parent, w, h, placeholder, onChange, onEnter)
     return e
 end
 
+-- A question in the addon's style (dark, light or classic):
+-- opts = { title, text, ok, cancel, okStyle, onOK, onCancel (Cancel, Esc or closed any other way),
+--          owner (the same owner may change its question in place; another one's open question is cancelled
+--          first), okDelay (seconds the OK button waits: a price that just changed) }.
+-- The game's own popups look like the game and can't show our language on their buttons.
+local confirm
+function UI.Confirm(opts)
+    local d = confirm
+    if not d then
+        UI.ResolveFont()
+        d = CreateFrame("Frame", "ForeverTradingConfirm", UIParent, UI.EdgeTemplate())
+        -- above every window (the full-screen ForeverTrading included)
+        d:SetFrameStrata("FULLSCREEN_DIALOG")
+        d:SetFrameLevel(100)
+        d:SetToplevel(true)
+        d:SetClampedToScreen(true)
+        d:EnableMouse(true)
+        d:SetMovable(true)
+        d:RegisterForDrag("LeftButton")
+        d:SetScript("OnDragStart", d.StartMoving)
+        d:SetScript("OnDragStop", d.StopMovingOrSizing)
+        d:SetWidth(420)
+        UI.Fill(d, "bg1")
+        if not UI.ClassicEdge(d, "line", { edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border", edgeSize = 16,
+            insets = { left = 4, right = 4, top = 4, bottom = 4 } }) then
+            UI.Border(d, "line")
+            d.accent = UI.Tex(d, "ARTWORK", "accent", 1)
+            d.accent:SetHeight(2)
+            d.accent:SetPoint("TOPLEFT", 1, -1)
+            d.accent:SetPoint("TOPRIGHT", -1, -1)
+        end
+        d.logo = UI.Icon(d, 22)
+        d.logo:SetIcon("Interface\\Icons\\INV_Misc_Coin_02")
+        d.logo:SetPoint("TOPLEFT", 18, -18)
+        d.title = UI.Text(d, 14, "text")
+        d.title:SetPoint("LEFT", d.logo, "RIGHT", 10, 0)
+        d.title:SetPoint("RIGHT", d, "RIGHT", -18, 0)
+        d.text = UI.Text(d, 12, "muted")
+        d.text:SetPoint("TOPLEFT", 18, -54)
+        d.text:SetWidth(420 - 36) -- a fixed width: its height is known at once
+        if d.text.SetWordWrap then d.text:SetWordWrap(true) end
+        d.text:SetJustifyV("TOP")
+        d.cancel = UI.Button(d, "", 10, 26, "default", function()
+            d:Hide()
+        end)
+        d.cancel:SetPoint("BOTTOMRIGHT", -18, 16)
+        d.ok = UI.Button(d, "", 10, 26, "primary", function()
+            local ok = d.onOK
+            d.accepted = true
+            -- the action first, while the button you clicked is still on the screen (the game lets an addon buy,
+            -- post or cancel only right in your click), then the window goes - unless the action asked again
+            if ok then ok() end
+            if d.accepted then d:Hide() end
+        end)
+        d:SetScript("OnHide", function()
+            local cancel = not d.accepted and d.onCancel
+            d.onCancel, d.onOK = nil, nil
+            -- hidden with the whole interface (Alt+Z): it doesn't come back without its question
+            d:Hide()
+            if cancel then cancel() end
+        end)
+        d.ok:SetPoint("RIGHT", d.cancel, "LEFT", -8, 0)
+        table.insert(UISpecialFrames, "ForeverTradingConfirm")
+        d:Hide()
+        confirm = d
+    end
+    local owner = opts.owner or opts
+    -- another question open: it is cancelled first (its Cancel runs)
+    if d:IsShown() and d.owner ~= owner and d.onCancel then
+        local cancel = d.onCancel
+        d.onCancel = nil
+        cancel()
+    end
+    d.owner = owner
+    d.onOK, d.onCancel, d.accepted = opts.onOK, opts.onCancel, false
+    d:SetScale(FT.S.scale or 1)
+    d.title:SetText(opts.title or "ForeverTrading")
+    d.text:SetText(opts.text or "")
+    d.ok.style = UI.ButtonStyle(opts.okStyle or "primary")
+    d.ok:SetLabel(opts.ok or L["Continue"])
+    d.ok:FitText(32)
+    d.ok:SetActive(false)
+    d.ok:SetUsable(not opts.okDelay)
+    if opts.okDelay then
+        C_Timer.After(opts.okDelay, function()
+            if d.owner == owner and d:IsShown() then d.ok:SetUsable(true) end
+        end)
+    end
+    d.cancel:SetLabel(opts.cancel or L["Cancel"])
+    d.cancel:FitText(32)
+    d:SetHeight(54 + math.ceil(d.text:GetStringHeight()) + 20 + 26 + 16)
+    d:ClearAllPoints()
+    d:SetPoint("CENTER", UIParent, "CENTER", 0, 120)
+    d:Show()
+    d:Raise()
+end
+
+-- the question closed from outside (as Cancel); owner: only that one's question
+function UI.CloseConfirm(owner)
+    if confirm and confirm:IsShown() and (owner == nil or confirm.owner == owner) then confirm:Hide() end
+end
+
+-- a "×" at the end of an input that empties it (shown while there is text); onClear() after
+function UI.ClearButton(e, onClear)
+    local b = UI.Button(e, "×", 20, 20, "ghost", function()
+        e:SetValue("")
+        e:ClearFocus()
+        if onClear then onClear() end
+    end)
+    b.label:SetFont(UI.FONT, 15, "")
+    b:SetPoint("RIGHT", -2, 0)
+    b:SetFrameLevel(e:GetFrameLevel() + 3)
+    b:SetTip(L["Clear"])
+    e:SetTextInsets(8, 24, 0, 0)
+    e.ph:SetPoint("RIGHT", -24, 0)
+    b:Hide()
+    e:HookScript("OnTextChanged", function(self) b:SetShown(self:GetText() ~= "") end)
+    return b
+end
+
 -- "12.5" (gold), "12g 50s", "75s", "3g20s15c" -> copper; nil when empty or unreadable
 function FT.ParseMoney(str)
     if type(str) ~= "string" then return nil end
@@ -260,17 +385,21 @@ end
 -- Money input: three number boxes - gold, silver, copper - each with its coin
 -- onCommit(copper or nil when all are empty) runs on Enter and when a box loses focus
 ---------------------------------------------------------------------------
-function UI.MoneyInput(parent, onCommit)
+-- small: the narrow one for cards (gold up to 99,999); noCopper: gold and silver only (auction prices)
+function UI.MoneyInput(parent, onCommit, small, noCopper)
     local f = CreateFrame("Frame", nil, parent)
     f.boxes = {}
-    local defs = { { "Gold", 56, 7 }, { "Silver", 34, 2 }, { "Copper", 34, 2 } }
+    local defs = small and { { "Gold", 42, 5 }, { "Silver", 22, 2 }, { "Copper", 22, 2 } }
+        or { { "Gold", 56, 7 }, { "Silver", 34, 2 }, { "Copper", 34, 2 } }
+    if noCopper then defs[3] = nil end
+    local h, coinSize, coinGap, gap = small and 22 or 24, small and 11 or 13, small and 2 or 3, small and 4 or 8
     local x = 0
     for i, d in ipairs(defs) do
-        local e = UI.Input(f, d[2], 24, "", nil, function() f:Commit() end)
+        local e = UI.Input(f, d[2], h, "", nil, function() f:Commit() end)
         e:SetNumeric(true)
         e:SetMaxLetters(d[3])
         e:SetJustifyH("RIGHT")
-        e:SetTextInsets(4, 6, 0, 0)
+        if small then e:SetTextInsets(2, 4, 0, 0) else e:SetTextInsets(4, 6, 0, 0) end
         e:SetPoint("LEFT", x, 0)
         e:HookScript("OnEditFocusLost", function()
             if not f.committing then f:Commit() end
@@ -282,15 +411,16 @@ function UI.MoneyInput(parent, onCommit)
         end)
         local coin = f:CreateTexture(nil, "ARTWORK")
         coin:SetTexture("Interface\\MoneyFrame\\UI-" .. d[1] .. "Icon")
-        coin:SetSize(13, 13)
-        coin:SetPoint("LEFT", e, "RIGHT", 3, 0)
+        coin:SetSize(coinSize, coinSize)
+        coin:SetPoint("LEFT", e, "RIGHT", coinGap, 0)
         f.boxes[i] = e
-        x = x + d[2] + 3 + 13 + 8
+        x = x + d[2] + coinGap + coinSize + gap
     end
-    f:SetSize(x - 8, 24)
+    f:SetSize(x - gap, h)
 
     function f:GetValue()
-        local g, s, c = tonumber(self.boxes[1]:GetText()), tonumber(self.boxes[2]:GetText()), tonumber(self.boxes[3]:GetText())
+        local g, s = tonumber(self.boxes[1]:GetText()), tonumber(self.boxes[2]:GetText())
+        local c = self.boxes[3] and tonumber(self.boxes[3]:GetText())
         if not (g or s or c) then return nil end
         return (g or 0) * 10000 + (s or 0) * 100 + (c or 0)
     end
@@ -304,7 +434,7 @@ function UI.MoneyInput(parent, onCommit)
         copper = math.max(0, math.floor(copper + 0.5))
         self.boxes[1]:SetValue(tostring(math.floor(copper / 10000)))
         self.boxes[2]:SetValue(tostring(math.floor((copper % 10000) / 100)))
-        self.boxes[3]:SetValue(tostring(copper % 100))
+        if self.boxes[3] then self.boxes[3]:SetValue(tostring(copper % 100)) end
     end
 
     function f:HasFocus()
@@ -406,6 +536,7 @@ function UI.Dropdown(parent, w, options, onSelect)
         local m = self.menu
         if not m then
             m = CreateFrame("Frame", nil, UIParent)
+            m:SetClampedToScreen(true)
             m:SetFrameStrata("FULLSCREEN_DIALOG")
             m:SetFrameLevel(blocker:GetFrameLevel() + 5)
             UI.Fill(m, "bg2")
@@ -570,6 +701,71 @@ end
 -- opts = { rowHeight, cols, setup(row), update(row, item, index), onClick(item, button, row), onEnter(row, item),
 --          onLeave(row, item), isSelected(item) }
 ---------------------------------------------------------------------------
+-- A small round countdown: it fills green until the item's next live search, then starts again.
+local CIRCLE = "Interface\\CHARACTERFRAME\\TempPortraitAlphaMask"
+function UI.LiveRing(parent, size)
+    local f = CreateFrame("Frame", nil, parent)
+    f:SetSize(size, size)
+    local r, g, b = UI.RGB("up")
+    f.bg = f:CreateTexture(nil, "BACKGROUND")
+    f.bg:SetAllPoints()
+    f.bg:SetTexture(CIRCLE)
+    f.bg:SetVertexColor(r, g, b, 0.3)
+    local ok, cd = pcall(CreateFrame, "Cooldown", nil, f, "CooldownFrameTemplate")
+    if ok and cd then
+        cd:SetAllPoints()
+        cd.noCooldownCount = true -- no numbers from cooldown-count addons
+        if cd.SetHideCountdownNumbers then cd:SetHideCountdownNumbers(true) end
+        if cd.SetDrawEdge then cd:SetDrawEdge(false) end
+        if cd.SetDrawBling then cd:SetDrawBling(false) end
+        if cd.SetSwipeTexture then cd:SetSwipeTexture(CIRCLE) end
+        if cd.SetSwipeColor then cd:SetSwipeColor(r, g, b, 1) end
+        -- the part of the round gone by is drawn: it fills up
+        if cd.SetReverse then cd:SetReverse(true) end
+        f.cd = cd
+    end
+    -- start, duration from FT.Scanner.LiveTick; 0: pale, waiting for its first search; nil hides it
+    function f:Set(start, duration)
+        if not start then
+            self.start = nil
+            self:Hide()
+            return
+        end
+        self:Show()
+        if start == 0 then
+            if self.start ~= 0 then
+                self.start, self.dur = 0, 0
+                if self.cd then
+                    if self.cd.Clear then self.cd:Clear() else self.cd:SetCooldown(0, 0) end
+                end
+            end
+            return
+        end
+        if not self.start or self.start == 0 or math.abs(self.start - start) > 0.05 or math.abs(self.dur - duration) > 0.05 then
+            self.start, self.dur = start, duration
+            if self.cd then self.cd:SetCooldown(start, duration) end
+        end
+    end
+    f:Hide()
+    return f
+end
+
+-- a circle that follows one item by itself: getID() -> the item shown there (by the "live" label)
+function UI.LiveRingFor(parent, size, getID)
+    local ring = UI.LiveRing(parent, size)
+    local tick = CreateFrame("Frame", nil, parent)
+    tick.elapsed = 0
+    tick:SetScript("OnUpdate", function(self, elapsed)
+        self.elapsed = self.elapsed + elapsed
+        if self.elapsed < 0.3 then return end
+        self.elapsed = 0
+        ring:Set(FT.Scanner.LiveTick(getID()))
+    end)
+    return ring
+end
+
+-- opts.liveID(item) -> itemID: the rows of items kept live show their countdown between the selection bar
+-- and the icon
 function UI.List(parent, opts)
     local f = CreateFrame("Frame", nil, parent)
     f.opts = opts
@@ -627,6 +823,10 @@ function UI.List(parent, opts)
             row.cells[c.key] = cell
         end
         if opts.setup then opts.setup(row) end
+        if opts.liveID then
+            row.live = UI.LiveRing(row, 8)
+            row.live:SetPoint("LEFT", row, "LEFT", 2, 0)
+        end
         row:SetScript("OnEnter", function(self)
             self.hover:Show()
             if opts.onEnter and self.item then opts.onEnter(self, self.item) end
@@ -681,6 +881,7 @@ function UI.List(parent, opts)
                 row.sel:SetShown(sel and true or false)
                 row.selBar:SetShown(sel and true or false)
                 opts.update(row, item, idx)
+                if row.live then row.live:Set(FT.Scanner.LiveTick(opts.liveID(item))) end
                 row:Show()
             else
                 row.item = nil
@@ -702,6 +903,22 @@ function UI.List(parent, opts)
         end
         self.empty:SetShown(total == 0 and self.emptyText ~= nil)
         if self.emptyText then self.empty:SetText(self.emptyText) end
+    end
+
+    -- the countdowns follow the searches (the circles animate by themselves; a new round restarts them)
+    if opts.liveID then
+        local tick = CreateFrame("Frame", nil, f)
+        tick.elapsed = 0
+        tick:SetScript("OnUpdate", function(self, elapsed)
+            self.elapsed = self.elapsed + elapsed
+            if self.elapsed < 0.3 then return end
+            self.elapsed = 0
+            for _, row in ipairs(f.rows) do
+                if row.item and row.live and row:IsShown() then
+                    row.live:Set(FT.Scanner.LiveTick(opts.liveID(row.item)))
+                end
+            end
+        end)
     end
 
     function f:SetItems(items, keepOffset)

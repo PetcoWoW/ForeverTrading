@@ -17,6 +17,7 @@ end
 FT.On("FT_RECIPES_CHANGED", Invalidate)
 FT.On("FT_SOURCES_CHANGED", Invalidate)
 FT.On("FT_PRICES_CHANGED", function() wipe(evalCache) end)
+FT.On("FT_LIVE_UPDATED", function() wipe(evalCache) end)
 FT.On("FT_SCAN_DONE", function() wipe(evalCache) end)
 FT.On("FT_SETTINGS_CHANGED", function() wipe(evalCache) end)
 
@@ -40,6 +41,9 @@ local function Build()
         elseif e.incomplete and not r.incomplete then
             e.reagents, e.incomplete = r.reagents, nil
         end
+        -- the game's id of the recipe: it opens in the profession window by it
+        local id = r.id or r.recipeID or r.spellID
+        if type(id) == "number" and not e.id then e.id = id end
         if charName then e.knownBy[charName] = true end
     end
     if FT.MC.Loaded() then
@@ -75,6 +79,28 @@ function C.EachItem(fn)
     end
 end
 
+-- of the recipes that make an item (several characters, ranks), the one that brings the most
+function C.Best(itemID)
+    local best, bestProfit
+    for _, r in ipairs(C.ByOutput(itemID) or {}) do
+        local p = C.Eval(r).profit or -math.huge
+        if not best or p > bestProfit then best, bestProfit = r, p end
+    end
+    return best
+end
+
+-- the materials of a recipe bought at the auction house (or with no price yet): what live searches follow
+function C.MarketMaterials(r)
+    local out = {}
+    for _, part in ipairs(C.Eval(r).parts or {}) do
+        local id = part.itemID
+        if id and id ~= r.output and (part.source == "ah" or not part.unit) and not FT.VENDOR_REAGENTS[id] then
+            out[#out + 1] = id
+        end
+    end
+    return out
+end
+
 -- professions present, sorted
 function C.Professions()
     local seen, out = {}, {}
@@ -93,11 +119,26 @@ end
 ---------------------------------------------------------------------------
 local RecipeCost
 
--- the cheapest way to get one: auction house, vendor or crafting it yourself
+-- the auction house price of `qty`: walked up the order book when the book is as fresh as the price (a few
+-- cheap lots aren't the price of all you need), else the lowest price
+local function AHUnit(itemID, qty)
+    local p, t = FT.Price(itemID)
+    if not p then return nil end
+    if qty and qty > 1 then
+        local book = FT.Hist.Book(itemID)
+        if book and book.source ~= "mastercraft" and book.levels and #book.levels > 0 and (book.t or 0) >= (t or 0) - 600 then
+            local cost = FT.Hist.CostToBuy(itemID, qty)
+            if cost then return cost / qty end
+        end
+    end
+    return p
+end
+
+-- the cheapest way to get `qty` (one by default): auction house, vendor or crafting it yourself
 -- returns unit cost, source ("ah", "vendor", "vendor~", "craft"), the recipe when crafted
-local function UnitCost(itemID, depth, visiting)
+local function UnitCost(itemID, depth, visiting, qty)
     local best, src, via
-    local p = FT.Price(itemID)
+    local p = AHUnit(itemID, qty)
     if p then best, src = p, "ah" end
     local v, how = FT.VendorBuy(itemID)
     if v and (not best or v < best) then best, src = v, (how == "estimate") and "vendor~" or "vendor" end
@@ -121,8 +162,8 @@ end
 RecipeCost = function(r, depth, visiting)
     local total, complete, parts, missing = 0, not r.incomplete, {}, nil
     for _, rg in ipairs(r.reagents) do
-        local unit, src, via = UnitCost(rg.itemID, depth, visiting)
         local qty = rg.qty or 1
+        local unit, src, via = UnitCost(rg.itemID, depth, visiting, qty)
         parts[#parts + 1] = { itemID = rg.itemID, qty = qty, unit = unit, source = src, via = via,
             total = unit and unit * qty or nil }
         if unit then
@@ -157,7 +198,9 @@ function C.Eval(r)
     local visiting = { [r.key] = true }
     e.cost, e.complete, e.parts, e.missing = RecipeCost(r, 0, visiting)
     e.stats = FT.An.Stats(r.output)
-    e.sellUnit = e.stats.price
+    -- a price blown up by a buyout isn't counted on: the fair price is
+    e.sellUnit = e.stats.sale or e.stats.price
+    e.rawUnit, e.spike = e.stats.price, e.stats.spike
     local qty = r.outputQty
     local ahRevenue = e.sellUnit and e.sellUnit * qty * Cut() or nil
     local vendorUnit = FT.VendorSell(r.output)
@@ -187,6 +230,13 @@ function C.Eval(r)
     elseif e.profit < FT.S.minProfit or (e.margin or 0) * 100 < FT.S.minMargin then
         e.signal, e.strength = "WATCH", 1
         e.reason = string.format(L["Small profit: %s (%d%%)"], FT.Money(e.profit, "short"), math.floor((e.margin or 0) * 100 + 0.5))
+    elseif e.via == "ah" and e.stats.falling then
+        -- other crafters undercut: by the time yours is listed it may be lower still
+        e.signal, e.strength = "RISKY", 2
+        e.reason = string.format(L["Price falling fast: %s vs its fair price"], FT.Pct(e.stats.price / e.stats.fair - 1, true))
+        if e.stats.moreListed then
+            e.reason = e.reason .. ", " .. string.format(L["%s more listed"], FT.Pct(e.stats.moreListed, true))
+        end
     elseif e.via == "ah" and e.liquidity == "low" then
         e.signal, e.strength = "RISKY", 2
         e.reason = L["Rarely listed: it may not sell"]
@@ -197,6 +247,9 @@ function C.Eval(r)
         e.signal = "CRAFT"
         e.strength = ((e.margin or 0) >= 0.3) and 3 or 2
         e.reason = string.format(L["Profit %s (%d%%)"], FT.Money(e.profit, "short"), math.floor((e.margin or 0) * 100 + 0.5))
+    end
+    if e.spike and e.reason then
+        e.reason = e.reason .. "  ||  " .. FT.C("accent", string.format(L["buyout? counted at %s"], FT.Money(e.sellUnit, "short")))
     end
     e.sell, e.sellStrength, e.sellReason = FT.An.SellSignal(e.stats)
     evalCache[r.key] = e

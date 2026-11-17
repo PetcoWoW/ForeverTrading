@@ -31,7 +31,7 @@ local function Rows()
             if state.profitable and not (e.profit and e.profit > 0) then ok = false end
         end
         if ok and search then
-            local name = (FT.Item(r.output) or r.name or ""):lower()
+            local name = (FT.Name(r.output) or r.name or ""):lower()
             ok = name:find(search, 1, true) ~= nil or (r.name or ""):lower():find(search, 1, true) ~= nil
         end
         if ok then out[#out + 1] = { r = r, e = e } end
@@ -112,6 +112,10 @@ local function BuildToolbar(p)
         FT.Debounce("craftSearch", 0.25, function() T.RefreshList() end)
     end)
     T.search:SetPoint("RIGHT", 0, 0)
+    UI.ClearButton(T.search, function()
+        state.search = ""
+        T.RefreshList()
+    end)
 
     T.profitable = UI.Check(bar2, L["Profitable only"], function(on)
         state.profitable = on
@@ -231,6 +235,7 @@ local function BuildTable(p)
     list = UI.List(panel, {
         rowHeight = 28,
         cols = cols,
+        liveID = function(x) return x.r.output end,
         update = function(row, x)
             local r, e = x.r, x.e
             local c = row.cells.name
@@ -238,7 +243,8 @@ local function BuildTable(p)
             local qty = r.outputQty > 1 and FT.C("dim", string.format(" x%g", r.outputQty)) or ""
             c.text:SetText(FT.ItemText(r.output, 34) .. qty)
             row.cells.cost:SetText(e.complete and FT.Money(e.cost, "short") or FT.C("dim", "?"))
-            row.cells.revenue:SetText(e.revenue and (FT.Money(e.revenue, "short") .. (e.via == "vendor" and FT.C("dim", " v") or "")) or FT.C("dim", "?"))
+            row.cells.revenue:SetText(e.revenue and (FT.Money(e.revenue, "short") .. (e.via == "vendor" and FT.C("dim", " v") or "")
+                .. (e.spike and FT.C("accent", " !") or "")) or FT.C("dim", "?"))
             if e.profit then
                 row.cells.profit:SetText(FT.C(e.profit >= 0 and "up" or "down", FT.Money(e.profit, "short")))
                 row.cells.margin:SetText(FT.C(e.profit >= 0 and "up" or "down", string.format("%d%%", math.floor((e.margin or 0) * 100 + 0.5))))
@@ -317,6 +323,13 @@ local function BuildDetail(p)
     d.reason = UI.Text(d, 12, "text")
     d.reason:SetPoint("LEFT", d.badge, "RIGHT", 10, 0)
     d.reason:SetPoint("RIGHT", d, "RIGHT", -12, 0)
+    -- worth crafting: the recipe in the game's profession window
+    d.btnOpen = UI.Button(d, L["Open recipe"], 10, 22, "default", function()
+        if d.r then FT.OpenRecipeInGame(d.r) end
+    end)
+    d.btnOpen:FitText(20)
+    d.btnOpen:SetPoint("TOPRIGHT", -12, -57)
+    d.btnOpen:Hide()
 
     -- numbers
     local defs = {
@@ -342,6 +355,7 @@ local function BuildDetail(p)
     d.chart:SetPoint("TOPLEFT", 1, -192)
     d.chart:SetPoint("TOPRIGHT", -1, -192)
     d.chart:SetHeight(120)
+    d.more = UI.MoreButton(d.chart, function() return d.r and d.r.output end)
     d.pchart = UI.Chart(d)
     d.pchart:SetPoint("TOPLEFT", d.chart, "BOTTOMLEFT", 0, -4)
     d.pchart:SetPoint("TOPRIGHT", d.chart, "BOTTOMRIGHT", 0, -4)
@@ -357,6 +371,11 @@ local function BuildDetail(p)
     d.matsTitle = UI.Text(d, 11, "muted")
     d.matsTitle:SetPoint("TOPLEFT", d.pchart, "BOTTOMLEFT", 11, -8)
     d.matsTitle:SetText(L["Materials"])
+    d.liveText = UI.Text(d, 11, "dim", "RIGHT")
+    d.liveText:SetPoint("TOPRIGHT", d.pchart, "BOTTOMRIGHT", -11, -8)
+    -- the countdown to the next live search of what the recipe makes
+    d.ring = UI.LiveRingFor(d, 9, function() return d.r and d:IsVisible() and d.r.output or nil end)
+    d.ring:SetPoint("RIGHT", d.liveText, "LEFT", -5, 0)
     local cols = {
         { key = "name", title = "", width = "fill", make = function(row)
             local f = CreateFrame("Frame", nil, row)
@@ -373,6 +392,7 @@ local function BuildDetail(p)
     }
     d.mats = UI.List(d, {
         rowHeight = 22, cols = cols,
+        liveID = function(part) return part.itemID end,
         update = function(row, part)
             local c = row.cells.name
             c.icon:SetItem(part.itemID)
@@ -428,25 +448,60 @@ local function BuildDetail(p)
     d.empty:SetPoint("CENTER")
 end
 
-function T.ShowDetail()
+-- item names and colours arrived: the rows on screen show them
+function T.OnItems()
+    if list then list:Refresh() end
+    if detail and detail.mats then detail.mats:Refresh() end
+    if detail and detail.r then
+        detail.name:SetText(FT.ItemText(detail.r.output, 36) .. (detail.r.outputQty > 1 and FT.C("dim", string.format(" x%g", detail.r.outputQty)) or ""))
+    end
+end
+
+-- the materials of the chosen recipe bought at the auction house (or with no price yet)
+local function LiveMaterials(r)
+    return FT.Craft.MarketMaterials(r)
+end
+
+-- keepView: the charts keep their zoom (a live price came in)
+function T.ShowDetail(keepView)
     local d = detail
     if not d then return end
     local r = state.selected and FT.Craft.Find(state.selected)
     d.r = r
     local show = r ~= nil
-    for _, region in ipairs({ d.icon, d.name, d.sub, d.badge, d.reason, d.chart, d.pchart, d.matsTitle, d.mats,
+    for _, region in ipairs({ d.icon, d.name, d.sub, d.badge, d.reason, d.chart, d.pchart, d.matsTitle, d.liveText, d.mats,
         d.btnSearch, d.btnChart, d.btnWatch }) do
         region:SetShown(show)
     end
     for _, v in pairs(d.cells) do v:SetShown(show) end
     d.empty:SetShown(not show)
-    if not r then return end
+    if not r then
+        d.btnOpen:Hide()
+        return
+    end
     local e = FT.Craft.Eval(r)
     d.icon:SetItem(r.output)
     d.name:SetText(FT.ItemText(r.output, 36) .. (r.outputQty > 1 and FT.C("dim", string.format(" x%g", r.outputQty)) or ""))
     d.sub:SetText(ProfName(r.prof) .. FT.C("dim", "  ||  ") .. FT.Craft.KnownByText(r))
     d.badge:Set(e.signal, nil, e.strength)
     d.reason:SetText(e.reason or "")
+    -- worth crafting: open it in the profession window (this character must know it)
+    local craft = e.signal == "CRAFT"
+    d.btnOpen:SetShown(craft)
+    d.reason:ClearAllPoints()
+    d.reason:SetPoint("LEFT", d.badge, "RIGHT", 10, 0)
+    if craft then
+        d.reason:SetPoint("RIGHT", d.btnOpen, "LEFT", -8, 0)
+        local mine = r.knownBy[UnitName("player")]
+        d.btnOpen:SetUsable(mine == true)
+        if mine then
+            d.btnOpen:SetTip(L["Open recipe"], L["Opens this recipe in the game's profession window."])
+        else
+            d.btnOpen:SetTip(L["Open recipe"], string.format(L["Known by %s: log in with them to craft it."], FT.Craft.KnownByText(r)))
+        end
+    else
+        d.reason:SetPoint("RIGHT", d, "RIGHT", -12, 0)
+    end
 
     d.cells.cost:SetText(e.complete and FT.Money(e.cost) or FT.C("dim", L["incomplete"]))
     local rev = e.revenue and FT.Money(e.revenue) or FT.C("dim", "—")
@@ -459,7 +514,12 @@ function T.ShowDetail()
         d.cells.profit:SetText(FT.C("dim", "—"))
         d.cells.margin:SetText(FT.C("dim", "—"))
     end
-    d.cells.price:SetText((e.sellUnit and FT.Money(e.sellUnit, "short") or "—") .. "  " .. FT.Pct(e.stats.ch7) .. FT.C("dim", " 7d"))
+    d.cells.price:SetText((e.sellUnit and FT.Money(e.sellUnit, "short") or "—") .. "  " .. FT.Pct(e.stats.ch7) .. FT.C("dim", " 7d")
+        .. (e.spike and FT.C("accent", " !") or ""))
+    -- live: the item and its materials searched in turn at the open auction house
+    local on = FT.Scanner.LiveOn(r.output)
+    for _, id in ipairs(LiveMaterials(r)) do on = on or FT.Scanner.LiveOn(id) end
+    d.liveText:SetText(on and (FT.C("up", L["live"]) .. FT.C("dim", " || " .. L["the item and its materials"])) or "")
     local liqNames = { high = L["high"], medium = L["medium"], low = L["low"], unknown = L["no data"] }
     d.cells.sell:SetText(FT.C(FT.SIGNAL_COLORS[e.sell] or "muted", FT.SignalText(e.sell)) .. FT.C("dim", "  ||  " .. L["liquidity"] .. " " .. liqNames[e.liquidity]))
 
@@ -473,7 +533,7 @@ function T.ShowDetail()
         defaultCount = 30,
         emptyTitle = L["No price history"],
         emptyBody = L["No prices for it yet: scan My items or run a full scan at the auction house."],
-    })
+    }, keepView)
     d.pchart:SetData({
         candles = UI.LineCandles(FT.Craft.History(r, 30), "profit"),
         mode = "line",
@@ -483,7 +543,7 @@ function T.ShowDetail()
         defaultCount = 30,
         emptyTitle = L["No history yet"],
         emptyBody = L["Needs a few days of prices for the item and its materials."],
-    })
+    }, keepView)
     d.mats:SetItems(e.parts)
     local watched = FT.Market.IsWatched(r.output)
     d.btnWatch:SetLabel(watched and L["In watchlist"] or L["Watch"])
@@ -513,11 +573,45 @@ function T.Select(key)
         end
     end
     T.ShowDetail()
+    -- with the auction house open what it makes is searched now
+    if detail and detail.r then FT.Scanner.LiveNow(detail.r.output) end
 end
 
 function T.Refresh()
     UpdateFilters()
     T.RefreshList(true)
+end
+
+-- kept live at the auction house: what the chosen recipe makes, then its materials in turn - its cost and
+-- profit follow the market too
+function T.LiveItems()
+    local r = detail and detail:IsVisible() and detail.r
+    if not r then return nil end
+    local list = { r.output }
+    for _, id in ipairs(LiveMaterials(r)) do list[#list + 1] = id end
+    return list
+end
+
+-- a live price came in (id), or the auction house opened or closed (nil)
+function T.OnLive(_, id)
+    local r = detail and detail.r
+    if not r then return end
+    local mine = id == nil or id == r.output
+    if not mine then
+        for _, rg in ipairs(r.reagents) do
+            if rg.itemID == id then mine = true end
+        end
+    end
+    if mine then
+        T.ShowDetail(true)
+        if list then
+            -- its row in the table shows the new cost and profit too
+            for _, x in ipairs(list.items) do
+                if x.r == r then x.e = FT.Craft.Eval(r) end
+            end
+            list:Refresh()
+        end
+    end
 end
 
 T.OnShow = T.Refresh

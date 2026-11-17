@@ -8,12 +8,17 @@ FT.An = An
 ---------------------------------------------------------------------------
 -- Indicators over a list of numbers (oldest first)
 ---------------------------------------------------------------------------
-function An.SMA(values, n)
+-- partial: the first values (fewer than n so far) get the average of what there is
+function An.SMA(values, n, partial)
     local out, sum = {}, 0
     for i = 1, #values do
         sum = sum + values[i]
         if i > n then sum = sum - values[i - n] end
-        if i >= n then out[i] = sum / n end
+        if i >= n then
+            out[i] = sum / n
+        elseif partial then
+            out[i] = sum / i
+        end
     end
     return out
 end
@@ -80,6 +85,7 @@ end
 ---------------------------------------------------------------------------
 local cache = {}
 FT.On("FT_PRICES_CHANGED", function() wipe(cache) end)
+FT.On("FT_LIVE_UPDATED", function(itemID) if itemID then cache[itemID] = nil end end)
 FT.On("FT_SCAN_DONE", function() wipe(cache) end)
 FT.On("FT_SETTINGS_CHANGED", function() wipe(cache) end)
 
@@ -95,8 +101,90 @@ local function Change(now, ref)
     return now / ref - 1
 end
 
+---------------------------------------------------------------------------
+-- The fair price right now: what the market stood at lately, so a sudden jump (someone bought out the cheap
+-- lots and listed them three times higher) or a sudden fall (other crafters undercutting) shows against it.
+-- The median of the prices of the last days up to an hour ago, each weighted by how many were listed at it,
+-- how long it stood (not how often it was looked at) and how recent it is (half the weight a day): the hour
+-- that just went by doesn't move it, a new level the market keeps for hours does.
+---------------------------------------------------------------------------
+local HALF_LIFE = 24 * 3600
+local LOOK_BACK = 4 * 86400
+local SETTLED = 3600
+local MAX_SPAN = 3 * 3600
+
+-- fair price, the number usually listed (nil: no prices from before the last hour)
+function An.FairNow(itemID)
+    local now = time()
+    local cutoff = now - SETTLED
+    local obs = {}
+    local function Add(p, q, t, span)
+        if p and p > 0 and t and t <= cutoff and now - t <= LOOK_BACK then
+            obs[#obs + 1] = { p = p, q = q, t = t, span = span }
+        end
+    end
+    local s = FT.Hist.Snaps(itemID)
+    local firstSnap = s and s.t[1]
+    -- the days before today: their closing price stood about half a day (where intraday prices don't cover it)
+    local today = FT.Day()
+    for _, c in ipairs(FT.Hist.Daily(itemID, 5)) do
+        if c.day < today then
+            local t = c.t + 43200
+            if not firstSnap or t < firstSnap then Add(c.c, c.v, t, 12 * 3600) end
+        end
+    end
+    if s then
+        for i = 1, #s.t do Add(s.p[i], s.q[i], s.t[i], nil) end
+    end
+    if #obs == 0 then return nil end
+    table.sort(obs, function(a, b) return a.t < b.t end)
+    -- an intraday price stood until the next one (at most 3 hours: a long silence says nothing)
+    for i, o in ipairs(obs) do
+        if not o.span then
+            local nextT = obs[i + 1] and obs[i + 1].t or cutoff
+            o.span = math.max(600, math.min(nextT - o.t, MAX_SPAN))
+        end
+    end
+    local qs = {}
+    for _, o in ipairs(obs) do
+        if o.q and o.q > 0 then qs[#qs + 1] = o.q end
+    end
+    table.sort(qs)
+    local qMid = #qs > 0 and qs[math.ceil(#qs / 2)] or 1
+    local total, sumQ, sumR = 0, 0, 0
+    for _, o in ipairs(obs) do
+        local r = 0.5 ^ ((now - o.t) / HALF_LIFE) * o.span
+        local q = (o.q and o.q > 0) and o.q or qMid
+        o.w = q * r
+        total = total + o.w
+        sumQ, sumR = sumQ + q * r, sumR + r
+    end
+    table.sort(obs, function(a, b) return a.p < b.p end)
+    local acc, fair = 0, obs[#obs].p
+    for _, o in ipairs(obs) do
+        acc = acc + o.w
+        if acc >= total / 2 then
+            fair = o.p
+            break
+        end
+    end
+    return fair, sumR > 0 and sumQ / sumR or nil
+end
+
+-- far above the fair price: a buyout (or a shortage) - not to be counted on for long (Settings: by how much)
+local function Spike(s)
+    if FT.S.spikeGuard == false or not (s.price and s.fair) then return false end
+    return s.price > s.fair * (1 + (FT.S.spikeAbove or 50) / 100)
+end
+
+-- far below the fair price: falling fast - others undercut (Settings: by how much)
+local function Falling(s)
+    if not (s.price and s.fair) then return false end
+    return s.price < s.fair * (1 - (FT.S.fallBelow or 20) / 100)
+end
+
 -- { price, t, source, listed, ch1, ch7, ch30, avg, dev, rsi, hi7, lo7, hi30, lo30, vol, days, auctions,
---   sellers, closes, daily }
+--   sellers, closes, daily, fair, typicalQ, spike, sale (the price to count on when selling) }
 function An.Stats(itemID)
     local s = cache[itemID]
     if s then return s end
@@ -150,6 +238,12 @@ function An.Stats(itemID)
         s.listed = s.listed or book.qty
         s.bookT = book.t
     end
+    s.fair, s.typicalQ = An.FairNow(itemID)
+    s.spike = Spike(s)
+    s.falling = Falling(s)
+    -- more listed than usual: competitors are selling
+    s.moreListed = s.listed and s.typicalQ and s.typicalQ > 0 and s.listed > s.typicalQ * 1.3 and (s.listed / s.typicalQ - 1) or nil
+    s.sale = s.spike and s.fair or s.price
     cache[itemID] = s
     return s
 end
@@ -169,7 +263,9 @@ function An.DevSeries(itemID, days)
                 sum, n = sum + prev.c, n + 1
             end
             if n >= 3 and sum > 0 then
-                out[#out + 1] = { t = c.t, value = c.c / (sum / n) - 1 }
+                -- in money: what selling one now brings above (or below) the average price
+                local avg = sum / n
+                out[#out + 1] = { t = c.t, value = c.c - avg, pct = c.c / avg - 1 }
             end
         end
     end
@@ -196,6 +292,11 @@ end
 
 -- for something you have or make: sell now?
 function An.SellSignal(s)
+    -- a buyout: worth selling a little under it now - it won't last
+    if s.spike then
+        return "SELL", 2, string.format(L["Price jump (buyout?): %s above its fair price ~%s - sell a little under it now, it won't last"],
+            FT.Pct(s.price / s.fair - 1, true), FT.Money(s.fair, "short"))
+    end
     if not Enough(s) then return "NODATA", 0, L["Not enough price history yet"] end
     local th = FT.S.sellAbove / 100
     local dev = s.dev or 0

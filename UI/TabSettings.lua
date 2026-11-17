@@ -121,32 +121,14 @@ end
 
 -- "reload now?" after a change that only shows after a reload (language, style, ticker tape)
 function FT.AskReload(text)
-    StaticPopup_Show("FOREVERTRADING_RELOAD", text or L["This change shows after the interface reloads. Reload now?"])
+    UI.Confirm({
+        title = L["Reload UI"],
+        text = text or L["This change shows after the interface reloads. Reload now?"],
+        ok = L["Reload UI"],
+        cancel = L["Later"],
+        onOK = function() ReloadUI() end,
+    })
 end
-
-StaticPopupDialogs["FOREVERTRADING_RELOAD"] = {
-    text = "%s",
-    button1 = YES,
-    button2 = NO,
-    OnAccept = function() ReloadUI() end,
-    timeout = 0,
-    whileDead = true,
-    hideOnEscape = true,
-}
-
-StaticPopupDialogs["FOREVERTRADING_CLEAR"] = {
-    text = "%s",
-    button1 = YES,
-    button2 = NO,
-    OnAccept = function()
-        FT.Hist.ClearAll()
-        FT.Print(L["Price history cleared."])
-        T.Refresh()
-    end,
-    timeout = 0,
-    whileDead = true,
-    hideOnEscape = true,
-}
 
 function T.Build(p)
     local scroll, content = UI.ScrollArea(p)
@@ -157,7 +139,7 @@ function T.Build(p)
     local right = CreateFrame("Frame", nil, content)
 
     -- general
-    local g = Section(left, L["General"], 8)
+    local g = Section(left, L["General"], 9)
     Choice(g, "lang", L["Language"], { { "auto", L["Game language"] }, { "ru", "Русский" }, { "en", "English" } },
         L["Takes effect after /reload."], function()
             FT.AskReload(L["The new language shows after the interface reloads. Reload now?"])
@@ -172,19 +154,22 @@ function T.Build(p)
                 w:SetScale(v)
                 FT.ResetWindow()
             end
+            FT.Detail.Rescale(v)
         end)
     Check(g, "ticker", L["Ticker tape under the header"], L["Your watchlist and the day's biggest movers, scrolling. Takes effect after /reload."],
         function() FT.AskReload() end)
     Check(g, "minimap", L["Minimap button"], nil, function() if FT.UpdateMinimap then FT.UpdateMinimap() end end)
     Check(g, "ahButton", L["Button on the auction house"], L["Opens ForeverTrading next to the auction house window."])
+    Check(g, "replaceAH", L["Open ForeverTrading instead of the auction house window"],
+        L["Talking to an auctioneer opens ForeverTrading; the game's window stays open behind it, unseen. The \"AH: online\" pill in the header brings it back for buying and selling (and Auctionator). Walking away: the terminal goes offline with the last known prices."])
     Check(g, "tooltip", L["Lines in item tooltips"], L["Price change, RSI, the signal and the craft profit of the item."])
     Check(g, "versionCheck", L["Tell me about new versions"],
         L["ForeverTrading users in your guild and group tell each other which version they have (a hidden addon message): a newer one shows in chat and in the status bar."])
 
     -- scanning
     local sc = Section(left, L["Scanning"], 4)
-    Check(sc, "autoMine", L["Scan My items when the auction house opens"],
-        L["When they haven't been seen for 30 minutes. It pauses while you search yourself."])
+    Check(sc, "liveRefresh", L["Live price of the open item"],
+        L["While the auction house is open, the item you have open (on the Market or in its own window) is searched again every 8 seconds: its price and order book stay fresh. On the Craft page the recipe's item and its materials take turns, so its cost and profit stay fresh too. It pauses while you search, buy or sell yourself, and slows down when the server is busy."])
     Check(sc, "autoFull", L["Full scan when the auction house opens"], L["At most once an hour."])
     Check(sc, "deepFull", L["Deep full scan (every auction)"],
         L["Reads every single auction (the game allows it once every 15 minutes): order books and auction counts of every item, not only the lowest price. The game freezes for a few seconds while it is read. In between, the quick full scan runs."])
@@ -212,12 +197,31 @@ function T.Build(p)
     Check(al, "alertChat", L["Message in chat on a price alert"])
 
     -- signals
-    local sg = Section(right, L["Signals"], 5)
+    local sg = Section(right, L["Signals"], 8)
     MoneyField(sg, "minProfit", L["Craft: minimum profit"], L["A recipe with less profit gets WATCH instead of CRAFT."])
     Number(sg, "minMargin", L["Craft: minimum margin"], "%", nil, false, 0, 500)
     Number(sg, "sellAbove", L["Sell when the price is above average by"], "%", nil, false, 1, 500)
     Number(sg, "buyBelow", L["Buy when the price is below average by"], "%", nil, false, 1, 95)
     Choice(sg, "avgDays", L["Average over"], { { 7, L["7 days"] }, { 14, L["14 days"] }, { 30, L["30 days"] } })
+    Check(sg, "spikeGuard", L["Don't trust buyouts"],
+        L["Someone bought out the cheap lots and listed them far higher: the lowest price then says little. The fair price is the median of the prices of the last days up to an hour ago, each weighted by how many were listed at it and how recent it is. When the price is far above it, profits and signals count the fair price."])
+    Choice(sg, "spikeAbove", L["Jump: above the fair price by"], { { 30, "30%" }, { 50, "50%" }, { 100, "100%" }, { 200, "200%" } })
+    Choice(sg, "fallBelow", L["Falling fast: below the fair price by"], { { 10, "10%" }, { 20, "20%" }, { 30, "30%" }, { 50, "50%" } },
+        L["Other crafters undercut: a craft of an item falling this fast gets RISKY - by the time yours is listed the price may be lower still."])
+
+    -- exchange
+    local ex = Section(right, L["Exchange"], 3)
+    Check(ex, "shareAuto", L["Ask guild and group for fresh prices"],
+        L["When your prices of the whole market are more than an hour old, ForeverTrading asks its users in your guild (then your group) who has fresher ones; the freshest sends its last full scan in the background. At most once an hour."])
+    Check(ex, "shareSend", L["Share my scans"],
+        L["When someone in your guild or group asks, your fresh full scan goes to them in the background: hidden addon messages, one a second, paused in a fight."])
+    T.shareText = UI.Text(ex, 11, "dim")
+    T.shareText:SetPoint("TOPLEFT", 14, ex.y - 6)
+    local askNow = UI.Button(ex, L["Ask now"], 10, 24, "default", function() FT.Share.Ask(true) end)
+    askNow:FitText(24)
+    askNow:SetPoint("TOPRIGHT", -14, ex.y)
+    T.shareText:SetPoint("RIGHT", askNow, "LEFT", -10, 0)
+    Next(ex)
 
     -- data
     local dt = Section(right, L["Data"], 5)
@@ -230,7 +234,17 @@ function T.Build(p)
     T.footprint = UI.Text(dt, 11, "dim")
     T.footprint:SetPoint("TOPLEFT", 14, dt.y - 6)
     local clear = UI.Button(dt, L["Clear history"], 10, 24, "down", function()
-        StaticPopup_Show("FOREVERTRADING_CLEAR", L["Clear ForeverTrading's price history (day candles, intraday, order books) of this server? Auctionator's and Mastercraft's own data stay."])
+        UI.Confirm({
+            title = L["Clear history"],
+            text = L["Clear ForeverTrading's price history (day candles, intraday, order books) of this server? Auctionator's and Mastercraft's own data stay."],
+            ok = L["Clear history"],
+            okStyle = "down",
+            onOK = function()
+                FT.Hist.ClearAll()
+                FT.Print(L["Price history cleared."])
+                T.Refresh()
+            end,
+        })
     end)
     clear:FitText(24)
     clear:SetPoint("TOPRIGHT", -14, dt.y)
@@ -277,7 +291,7 @@ function T.Build(p)
         right:SetPoint("TOPLEFT", cw + 10, 0)
         right:SetWidth(cw)
         local h1 = Stack(left, { g, sc, so, pr, al })
-        local h2 = Stack(right, { sg, dt, ab })
+        local h2 = Stack(right, { sg, ex, dt, ab })
         left:SetHeight(h1)
         right:SetHeight(h2)
         self:SetHeight(math.max(h1, h2))
@@ -288,6 +302,12 @@ function T.Refresh()
     for _, fn in ipairs(controls) do fn() end
     local items, size = FT.Hist.Footprint()
     T.footprint:SetText(string.format(L["%d items, about %s KB saved"], items, FT.Num(math.ceil(size / 1024))))
+    local meta = FT.R().meta
+    if meta.lastPeer then
+        T.shareText:SetText(string.format(L["Last received: %s from %s"], FT.Ago(meta.lastPeer), meta.lastPeerFrom or "?"))
+    else
+        T.shareText:SetText(L["Nothing received yet"])
+    end
     local lines = {
         "ForeverTrading " .. FT.VERSION_TEXT,
         "Auctionator: " .. (FT.Atr.Loaded() and FT.C("up", L["connected"]) or FT.C("down", L["not loaded"])) ..

@@ -52,9 +52,13 @@ function UI.OrderBook(parent)
     f.calc = UI.Input(f, 70, 22, L["qty"], function() f:UpdateCalc() end)
     f.calc:SetPoint("BOTTOMRIGHT", -12, 56)
     f.calc:SetNumeric(true)
+    -- at the auction house: buy what the box says
+    f.buy = UI.Button(f, L["Buy"], 10, 22, "primary", function() f:Buy() end)
+    f.buy:FitText(24)
+    f.buy:SetPoint("BOTTOMRIGHT", -12, 29)
     f.calcResult = UI.Text(f, 12, "text")
     f.calcResult:SetPoint("BOTTOMLEFT", 12, 34)
-    f.calcResult:SetPoint("RIGHT", -12, 0)
+    f.calcResult:SetPoint("RIGHT", f.buy, "LEFT", -8, 0)
     f.calcAvg = UI.Text(f, 11, "dim")
     f.calcAvg:SetPoint("BOTTOMLEFT", 12, 16)
     f.calcAvg:SetPoint("RIGHT", -12, 0)
@@ -84,8 +88,15 @@ function UI.OrderBook(parent)
             if self.cumQty then
                 UI.TipText(self, string.format(L["Buy up to %s"], FT.Money(self.unit)),
                     string.format(L["%d pcs for %s (avg %s)"], self.cumQty, FT.Money(self.cumCost),
-                        FT.Money(self.cumCost / math.max(1, self.cumQty))))
+                        FT.Money(self.cumCost / math.max(1, self.cumQty))) .. "\n\n" .. L["Click: that many in the buy box below."])
             end
+        end)
+        -- a level clicked: buy everything up to its price
+        r:SetScript("OnMouseUp", function(self)
+            if not self.cumQty then return end
+            f.calc:SetText(tostring(self.cumQty))
+            f.calc:ClearFocus()
+            f:UpdateCalc()
         end)
         r:SetScript("OnLeave", function(self)
             self.hl:Hide()
@@ -111,6 +122,8 @@ function UI.OrderBook(parent)
     end
 
     function f:SetItem(itemID)
+        -- another item: the quantity typed for the last one doesn't carry over
+        if itemID ~= self.itemID then self.calc:SetText("") end
         self.itemID = itemID
         self:Refresh()
     end
@@ -167,7 +180,49 @@ function UI.OrderBook(parent)
         self:UpdateCalc()
     end
 
+    -- the Buy button: at the auction house, with a quantity (gear: its cheapest auction)
+    function f:UpdateBuy()
+        local id = self.itemID
+        local qty = tonumber(self.calc:GetText())
+        local commodity = id and FT.Buy.IsCommodity(id)
+        local gear = commodity == false
+        local can = id and FT.Buy.Possible() and commodity ~= nil and (gear or (qty and qty > 0))
+        self.buy:SetUsable(can and true or false)
+        if not FT.Buy.Possible() then
+            self.buy:SetTip(L["Buy"], L["Talk to an auctioneer to buy."])
+        elseif commodity == nil then
+            -- the game is loading the item: asked again in a moment
+            self.buy:SetTip(L["Buy"], L["The item is still loading: try again in a moment."])
+            if id and not self.recheck then
+                self.recheck = true
+                C_Timer.After(1, function()
+                    self.recheck = false
+                    if self.itemID == id then self:UpdateBuy() end
+                end)
+            end
+        elseif gear then
+            self.buy:SetTip(L["Buy"], L["Gear is bought one auction at a time: its cheapest with a buyout. You confirm its price first."])
+        elseif not (qty and qty > 0) then
+            self.buy:SetTip(L["Buy"], L["Type a quantity or click a price in the order book."])
+        else
+            self.buy:SetTip(L["Buy"], L["The cheapest that many: the server tells their exact price first, you confirm."])
+        end
+    end
+
+    function f:Buy()
+        local id = self.itemID
+        if not id then return end
+        local qty = tonumber(self.calc:GetText())
+        local commodity = FT.Buy.IsCommodity(id)
+        if commodity == nil then return end
+        if not commodity then qty = 1 end
+        if not (qty and qty > 0) then return end
+        local cost, _, avg = FT.Hist.CostToBuy(id, qty)
+        FT.Buy.Start(id, qty, avg or (cost and cost / qty) or FT.Price(id))
+    end
+
     function f:UpdateCalc()
+        self:UpdateBuy()
         local qty = tonumber(self.calc:GetText())
         if not (self.itemID and qty and qty > 0) then
             self.calcResult:SetText(FT.C("dim", L["Type a quantity"]))

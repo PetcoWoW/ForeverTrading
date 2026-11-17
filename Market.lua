@@ -159,6 +159,17 @@ function M.Row(id)
     return byID[id]
 end
 
+-- one item's row again (its live price): the list keeps its place
+function M.Touch(id)
+    local row = byID[id]
+    if not row or building then return end
+    local fresh = RowFromOwn(id, FT.Day())
+    if fresh then
+        for k in pairs(row) do row[k] = nil end
+        for k, v in pairs(fresh) do row[k] = v end
+    end
+end
+
 function M.Building()
     return building
 end
@@ -298,3 +309,4 @@ end
 
 FT.On("FT_SCAN_DONE", function() FT.Debounce("alerts", 2, M.CheckAlerts) end)
 FT.On("FT_PRICES_CHANGED", function() FT.Debounce("alerts", 2, M.CheckAlerts) end)
+FT.On("FT_LIVE_UPDATED", function() FT.Debounce("alerts", 2, M.CheckAlerts) end)

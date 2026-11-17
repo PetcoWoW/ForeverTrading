@@ -1,6 +1,7 @@
 -- ForeverTrading: what we read from the game ourselves, so it also works without Mastercraft:
 -- the recipes of your profession windows, your bags and bank, and what merchants charge.
 local ADDON, FT = ...
+local L = FT.L
 
 local G = {}
 FT.Game = G
@@ -21,6 +22,12 @@ local PROF_EN = {
     ["Smelting"] = "Mining", ["Выплавка металлов"] = "Mining", ["Verhüttung"] = "Mining",
     ["Jewelcrafting"] = "Jewelcrafting", ["Ювелирное дело"] = "Jewelcrafting",
     ["Poisons"] = "Poisons", ["Яды"] = "Poisons",
+    ["Inscription"] = "Inscription", ["Начертание"] = "Inscription", ["Inschriftenkunde"] = "Inscription",
+    ["Fishing"] = "Fishing", ["Рыбная ловля"] = "Fishing", ["Angeln"] = "Fishing",
+    ["Skinning"] = "Skinning", ["Снятие шкур"] = "Skinning", ["Kürschnerei"] = "Skinning",
+    ["Herbalism"] = "Herbalism", ["Травничество"] = "Herbalism", ["Kräuterkunde"] = "Herbalism",
+    ["Lockpicking"] = "Lockpicking", ["Взлом замков"] = "Lockpicking", ["Вскрытие замков"] = "Lockpicking",
+    ["Schlossknacken"] = "Lockpicking",
 }
 function FT.ProfKey(name)
     return name and (PROF_EN[name] or name) or "?"
@@ -155,6 +162,75 @@ local function ScanCraft()
     if G.retry then FT.Debounce("craftRetry", 2, ScanCraft) end
 end
 
+---------------------------------------------------------------------------
+-- Open a recipe in the game's profession window
+---------------------------------------------------------------------------
+local pending -- { name, at }: chosen as soon as the classic profession window opens
+
+-- the classic windows (trade skills, enchanting): choose the recipe in the open one and scroll to it
+local function SelectIn(count, info, setSelection, select, scroll, shown, height, update, expand)
+    if expand then pcall(expand, 0) end
+    local n = count()
+    for i = 1, n do
+        local name, kind = info(i)
+        if name == pending.name and kind ~= "header" and kind ~= "subheader" then
+            if setSelection then pcall(setSelection, i) elseif select then pcall(select, i) end
+            if scroll and FauxScrollFrame_SetOffset then
+                local offset = math.max(0, math.min(i - 1, n - (shown or 8)))
+                pcall(FauxScrollFrame_SetOffset, scroll, offset)
+                local bar = scroll.ScrollBar or _G[(scroll:GetName() or "") .. "ScrollBar"]
+                if bar and bar.SetValue then pcall(bar.SetValue, bar, offset * (height or 16)) end
+            end
+            if update then pcall(update) end
+            return true
+        end
+    end
+    return false
+end
+
+local function SelectPending()
+    if not pending or GetTime() - pending.at > 120 then return false end
+    if TradeSkillFrame and TradeSkillFrame:IsShown() and GetNumTradeSkills and GetTradeSkillInfo then
+        if SelectIn(GetNumTradeSkills, GetTradeSkillInfo, TradeSkillFrame_SetSelection, SelectTradeSkill,
+            TradeSkillListScrollFrame, TRADE_SKILLS_DISPLAYED, TRADE_SKILL_HEIGHT, TradeSkillFrame_Update,
+            ExpandTradeSkillSubClass) then
+            pending = nil
+            return true
+        end
+    end
+    if CraftFrame and CraftFrame:IsShown() and GetNumCrafts and GetCraftInfo then
+        local function Info(i)
+            local name, _, kind = GetCraftInfo(i)
+            return name, kind
+        end
+        if SelectIn(GetNumCrafts, Info, CraftFrame_SetSelection, SelectCraft, CraftListScrollFrame, CRAFTS_DISPLAYED,
+            CRAFT_SKILL_HEIGHT, CraftFrame_Update, ExpandCraftSkillLine) then
+            pending = nil
+            return true
+        end
+    end
+    return false
+end
+
+-- r: a recipe of FT.Craft. The modern profession window opens right at it; the classic one has it chosen
+-- when it is open or as soon as you open it (the game lets only you open a profession)
+function FT.OpenRecipeInGame(r)
+    if not r then return false end
+    if InCombatLockdown and InCombatLockdown() then
+        FT.Print(L["Not during a fight."])
+        return false
+    end
+    local T = C_TradeSkillUI
+    if r.id and T and T.OpenRecipe and pcall(T.OpenRecipe, r.id) then return true end
+    pending = { name = r.name, at = GetTime() }
+    if SelectPending() then return true end
+    FT.Print(string.format(L["Open the %s window: the recipe is chosen there by itself."], L[r.prof] or r.prof))
+    return false
+end
+
+FT.On("TRADE_SKILL_SHOW", function() C_Timer.After(0.3, SelectPending) end)
+FT.On("CRAFT_SHOW", function() C_Timer.After(0.3, SelectPending) end)
+
 FT.On("TRADE_SKILL_SHOW", function() C_Timer.After(0.5, ScanTrade) end)
 FT.On("TRADE_SKILL_UPDATE", function() FT.Debounce("tradeScan", 0.6, ScanTrade) end)
 FT.On("TRADE_SKILL_LIST_UPDATE", function() FT.Debounce("tradeScan", 0.6, ScanTrade) end)
@@ -167,15 +243,16 @@ FT.On("CRAFT_UPDATE", function() FT.Debounce("craftScan", 0.6, ScanCraft) end)
 local Container = C_Container
 local NumSlots = (Container and Container.GetContainerNumSlots) or GetContainerNumSlots
 
+-- itemID, count, bound (nil: ask the item), link
 local function SlotInfo(bag, slot)
     if Container and Container.GetContainerItemInfo then
         local info = Container.GetContainerItemInfo(bag, slot)
-        if info then return info.itemID, info.stackCount or 1, info.isBound end
+        if info then return info.itemID, info.stackCount or 1, info.isBound, info.hyperlink end
         return nil
     end
     if GetContainerItemInfo then
         local _, count, _, _, _, _, link, _, _, itemID = GetContainerItemInfo(bag, slot)
-        return itemID or ItemID(link), count or 1, nil
+        return itemID or ItemID(link), count or 1, nil, link
     end
 end
 
@@ -221,6 +298,42 @@ local function BankList()
     local out = { BANK_CONTAINER or -1 }
     local first = (NUM_BAG_SLOTS or 4) + 1
     for b = first, first + (NUM_BANKBAGSLOTS or 6) - 1 do out[#out + 1] = b end
+    return out
+end
+
+-- What this character carries that the auction house could take (not bound): stackable goods one entry per
+-- item (all its stacks together), everything else one entry per bag slot.
+-- { id, count, gear, bag, slot (the first), link, slots = { { bag, slot, count }, ... } }
+local GetItem = (C_Item and C_Item.GetItemInfo) or GetItemInfo
+function FT.BagItems()
+    local byID, out = {}, {}
+    for _, bag in ipairs(BagList()) do
+        for slot = 1, (NumSlots and NumSlots(bag) or 0) do
+            local id, count, isBound, link = SlotInfo(bag, slot)
+            if id and not IsBound(bag, slot, isBound) then
+                local stack = select(8, GetItem(id))
+                if stack == 1 then
+                    -- this very item (another copy of it, another version, has its own)
+                    local guid
+                    if C_Item and C_Item.GetItemGUID and ItemLocation and ItemLocation.CreateFromBagAndSlot then
+                        local ok, g = pcall(C_Item.GetItemGUID, ItemLocation:CreateFromBagAndSlot(bag, slot))
+                        if ok then guid = g end
+                    end
+                    out[#out + 1] = { id = id, count = 1, gear = true, bag = bag, slot = slot, link = link, guid = guid,
+                        slots = { { bag, slot, 1 } } }
+                else
+                    local e = byID[id]
+                    if not e then
+                        e = { id = id, count = 0, bag = bag, slot = slot, link = link, slots = {} }
+                        byID[id] = e
+                        out[#out + 1] = e
+                    end
+                    e.count = e.count + count
+                    e.slots[#e.slots + 1] = { bag, slot, count }
+                end
+            end
+        end
+    end
     return out
 end
 

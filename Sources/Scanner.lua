@@ -5,7 +5,8 @@
 --  * My items: what your recipes make and use, your watchlist and what you own - one search each, cheapest
 --    first: its order book and price.
 --  * And everything you look at yourself on the auction house is kept too.
--- When you (or another addon) search, "my items" pauses and goes on by itself.
+--  * Live: the item you have open (Market, Craft, its own window) is searched again every few seconds.
+-- When you (or another addon) search, "my items" and live pause and go on by themselves.
 local ADDON, FT = ...
 local L = FT.L
 
@@ -649,6 +650,27 @@ local function Step()
     Send()
 end
 
+-- The My items button: it reads the order book of every item of yours, one search each - that takes minutes,
+-- so it asks first
+function S.AskMine()
+    if not NeedAH(false) then return false end
+    if S.mode then
+        FT.Print(L["A scan is already running."])
+        return false
+    end
+    S.LoadListed()
+    local n = #S.MineList()
+    -- nothing to read: StartMine says why
+    if n == 0 then return S.StartMine() end
+    FT.UI.Confirm({
+        title = L["My items"],
+        text = string.format(L["My items: the order book of every item your recipes make and use, your watchlist and what you own - one search each, %s items now. It can take a few minutes. Your own searches at the auction house pause it, and live prices wait for it."], FT.Num(n)),
+        ok = L["Continue"],
+        onOK = function() S.StartMine() end,
+    })
+    return true
+end
+
 -- ids: just these items (no full scan first, however recently they were seen)
 function S.StartMine(quiet, ids)
     if not NeedAH(quiet) then return false end
@@ -682,7 +704,230 @@ function S.StartMine(quiet, ids)
     return true
 end
 
--- an answer about one item: ours (my items) or anything you looked at yourself
+---------------------------------------------------------------------------
+-- Live: the item you have open, searched again every few seconds while the auction house is open (on the
+-- Craft page the recipe's item and its materials take turns). One search at a time, only when nothing else
+-- runs, never right after a search of yours, slower when the server says it is busy.
+---------------------------------------------------------------------------
+local LIVE_EVERY = 8  -- one item: searched every 8 seconds
+local LIVE_TURN = 4   -- several (an item and its materials): one of them every 4 seconds
+local LIVE_SLOW = 30
+-- head: the item opened (the first of the list); turn: whose turn it was; answered: itemID -> when prices came
+local live = { id = nil, head = nil, turn = 0, sentAt = 0, slowUntil = 0, rest = {}, answered = {}, named = {} }
+local GetInfo = (C_Item and C_Item.GetItemInfo) or GetItemInfo
+
+-- The key an item is searched by. Stackable goods: the item itself. Gear is listed under a key with its item
+-- level (and version, "of the Bear"): the one the last full scan (or a search by name) found, else one made
+-- with the item's own level. how: "known" / "level" / "bare"
+function S.KeyFor(id)
+    S.LoadListed()
+    local known = S.listed and S.listed[id]
+    if type(known) == "table" then return known, "known" end
+    if FT.Buy and FT.Buy.IsCommodity(id) == false then
+        local level = select(4, GetInfo(id))
+        if level and level > 0 then
+            local ok, key = pcall(AH.MakeItemKey, id, level)
+            if ok and type(key) == "table" then return key, "level" end
+        end
+    end
+    return AH.MakeItemKey(id), "bare"
+end
+
+-- a key found for an item (by a search by name): used from now on and kept for the next time
+local function Learn(id, key)
+    S.LoadListed()
+    S.listed = S.listed or {}
+    S.listed[id] = key
+    local r = FT.R()
+    r.listed = r.listed or {}
+    r.listed[id] = KeyText(key)
+end
+
+-- the game's auction house window on screen: its browse list is yours (not replaced by our searches by name)
+local function WindowOnScreen()
+    local f = AuctionHouseFrame
+    return f ~= nil and f:IsVisible() and f:GetAlpha() > 0.05
+end
+
+-- gear not found under its key: its versions looked up by name, once (the cheapest one is searched next)
+local function FindByName(id)
+    if live.named[id] or WindowOnScreen() then return false end
+    local name = FT.Name(id)
+    if not name then return false end
+    live.named[id] = true
+    S.sending = true
+    local ok = pcall(AH.SendBrowseQuery, { searchString = name, sorts = PriceSort(), filters = {}, itemClassFilters = {} })
+    S.sending = false
+    if ok then live.browseFor, live.browseAt = id, GetTime() end
+    return ok
+end
+S.otherAt = 0
+
+-- the items on screen, all taking turns: the item window's, the open page's item (on the Craft page its
+-- materials too)
+local function LiveTargets()
+    if not FT.S.liveRefresh then return nil end
+    local list, seen = {}, {}
+    local function Add(id)
+        if id and not seen[id] then
+            seen[id] = true
+            list[#list + 1] = id
+        end
+    end
+    if FT.Detail and FT.Detail.Items then
+        for _, id in ipairs(FT.Detail.Items() or {}) do Add(id) end
+    end
+    if FT.IsShown and FT.IsShown() then
+        local tab = FT.Tabs and FT.Tabs[FT.currentTab]
+        if tab and tab.LiveItems then
+            for _, id in ipairs(tab.LiveItems() or {}) do Add(id) end
+        elseif tab and tab.LiveItem then
+            Add(tab.LiveItem())
+        end
+    end
+    return list[1] and list or nil
+end
+
+-- the auction house window is busy with an item of its own (buying, selling): it goes first
+local function AHBusy()
+    local f = AuctionHouseFrame
+    if f and not f:IsVisible() then return false end
+    if not f then return false end
+    for _, k in ipairs({ "CommoditiesBuyFrame", "ItemBuyFrame" }) do
+        local sub = f[k]
+        if type(sub) == "table" and sub.IsVisible and sub:IsVisible() then return true end
+    end
+    -- its Sell tab only with an item placed in it
+    for _, k in ipairs({ "CommoditiesSellFrame", "ItemSellFrame" }) do
+        local sub = f[k]
+        if type(sub) == "table" and sub.IsVisible and sub:IsVisible() then
+            local ok, item = pcall(function() return sub.GetItem and sub:GetItem() end)
+            if not ok or item then return true end
+        end
+    end
+    return false
+end
+
+S.AHBusy = AHBusy
+
+local function LiveStep()
+    if not (FT.ahOpen and Modern()) then
+        live.list = nil
+        return
+    end
+    local list = LiveTargets()
+    live.list = list
+    if not (list and list[1]) then
+        live.head = nil
+        return
+    end
+    -- a scan goes first (ours or Auctionator's): the items wait for it, their circles pale
+    live.blocked = S.mode ~= nil or FT.atrScanning
+    if live.blocked then return end
+    local now = GetTime()
+    -- another item opened: it goes first, now
+    if list[1] ~= live.head then
+        live.head, live.turn, live.sentAt = list[1], 0, 0
+    end
+    local every = now < live.slowUntil and LIVE_SLOW or (#list > 1 and LIVE_TURN or LIVE_EVERY)
+    live.every = every
+    -- an item just opened goes before the others
+    local turn
+    if live.now then
+        for k, id in ipairs(list) do
+            if id == live.now and not (live.rest[id] and now < live.rest[id]) then turn = k end
+        end
+        if not turn then live.now = nil end
+    end
+    if not turn then
+        if now - live.sentAt < every then return end
+        -- whose turn: the next one, passing over the items resting (gear with nothing under its key)
+        local passed = 0
+        turn = live.turn % #list + 1
+        while live.rest[list[turn]] and now < live.rest[list[turn]] do
+            passed = passed + 1
+            if passed >= #list then return end
+            turn = turn % #list + 1
+        end
+    end
+    if now - (S.otherAt or 0) < 4 or AHBusy() or not Ready() then return end
+    -- a search by name of ours under way: its answer first
+    if live.browseFor and now - live.browseAt < 10 then return end
+    local id = list[turn]
+    local key = S.KeyFor(id)
+    S.sending = true
+    local ok = pcall(AH.SendSearchQuery, key, PriceSort(), false)
+    S.sending = false
+    live.id, live.turn, live.sentAt, live.waiting = id, turn, now, ok
+    if id == live.now then live.now = nil end
+end
+
+-- the item is being kept live (its prices came in the last half minute)
+function S.LiveOn(id)
+    local at = id and live.answered[id]
+    return FT.ahOpen and at ~= nil and GetTime() - at < 30
+end
+
+-- The countdown of an item kept live (the green circle in the lists): when its round began and how long a
+-- round takes - it is searched again at the end. 0, 0: kept live but waiting for its first search (a scan or
+-- a search of yours goes first). nil: not kept live.
+function S.LiveTick(id)
+    local list = live.list
+    if not (id and list and FT.ahOpen) then return nil end
+    local n = #list
+    for k = 1, n do
+        if list[k] == id then
+            if live.blocked or live.sentAt == 0 or not live.every or list[1] ~= live.head then return 0, 0 end
+            -- turns until it is searched again (n for the one just searched)
+            local steps = (k - live.turn - 1) % n + 1
+            local round = live.every * n
+            return live.sentAt + live.every * steps - round, round
+        end
+    end
+    return nil
+end
+
+-- open an item: its search goes out at once instead of waiting for its turn
+function S.LiveNow(id)
+    live.now = id
+    if not id then live.sentAt = 0 end
+    LiveStep()
+end
+
+-- for /ft debug
+function S.LiveState()
+    local ids = {}
+    for _, id in ipairs(live.list or {}) do ids[#ids + 1] = tostring(id) end
+    return string.format("live: on %s, ah %s, items [%s], blocked %s, last search %s s ago, every %s s",
+        tostring(FT.S.liveRefresh), tostring(FT.ahOpen), table.concat(ids, ","), tostring(live.blocked),
+        live.sentAt > 0 and string.format("%.1f", GetTime() - live.sentAt) or "-", tostring(live.every))
+end
+
+-- the answer to our live search; true when it was one. commodity: stackable goods have one key, so
+-- nothing under it means none listed; gear is listed under a key per version (item level, "of the Bear"...)
+local function LiveAnswer(itemID, it, n, full, commodity)
+    if not (live.waiting and live.id == itemID) then return false end
+    live.waiting = false
+    if n > 0 then
+        SaveItem(itemID, it, n, full, "live")
+    elseif full and commodity then
+        -- none listed any more
+        FT.Hist.Gone(itemID, time(), "live")
+        FT.Hist.SetBook(itemID, { t = time(), levels = {}, auctions = 0, qty = 0, sellers = 0, source = "live" })
+    else
+        -- gear with nothing under this key (that version sold, or it is listed under a key we don't know):
+        -- what we know stays; its versions are looked up by name once, else it rests for two minutes
+        if S.listed and type(S.listed[itemID]) == "table" then S.listed[itemID] = true end
+        if not FindByName(itemID) then live.rest[itemID] = GetTime() + 120 end
+        return true
+    end
+    live.answered[itemID] = GetTime()
+    FT.Market.Touch(itemID)
+    FT.Fire("FT_LIVE_UPDATED", itemID)
+    return true
+end
+
+-- an answer about one item: ours (my items, live) or anything you looked at yourself
 local function OnCommodity(itemID)
     if not itemID then return end
     local it, n, full = ReadCommodity(itemID)
@@ -696,6 +941,7 @@ local function OnCommodity(itemID)
         SaveItem(itemID, it, n, full, "mine")
         return ItemDone(true)
     end
+    if LiveAnswer(itemID, it, n, full, true) then return end
     if n > 0 then SaveItem(itemID, it, n, full, "search") end
 end
 
@@ -717,6 +963,7 @@ local function OnItemKey(itemKey)
         SaveItem(itemID, it, n, full, "mine")
         return ItemDone(true)
     end
+    if LiveAnswer(itemID, it, n, full, false) then return end
     if n > 0 then SaveItem(itemID, it, n, full, "search") end
 end
 
@@ -724,6 +971,27 @@ end
 local function OnBrowse(added)
     if OnBrowseFull(added) then return end
     local results = added or (AH.GetBrowseResults and AH.GetBrowseResults()) or {}
+    -- live: the versions of a gear item looked up by name - its cheapest key is searched next
+    local want = live.browseFor
+    if want and GetTime() - live.browseAt < 10 then
+        local best
+        for _, r in ipairs(results) do
+            local k = r.itemKey
+            if k and k.itemID == want and r.minPrice and r.minPrice > 0 and (not best or r.minPrice < best.minPrice) then
+                best = r
+            end
+        end
+        if best or not AH.HasFullBrowseResults or AH.HasFullBrowseResults() then
+            live.browseFor = nil
+            if best then
+                Learn(want, best.itemKey)
+                live.rest[want] = nil
+                live.now, live.sentAt = want, 0
+            else
+                live.rest[want] = GetTime() + 120
+            end
+        end
+    end
     if S.mode == "mine" and S.stage == "name" and S.waiting then
         -- our search by name: the cheapest key of our item, searched next for its listings
         local best
@@ -761,13 +1029,17 @@ frame:SetScript("OnEvent", function(_, event, ...)
         if S.mode == "full" and not S.deep then S.Stop("timeout") end
     elseif event == "REPLICATE_ITEM_LIST_UPDATE" then
         if S.mode == "full" and S.deep and S.phase == "wait" then ReadDeep() end
+    elseif event == "AUCTION_HOUSE_THROTTLED_MESSAGE_DROPPED" then
+        -- the server is busy: live searches slow down for two minutes
+        live.slowUntil = GetTime() + 120
+        live.waiting = false
     end
 end)
 
 local EVENTS = {
     "COMMODITY_SEARCH_RESULTS_UPDATED", "COMMODITY_SEARCH_RESULTS_ADDED", "ITEM_SEARCH_RESULTS_UPDATED",
     "ITEM_SEARCH_RESULTS_ADDED", "AUCTION_HOUSE_BROWSE_RESULTS_UPDATED", "AUCTION_HOUSE_BROWSE_RESULTS_ADDED",
-    "AUCTION_HOUSE_BROWSE_FAILURE", "REPLICATE_ITEM_LIST_UPDATE",
+    "AUCTION_HOUSE_BROWSE_FAILURE", "REPLICATE_ITEM_LIST_UPDATE", "AUCTION_HOUSE_THROTTLED_MESSAGE_DROPPED",
 }
 
 ---------------------------------------------------------------------------
@@ -779,6 +1051,7 @@ local function HookSearches()
     hooked = true
     local function Other(name)
         if S.sending then return end
+        S.otherAt = GetTime()
         if S.mode == "mine" then
             -- yours (or another addon's) first: ours goes on a few seconds after the last one
             S.pausedUntil = GetTime() + 4
@@ -789,7 +1062,8 @@ local function HookSearches()
         end
     end
     for _, name in ipairs({ "SendBrowseQuery", "SendSearchQuery", "SendSellSearchQuery", "SearchForFavorites",
-        "SearchForItemKeys", "ReplicateItems" }) do
+        "SearchForItemKeys", "ReplicateItems", "RequestMoreBrowseResults", "RequestMoreCommoditySearchResults",
+        "RequestMoreItemSearchResults" }) do
         if type(AH[name]) == "function" then
             hooksecurefunc(AH, name, function() Other(name) end)
         end
@@ -799,27 +1073,32 @@ end
 ---------------------------------------------------------------------------
 -- Auction house open / closed, scanning by itself
 ---------------------------------------------------------------------------
+local liveTicker
+
 FT.On("AUCTION_HOUSE_SHOW", function()
     FT.ahOpen = true
     if not Modern() then return end
     HookSearches()
     for _, e in ipairs(EVENTS) do pcall(frame.RegisterEvent, frame, e) end
     FT.Fire("FT_AH_CHANGED")
+    if not liveTicker then liveTicker = C_Timer.NewTicker(1, LiveStep) end
     C_Timer.After(2.5, function()
         if not FT.ahOpen or S.mode then return end
         local now = time()
         if FT.S.autoFull and now - (FT.Hist.LastScan("full") or 0) > 3600 then
-            if S.StartFull(true) then return end
-        end
-        if FT.S.autoMine then
-            local last = math.max(FT.Hist.LastScan("mine") or 0, FT.Hist.LastScan("full") or 0)
-            if now - last > 1800 then S.StartMine(true) end
+            S.StartFull(true)
         end
     end)
 end)
 
 FT.On("AUCTION_HOUSE_CLOSED", function()
     FT.ahOpen = false
+    if liveTicker then
+        liveTicker:Cancel()
+        liveTicker = nil
+    end
+    live.id, live.head, live.list, live.waiting, live.rest, live.answered = nil, nil, nil, false, {}, {}
+    live.named, live.browseFor = {}, nil
     if S.mode then S.Stop("closed") end
     frame:UnregisterAllEvents()
     FT.Fire("FT_AH_CHANGED")

@@ -38,6 +38,7 @@ end
 local function Minutes(t)
     return math.floor((t - EPOCH) / 60)
 end
+H.Enc, H.Dec = Enc, Dec
 
 ---------------------------------------------------------------------------
 -- Items we keep every observation of
@@ -294,6 +295,10 @@ local function ObserveIntraday(itemID, p, q, n, t)
     end
 end
 
+-- Sources that tell the pages themselves when they are done (one item every few seconds, or a transfer
+-- of thousands): no "prices changed" storm for each price
+local QUIET = { live = true, peer = true }
+
 -- The one way prices come in: the lowest unit buyout `p` of an item, how many are listed `q`, in how many
 -- auctions `n` (q and n may be unknown), seen at time `t`, by `source` ("full", "mine", "auctionator"...)
 function H.Observe(itemID, p, q, n, t, source)
@@ -306,18 +311,36 @@ function H.Observe(itemID, p, q, n, t, source)
     end
     ObserveDay(itemID, p, q, n, t)
     if H.Tracked(itemID) then ObserveIntraday(itemID, p, q, n, t) end
-    FT.Debounce("pricesChanged", 1.0, function() FT.Fire("FT_PRICES_CHANGED", source) end)
+    if not QUIET[source] then
+        FT.Debounce("pricesChanged", 1.0, function() FT.Fire("FT_PRICES_CHANGED", source) end)
+    end
+end
+
+-- the prices seen since `since` (the newest of each item): fn(itemID, price, listed, t)
+function H.EachSince(since, fn)
+    local m0 = Minutes(since)
+    for itemID in pairs(FT.R().today) do
+        local l = latest[itemID]
+        if l and l.p and l.t >= since then
+            if not l.gone then fn(itemID, l.p, l.q, l.t) end
+        else
+            local tr = Today(itemID)
+            if tr and tr.m >= m0 and not (l and l.gone and l.t >= tr.m * 60 + EPOCH) then
+                fn(itemID, tr.c, tr.q, tr.m * 60 + EPOCH)
+            end
+        end
+    end
 end
 
 -- a full scan didn't find it: none listed right now (its last price stays)
-function H.Gone(itemID, t)
+function H.Gone(itemID, t, source)
     local cur = latest[itemID]
     local p = cur and cur.p
     if not p then
         local tr = Today(itemID)
         p = tr and tr.c
     end
-    latest[itemID] = { p = p, q = 0, n = 0, t = t or time(), source = "full", gone = true }
+    latest[itemID] = { p = p, q = 0, n = 0, t = t or time(), source = source or "full", gone = true }
 end
 
 function H.Latest(itemID)
@@ -500,26 +523,45 @@ end
 ---------------------------------------------------------------------------
 -- Scan log (the whole market after each full scan) and scan times
 ---------------------------------------------------------------------------
+-- in time order (a scan received from someone else may be older than our last one)
 function H.LogScan(entry)
     local scans = FT.R().scans
-    scans[#scans + 1] = entry
+    local i = #scans + 1
+    while i > 1 and (scans[i - 1].t or 0) > (entry.t or 0) do i = i - 1 end
+    table.insert(scans, i, entry)
     while #scans > 300 do table.remove(scans, 1) end
 end
 
--- kind: "full" or "mine"
+-- a logged scan within a minute of `t` (the same scan heard twice)
+function H.HasScan(t)
+    for _, s in ipairs(FT.R().scans) do
+        if s.t and math.abs(s.t - t) < 60 then return true end
+    end
+    return false
+end
+
+-- kind: "full", "mine" or "peer" (a whole-market scan received from another ForeverTrading user)
 function H.MarkScan(kind, t)
     local meta = FT.R().meta
     t = t or time()
-    meta.lastScan = t
+    meta.lastScan = math.max(meta.lastScan or 0, t)
     if kind == "full" then meta.lastFull = t end
     if kind == "mine" then meta.lastMine = t end
+    if kind == "peer" then meta.lastPeer = math.max(meta.lastPeer or 0, t) end
 end
 
 function H.LastScan(kind)
     local meta = FT.R().meta
     if kind == "full" then return meta.lastFull end
     if kind == "mine" then return meta.lastMine end
+    if kind == "peer" then return meta.lastPeer end
     return meta.lastScan
+end
+
+-- the time of the newest prices of the whole market we have: our full scan or one received
+function H.MarketTime()
+    local meta = FT.R().meta
+    return math.max(meta.lastFull or 0, meta.lastPeer or 0)
 end
 
 ---------------------------------------------------------------------------

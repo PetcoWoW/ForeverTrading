@@ -7,9 +7,65 @@ local L = FT.L
 local T = {}
 FT.Tabs.market = T
 
-local state = { filter = "all", cls = "all", sort = "cap", desc = true, search = "", selected = nil }
-local page, list, countText, overview, itemView, book
+-- open: under "My recipes", the item whose materials are shown under it
+local state = { filter = "all", cls = "all", sub = "all", sort = "cap", desc = true, search = "", selected = nil, open = nil }
+-- the auction house's own filters: required level, usable, not collected, quality
+local QUALITIES = { 0, 1, 2, 3, 4, 5 }
+local filt = { min = nil, max = nil, usable = false, uncollected = false, quality = {} }
+for _, q in ipairs(QUALITIES) do filt.quality[q] = true end
+
+local function FiltersOn()
+    if filt.min or filt.max or filt.usable or filt.uncollected then return true end
+    for _, q in ipairs(QUALITIES) do
+        if not filt.quality[q] then return true end
+    end
+    return false
+end
+
+-- the game's own "can this character use it" (armor and weapon skills, class); without it only the level counts
+local CanUse = C_PlayerInfo and C_PlayerInfo.CanUseItem
+local Transmog = C_TransmogCollection
+local GetInstant = (C_Item and C_Item.GetItemInfoInstant) or GetItemInfoInstant
+
+-- collected: true / false; nil when it isn't something to collect (an appearance, a toy)
+local function Collected(id)
+    if PlayerHasToy and C_ToyBox and C_ToyBox.GetToyInfo and C_ToyBox.GetToyInfo(id) then return PlayerHasToy(id) end
+    if Transmog and Transmog.PlayerHasTransmog then
+        local equip = GetInstant and select(4, GetInstant(id))
+        if equip and equip ~= "" and equip ~= "INVTYPE_NON_EQUIP_IGNORE" and equip ~= "INVTYPE_BAG" then
+            local ok, has = pcall(Transmog.PlayerHasTransmog, id)
+            if ok then return has and true or false end
+        end
+    end
+    return nil
+end
+
+-- the "not collected" filter only where the game keeps collections
+local function CanCollect()
+    return (Transmog and Transmog.PlayerHasTransmog) ~= nil or PlayerHasToy ~= nil
+end
+
+-- an item passes the filters (what the game hasn't loaded yet passes the level and usable ones)
+local function PassFilters(id)
+    local q, lvl = FT.ItemFacts(id)
+    if q and filt.quality[q] == false then return false end
+    if lvl then
+        if filt.min and lvl < filt.min then return false end
+        if filt.max and lvl > filt.max then return false end
+    end
+    if filt.usable then
+        if lvl and lvl > (UnitLevel("player") or 0) then return false end
+        if CanUse and FT.ItemCached(id) then
+            local ok, usable = pcall(CanUse, id)
+            if ok and usable == false then return false end
+        end
+    end
+    if filt.uncollected and Collected(id) ~= false then return false end
+    return true
+end
+local page, list, countText, overview, itemView, book, center, mats
 local LEFT_W, RIGHT_W = 372, 232
+local CARDS_H = 118 -- the indicator, signal and alert cards under the charts
 
 local GetClassInfo = (C_Item and C_Item.GetItemClassInfo) or GetItemClassInfo
 local GetSubClassInfo = (C_Item and C_Item.GetItemSubClassInfo) or GetItemSubClassInfo
@@ -27,10 +83,31 @@ end
 ---------------------------------------------------------------------------
 -- The list
 ---------------------------------------------------------------------------
-local function RecipeItems()
+-- what your recipes make (their materials show under an item when you open it)
+local function RecipeOutputs()
     local set = {}
-    FT.Craft.EachItem(function(id) set[id] = true end)
+    for _, r in ipairs(FT.Craft.List()) do set[r.output] = true end
     return set
+end
+
+local SOURCE_TAG = { ah = "AH", vendor = "vendor", ["vendor~"] = "vendor~", craft = "craft" }
+
+-- the materials of one craft of the item, as rows under it: each at its cheapest (auction house, vendor,
+-- your own craft), with the market's moves when it has them
+local function MaterialRows(id)
+    local r = FT.Craft.Best(id)
+    if not r then return {} end
+    local kids = {}
+    for _, part in ipairs(FT.Craft.Eval(r).parts or {}) do
+        if part.itemID then
+            local m = FT.Market.Row(part.itemID)
+            kids[#kids + 1] = {
+                id = part.itemID, child = true, parent = id, qty = part.qty, unit = part.unit, source = part.source,
+                price = part.unit or (m and m.price), ch1 = m and m.ch1, ch7 = m and m.ch7, spark = m and m.spark or {},
+            }
+        end
+    end
+    return kids
 end
 
 local SORTS = {
@@ -45,8 +122,16 @@ local function Filtered()
     local rows = FT.Market.Rows()
     if not rows then return nil end
     local out = {}
-    local search = state.search ~= "" and state.search:lower() or nil
-    local mine = state.filter == "mine" and RecipeItems() or nil
+    -- "name" in quotes: that name exactly (not the recipes for it and such); otherwise a part of the name
+    local search, exact
+    if state.search ~= "" then
+        local q = state.search:lower():gsub("^%s+", ""):gsub("%s+$", "")
+        exact = q:match('^"(.+)"$')
+        if not exact then search = q:gsub('^"', "") end
+        if search == "" then search = nil end
+    end
+    local mine = state.filter == "mine" and RecipeOutputs() or nil
+    local filtersOn = FiltersOn()
     local holdings = state.filter == "bags" and FT.Port.Holdings() or nil
     for _, r in ipairs(rows) do
         local ok = true
@@ -65,7 +150,12 @@ local function Filtered()
         if ok and state.cls ~= "all" then
             if state.cls == "other" then ok = not KNOWN[r.cls] else ok = r.cls == state.cls end
         end
-        if ok and search then
+        if ok and state.sub ~= "all" then ok = r.sub == state.sub end
+        if ok and filtersOn then ok = PassFilters(r.id) end
+        if ok and exact then
+            local name = FT.Name(r.id)
+            ok = name ~= nil and name:lower() == exact
+        elseif ok and search then
             local name = FT.Name(r.id)
             ok = name ~= nil and name:lower():find(search, 1, true) ~= nil
         end
@@ -94,7 +184,17 @@ local function Filtered()
             return a.id < b.id
         end)
     end
-    return out
+    -- My recipes: the open item's materials under it
+    local count = #out
+    if mine and state.open then
+        for i, r in ipairs(out) do
+            if r.id == state.open then
+                for k, kid in ipairs(MaterialRows(r.id)) do table.insert(out, i + k, kid) end
+                break
+            end
+        end
+    end
+    return out, count
 end
 
 -- names the game hasn't loaded yet, asked for a few at a time while you search (no flood of requests)
@@ -108,7 +208,7 @@ function T.LoadMissingNames()
     if #missing == 0 then return end
     local i = 1
     loader = C_Timer.NewTicker(0.5, function()
-        if state.search == "" or i > #missing then
+        if (state.search == "" and not FiltersOn()) or i > #missing then
             loader:Cancel()
             loader = nil
             return
@@ -120,15 +220,55 @@ end
 
 -- names arrived: the rows on screen show them; a search takes the new matches in now and then
 function T.OnItems()
+    -- an item opened from elsewhere before the game had its name: now it goes in the search box
+    local id = state.focusFor
+    local name = id and state.search == "" and FT.Name(id)
+    if name then
+        state.focusFor = nil
+        state.search = '"' .. name .. '"'
+        if T.searchBox then T.searchBox:SetValue(state.search) end
+        T.RefreshList()
+        return
+    end
     if list then list:Refresh() end
-    if state.search ~= "" then
+    if state.search ~= "" or FiltersOn() then
         FT.Debounce("marketSearchMore", 1.5, function() T.RefreshList(true) end)
     end
 end
 
+-- the subcategories of the chosen category that are on the market, with how many items each
+local function UpdateSubs()
+    local dd = T.subDD
+    if not dd then return end
+    local opts = { { "all", L["All subcategories"] } }
+    local real = state.cls ~= "all" and state.cls ~= "other"
+    if real then
+        local counts = {}
+        for _, r in ipairs(FT.Market.Rows() or {}) do
+            if r.cls == state.cls and r.sub then counts[r.sub] = (counts[r.sub] or 0) + 1 end
+        end
+        local subs = {}
+        for sub, n in pairs(counts) do
+            local name = GetSubClassInfo and GetSubClassInfo(state.cls, sub)
+            subs[#subs + 1] = { sub, (name and name ~= "") and name or ("#" .. sub), n }
+        end
+        table.sort(subs, function(a, b) return a[2] < b[2] end)
+        for _, s in ipairs(subs) do opts[#opts + 1] = { s[1], s[2] .. FT.C("dim", "  " .. FT.Num(s[3])) } end
+    end
+    dd:SetOptions(opts)
+    local found = false
+    for _, o in ipairs(opts) do
+        if o[1] == state.sub then found = true end
+    end
+    if not found then state.sub = "all" end
+    dd:SetValue(state.sub)
+    UI.SetTextColor(dd.label, real and "text" or "dim")
+end
+
 function T.RefreshList(keepOffset)
     if not list then return end
-    local items = Filtered()
+    UpdateSubs()
+    local items, count = Filtered()
     if not items then
         list:SetEmptyText(FT.Market.Building() and L["Reading the market..."] or
             L["No market data yet: open the auction house and press Full scan."])
@@ -138,12 +278,33 @@ function T.RefreshList(keepOffset)
     end
     list:SetEmptyText(L["Nothing matches"])
     list:SetItems(items, keepOffset)
-    countText:SetText(string.format(L["%s items"], FT.Num(#items)))
+    countText:SetText(string.format(L["%s items"], FT.Num(count)))
+end
+
+-- My recipes: open an item's materials under it (again: close them)
+local function ToggleOpen(id)
+    state.open = state.open ~= id and id or nil
+    T.RefreshList(true)
+    if not (state.open and list) then return end
+    for i, x in ipairs(list.items) do
+        if x.id == id and not x.child then
+            -- its materials in sight, the item too
+            local last = i
+            while list.items[last + 1] and list.items[last + 1].child do last = last + 1 end
+            list:ScrollTo(last)
+            list:ScrollTo(i)
+            break
+        end
+    end
 end
 
 local function NameCell(row)
     local f = CreateFrame("Frame", nil, row)
     f:SetHeight(24)
+    -- My recipes: an arrow to open the materials
+    f.chev = UI.Chevron(f, 8, "muted")
+    f.chev:SetPoint("LEFT", 2, 0)
+    f.chev:Hide()
     f.icon = UI.Icon(f, 18)
     f.icon:SetPoint("LEFT", 0, 0)
     f.star = UI.Text(f, 11, "accent")
@@ -165,14 +326,26 @@ local function BuildList(parent)
     panel:SetPoint("BOTTOMLEFT", 8, 8)
     panel:SetWidth(LEFT_W)
 
-    local search = UI.Input(panel, LEFT_W - 20, 26, L["Search item..."], function(text)
+    local search = UI.Input(panel, LEFT_W - 20 - 84, 26, L["Search item..."], function(text)
         state.search = text or ""
+        state.focusFor = nil
         FT.Debounce("marketSearch", 0.25, function()
             T.RefreshList()
             if state.search ~= "" then T.LoadMissingNames() end
         end)
     end)
     search:SetPoint("TOPLEFT", 10, -10)
+    T.searchBox = search
+    T.filterBtn = UI.Button(panel, L["Filter"], 78, 26, "default", function(self) T.ToggleFilters(self) end)
+    T.filterBtn:SetPoint("LEFT", search, "RIGHT", 6, 0)
+    T.filterBtn:SetTip(L["Filter"], L["Required level, usable, not collected, quality - as on the auction house."])
+    panel:HookScript("OnHide", function() if T.filterPanel then T.filterPanel:Hide() end end)
+    -- × : the whole list again, the item you have open still in sight
+    UI.ClearButton(search, function()
+        state.search, state.focusFor = "", nil
+        T.RefreshList()
+        T.ShowSelectedInList()
+    end)
 
     local chips = {}
     local function Chip(key, label)
@@ -189,19 +362,23 @@ local function BuildList(parent)
         Chip("bags", L["I own"]) }
     local row2 = { Chip("up", L["Rising"]), Chip("down", L["Falling"]) }
     UI.RowLayout(panel, row1, 10, -44, 6)
-    local x = UI.RowLayout(panel, row2, 10, -70, 6)
+    UI.RowLayout(panel, row2, 10, -70, 6)
     for _, c in ipairs(chips) do c:SetOn(c.key == state.filter) end
+    T.chips = chips
 
     local clsOptions = { { "all", L["All categories"] } }
     for _, c in ipairs(CLASSES) do clsOptions[#clsOptions + 1] = { c, ClassName(c) } end
     clsOptions[#clsOptions + 1] = { "other", L["Other"] }
-    local cls = UI.Dropdown(panel, LEFT_W - x - 10, clsOptions, function(v)
-        state.cls = v
+    -- what kind: the category and its subcategory side by side (the row under the chips)
+    local half = math.floor((LEFT_W - 20 - 6) / 2)
+    local cls = UI.Dropdown(panel, half, clsOptions, function(v)
+        state.cls, state.sub = v, "all"
         T.RefreshList()
     end)
     cls:SetHeight(20)
-    cls:SetPoint("TOPLEFT", x, -70)
+    cls:SetPoint("TOPLEFT", 10, -96)
     cls:SetValue("all")
+    T.clsDD = cls
 
     local sortOptions = {
         { "cap", L["Sort: market value"] }, { "ch1", L["Sort: 24h change"] }, { "ch7", L["Sort: 7d change"] },
@@ -213,12 +390,22 @@ local function BuildList(parent)
         T.header:SetSort(v, state.desc)
         T.RefreshList()
     end)
+    -- the order: on the right of the rising / falling chips
     sortDD:SetHeight(20)
-    sortDD:SetPoint("TOPLEFT", 10, -96)
+    sortDD:SetPoint("TOPRIGHT", -10, -70)
     sortDD:SetValue(state.sort)
     T.sortDD = sortDD
+    -- the subcategory of the chosen category (armor: cloth, leather...; trade goods: cloth, metal...)
+    local subDD = UI.Dropdown(panel, half, { { "all", L["All subcategories"] } }, function(v)
+        state.sub = v
+        T.RefreshList()
+    end)
+    subDD:SetHeight(20)
+    subDD:SetPoint("LEFT", cls, "RIGHT", 6, 0)
+    subDD:SetValue("all")
+    T.subDD = subDD
     countText = UI.Text(panel, 11, "dim", "RIGHT")
-    countText:SetPoint("TOPRIGHT", -12, -100)
+    countText:SetPoint("BOTTOMRIGHT", -12, 6)
 
     local cols = {
         { key = "name", title = L["Item"], width = "fill", sort = "name", make = NameCell, cellHeight = 24 },
@@ -243,15 +430,37 @@ local function BuildList(parent)
     list = UI.List(panel, {
         rowHeight = 26,
         cols = cols,
+        liveID = function(r) return r.id end,
         update = function(row, r)
             local cell = row.cells.name
+            -- My recipes: the items with an arrow, their materials indented under them
+            local indent = 0
+            if state.filter == "mine" then
+                if r.child then
+                    indent = 30
+                    cell.chev:Hide()
+                else
+                    indent = 14
+                    local open = state.open == r.id
+                    cell.chev:Show()
+                    cell.chev:SetDir(open and "down" or "right", open and "accent" or "muted")
+                end
+            else
+                cell.chev:Hide()
+            end
+            cell.icon:ClearAllPoints()
+            cell.icon:SetPoint("LEFT", indent, 0)
             cell.icon:SetItem(r.id)
             local watched = FT.db.watch[r.id] ~= nil
             cell.star:SetText(watched and "*" or "")
             cell.text:ClearAllPoints()
             cell.text:SetPoint("LEFT", cell.icon, "RIGHT", watched and 14 or 6, 0)
             cell.text:SetPoint("RIGHT", cell, "RIGHT", 0, 0)
-            cell.text:SetText(FT.ItemText(r.id))
+            if r.child then
+                cell.text:SetText(FT.ItemText(r.id) .. FT.C("dim", " x" .. r.qty))
+            else
+                cell.text:SetText(FT.ItemText(r.id))
+            end
             row.cells.price:SetText(FT.Money(r.price, "short"))
             row.cells.ch1:SetText(FT.Pct(r.ch1))
             local color = (r.ch7 and r.ch7 < 0) and "down" or ((r.ch7 and r.ch7 > 0) and "up" or "muted")
@@ -265,17 +474,31 @@ local function BuildList(parent)
                 return
             end
             T.Select(r.id)
+            if state.filter == "mine" and not r.child then ToggleOpen(r.id) end
         end,
         onEnter = function(row, r)
             GameTooltip:SetOwner(row, "ANCHOR_RIGHT")
             if GameTooltip.SetItemByID then GameTooltip:SetItemByID(r.id) end
             GameTooltip:AddLine(" ")
-            GameTooltip:AddLine(L["Click: chart || Right-click: watchlist || Shift-click: link"], 0.52, 0.56, 0.61)
+            if r.child then
+                -- a material: how many one craft takes and where it is cheapest
+                GameTooltip:AddLine(string.format(L["%s per craft of %s"], "x" .. r.qty, FT.ItemText(r.parent)), 0.85, 0.87, 0.9)
+                if r.unit then
+                    local tag = r.source and L[SOURCE_TAG[r.source] or r.source] or ""
+                    GameTooltip:AddLine(FT.Money(r.unit) .. "  " .. FT.C("dim", tag) .. "  =  " .. FT.Money(r.unit * r.qty), 0.85, 0.87, 0.9)
+                end
+                GameTooltip:AddLine(" ")
+                GameTooltip:AddLine(L["Click: chart || Right-click: watchlist || Shift-click: link"], 0.52, 0.56, 0.61)
+            elseif state.filter == "mine" then
+                GameTooltip:AddLine(L["Click: chart and materials || Right-click: watchlist || Shift-click: link"], 0.52, 0.56, 0.61)
+            else
+                GameTooltip:AddLine(L["Click: chart || Right-click: watchlist || Shift-click: link"], 0.52, 0.56, 0.61)
+            end
             GameTooltip:Show()
         end,
     })
     list:SetPoint("TOPLEFT", T.header, "BOTTOMLEFT", 0, -2)
-    list:SetPoint("BOTTOMRIGHT", -1, 4)
+    list:SetPoint("BOTTOMRIGHT", -1, 22)
     return panel
 end
 
@@ -372,6 +595,7 @@ function T.ShowOverview()
     itemView:Hide()
     overview:Show()
     book:SetItem(nil)
+    T.LayoutRight()
     local rows = FT.Market.Rows()
     overview.cards[1]:Set(rows and FT.Num(#rows) or "—", rows and L["seen in scans"] or L["no data"])
     local scans = FT.R().scans
@@ -458,6 +682,9 @@ local function BuildItemView(parent)
     v.price:SetPoint("RIGHT", v.change, "LEFT", -12, -1)
     v.priceAge = UI.Text(v, 10, "dim", "RIGHT")
     v.priceAge:SetPoint("TOPRIGHT", -30, -28)
+    -- the countdown to its next live search
+    v.ring = UI.LiveRingFor(v, 9, function() return state.selected end)
+    v.ring:SetPoint("RIGHT", v.priceAge, "LEFT", -5, 0)
 
     -- stats strip
     v.strip = UI.Panel(v, "bg1", "line")
@@ -489,12 +716,12 @@ local function BuildItemView(parent)
         T.DrawChart()
     end)
     v.tf:SetPoint("TOPLEFT", 0, -100)
-    v.ma = UI.Check(v, "MA", function(on)
+    v.ma = UI.Check(v, L["Averages"], function(on)
         FT.S.showMA = on
         T.DrawChart(true)
     end)
     v.ma:SetPoint("LEFT", v.tf, "RIGHT", 16, 0)
-    v.ma:SetTip(L["Moving averages"], L["MA7 and MA25: the average close of the last 7 and 25 candles."])
+    v.ma:SetTip(L["Moving averages"], L["Two smoothed lines on the price chart: MA7 and MA25, the average price of the last 7 and 25 points (days on 1D). Until there are that many, of the points there are; MA25 shows once there are more than 7."])
 
     v.search = UI.Button(v, L["Search on AH"], 10, 22, "default", function()
         if state.selected then FT.SearchItems({ state.selected }) end
@@ -512,9 +739,10 @@ local function BuildItemView(parent)
     v.chart:SetPoint("TOPLEFT", 0, -128)
     v.chart:SetPoint("TOPRIGHT", 0, -128)
     UI.Border(v.chart, "line")
+    v.more = UI.MoreButton(v.chart, function() return state.selected end)
     v.pchart = UI.Chart(v)
     v.pchart:SetPoint("TOPLEFT", v.chart, "BOTTOMLEFT", 0, -6)
-    v.pchart:SetPoint("BOTTOMRIGHT", 0, 118)
+    v.pchart:SetPoint("BOTTOMRIGHT", 0, CARDS_H)
     UI.Border(v.pchart, "line")
 
     -- bottom cards
@@ -523,7 +751,9 @@ local function BuildItemView(parent)
     v.alert = Card(v, L["Price alert"])
     for _, c in ipairs({ v.ind, v.sig, v.alert }) do c:SetHeight(110) end
     UI.OnSize(v, function(self, w, h)
-        self.chart:SetHeight(math.max(80, math.floor((h - 128 - 118 - 6) * 0.56)))
+        T.FitHeader()
+        local cards = self.compact and 0 or CARDS_H
+        self.chart:SetHeight(math.max(80, math.floor((h - 128 - cards - 6) * 0.56)))
         local cw = (w - 16) / 3
         self.ind:ClearAllPoints()
         self.ind:SetPoint("BOTTOMLEFT", 0, 0)
@@ -577,7 +807,7 @@ local function BuildItemView(parent)
     end
     v.sellBadge, v.sellText = SigRow(-28, L["If you sell"])
     v.buyBadge, v.buyText = SigRow(-64, L["If you buy"])
-    v.craft = UI.Button(v.sig, L["Recipe"], 10, 18, "ghost", function()
+    v.craft = UI.Button(v.sig, L["Recipe"], 10, 18, "default", function()
         local rs = FT.Craft.ByOutput(state.selected)
         if rs and rs[1] then FT.OpenRecipe(rs[1].key) end
     end)
@@ -585,36 +815,54 @@ local function BuildItemView(parent)
     v.craft:FitText(16)
     v.craft:SetPoint("TOPRIGHT", -6, -4)
 
-    -- alert
-    v.below = UI.Input(v.alert, 80, 22, L["below, e.g. 12g"])
-    v.below:SetPoint("TOPLEFT", 10, -28)
-    v.above = UI.Input(v.alert, 80, 22, L["above, e.g. 15g50s"])
-    v.above:SetPoint("TOPRIGHT", -10, -28)
-    v.save = UI.Button(v.alert, L["Save"], 10, 22, "primary", function()
+    -- alert: below / above, each in gold, silver and copper
+    local function AlertRow(y, label)
+        local l = UI.Text(v.alert, 11, "muted")
+        l:SetPoint("TOPLEFT", 10, y - 5)
+        l:SetText(label)
+        local m = UI.MoneyInput(v.alert, nil, true)
+        m:SetPoint("TOPRIGHT", -10, y)
+        return m
+    end
+    v.below = AlertRow(-26, L["Below"])
+    v.above = AlertRow(-52, L["Above"])
+    v.save = UI.Button(v.alert, L["Save"], 10, 20, "primary", function()
         local id = state.selected
         if not id then return end
-        FT.Market.SetAlert(id, "below", FT.ParseMoney(v.below:GetText()))
-        FT.Market.SetAlert(id, "above", FT.ParseMoney(v.above:GetText()))
-        v.below:ClearFocus()
-        v.above:ClearFocus()
+        local below, above = v.below:GetValue(), v.above:GetValue()
+        if below == 0 then below = nil end
+        if above == 0 then above = nil end
+        -- nothing to save and nothing saved: the item doesn't go on the watchlist for it
+        if below or above or FT.db.watch[id] then
+            FT.Market.SetAlert(id, "below", below)
+            FT.Market.SetAlert(id, "above", above)
+        end
+        for _, m in ipairs({ v.below, v.above }) do
+            for _, e in ipairs(m.boxes) do e:ClearFocus() end
+        end
+        v.alertFor = nil
         T.UpdateAlert()
         FT.Market.CheckAlerts()
     end)
     v.save:FitText(24)
-    v.save:SetPoint("TOPLEFT", 10, -56)
+    v.save:SetPoint("TOPLEFT", 10, -80)
+    v.save:SetTip(L["Price alert"], L["Checked after every scan. Empty = no alert."])
     v.alertText = UI.Text(v.alert, 11, "muted")
     v.alertText:SetPoint("LEFT", v.save, "RIGHT", 10, 0)
     v.alertText:SetPoint("RIGHT", v.alert, "RIGHT", -10, 0)
-    v.alertHint = UI.Text(v.alert, 10, "dim")
-    v.alertHint:SetPoint("BOTTOMLEFT", 10, 8)
-    v.alertHint:SetPoint("RIGHT", v.alert, "RIGHT", -10, 0)
-    v.alertHint:SetText(L["Checked after every scan. Empty = no alert."])
-    UI.OnSize(v.alert, function(self, w)
-        local iw = math.floor((w - 26) / 2)
-        v.below:SetWidth(iw)
-        v.above:SetWidth(iw)
-    end)
     return v
+end
+
+-- the name and the line under it stop before the price, its change and its age (cut with "...")
+function T.FitHeader()
+    local v = itemView
+    local w = v and v:GetWidth()
+    if not w or w <= 0 then return end
+    local left = 2 + 38 + 10
+    local top = 30 + v.change:GetStringWidth() + 12 + v.price:GetStringWidth() + 14
+    local bottom = 30 + v.priceAge:GetStringWidth() + 5 + 9 + 14
+    v.name:SetWidth(math.max(60, w - left - top))
+    v.sub:SetWidth(math.max(60, w - left - bottom))
 end
 
 function T.UpdateWatchButton()
@@ -635,78 +883,13 @@ function T.UpdateAlert()
     v.alertText:SetText(#parts > 0 and (L["Alert when"] .. ": " .. table.concat(parts, ", ")) or FT.C("dim", L["No alert set"]))
 end
 
--- money on chart axes: "12s 50c"; profit with its sign: "+1g 20s" / "-35s"
-local function MoneyAxis(v) return FT.Money(v, "short") end
-local SignedMoney = FT.SignedMoney
-local function SignedPct(v) return string.format("%+.0f%%", v * 100) end
-
--- the profitability line: the profit of one craft (your recipe), else selling now vs the average price
-function T.DrawProfit(keepView)
-    local v = itemView
-    local id = state.selected
-    if not (v and id) then return end
-    local best, bestProfit
-    for _, r in ipairs(FT.Craft.ByOutput(id) or {}) do
-        local e = FT.Craft.Eval(r)
-        local p = e.profit or -math.huge
-        if not best or p > bestProfit then best, bestProfit = r, p end
-    end
-    if best then
-        v.pchart:SetData({
-            candles = UI.LineCandles(FT.Craft.History(best, 30), "profit"),
-            mode = "line", centerZero = true, fmt = SignedMoney, defaultCount = 30,
-            title = L["Profit per craft"],
-            emptyTitle = L["No history yet"],
-            emptyBody = L["Needs a few days of prices for the item and its materials."],
-        }, keepView)
-    else
-        v.pchart:SetData({
-            candles = UI.LineCandles(FT.An.DevSeries(id, 30)),
-            mode = "line", centerZero = true, fmt = SignedPct, defaultCount = 30,
-            title = string.format(L["Selling now: price vs its %d-day average"], FT.S.avgDays),
-            emptyTitle = L["Not enough price history yet"],
-            emptyBody = L["Shows once there are a few days of prices."],
-        }, keepView)
-    end
-end
-
--- draw the charts of the chosen item; keepView: same zoom
+-- draw the charts of the chosen item (price; profit in money, zero in the middle); keepView: same zoom
 function T.DrawChart(keepView)
     local v = itemView
     local id = state.selected
     if not (v and id) then return end
-    local tf = FT.S.chartTF
-    local candles = FT.Hist.Series(id, tf)
-    local overlays = {}
-    if FT.S.showMA and #candles >= 7 then
-        local closes = {}
-        for i, c in ipairs(candles) do closes[i] = c.c end
-        overlays[#overlays + 1] = { values = FT.An.SMA(closes, 7), color = "blue", label = "MA7" }
-        if #candles >= 25 then
-            overlays[#overlays + 1] = { values = FT.An.SMA(closes, 25), color = "purple", label = "MA25" }
-        end
-    end
-    local intraday = (tf == "1H" or tf == "4H")
-    local emptyBody
-    if intraday then
-        emptyBody = L["Hourly prices are recorded for the items you track (recipes, watchlist, what you own, what you open). This item is tracked now: its hourly line starts with the next scan."]
-    else
-        emptyBody = L["No prices for it yet: scan My items or run a full scan at the auction house."]
-    end
-    v.chart:SetData({
-        candles = candles,
-        mode = "line",
-        lineColor = "accent",
-        tagColor = "accent",
-        fmt = MoneyAxis,
-        title = L["Price"],
-        overlays = overlays,
-        hourly = intraday,
-        defaultCount = intraday and 72 or 60,
-        emptyTitle = L["No price history"],
-        emptyBody = emptyBody,
-    }, keepView)
-    T.DrawProfit(keepView)
+    v.chart:SetData(UI.PriceChartData(id, FT.S.chartTF, FT.S.showMA), keepView)
+    v.pchart:SetData(UI.ProfitChartData(id), keepView)
 end
 
 function T.ShowItem(id, keepView)
@@ -729,14 +912,18 @@ function T.ShowItem(id, keepView)
     if rs and rs[1] then parts[#parts + 1] = FT.C("up", L["you can craft it"]) end
     local own = FT.Port.Count(id)
     if own > 0 then parts[#parts + 1] = FT.C("text", string.format(L["you have %s"], FT.Num(own))) end
+    local s = FT.An.Stats(id)
+    if s.spike then
+        table.insert(parts, 1, FT.C("accent", string.format(L["price jump (buyout?): fair ~%s"], FT.Money(s.fair, "short"))))
+    elseif s.falling then
+        table.insert(parts, 1, FT.C("down", string.format(L["falling fast: %s, fair ~%s"], FT.Pct(s.price / s.fair - 1, true), FT.Money(s.fair, "short"))))
+    end
     v.sub:SetText(table.concat(parts, FT.C("dim", "  ||  ")))
     v.craft:SetShown(rs ~= nil and rs[1] ~= nil)
 
-    local s = FT.An.Stats(id)
     v.price:SetText(s.price and FT.Money(s.price) or "—")
     v.change:SetText(FT.Pct(s.ch1) .. FT.C("dim", " " .. L["24h"]))
-    local src = FT.SourceName(s.source)
-    v.priceAge:SetText(s.t and (src .. " || " .. FT.Ago(s.t)) or "")
+    v.priceAge:SetText(UI.PriceAgeText(id, s))
 
     for _, p in ipairs(v.pairs) do
         local val = s[p.key]
@@ -780,16 +967,18 @@ function T.ShowItem(id, keepView)
     v.buyBadge:Set(buy, nil, buyStrength)
     v.buyText:SetText(buyReason or "")
 
-    -- alert: the boxes are filled when another item is opened, never while you type in them
-    if v.alertFor ~= id then
+    -- alert: the boxes are filled when another item is opened (and after Save), never while you type in them
+    if v.alertFor ~= id and not (v.below:HasFocus() or v.above:HasFocus()) then
         v.alertFor = id
         local w = FT.db.watch[id]
-        v.below:SetValue(w and w.below and FT.MoneyPlain(w.below) or "")
-        v.above:SetValue(w and w.above and FT.MoneyPlain(w.above) or "")
+        v.below:SetValue(w and w.below or nil)
+        v.above:SetValue(w and w.above or nil)
     end
     T.UpdateAlert()
     T.UpdateWatchButton()
     book:SetItem(id)
+    T.LayoutRight()
+    T.FitHeader()
 end
 
 ---------------------------------------------------------------------------
@@ -798,9 +987,7 @@ end
 function T.Build(p)
     page = p
     BuildList(p)
-    local center = CreateFrame("Frame", nil, p)
-    center:SetPoint("TOPLEFT", LEFT_W + 18, -8)
-    center:SetPoint("BOTTOMRIGHT", -(RIGHT_W + 18), 8)
+    center = CreateFrame("Frame", nil, p)
     overview = BuildOverview(center)
     itemView = BuildItemView(center)
     itemView:Hide()
@@ -808,6 +995,222 @@ function T.Build(p)
     book:SetPoint("TOPRIGHT", -8, -8)
     book:SetPoint("BOTTOMRIGHT", -8, 8)
     book:SetWidth(RIGHT_W)
+    -- a material clicked opens it here (the list stays as it is)
+    mats = UI.Materials(p, function(id) T.Select(id) end)
+    mats:SetPoint("BOTTOMRIGHT", -8, 8)
+    mats:SetWidth(RIGHT_W)
+    mats:Hide()
+    T.OnLayout()
+end
+
+-- the right side: the order book, and under it the materials of one craft when you can make the item
+function T.LayoutRight()
+    if not (book and mats) then return end
+    local show, h = false, 0
+    if not FT.Compact() and itemView:IsShown() and state.selected then
+        show, h = mats:SetItem(state.selected)
+    end
+    mats:SetShown(show)
+    book:ClearAllPoints()
+    book:SetPoint("TOPRIGHT", -8, -8)
+    book:SetWidth(RIGHT_W)
+    if show then
+        mats:SetHeight(h)
+        book:SetPoint("BOTTOMRIGHT", mats, "TOPRIGHT", 0, 8)
+    else
+        book:SetPoint("BOTTOMRIGHT", -8, 8)
+    end
+end
+
+-- the compact window: charts only - no order book on the side, no cards under the charts ("More" has them)
+function T.OnLayout()
+    if not page then return end
+    local compact = FT.Compact()
+    book:SetShown(not compact)
+    center:ClearAllPoints()
+    center:SetPoint("TOPLEFT", LEFT_W + 18, -8)
+    center:SetPoint("BOTTOMRIGHT", compact and -8 or -(RIGHT_W + 18), 8)
+    local v = itemView
+    v.compact = compact
+    for _, c in ipairs({ v.ind, v.sig, v.alert }) do c:SetShown(not compact) end
+    v.pchart:ClearAllPoints()
+    v.pchart:SetPoint("TOPLEFT", v.chart, "BOTTOMLEFT", 0, -6)
+    v.pchart:SetPoint("BOTTOMRIGHT", 0, compact and 0 or CARDS_H)
+    local h = v:GetHeight()
+    if h and h > 0 then
+        v.chart:SetHeight(math.max(80, math.floor((h - 128 - (compact and 0 or CARDS_H) - 6) * 0.56)))
+    end
+    T.LayoutRight()
+end
+
+-- the list scrolled to the item you have open
+function T.ShowSelectedInList()
+    if not (list and state.selected) then return end
+    for i, x in ipairs(list.items) do
+        if x.id == state.selected and not x.child then
+            list:ScrollTo(i)
+            return
+        end
+    end
+end
+
+---------------------------------------------------------------------------
+-- The filters panel (the button next to the search box)
+---------------------------------------------------------------------------
+local function FiltersChanged()
+    if T.filterBtn then T.filterBtn:SetActive(FiltersOn()) end
+    FT.Debounce("marketFilters", 0.2, function()
+        T.RefreshList()
+        if FiltersOn() then T.LoadMissingNames() end
+    end)
+end
+
+local function QualityName(q)
+    local name = _G["ITEM_QUALITY" .. q .. "_DESC"]
+    return "|c" .. FT.QualityHex(q) .. (name or tostring(q)) .. "|r"
+end
+
+local function BuildFilters()
+    local p = CreateFrame("Frame", nil, UIParent)
+    p:SetFrameStrata("FULLSCREEN_DIALOG")
+    p:SetFrameLevel(60)
+    p:SetClampedToScreen(true)
+    p:EnableMouse(true)
+    p:SetWidth(220)
+    UI.Fill(p, "bg1")
+    UI.Border(p, "line")
+    -- a click anywhere else closes it
+    local blocker = CreateFrame("Button", nil, UIParent)
+    blocker:SetAllPoints(UIParent)
+    blocker:SetFrameStrata("FULLSCREEN_DIALOG")
+    blocker:SetFrameLevel(50)
+    blocker:SetScript("OnClick", function() p:Hide() end)
+    blocker:Hide()
+    p:SetScript("OnShow", function() blocker:Show() end)
+    p:SetScript("OnHide", function() blocker:Hide() end)
+
+    local y = -12
+    local function Title(text)
+        local t = UI.Text(p, 12, "accent")
+        t:SetPoint("TOPLEFT", 14, y)
+        t:SetText(text)
+        y = y - 22
+    end
+
+    Title(L["Levels"])
+    local function LevelBox(onSet)
+        local e = UI.Input(p, 48, 22, "", function(text)
+            onSet(tonumber(text))
+            FiltersChanged()
+        end)
+        e:SetNumeric(true)
+        e:SetMaxLetters(3)
+        e:SetJustifyH("CENTER")
+        return e
+    end
+    p.min = LevelBox(function(v) filt.min = v end)
+    p.min:SetPoint("TOPLEFT", 14, y)
+    local dash = UI.Text(p, 12, "muted")
+    dash:SetPoint("LEFT", p.min, "RIGHT", 6, 0)
+    dash:SetText("-")
+    p.max = LevelBox(function(v) filt.max = v end)
+    p.max:SetPoint("LEFT", dash, "RIGHT", 6, 0)
+    y = y - 34
+
+    p.usable = UI.Check(p, L["Usable only"], function(on)
+        filt.usable = on
+        FiltersChanged()
+    end)
+    p.usable:SetPoint("TOPLEFT", 14, y)
+    y = y - 24
+    if CanCollect() then
+        p.uncollected = UI.Check(p, L["Not collected only"], function(on)
+            filt.uncollected = on
+            FiltersChanged()
+        end)
+        p.uncollected:SetPoint("TOPLEFT", 14, y)
+        y = y - 24
+    end
+    y = y - 6
+
+    Title(L["Quality"])
+    p.quality = {}
+    for _, q in ipairs(QUALITIES) do
+        local c = UI.Check(p, QualityName(q), function(on)
+            filt.quality[q] = on
+            FiltersChanged()
+        end)
+        c:SetPoint("TOPLEFT", 14, y)
+        p.quality[q] = c
+        y = y - 22
+    end
+    y = y - 8
+
+    p.reset = UI.Button(p, L["Reset"], 10, 22, "default", function()
+        T.ResetFilters()
+        T.SyncFilters()
+    end)
+    p.reset:FitText(24)
+    p.reset:SetPoint("TOPLEFT", 14, y)
+    y = y - 22 - 12
+    p:SetHeight(-y)
+    p:Hide()
+    T.filterPanel = p
+    return p
+end
+
+-- the panel shows what is set
+function T.SyncFilters()
+    local p = T.filterPanel
+    if not p then return end
+    p.min:SetValue(filt.min and tostring(filt.min) or "")
+    p.max:SetValue(filt.max and tostring(filt.max) or "")
+    p.usable:SetChecked(filt.usable)
+    if p.uncollected then p.uncollected:SetChecked(filt.uncollected) end
+    for q, c in pairs(p.quality) do c:SetChecked(filt.quality[q]) end
+end
+
+function T.ResetFilters()
+    filt.min, filt.max, filt.usable, filt.uncollected = nil, nil, false, false
+    for _, q in ipairs(QUALITIES) do filt.quality[q] = true end
+    FiltersChanged()
+end
+
+function T.ToggleFilters(button)
+    local p = T.filterPanel or BuildFilters()
+    if p:IsShown() then
+        p:Hide()
+        return
+    end
+    p:SetScale(button:GetEffectiveScale() / UIParent:GetEffectiveScale())
+    p:ClearAllPoints()
+    p:SetPoint("TOPLEFT", button, "BOTTOMLEFT", 0, -2)
+    T.SyncFilters()
+    p:Show()
+end
+
+-- An item opened from elsewhere (Craft, Signals, Portfolio, the ticker, the item window): the list shows just
+-- it - its exact name in quotes in the search box, the filters back to all. × brings the whole list back.
+-- (Picking an item in the list itself leaves the list as it is.)
+function T.Focus(id)
+    if not id then return end
+    if not page then FT.Show("market") end
+    state.filter, state.cls, state.sub = "all", "all", "all"
+    if FiltersOn() then
+        T.ResetFilters()
+        T.SyncFilters()
+    end
+    if T.chips then
+        for _, c in ipairs(T.chips) do c:SetOn(c.key == "all") end
+    end
+    if T.clsDD then T.clsDD:SetValue("all") end
+    local name = FT.Name(id) or FT.Item(id)
+    -- no name yet: the search box gets it when it arrives
+    state.focusFor = not name and id or nil
+    state.search = name and ('"' .. name .. '"') or ""
+    if T.searchBox then T.searchBox:SetValue(state.search) end
+    T.RefreshList()
+    T.Select(id)
 end
 
 function T.Select(id)
@@ -817,6 +1220,32 @@ function T.Select(id)
     FT.Hist.Viewed(id)
     if list then list:Refresh() end
     T.ShowItem(id)
+    FT.Scanner.LiveNow(id)
+end
+
+-- the item kept live at the auction house: the one open here
+function T.LiveItem()
+    return itemView and itemView:IsVisible() and state.selected or nil
+end
+
+-- and the materials of one craft of it (when they show): its cost and profit follow the market too
+function T.LiveItems()
+    local id = T.LiveItem()
+    if not id then return nil end
+    local out = { id }
+    if mats and mats:IsVisible() and mats.r then
+        for _, m in ipairs(FT.Craft.MarketMaterials(mats.r)) do out[#out + 1] = m end
+    end
+    return out
+end
+
+-- a live price came in (id), or the auction house opened or closed (nil)
+function T.OnLive(_, id)
+    if list then list:Refresh() end
+    local ours = id == nil or id == state.selected or (mats and mats:IsShown() and mats:Has(id))
+    if state.selected and itemView and itemView:IsShown() and ours then
+        T.ShowItem(state.selected, true)
+    end
 end
 
 function T.OnShow()
