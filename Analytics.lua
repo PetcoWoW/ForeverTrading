@@ -112,15 +112,20 @@ local HALF_LIFE = 24 * 3600
 local LOOK_BACK = 4 * 86400
 local SETTLED = 3600
 local MAX_SPAN = 3 * 3600
+local DROP = 0.10      -- a price this much lower than at the last check: risky
+local FLOOD_MIN = 3    -- flooded: at least this many more listed than usual too (2 instead of 1 is no flood)
+local CROWD_MIN = 2    -- more sellers: at least this many more than usual too
+local SLOW_HOURS = 12  -- "hardly bought" needs at least this many hours watched
 
--- fair price, the number usually listed (nil: no prices from before the last hour)
+-- fair price, and what is usual (the same weights): how many listed, in how many auctions, by how many sellers
+-- (nil: no prices from before the last hour; the usual auctions and sellers: nil while none were counted)
 function An.FairNow(itemID)
     local now = time()
     local cutoff = now - SETTLED
     local obs = {}
-    local function Add(p, q, t, span)
+    local function Add(p, q, t, span, n, sl)
         if p and p > 0 and t and t <= cutoff and now - t <= LOOK_BACK then
-            obs[#obs + 1] = { p = p, q = q, t = t, span = span }
+            obs[#obs + 1] = { p = p, q = q, t = t, span = span, n = n, sl = sl }
         end
     end
     local s = FT.Hist.Snaps(itemID)
@@ -130,11 +135,11 @@ function An.FairNow(itemID)
     for _, c in ipairs(FT.Hist.Daily(itemID, 5)) do
         if c.day < today then
             local t = c.t + 43200
-            if not firstSnap or t < firstSnap then Add(c.c, c.v, t, 12 * 3600) end
+            if not firstSnap or t < firstSnap then Add(c.c, c.v, t, 12 * 3600, c.n, nil) end
         end
     end
     if s then
-        for i = 1, #s.t do Add(s.p[i], s.q[i], s.t[i], nil) end
+        for i = 1, #s.t do Add(s.p[i], s.q[i], s.t[i], nil, s.n[i], s.sl and s.sl[i]) end
     end
     if #obs == 0 then return nil end
     table.sort(obs, function(a, b) return a.t < b.t end)
@@ -152,13 +157,18 @@ function An.FairNow(itemID)
     table.sort(qs)
     local qMid = #qs > 0 and qs[math.ceil(#qs / 2)] or 1
     local total, sumQ, sumR = 0, 0, 0
+    local sumN, rN, sumS, rS = 0, 0, 0, 0
     for _, o in ipairs(obs) do
         local r = 0.5 ^ ((now - o.t) / HALF_LIFE) * o.span
         local q = (o.q and o.q > 0) and o.q or qMid
         o.w = q * r
         total = total + o.w
         sumQ, sumR = sumQ + q * r, sumR + r
+        if o.n and o.n > 0 then sumN, rN = sumN + o.n * r, rN + r end
+        if o.sl and o.sl > 0 then sumS, rS = sumS + o.sl * r, rS + r end
     end
+    local typicalN = rN > 0 and sumN / rN or nil
+    local typicalS = rS > 0 and sumS / rS or nil
     table.sort(obs, function(a, b) return a.p < b.p end)
     local acc, fair = 0, obs[#obs].p
     for _, o in ipairs(obs) do
@@ -168,7 +178,7 @@ function An.FairNow(itemID)
             break
         end
     end
-    return fair, sumR > 0 and sumQ / sumR or nil
+    return fair, sumR > 0 and sumQ / sumR or nil, typicalN, typicalS
 end
 
 -- far above the fair price: a buyout (or a shortage) - not to be counted on for long (Settings: by how much)
@@ -184,7 +194,10 @@ local function Falling(s)
 end
 
 -- { price, t, source, listed, ch1, ch7, ch30, avg, dev, rsi, hi7, lo7, hi30, lo30, vol, days, auctions,
---   sellers, closes, daily, fair, typicalQ, spike, sale (the price to count on when selling) }
+--   sellers, closes, daily, fair, typicalQ, spike, sale (the price to count on when selling),
+--   auctionsNow, sellersNow (of the newest measurement), typicalN, typicalS (usual auctions, sellers),
+--   prev (the check half an hour or more before: t, p, q, n, sl), sinceP (price change since, a fraction),
+--   sinceQ, sinceN, sinceS (listed, auctions, sellers: more (+) or fewer (-) since), flood, crowd, dropped }
 function An.Stats(itemID)
     local s = cache[itemID]
     if s then return s end
@@ -238,14 +251,89 @@ function An.Stats(itemID)
         s.listed = s.listed or book.qty
         s.bookT = book.t
     end
-    s.fair, s.typicalQ = An.FairNow(itemID)
+    -- the market right now: auctions and sellers of the newest measurement (an older order book doesn't count)
+    local l = FT.Hist.Latest(itemID)
+    if l and s.t and l.t == s.t and not l.gone then
+        s.auctionsNow, s.sellersNow = l.n, l.sl
+    end
+    if book and s.t and book.t and book.t >= s.t - 600 and book.source ~= "mastercraft" then
+        s.auctionsNow = s.auctionsNow or ((book.auctions or 0) > 0 and book.auctions or nil)
+        s.sellersNow = s.sellersNow or ((book.sellers or 0) > 0 and book.sellers or nil)
+    end
+    s.fair, s.typicalQ, s.typicalN, s.typicalS = An.FairNow(itemID)
     s.spike = Spike(s)
     s.falling = Falling(s)
-    -- more listed than usual: competitors are selling
-    s.moreListed = s.listed and s.typicalQ and s.typicalQ > 0 and s.listed > s.typicalQ * 1.3 and (s.listed / s.typicalQ - 1) or nil
     s.sale = s.spike and s.fair or s.price
+
+    -- what changed since the last check (the scan, or the live update, of half an hour or more ago)
+    local prev = FT.Hist.Previous(itemID)
+    if prev and s.price and prev.p and prev.p > 0 then
+        s.prev = prev
+        s.sinceP = s.price / prev.p - 1
+        s.sinceQ = (s.listed and prev.q) and (s.listed - prev.q) or nil
+        s.sinceN = (s.auctionsNow and prev.n) and (s.auctionsNow - prev.n) or nil
+        s.sinceS = (s.sellersNow and prev.sl) and (s.sellersNow - prev.sl) or nil
+    end
+    local more = 1 + (FT.S.floodAbove or 50) / 100
+    -- far more listed than usual: the market is flooded - a price that holds now may not hold long
+    s.flood = (s.listed and s.typicalQ and s.typicalQ > 0 and s.listed >= s.typicalQ * more
+        and s.listed - s.typicalQ >= FLOOD_MIN) and true or false
+    -- far more sellers than usual: competitors have come
+    s.crowd = (s.sellersNow and s.typicalS and s.typicalS > 0 and s.sellersNow >= s.typicalS * more
+        and s.sellersNow - s.typicalS >= CROWD_MIN) and true or false
+    -- what really sells (FT.Sales: told from the listings seen go): slow when a day sells under 5% of what is
+    -- usually listed (and under one) - the listed take weeks to clear
+    s.sales = FT.Sales.Rate(itemID)
+    local usual = s.typicalQ or s.listed or 0
+    s.slow = (s.sales and s.sales.hours >= SLOW_HOURS and s.sales.perDay < math.max(1, usual * 0.05)) and true or false
+    -- the price fell since the last check (one of the last day)
+    s.dropped = (s.sinceP and s.sinceP <= -DROP and time() - s.prev.t <= 86400) and true or false
     cache[itemID] = s
     return s
+end
+
+-- Why selling it (or crafting it to sell) is risky right now: reasons, the strongest first.
+-- liquidity: An.Liquidity of the same stats (given when known)
+function An.Risks(s, liquidity)
+    local out = {}
+    if not (s and s.price) then return out end
+    if s.falling and s.fair then
+        out[#out + 1] = string.format(L["Price falling fast: %s vs its fair price"], FT.Pct(s.price / s.fair - 1, true))
+    end
+    if s.dropped then
+        out[#out + 1] = string.format(L["%s since the check %s"], FT.Pct(s.sinceP, true), FT.Ago(s.prev.t))
+    end
+    if s.flood then
+        out[#out + 1] = string.format(L["Flooded: %s listed, usually ~%s"], FT.Num(s.listed), FT.Num(math.floor(s.typicalQ + 0.5)))
+    end
+    if s.crowd then
+        out[#out + 1] = string.format(L["More sellers: %d, usually ~%d"], s.sellersNow, math.floor(s.typicalS + 0.5))
+    end
+    if s.slow then
+        out[#out + 1] = string.format(L["Hardly bought: %s with ~%s usually listed"], FT.Sales.PerDayText(s.sales),
+            FT.Num(math.floor((s.typicalQ or s.listed or 0) + 0.5)))
+    end
+    if liquidity == "low" then out[#out + 1] = L["Rarely listed: it may not sell"] end
+    if s.ch7 and s.ch7 <= -0.10 then
+        out[#out + 1] = string.format(L["Price falling: %s in 7 days"], FT.Pct(s.ch7, true))
+    end
+    return out
+end
+
+-- the same, short, for the line under an item's name (falling fast and a jump are said there already)
+function An.RiskNotes(s)
+    local out = {}
+    if not (s and s.price) then return out end
+    if s.dropped then
+        out[#out + 1] = string.format(L["%s since the check %s"], FT.Pct(s.sinceP, true), FT.Ago(s.prev.t))
+    end
+    if s.flood then
+        out[#out + 1] = string.format(L["flooded: %s listed (usually ~%s)"], FT.Num(s.listed), FT.Num(math.floor(s.typicalQ + 0.5)))
+    end
+    if s.crowd then
+        out[#out + 1] = string.format(L["%d sellers (usually ~%d)"], s.sellersNow, math.floor(s.typicalS + 0.5))
+    end
+    return out
 end
 
 -- day by day: how far the price stood above (+) or below (-) its average of the days before it
@@ -352,13 +440,14 @@ FT.SIGNAL_COLORS = {
     HOLD = "accent", WATCH = "accent", EXPENSIVE = "accent", RISKY = "accent",
     AVOID = "down", LOSS = "down",
     FAIR = "muted", NODATA = "dim",
+    VENDOR = "up", RESELL = "blue", UNDERCUT = "down",
 }
 
 function FT.SignalText(kind)
     local names = {
         SELL = L["SELL"], BUY = L["BUY"], CRAFT = L["CRAFT"], HOLD = L["HOLD"], WATCH = L["WATCH"],
         EXPENSIVE = L["PRICEY"], RISKY = L["RISKY"], AVOID = L["AVOID"], LOSS = L["LOSS"], FAIR = L["FAIR"],
-        NODATA = L["NO DATA"],
+        NODATA = L["NO DATA"], VENDOR = L["TO VENDOR"], RESELL = L["RESELL"], UNDERCUT = L["UNDERCUT"],
     }
     return names[kind] or kind
 end

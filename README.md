@@ -10,9 +10,14 @@ charts, order books, craft profitability and "sell / craft / buy" signals. It al
   and a profitability line (zero in the middle) per item, RSI and other indicators, price alerts, and the
   item's order book with a "what does buying N cost" calculator.
 - **Craft** - every recipe your characters know: cost (each material at the cheapest of auction house, vendor or
-  crafting it yourself), revenue after the 5% cut, profit, margin and a signal.
-- **Signals** - sell now / worth crafting / worth buying / hold or avoid.
-- **Portfolio** - what your characters own (bags, banks, mail) at market prices.
+  crafting it yourself), revenue after the auction house's cut, profit, margin, risks and a signal. The **craft
+  queue** adds up what to buy for several crafts at once and how long it all takes to sell.
+- **Signals** - sell now / worth crafting / worth buying / hold or avoid, your auctions undercut, risky recipes;
+  **Good deals** - what to buy right now for a profit (under what a vendor pays, or far under the fair price).
+- **Portfolio** - what your characters own (bags, banks, mail) at market prices; the **deals journal** - what
+  you really bought, sold and earned, from the auction house's letters.
+- **What really sells** - an estimate from the listings seen go (bought, not relisted or expired), shown as
+  "sells ~N a day"; risks see a flooded market, more sellers than usual and a price falling since the last check.
 - **Scanning** - *Full scan* (the whole auction house in seconds, any time; an optional deep scan reads every
   auction once every 15 minutes) and *My items* (order books of your recipe items, materials, watchlist and
   holdings). Whatever you look at yourself on the auction house is recorded too.
@@ -22,7 +27,9 @@ charts, order books, craft profitability and "sell / craft / buy" signals. It al
   than an hour old, the freshest scan around comes to you in the background (or press **Exchange**).
 - **Trading** - at the auction house: buy from the order book, post from your bags (a suggested price, the
   deposit, the cut, warnings) and watch **My auctions** (who undercut you, cancel) - every action confirmed with
-  the exact numbers first. Optionally ForeverTrading opens in place of the game's auction house window.
+  the exact numbers first; when you are undercut it says whether to wait or post again. Optionally ForeverTrading
+  opens in place of the game's auction house window.
+- **What's new** once a version and a **tour** of the window (Settings > About, `/ft news`, `/ft tour`).
 
 Install: download the latest release (or this repository) into `Interface/AddOns/ForeverTrading`.
 Open the auction house and press **Full scan** in the ForeverTrading window (`/ft`). The UI is in Russian and
@@ -58,10 +65,10 @@ English (Settings > Language).
 ## Вкладки
 
 - **Рынок** — все предметы: цена, изменение 24ч, спарклайн 7 дней, сортировка по стоимости предложения, фильтры. Для предмета — два графика: **линия цены** (1ч / 4ч / 1д / 1н, по желанию скользящие средние MA7/MA25) и **линия прибыльности с нулём посередине** — для ваших рецептов это прибыль за один крафт, для остальных предметов — на сколько золота продажа сейчас выше (+, выгодно продавать) или ниже (−) средней за 14 дней. Выше нуля линия зелёная, ниже — красная. Кнопка **Подробнее** на графике открывает предмет в отдельном окне: большие графики, цифры и стакан. Ниже — индикаторы (RSI, отклонение от средней, волатильность, ликвидность), сигналы и ценовые алерты. Справа — **стакан** с глубиной и калькулятором «сколько стоит купить N шт»; у аукциониста из него можно **купить**: клик по цене (всё до неё) или своё количество → «Купить» → подтверждение с точной ценой сервера. Без выбранного предмета — обзор рынка: настроение, стоимость всех лотов по сканам, лидеры роста и падения.
-- **Крафт** — себестоимость (каждый материал по самой низкой цене: аукцион, торговец или свой крафт), выручка после 5%, прибыль, маржа, сигнал; графики цены предмета и прибыли за крафт (ноль посередине) за 30 дней и разбор материалов.
-- **Сигналы** — продавать сейчас / выгодно крафтить / выгодно закупать / держать и не крафтить.
-- **Портфель** — запасы всех персонажей сервера по рыночным ценам и их стоимость по дням.
-- **Продажа** — что у вас в сумках можно выставить: цена рынка и сигнал; форма выставления с подсказанной ценой (на 1 медь дешевле самой низкой), сроком, залогом, комиссией, итогом и предупреждениями; выставление — только после подтверждения, у аукциониста. Переключатель «Мои лоты» — ваши лоты: где вас перебили, сколько осталось, снять с аукциона.
+- **Крафт** — себестоимость (каждый материал по самой низкой цене: аукцион, торговец или свой крафт), выручка после комиссии аукциона, прибыль, маржа, риски, сигнал, сколько реально продаётся в день; графики цены предмета и прибыли за крафт (ноль посередине) за 30 дней и разбор материалов. **Очередь** — что купить сразу на несколько крафтов по самым выгодным ценам и сколько дней займёт продажа.
+- **Сигналы** — продавать сейчас / выгодно крафтить / выгодно закупать / держать и не крафтить, перебитые лоты и рискованные рецепты. **Сделки** — что выгодно купить прямо сейчас: дешевле, чем даст торговец, или сильно ниже справедливой цены на спокойном рынке.
+- **Портфель** — запасы всех персонажей сервера по рыночным ценам и их стоимость по дням. **Журнал сделок** — что вы реально купили, продали и заработали, по письмам аукциона.
+- **Продажа** — что у вас в сумках можно выставить: цена рынка и сигнал; форма выставления с подсказанной ценой (на 1 медь дешевле самой низкой), сроком, залогом, комиссией, итогом и предупреждениями; выставление — только после подтверждения, у аукциониста. Переключатель «Мои лоты» — ваши лоты: где вас перебили и стоит ли перевыставлять, сколько осталось, снять с аукциона.
 - **Настройки** — сканирование, живые цены, источники, обмен, пороги сигналов, хранение данных.
 
 Три размера окна в шапке: компактное (только графики — без стакана и карточек), стандартное и на весь экран.
@@ -82,6 +89,7 @@ English (Settings > Language).
 - **История по дням** — у каждого встреченного предмета: цена на открытии и закрытии дня, минимум, максимум, предложение и лоты. Хранится 90 дней (настройка).
 - **Почасовая история (1ч / 4ч)** — для важных вам предметов (рецепты и материалы, избранное, запасы, всё, что вы открывали); для всех — отдельная настройка.
 - **Предложение** — сколько выставлено, а не сделки: игра не сообщает о продажах. На аукционе есть только продажи, поэтому стакан односторонний.
+- **Что реально продаётся** — оценка: два замера стакана сравниваются по продавцам и ценам (купили, перевыставили или истекло), отсюда «продаётся ~N в день». Риски видят завал рынка, наплыв продавцов и падение цены с прошлого замера.
 
 ## Команды
 

@@ -393,6 +393,20 @@ function FT.DebugReport()
     FT.Print("Auctionator " .. tostring(FT.Atr.Loaded()) .. ", days " .. tostring(FT.Atr.HistoryDays()))
     FT.Print("Mastercraft " .. tostring(FT.MC.Loaded()) .. ", last scan " .. tostring(FT.MC.LastScan()))
     FT.Print("recipes " .. #FT.Craft.List() .. ", tracked " .. FT.Hist.UniverseSize())
+    -- recipes by profession: how many the Craft page has, how many ForeverTrading read itself (Mastercraft: the rest)
+    local all, own = {}, {}
+    for _, r in ipairs(FT.Craft.List()) do all[r.prof] = (all[r.prof] or 0) + 1 end
+    for _, profs in pairs(FT.db.recipes or {}) do
+        for prof, data in pairs(type(profs) == "table" and profs or {}) do
+            local n = type(data) == "table" and type(data.list) == "table" and #data.list or 0
+            own[prof] = (own[prof] or 0) + n
+            all[prof] = all[prof] or 0
+        end
+    end
+    local parts = {}
+    for prof, n in pairs(all) do parts[#parts + 1] = string.format("%s %d (own %d)", L[prof] or prof, n, own[prof] or 0) end
+    table.sort(parts)
+    FT.Print("by profession: " .. table.concat(parts, ", "))
     local items, size = FT.Hist.Footprint()
     FT.Print("history items " .. items .. ", saved " .. size .. " chars, font " .. tostring(UI.FONT))
     local rows = FT.Market.Rows()

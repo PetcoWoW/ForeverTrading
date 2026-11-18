@@ -187,17 +187,20 @@ function T.Build(p)
 
     -- prices
     local pr = Section(left, L["Prices"], 2)
-    Check(pr, "ahCut", L["Take the 5% auction house cut off profits"])
+    Check(pr, "ahCut", L["Take the auction house cut off profits"],
+        L["The cut is learned from the auction house's letters about your sales (it isn't the same everywhere); 5% until one is read."])
     Check(pr, "cheapestWay", L["Count materials you can craft cheaper at their craft cost"],
         L["Bars from ore, cloth bolts from cloth...: when one of your characters knows the recipe and it costs less than buying."])
 
     -- alerts
-    local al = Section(left, L["Alerts"], 2)
+    local al = Section(left, L["Alerts"], 3)
     Check(al, "alertSound", L["Sound on a price alert"])
     Check(al, "alertChat", L["Message in chat on a price alert"])
+    Check(al, "undercutAlert", L["Say in chat when you are undercut"],
+        L["At the auction house: when an auction of yours is no longer the cheapest (your own other lots aside) - once per auction and price. Sell > My auctions tells whether to wait or post it again."])
 
     -- signals
-    local sg = Section(right, L["Signals"], 8)
+    local sg = Section(right, L["Signals"], 11)
     MoneyField(sg, "minProfit", L["Craft: minimum profit"], L["A recipe with less profit gets WATCH instead of CRAFT."])
     Number(sg, "minMargin", L["Craft: minimum margin"], "%", nil, false, 0, 500)
     Number(sg, "sellAbove", L["Sell when the price is above average by"], "%", nil, false, 1, 500)
@@ -208,13 +211,18 @@ function T.Build(p)
     Choice(sg, "spikeAbove", L["Jump: above the fair price by"], { { 30, "30%" }, { 50, "50%" }, { 100, "100%" }, { 200, "200%" } })
     Choice(sg, "fallBelow", L["Falling fast: below the fair price by"], { { 10, "10%" }, { 20, "20%" }, { 30, "30%" }, { 50, "50%" } },
         L["Other crafters undercut: a craft of an item falling this fast gets RISKY - by the time yours is listed the price may be lower still."])
+    Choice(sg, "floodAbove", L["Flooded: more than usual by"], { { 30, "30%" }, { 50, "50%" }, { 100, "100%" }, { 200, "200%" } },
+        L["More listed than usual, or more sellers than usual, by this much: competitors have come, and a price that holds now may not hold long. A craft of it gets RISKY and the Sell page warns. Usual: the average of the last days up to an hour ago (sellers are counted from the searches of an item: My items, live prices, the items you open). A price 10% lower than at the last check half an hour or more ago is RISKY too."])
+    Choice(sg, "dealBelow", L["Deals: resale under the fair price by"], { { 20, "20%" }, { 30, "30%" }, { 40, "40%" }, { 50, "50%" } },
+        L["Signals > Good deals: a lot this far under its fair price, on a market that sells most days and isn't flooded, is worth buying to list again."])
+    MoneyField(sg, "dealMin", L["Deals: minimum profit"], L["Deals that bring less are not shown (a vendor deal too)."])
 
     -- exchange
     local ex = Section(right, L["Exchange"], 3)
     Check(ex, "shareAuto", L["Ask guild and group for fresh prices"],
         L["When your prices of the whole market are more than an hour old, ForeverTrading asks its users in your guild (then your group) who has fresher ones; the freshest sends its last full scan in the background. At most once an hour."])
     Check(ex, "shareSend", L["Share my scans"],
-        L["When someone in your guild or group asks, your fresh full scan goes to them in the background: hidden addon messages, one a second, paused in a fight."])
+        L["When someone in your guild or group asks, your full scan (less than 3 days old and fresher than theirs) goes to them in the background: hidden addon messages, one a second, paused in a fight."])
     T.shareText = UI.Text(ex, 11, "dim")
     T.shareText:SetPoint("TOPLEFT", 14, ex.y - 6)
     local askNow = UI.Button(ex, L["Ask now"], 10, 24, "default", function() FT.Share.Ask(true) end)
@@ -258,7 +266,7 @@ function T.Build(p)
     Next(dt)
 
     -- about
-    local ab = Section(right, L["About"], 5)
+    local ab = Section(right, L["About"], 6)
     T.about = UI.Text(ab, 11, "muted")
     T.about:SetPoint("TOPLEFT", 14, -40)
     T.about:SetPoint("RIGHT", ab, "RIGHT", -14, 0)
@@ -271,6 +279,12 @@ function T.Build(p)
     local gh = UI.Button(ab, "GitHub", 10, 24, "default", function() FT.ShowGitHub() end)
     gh:FitText(28)
     gh:SetPoint("LEFT", support, "RIGHT", 8, 0)
+    local news = UI.Button(ab, L["What's new"], 10, 24, "default", function() FT.News.Show() end)
+    news:FitText(28)
+    news:SetPoint("BOTTOMLEFT", support, "TOPLEFT", 0, 8)
+    local tour = UI.Button(ab, L["Take the tour again"], 10, 24, "default", function() FT.Tour.Start() end)
+    tour:FitText(28)
+    tour:SetPoint("LEFT", news, "RIGHT", 8, 0)
 
     local function Stack(col, sections)
         local y = 0
@@ -309,7 +323,7 @@ function T.Refresh()
         T.shareText:SetText(L["Nothing received yet"])
     end
     local lines = {
-        "ForeverTrading " .. FT.VERSION_TEXT,
+        "ForeverTrading  ||  " .. string.format(L["version %s"], FT.C("text", FT.VERSION_TEXT)),
         "Auctionator: " .. (FT.Atr.Loaded() and FT.C("up", L["connected"]) or FT.C("down", L["not loaded"])) ..
             "    Mastercraft: " .. (FT.MC.Loaded() and FT.C("up", L["connected"]) or FT.C("down", L["not loaded"])),
         L["Prices come from ForeverTrading's own scans (and Auctionator's and Mastercraft's when they are on); recipes from your profession windows and Mastercraft."],

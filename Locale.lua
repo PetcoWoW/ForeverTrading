@@ -199,6 +199,8 @@ ru["30d high"] = "Макс 30д"
 ru["30d low"] = "Мин 30д"
 ru["Listed"] = "Предложение"
 ru["Auctions"] = "Лотов"
+ru["Price levels"] = "Цен"
+ru["%d price levels"] = "цен: %d"
 ru["Sellers"] = "Продавцов"
 ru["Moving averages"] = "Скользящие средние"
 ru["Two smoothed lines on the price chart: MA7 and MA25, the average price of the last 7 and 25 points (days on 1D). Until there are that many, of the points there are; MA25 shows once there are more than 7."] =
@@ -240,8 +242,6 @@ ru["Cost"] = "Себест."
 ru["What one craft costs: each material at the cheapest of auction house, vendor or crafting it yourself."] =
     "Сколько стоит один крафт: каждый материал по самой низкой цене — аукцион, торговец или собственный крафт."
 ru["Sells for"] = "Выручка"
-ru["What one craft brings in at the auction house after its 5% cut (or at a vendor, when that pays more)."] =
-    "Сколько приносит один крафт на аукционе после комиссии 5% (или у торговца, если тот платит больше)."
 ru["Profit"] = "Прибыль"
 ru["Margin"] = "Маржа"
 ru["How the crafted item's price moved in 7 days."] = "Как изменилась цена результата крафта за 7 дней."
@@ -276,13 +276,13 @@ ru["You have %s: worth %s"] = "У вас %s шт на %s"
 ru["price is high now"] = "цена сейчас высокая"
 ru["Thresholds"] = "Пороги"
 ru["Sell now"] = "Продавать сейчас"
-ru["What you own, priced above its average"] = "Ваши запасы дороже своей средней цены"
+ru["What you own, priced above its average; your auctions undercut"] = "Ваши запасы дороже своей средней цены; ваши перебитые лоты"
 ru["Worth crafting"] = "Выгодно крафтить"
 ru["Your recipes with a good profit"] = "Ваши рецепты с хорошей прибылью"
 ru["Worth buying"] = "Выгодно закупать"
 ru["Your materials and watchlist on a dip"] = "Ваши материалы и избранное на просадке"
 ru["Hold / avoid"] = "Держать / не крафтить"
-ru["Below average - wait; recipes at a loss"] = "Ниже средней — подождать; убыточные рецепты"
+ru["Below average - wait; recipes at a loss or at risk"] = "Ниже средней — подождать; убыточные и рискованные рецепты"
 ru["Nothing you own is priced high right now."] = "Сейчас ничего из ваших запасов не стоит дороже обычного."
 ru["No recipe clears your profit and margin thresholds right now."] = "Сейчас ни один рецепт не проходит ваши пороги прибыли и маржи."
 ru["None of your materials is on a dip."] = "Ни один из ваших материалов сейчас не на просадке."
@@ -326,7 +326,6 @@ ru["Opens ForeverTrading next to the auction house window."] = "Открывае
 ru["Lines in item tooltips"] = "Строки в подсказках предметов"
 ru["Price change, RSI, the signal and the craft profit of the item."] = "Изменение цены, RSI, сигнал и прибыль крафта предмета."
 ru["Prices"] = "Цены"
-ru["Take the 5% auction house cut off profits"] = "Вычитать комиссию аукциона 5% из прибыли"
 ru["Count materials you can craft cheaper at their craft cost"] = "Считать материалы по себестоимости, если скрафтить дешевле"
 ru["Bars from ore, cloth bolts from cloth...: when one of your characters knows the recipe and it costs less than buying."] =
     "Слитки из руды, рулоны из ткани...: когда рецепт знает один из ваших персонажей и это дешевле покупки."
@@ -486,14 +485,26 @@ ru["Ask guild and group for fresh prices"] = "Запрашивать свежи�
 ru["When your prices of the whole market are more than an hour old, ForeverTrading asks its users in your guild (then your group) who has fresher ones; the freshest sends its last full scan in the background. At most once an hour."] =
     "Когда вашим ценам всего рынка больше часа, ForeverTrading спрашивает своих пользователей в гильдии (затем в группе), у кого свежее; самый свежий присылает свой последний полный скан в фоне. Не чаще раза в час."
 ru["Share my scans"] = "Делиться своими сканами"
-ru["When someone in your guild or group asks, your fresh full scan goes to them in the background: hidden addon messages, one a second, paused in a fight."] =
-    "Когда кто-то в гильдии или группе спрашивает, ваш свежий полный скан уходит ему в фоне: скрытыми сообщениями аддона, по одному в секунду, с паузой в бою."
+ru["When someone in your guild or group asks, your full scan (less than 3 days old and fresher than theirs) goes to them in the background: hidden addon messages, one a second, paused in a fight."] =
+    "Когда кто-то в гильдии или группе спрашивает, ваш полный скан (если ему меньше 3 дней и он свежее, чем у спросившего) уходит ему в фоне: скрытыми сообщениями аддона, по одному в секунду, с паузой в бою."
 ru["Ask now"] = "Запросить сейчас"
 ru["Last received: %s from %s"] = "Последний раз получено: %s от %s"
 ru["Nothing received yet"] = "Пока ничего не получено"
 ru["Asking ForeverTrading users in your guild and group for fresher prices..."] =
     "Спрашиваю у пользователей ForeverTrading в гильдии и группе более свежие цены..."
 ru["Nobody in your guild or group has fresher prices right now."] = "Сейчас ни у кого в гильдии и группе нет более свежих цен."
+ru["The game didn't let the question out (it holds addon messages back for a while): try again in a minute."] =
+    "Игра не выпустила запрос (она временно придерживает сообщения аддонов): попробуйте через минуту."
+ru["No ForeverTrading user in your guild or group answered: they have to be in the game right now, in your guild or group, on your server and side. (An older ForeverTrading stays silent when it has nothing to give: ask them to update it.)"] =
+    "Ни один пользователь ForeverTrading в гильдии и группе не ответил: он должен быть в игре прямо сейчас, в вашей гильдии или группе, на вашем сервере и за вашу фракцию. (Старые версии ForeverTrading молчат, когда им нечего дать, — попросите обновить аддон.)"
+ru["hasn't scanned the whole auction house yet"] = "полного скана аукциона ещё нет"
+ru["their last scan is too old to pass on (%s, older than 3 days)"] = "последний скан слишком старый (%s, старше 3 дней) — такие не передаются"
+ru["their scan (%s) isn't fresher than your prices"] = "скан (%s) не свежее ваших цен"
+ru["has Share my scans turned off"] = "выключено «Делиться своими сканами»"
+ru["offered its prices but didn't begin sending: try again in a few minutes"] =
+    "цены были предложены, но отправка не началась — попробуйте через несколько минут"
+ru["busy (sending prices or in a fight): try again in a few minutes"] =
+    "сейчас занято: уже идёт отправка цен или бой — попробуйте через несколько минут"
 ru["The price exchange is already running."] = "Обмен ценами уже идёт."
 ru["The price exchange needs a guild or a group with other ForeverTrading users."] =
     "Для обмена ценами нужна гильдия или группа с другими пользователями ForeverTrading."
@@ -535,7 +546,6 @@ ru["Price jump (buyout?): %s above its fair price ~%s - sell a little under it n
 ru["price jump (buyout?): fair ~%s"] = "скачок цены (перекуп?): справедливая ~%s"
 ru["falling fast: %s, fair ~%s"] = "цена быстро падает: %s, справедливая ~%s"
 ru["Price falling fast: %s vs its fair price"] = "Цена быстро падает: %s к справедливой"
-ru["%s more listed"] = "лотов больше на %s"
 ru["Jump: above the fair price by"] = "Скачок: выше справедливой на"
 ru["Falling fast: below the fair price by"] = "Быстрое падение: ниже справедливой на"
 ru["Other crafters undercut: a craft of an item falling this fast gets RISKY - by the time yours is listed the price may be lower still."] =
@@ -618,7 +628,6 @@ ru["The median of the last days' prices, weighted by how many were listed and ho
 ru["Duration"] = "Срок"
 ru["For all"] = "За весь лот"
 ru["Deposit (back when it sells)"] = "Залог (вернётся при продаже)"
-ru["Auction house cut 5%"] = "Комиссия аукциона 5%"
 ru["You get"] = "Вы получите"
 ru["Post"] = "Выставить"
 ru["Post anyway"] = "Всё равно выставить"
@@ -642,7 +651,6 @@ ru["The item isn't in that bag slot any more."] = "Предмета больше
 ru["The auction house doesn't take this item."] = "Аукцион не принимает этот предмет."
 ru["Post %s x %s at %s each?"] = "Выставить %s x %s по %s за штуку?"
 ru["For all: %s. For %d hours."] = "За весь лот: %s. На %d ч."
-ru["Deposit %s (back when it sells), the auction house's cut 5%%: %s."] = "Залог %s (вернётся при продаже), комиссия аукциона 5%%: %s."
 ru["You get %s when it all sells."] = "Вы получите %s, когда всё продастся."
 ru["No answer from the server about the posting: look in the auction house window."] = "Сервер не ответил о выставлении — проверьте в окне аукциона."
 ru["Not enough gold for the deposit: %s needed."] = "Не хватает золота на залог: нужно %s."
@@ -692,8 +700,6 @@ ru["sold: the gold comes by mail"] = "продан — золото придёт
 ru["all: %s"] = "всего: %s"
 ru["Sold."] = "Продан."
 ru["Undercut by %s (%s)."] = "Вас перебили на %s (%s)."
-ru["To sell first: take it off and post it again a little under the lowest (the item comes back by mail, the deposit is lost) - or wait if the lowest is a single cheap lot that will go soon."] =
-    "Чтобы продать первым: снимите лот и выставьте снова чуть ниже самой низкой цены (предмет вернётся по почте, залог пропадёт) — или подождите, если самая низкая — одиночный дешёвый лот, который скоро уйдёт."
 ru["Yours is the cheapest."] = "Ваш лот самый дешёвый."
 ru["As of %s: Check the prices for now."] = "Данные — %s: «Проверить цены», чтобы узнать, как сейчас."
 ru["No market price known."] = "Цена рынка неизвестна."
@@ -713,3 +719,254 @@ ru["WoW Forever lets only its own auction house window post auctions: use its Se
 ru["WoW Forever lets only its own auction house window buy: buy there (the order book here shows what it costs)."] =
     "WoW Forever разрешает покупать только в своём окне аукциона: купите там (стакан здесь покажет, сколько это стоит)."
 ru["Cancel in the game's window"] = "Снять в окне аукциона"
+
+-- the price exchange test
+ru["check which ways the exchange can use"] = "проверить, какими путями может идти обмен"
+ru["Exchange test: which ways the game carries ForeverTrading's hidden messages (the realm restricts addon messages: %s)..."] =
+    "Проверка обмена: какими путями игра пропускает скрытые сообщения ForeverTrading (сервер ограничивает сообщения аддонов: %s)..."
+ru["the game refused to send it (code %s)"] = "игра отказалась отправить (код %s)"
+ru["the game found no player named %s"] = "игра не нашла персонажа «%s»"
+ru["works"] = "работает"
+ru["sent, but it didn't come back: this way seems not to work here"] = "отправлено, но не вернулось — похоже, здесь этот путь не работает"
+ru["guild"] = "гильдия"
+ru["group"] = "группа"
+ru["whisper"] = "шёпот"
+ru["yes"] = "да"
+ru["no"] = "нет"
+ru["unknown"] = "неизвестно"
+
+-- risks: the competition, since the last check and against what is usual
+ru["%s since the check %s"] = "%s с замера %s"
+ru["Flooded: %s listed, usually ~%s"] = "Завал: выставлено %s, обычно ~%s"
+ru["More sellers: %d, usually ~%d"] = "Больше продавцов: %d, обычно ~%d"
+ru["flooded: %s listed (usually ~%s)"] = "завал: выставлено %s (обычно ~%s)"
+ru["%d sellers (usually ~%d)"] = "продавцов: %d (обычно ~%d)"
+ru["The price went %s since the check %s: others undercut."] = "Цена %s с замера %s: другие сбивают цену."
+ru["Flooded: %s listed, usually ~%s - it may sell slowly, and undercuts come."] =
+    "Завал: выставлено %s, обычно ~%s — может продаваться медленно, будут перебивать."
+ru["More sellers than usual: %d, usually ~%d - expect undercuts."] =
+    "Продавцов больше обычного: %d, обычно ~%d — скорее всего, вас перебьют."
+ru["Flooded: more than usual by"] = "Завал: больше обычного на"
+ru["More listed than usual, or more sellers than usual, by this much: competitors have come, and a price that holds now may not hold long. A craft of it gets RISKY and the Sell page warns. Usual: the average of the last days up to an hour ago (sellers are counted from the searches of an item: My items, live prices, the items you open). A price 10% lower than at the last check half an hour or more ago is RISKY too."] =
+    "Выставлено больше обычного или продавцов больше обычного на столько: пришли конкуренты, и цена, которая держится сейчас, может скоро упасть. Крафт такого предмета получает РИСК, а страница продажи предупреждает. Обычное — среднее за последние дни, без последнего часа (продавцов видно только по поиску предмета: «Мои товары», живые цены, открытые предметы). Цена на 10% ниже, чем при замере полчаса и более назад, — тоже РИСК."
+
+-- good deals
+ru["TO VENDOR"] = "ТОРГОВЦУ"
+ru["RESELL"] = "ПЕРЕПРОДАЖА"
+ru["Good deals"] = "Сделки"
+ru["To a vendor"] = "Торговцу"
+ru["Resell"] = "Перепродать"
+ru["Prices not older than"] = "Цены не старше"
+ru["1 h"] = "1 ч"
+ru["6 h"] = "6 ч"
+ru["24 h"] = "24 ч"
+ru["Check order books"] = "Проверить стаканы"
+ru["Check order books (%d)"] = "Проверить стаканы (%d)"
+ru["Searches the auction house for the deals seen without an order book: how many cheap lots there really are (one search each, like My items)."] =
+    "Ищет на аукционе предметы сделок, у которых не загружен стакан: сколько дешёвых лотов там на самом деле (по одному поиску на предмет, как «Мои товары»)."
+ru["To a vendor: buy and sell to a vendor at once - a sure profit. Resell: buy the cheap lots of a steady market and list them again near the fair price."] =
+    "Торговцу: купить и сразу продать торговцу — прибыль без риска. Перепродать: купить дешёвые лоты на спокойном рынке и выставить снова около справедливой цены."
+ru["%s each, a vendor pays %s: +%s each"] = "%s за шт., торговец даст %s: +%s за шт."
+ru["%s each, fair ~%s: list at %s, +%s each after the cut"] = "%s за шт., справедливая ~%s: выставить по %s, +%s за шт. после комиссии"
+ru["the cheapest lot"] = "самый дешёвый лот"
+ru["%s pcs"] = "%s шт."
+ru["Buy: %s for %s"] = "Купить: %s за %s"
+ru["Sell them to a vendor for %s each: no cut, no waiting."] = "Продать торговцу по %s за шт.: без комиссии и ожидания."
+ru["Profit: %s"] = "Прибыль: %s"
+ru["Only the cheapest lot is sure: open the item (or Check order books) for its whole order book."] =
+    "Точно известен только самый дешёвый лот: откройте предмет (или нажмите «Проверить стаканы»), чтобы увидеть весь стакан."
+ru["Click: the item with its order book - buy there."] = "Клик: предмет со стаканом — покупать там."
+ru["Looking for deals..."] = "Ищу сделки..."
+ru["No good deals right now. They are looked for in the latest prices: scan the auction house, or open items while it is open."] =
+    "Сейчас выгодных сделок нет. Они ищутся по последним ценам: отсканируйте аукцион или открывайте предметы при открытом аукционе."
+ru["%d deals, +%s in all"] = "сделок: %d, всего +%s"
+ru["Talk to an auctioneer to check the order books."] = "Поговорите с аукционистом, чтобы проверить стаканы."
+ru["Deals: resale %d%% or more under the fair price, from %s profit (Settings > Signals)."] =
+    "Сделки: перепродажа от %d%% ниже справедливой цены, прибыль от %s (Настройки > Сигналы)."
+ru["Deals: resale under the fair price by"] = "Сделки: ниже справедливой на"
+ru["Signals > Good deals: a lot this far under its fair price, on a market that sells most days and isn't flooded, is worth buying to list again."] =
+    "Сигналы > Сделки: лот настолько ниже справедливой цены на рынке, где товар выставляется почти каждый день и нет завала, стоит купить и выставить снова."
+ru["Deals: minimum profit"] = "Сделки: минимальная прибыль"
+ru["Deals that bring less are not shown (a vendor deal too)."] = "Сделки с меньшей прибылью не показываются (продажа торговцу тоже)."
+
+-- sales seen from the listings
+ru["~%s a day"] = "~%s в день"
+ru["Sells"] = "Продаётся"
+ru["sells"] = "продаётся"
+ru["not seen yet"] = "пока не видно"
+ru["(%d h watched)"] = "(за %d ч наблюдений)"
+ru["Hardly bought: %s with ~%s usually listed"] = "Покупают мало: %s при ~%s выставленных обычно"
+
+-- undercut
+ru["UNDERCUT"] = "ПЕРЕБИЛИ"
+ru["post again"] = "перевыставить"
+ru["wait"] = "ждать"
+ru["not worth following"] = "не гнаться"
+ru["check the prices"] = "проверить цены"
+ru["yours %s, now %s"] = "ваш %s, теперь %s"
+ru["%d h"] = "%d ч"
+ru["%d min"] = "%d мин"
+ru["%s cheaper than yours"] = "дешевле вашего: %s шт."
+ru["Under the lowest would be %s: far under its fair price (or the vendor's). Rather wait for the cheap lots to go, or let yours run out."] =
+    "Ниже самой низкой — это %s: сильно ниже справедливой цены (или цены торговца). Лучше подождать, пока уйдут дешёвые лоты, или дать вашему истечь."
+ru["%s; at %s, about %s sell in the %s yours has left - yours too, likely. Waiting costs nothing; posting again costs a deposit."] =
+    "%s; при продажах %s уйдёт около %s шт. за %s, что осталось вашему лоту, — скорее всего, и ваш. Ждать — бесплатно, перевыставить — новый залог."
+ru["%s; at %s, only about %s sell in the %s yours has left - yours likely won't. Take it off and post it again at %s (the deposit is lost, a new one is paid)."] =
+    "%s; при продажах %s уйдёт только около %s шт. за %s, что осталось вашему лоту, — ваш, скорее всего, не успеет. Снимите и выставьте снова по %s (залог сгорит, нужен новый)."
+ru["%s cheaper than yours. To sell first: take it off and post it again at %s (the deposit is lost) - or wait if they are few and go fast."] =
+    "Дешевле вашего: %s шт. Чтобы продать первым — снимите и выставьте снова по %s (залог сгорит), или подождите, если их мало и они быстро уходят."
+ru["Check the prices first: how many are listed under yours, now."] = "Сначала проверьте цены: сколько сейчас выставлено дешевле вашего."
+ru["Take it from your mailbox: back in your bags, the Sell page has it first, at a copper under the lowest."] =
+    "Заберите предмет с почты: в сумках на странице «Продажа» он будет первым, с ценой на 1 медь ниже самой низкой."
+ru["%s is back in your bags: the Sell page has it first, at a copper under the lowest."] =
+    "%s снова в сумках: на странице «Продажа» он первый, с ценой на 1 медь ниже самой низкой."
+ru["Undercut: %s - yours %s, now %s."] = "Вас перебили: %s — ваш %s, теперь %s."
+ru["...and %d more: Sell > My auctions."] = "...и ещё %d: Продажа > Мои лоты."
+ru["Take off to post cheaper"] = "Снять и выставить дешевле"
+ru["The auction is taken off (the deposit is lost) and the item comes back by mail; back in your bags, the Sell page has it first, at a copper under the lowest. Posting again needs your click there."] =
+    "Лот снимается (залог сгорает), предмет приходит по почте; когда он вернётся в сумки, страница «Продажа» покажет его первым с ценой на 1 медь ниже самой низкой. Выставить снова — вашим кликом там."
+ru["Say in chat when you are undercut"] = "Сообщать в чат, когда вас перебили"
+ru["At the auction house: when an auction of yours is no longer the cheapest (your own other lots aside) - once per auction and price. Sell > My auctions tells whether to wait or post it again."] =
+    "У аукциониста: когда ваш лот перестал быть самым дешёвым (ваши другие лоты не в счёт) — один раз на лот и цену. Продажа > Мои лоты подскажет, ждать или перевыставить."
+
+-- the deals journal
+ru["Deals journal"] = "Журнал сделок"
+ru["What you bought and sold at the auction house, and what it brought"] = "Что вы купили и продали на аукционе и что это принесло"
+ru["Sold"] = "Продано"
+ru["Bought"] = "Куплено"
+ru["Deposits lost"] = "Залоги сгорели"
+ru["Result"] = "Итог"
+ru["Today"] = "Сегодня"
+ru["90d"] = "90д"
+ru["From the auction house's letters, read when you open your mailbox; deposits of what you post here. The cut is taken off what sold."] =
+    "По письмам аукциона (читаются, когда вы открываете почтовый ящик) и залогам выставленного здесь. Комиссия вычтена из проданного."
+ru["Bought / sold at"] = "Покупка → продажа"
+ru["Back unsold"] = "Не продано"
+ru["an item not known by name"] = "предмет без известного названия"
+ru["Sold, not bought at the auction house (crafted, farmed): its result is what it brought."] =
+    "Продано, но куплено не на аукционе (скрафчено, добыто): итог — всё, что принесло."
+ru["Deposits lost: %s"] = "Сгоревшие залоги: %s"
+ru["Came back unsold: %s expired, %s taken off"] = "Вернулось непроданным: истекло %s, снято %s"
+ru["%s pcs, the cut %s"] = "%s шт., комиссия %s"
+ru["paid %s, back %s"] = "внесено %s, вернулось %s"
+ru["back unsold: %s expired, %s taken off"] = "не продано: истекло %s, снято %s"
+ru["The journal fills from the auction house's letters: open your mailbox. What you post here writes its deposit."] =
+    "Журнал заполняется из писем аукциона: откройте почтовый ящик. Выставления через ForeverTrading записывают свой залог."
+ru["Nothing in this period."] = "За этот период ничего нет."
+
+-- the craft queue
+ru["Craft queue"] = "Очередь"
+ru["Queue it"] = "В очередь"
+ru["Queued: %d"] = "В очереди: %d"
+ru["Click: one craft more in the craft queue, Shift-click: five. The queue (Craft queue, above) adds up the materials to buy for all of it."] =
+    "Клик: ещё один крафт в очередь, Shift+клик: пять. Очередь (переключатель сверху) складывает материалы, которые нужно купить для всего сразу."
+ru["auction house"] = "аукцион"
+ru["craft it"] = "скрафтить"
+ru["~%s d"] = "~%s дн."
+ru["Crafts"] = "Крафтов"
+ru["Makes"] = "Выйдет"
+ru["To sell"] = "Продать"
+ru["How long what the crafts make takes to sell at what really sells a day (seen from the listings)."] =
+    "Сколько дней займёт продажа того, что выйдет, при реальных продажах в день (по наблюдениям за стаканом)."
+ru["Sells %s: the %s it makes take about %s."] = "Продаётся %s: %s шт. уйдут примерно за %s."
+ru["Click: the recipe. -/+ : one craft (Shift: five)."] = "Клик: рецепт. -/+ : один крафт (Shift: пять)."
+ru["The queue is empty: pick a recipe and press Queue it."] = "Очередь пуста: выберите рецепт и нажмите «В очередь»."
+ru["Material"] = "Материал"
+ru["Need"] = "Нужно"
+ru["Have"] = "Есть"
+ru["Costs"] = "Стоит"
+ru["enough"] = "хватает"
+ru["Need %s, have %s (bags and bank of this character): buy %s."] = "Нужно %s, есть %s (сумки и банк этого персонажа): купить %s."
+ru["At %s each: %s"] = "По %s за шт.: %s"
+ru["Click: its order book - buy there."] = "Клик: стакан — покупать там."
+ru["Nothing to buy."] = "Покупать ничего не нужно."
+ru["Search materials on AH"] = "Найти материалы на АХ"
+ru["Searches what is left to buy: fresh prices and order books, so the costs above are of now. The auction house must be open."] =
+    "Ищет то, что осталось купить: свежие цены и стаканы, чтобы стоимость выше была на сейчас. Аукцион должен быть открыт."
+ru["Clear the queue"] = "Очистить очередь"
+ru["Take every recipe out of the craft queue?"] = "Убрать все рецепты из очереди крафта?"
+ru["%d crafts"] = "крафтов: %d"
+ru["to buy"] = "купить на"
+ru["(%d without a price)"] = "(без цены: %d)"
+ru["brings"] = "выручка"
+ru["profit"] = "прибыль"
+ru["%d recipes in the queue"] = "рецептов в очереди: %d"
+
+-- the cut, as the auction house's letters say it is
+ru["Take the auction house cut off profits"] = "Вычитать комиссию аукциона из прибыли"
+ru["The cut is learned from the auction house's letters about your sales (it isn't the same everywhere); 5% until one is read."] =
+    "Комиссия берётся из писем аукциона о ваших продажах (она сейчас не везде одинакова); пока писем не было — 5%."
+ru["Deposit %s (back when it sells), the auction house's cut: %s."] = "Залог %s (вернётся при продаже), комиссия аукциона: %s."
+ru["What one craft brings in at the auction house after its cut (or at a vendor, when that pays more)."] =
+    "Сколько приносит один крафт на аукционе после комиссии (или у торговца, если тот платит больше)."
+ru["List them again at %s each (the auction house's cut is counted; the deposit comes back when they sell)."] =
+    "Выставить снова по %s за шт. (комиссия аукциона учтена; залог вернётся при продаже)."
+ru["Auction house cut"] = "Комиссия аукциона"
+
+-- About
+ru["version %s"] = "версия %s"
+
+-- What's new
+ru["What's new"] = "Что нового"
+ru["what's new"] = "что нового"
+ru["What's new in ForeverTrading %s"] = "Что нового в ForeverTrading %s"
+ru["Press Show to go there."] = "«Показать» — перейти туда."
+ru["Show"] = "Показать"
+ru["Got it"] = "Понятно"
+ru["Take the tour"] = "Пройти экскурсию"
+ru["Take the tour again"] = "Пройти обучение заново"
+ru["Nothing new written for %s."] = "Для %s нет списка нового."
+ru["Welcome to ForeverTrading"] = "Добро пожаловать в ForeverTrading"
+ru["A short tour: where everything is and how to use it (a couple of minutes). It can be taken again any time: Settings > About, /ft tour."] =
+    "Короткая экскурсия: где что находится и как этим пользоваться (пара минут). Повторить можно в любой момент: Настройки > Об аддоне, /ft tour."
+ru["Signals > Deals: what to buy right now for a profit - under what a vendor pays, or far under the fair price on a steady market."] =
+    "Сигналы > Сделки: что выгодно купить прямо сейчас — дешевле, чем даст торговец, или сильно ниже справедливой цены на спокойном рынке."
+ru["What really sells"] = "Что реально продаётся"
+ru["How much really sells a day, on the Craft page, the Market and the item window (told from the listings); and risks: a flooded market, more sellers, hardly bought."] =
+    "Сколько реально продаётся в день — в Крафте, на Рынке и в «Подробнее» (по наблюдениям за стаканом); и риски: завал рынка, наплыв продавцов, «покупают мало»."
+ru["Undercut"] = "Вас перебили"
+ru["A line in chat when an auction of yours is undercut; Sell > My auctions tells whether to wait or post it again."] =
+    "Сообщение в чат, когда ваш лот перебили; Продажа > Мои лоты подскажет, ждать или перевыставить."
+ru["Portfolio > Deals journal: what you really earned - from the auction house's letters."] =
+    "Портфель > Журнал сделок: сколько вы реально заработали — по письмам аукциона."
+ru["The craft queue"] = "Очередь крафта"
+ru["Craft > Queue: the materials to buy for several crafts at once, at their cheapest, and how long it all takes to sell."] =
+    "Крафт > Очередь: что купить сразу на несколько крафтов по самым выгодным ценам и сколько дней займёт продажа."
+ru["Fixes"] = "Исправления"
+ru["The price exchange works (it didn't know your name), poisons are back on the Craft page, vendor prices of materials count, searching finds Russian names in any case."] =
+    "Обмен ценами работает (аддон не узнавал своё имя), яды вернулись в Крафт, цены торговцев на материалы учитываются, поиск находит русские названия в любом регистре."
+
+-- the tour
+ru["the tour of ForeverTrading"] = "экскурсия по ForeverTrading"
+ru["The pages"] = "Разделы"
+ru["Market: the prices and charts of every item. Craft: what your recipes cost and bring. Signals: what to do now. Portfolio: what all you own is worth. Selling: post from your bags and watch your auctions."] =
+    "Рынок — цены и графики всех предметов. Крафт — себестоимость и прибыль ваших рецептов. Сигналы — что делать сейчас. Портфель — сколько стоит всё, что у вас есть. Продажа — выставить из сумок и следить за своими лотами."
+ru["The auction house"] = "Аукцион"
+ru["Green while you are at an auctioneer: the item you have open is searched again every few seconds, and you can buy, post and cancel right here. Click: the game's own auction house window."] =
+    "Горит зелёным, пока вы у аукциониста: открытый предмет обновляется каждые несколько секунд, а покупать, выставлять и снимать лоты можно прямо здесь. Клик — окно аукциона игры."
+ru["Scan and exchange"] = "Скан и обмен"
+ru["Full scan: the prices of the whole market in a couple of minutes (at an auctioneer). Exchange: fresh prices from ForeverTrading users in your guild and group, anywhere."] =
+    "«Полный скан» — цены всего рынка за пару минут (у аукциониста). «Обмен» — свежие цены от пользователей ForeverTrading в гильдии и группе, где угодно."
+ru["Search by name (in quotes: that name exactly), categories, filters as at the auction house. Click an item: its chart, signals and order book; right-click: watchlist."] =
+    "Поиск по названию (в кавычках — точное имя), категории и фильтры как на аукционе. Клик по предмету — график, сигналы и стакан; ПКМ — в избранное."
+ru["The order book"] = "Стакан"
+ru["Every listing by price, how many, by how many sellers. Click a price: how many to buy; Buy: at an auctioneer, at the server's exact price."] =
+    "Все лоты по ценам: сколько и у скольких продавцов. Клик по цене — сколько купить, «Купить» — у аукциониста, по точной цене сервера."
+ru["What each recipe costs with its cheapest materials (auction house, vendor or crafting it yourself), what it brings, its risks. Queue: the materials to buy for several crafts at once."] =
+    "Себестоимость каждого рецепта по самым выгодным материалам (аукцион, торговец или свой крафт), выручка и риски. «Очередь» — что купить сразу на несколько крафтов."
+ru["Signals and deals"] = "Сигналы и сделки"
+ru["What to sell, craft and buy now, your auctions undercut, risky recipes. Deals: what to buy right now for a profit - under what a vendor pays, or far under the fair price."] =
+    "Что продавать, крафтить и покупать сейчас, перебитые лоты и рискованные рецепты. «Сделки» — что выгодно купить прямо сейчас: дешевле торговца или сильно ниже справедливой цены."
+ru["Your bags at market prices: a copper under the lowest, the deposit, the cut, and warnings. My auctions: who undercut you, and whether to wait or post again."] =
+    "Ваши сумки по ценам рынка: цена на 1 медь ниже самой низкой, залог, комиссия и предупреждения. «Мои лоты» — кто вас перебил и стоит ли перевыставлять."
+ru["Portfolio and journal"] = "Портфель и журнал"
+ru["What everything your characters own is worth. Deals journal: what you really earned, from the auction house's letters."] =
+    "Сколько стоит всё, что есть у ваших персонажей. «Журнал сделок» — сколько вы реально заработали, по письмам аукциона."
+ru["Signal thresholds, the exchange, alerts, your data. In About: What's new, and this tour again (/ft tour)."] =
+    "Пороги сигналов, обмен, оповещения, данные. В «Об аддоне» — «Что нового» и эта экскурсия ещё раз (/ft tour)."
+ru["Next"] = "Далее"
+ru["Back"] = "Назад"
+ru["Done"] = "Готово"
+ru["End the tour"] = "Закончить"
+ru["The tour is over. Again: Settings > About, or /ft tour."] = "Экскурсия окончена. Повторить: Настройки > Об аддоне или /ft tour."
+ru["After the fight: the tour opens the pages of the window."] = "После боя: экскурсия открывает разделы окна."

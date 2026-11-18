@@ -105,12 +105,12 @@ end
 -- the whole posting in words (for the question), with its warnings
 function Sell.Text(p)
     local total = p.unit * p.qty
-    local cut = math.floor(total * 0.05)
+    local cut = math.floor(total * FT.Cut())
     local what = p.link or FT.ItemText(p.itemID, 40)
     local lines = {
         string.format(L["Post %s x %s at %s each?"], FT.Num(p.qty), what, FT.Money(p.unit)),
         string.format(L["For all: %s. For %d hours."], FT.Money(total), Sell.Hours(p.duration)),
-        string.format(L["Deposit %s (back when it sells), the auction house's cut 5%%: %s."], p.deposit and FT.Money(p.deposit) or "—",
+        string.format(L["Deposit %s (back when it sells), the auction house's cut: %s."], p.deposit and FT.Money(p.deposit) or "—",
             FT.Money(cut)),
         string.format(L["You get %s when it all sells."], FT.Money(total - cut)),
     }
@@ -251,7 +251,11 @@ local function Posted(p, auctionID)
     if FT.Owned then
         FT.Owned.Add({ auctionID = auctionID, itemID = p.itemID, link = p.link, qty = p.qty, unit = p.unit,
             seconds = Sell.Hours(p.duration) * 3600 })
+        -- taken off to post again: posted again
+        FT.Owned.Reposted(p.itemID)
     end
+    -- the deposit, for the deals journal
+    if FT.Journal then FT.Journal.Posted(p.itemID, p.qty, p.deposit) end
     Done(true)
 end
 

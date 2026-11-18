@@ -22,9 +22,13 @@ Sources\Mastercraft.lua
 Sources\Game.lua
 History.lua
 Analytics.lua
+Sales.lua
 Craft.lua
 Market.lua
 Portfolio.lua
+Deals.lua
+Journal.lua
+Queue.lua
 Sources\Share.lua
 Sources\Buy.lua
 Sources\Sell.lua
@@ -43,3 +47,5 @@ UI\TabPortfolio.lua
 UI\TabSell.lua
 UI\TabSettings.lua
 UI\Extras.lua
+UI\News.lua
+UI\Tour.lua

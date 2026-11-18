@@ -2,10 +2,12 @@
 local ADDON, FT = ...
 local L = FT.L
 
+-- The version being released: a copy straight from the repository (not packaged) has no version in its TOC yet
+-- (the packager puts the tag there) and shows this one. Set it with every release.
+local RELEASE = "v1.1.1"
 local GetMeta = (C_AddOns and C_AddOns.GetAddOnMetadata) or GetAddOnMetadata
-FT.VERSION = (GetMeta and GetMeta(ADDON, "Version")) or "dev"
--- a copy straight from the repository (not packaged): the packager hasn't put the version in yet
-if FT.VERSION:find("@", 1, true) then FT.VERSION = "dev" end
+FT.VERSION = (GetMeta and GetMeta(ADDON, "Version")) or RELEASE
+if FT.VERSION == "" or FT.VERSION:find("@", 1, true) then FT.VERSION = RELEASE end
 FT.VERSION_TEXT = FT.VERSION:match("^%d") and ("v" .. FT.VERSION) or FT.VERSION
 FT.MEDIA = "Interface\\AddOns\\" .. ADDON .. "\\media\\"
 FT.URL_SUPPORT = "https://boosty.to/andrewwoolfi"
@@ -81,12 +83,16 @@ FT.DEFAULTS = {
     deepFull = false,       -- full scan reads every auction (ReplicateItems, once every 15 minutes)
     scanPages = 2,          -- pages (50 auctions each, cheapest first) read per item in "my items"
     keepDaily = 90,         -- days of day candles kept
-    ahCut = true,           -- 5% auction house cut in profits
+    ahCut = true,           -- the auction house's cut taken off profits (FT.Cut: as its letters say it is)
     cheapestWay = true,     -- a material you can craft cheaper counts at its craft cost
     minProfit = 2000,       -- copper: below this a craft is not a "CRAFT" signal
+    dealBelow = 30,         -- percent under the fair price that makes a lot a resale deal
+    dealMin = 2000,         -- copper: deals that bring less aren't shown
+    undercutAlert = true,   -- at the auction house: a line in chat when an auction of yours is undercut
     spikeGuard = true,      -- a price blown up by a buyout (few lots far above the fair price) isn't counted on
     spikeAbove = 50,        -- percent above the fair price that counts as a jump (a buyout)
     fallBelow = 20,         -- percent below the fair price that counts as falling fast (crafts get RISKY)
+    floodAbove = 50,        -- percent more listed (or more sellers) than usual that counts as a flooded market
     minMargin = 10,         -- percent
     sellAbove = 10,         -- percent above the average price -> SELL
     buyBelow = 15,          -- percent below the average price -> BUY
@@ -168,6 +174,7 @@ function FT.R()
 end
 
 local function InitDB()
+    FT.freshInstall = ForeverTradingDB == nil
     ForeverTradingDB = ForeverTradingDB or {}
     local db = ForeverTradingDB
     db.settings = db.settings or {}
@@ -376,6 +383,34 @@ function FT.RememberName(itemID, name)
     if itemID and type(name) == "string" and name ~= "" and FT.db then NameBook()[itemID] = name end
 end
 
+-- Lower case for searching, Russian letters too: Lua's lower() knows only A-Z, so "трава" never found "Трава".
+-- А-Я are the bytes D0 90..AF, а-п D0 B0..BF, р-я D1 80..8F; Ё D0 81, ё D1 91.
+local CYRILLIC = { ["\208\129"] = "\209\145" }
+for i = 0, 31 do
+    CYRILLIC["\208" .. string.char(0x90 + i)] = i < 16 and ("\208" .. string.char(0xB0 + i)) or ("\209" .. string.char(0x80 + i - 16))
+end
+function FT.Fold(s)
+    if type(s) ~= "string" then return "" end
+    return (s:lower():gsub("\208[\128-\175]", CYRILLIC))
+end
+
+-- A search as typed: "name" in quotes is that name exactly, anything else a part of the name.
+-- Returns a test fn(itemID) -> true when the item's name matches (nil: an empty search, everything matches).
+function FT.NameMatcher(text)
+    local q = FT.Fold(text or ""):gsub("^%s+", ""):gsub("%s+$", "")
+    if q == "" then return nil end
+    local exact = q:match('^"(.+)"$')
+    local part = not exact and q:gsub('^"', ""):gsub('"$', "") or nil
+    if part == "" then return nil end
+    return function(itemID)
+        local name = FT.Name(itemID)
+        if not name then return false end
+        name = FT.Fold(name)
+        if exact then return name == exact end
+        return name:find(part, 1, true) ~= nil
+    end
+end
+
 -- the name of an item without asking the server (nil when the game hasn't loaded it and we never saw it).
 -- GetItemInfo itself asks the server for an item it doesn't have: only called for items the game has.
 local IsCached = C_Item and C_Item.IsItemDataCachedByID
@@ -390,6 +425,39 @@ function FT.Name(itemID)
         return name
     end
     return NameBook()[itemID]
+end
+
+-- The auction house's cut of a sale, a fraction: as the last letter of a sale told it (its cut over its price -
+-- it isn't the same everywhere now), else 5%
+function FT.Cut()
+    local c = FT.db and FT.db.cutSeen
+    if type(c) == "table" and type(c.rate) == "number" and c.rate >= 0 and c.rate < 0.5 then return c.rate end
+    return 0.05
+end
+
+-- name -> item, of every item name seen (in this game language; of two items with one name, one of them)
+function FT.NameIndex()
+    local idx = {}
+    if not FT.db then return idx end
+    for id, name in pairs(NameBook()) do
+        if type(name) == "string" and not idx[name] then idx[name] = id end
+    end
+    return idx
+end
+
+-- what a vendor pays for one, without asking the server (for looking through thousands of items: nil while
+-- the game hasn't loaded the item and we never saw it)
+function FT.SellPriceKnown(itemID)
+    if not (itemID and FT.db) then return nil end
+    FT.db.sellPrices = FT.db.sellPrices or {}
+    local book = FT.db.sellPrices
+    if IsCached and not IsCached(itemID) then return book[itemID] or nil end
+    local _, _, _, _, _, _, _, _, _, _, sellPrice = GetInfo(itemID)
+    if type(sellPrice) == "number" and sellPrice > 0 then
+        if book[itemID] ~= sellPrice then book[itemID] = sellPrice end
+        return sellPrice
+    end
+    return nil
 end
 
 -- name, quality, icon, sellPrice, link (name from our book while the game hasn't loaded the item yet)
@@ -581,12 +649,17 @@ SlashCmdList.FOREVERTRADING = function(msg)
     elseif cmd == "stop" then
         FT.Scanner.Stop("user")
     elseif cmd == "share" or cmd == "exchange" then
-        FT.Share.Ask(true)
+        if rest == "test" then FT.Share.Test() else FT.Share.Ask(true) end
+    elseif cmd == "news" then
+        FT.News.Show()
+    elseif cmd == "tour" then
+        FT.Tour.Start()
     else
         FT.Print("/ft — " .. L["open / close"])
         FT.Print("/ft market | craft | signals | portfolio | sell | settings")
         FT.Print("/ft scan — " .. L["full scan"] .. ",  /ft scan mine — " .. L["My items"] .. ",  /ft stop")
-        FT.Print("/ft share — " .. L["ask guild and group for fresh prices"])
+        FT.Print("/ft share — " .. L["ask guild and group for fresh prices"] .. ",  /ft share test — " .. L["check which ways the exchange can use"])
+        FT.Print("/ft news — " .. L["what's new"] .. ",  /ft tour — " .. L["the tour of ForeverTrading"])
         FT.Print("/ft lang ru | en | auto,  /ft reset,  /ft github,  /ft support")
     end
 end

@@ -123,13 +123,7 @@ local function Filtered()
     if not rows then return nil end
     local out = {}
     -- "name" in quotes: that name exactly (not the recipes for it and such); otherwise a part of the name
-    local search, exact
-    if state.search ~= "" then
-        local q = state.search:lower():gsub("^%s+", ""):gsub("%s+$", "")
-        exact = q:match('^"(.+)"$')
-        if not exact then search = q:gsub('^"', "") end
-        if search == "" then search = nil end
-    end
+    local matches = FT.NameMatcher(state.search)
     local mine = state.filter == "mine" and RecipeOutputs() or nil
     local filtersOn = FiltersOn()
     local holdings = state.filter == "bags" and FT.Port.Holdings() or nil
@@ -152,19 +146,13 @@ local function Filtered()
         end
         if ok and state.sub ~= "all" then ok = r.sub == state.sub end
         if ok and filtersOn then ok = PassFilters(r.id) end
-        if ok and exact then
-            local name = FT.Name(r.id)
-            ok = name ~= nil and name:lower() == exact
-        elseif ok and search then
-            local name = FT.Name(r.id)
-            ok = name ~= nil and name:lower():find(search, 1, true) ~= nil
-        end
+        if ok and matches then ok = matches(r.id) end
         if ok then out[#out + 1] = r end
     end
     local key, desc = state.sort, state.desc
     if key == "name" then
         local names = {}
-        for _, r in ipairs(out) do names[r.id] = (FT.Name(r.id) or "~"):lower() end
+        for _, r in ipairs(out) do names[r.id] = FT.Fold(FT.Name(r.id) or "~") end
         table.sort(out, function(a, b)
             if names[a.id] ~= names[b.id] then
                 if desc then return names[a.id] > names[b.id] end
@@ -322,6 +310,7 @@ end
 
 local function BuildList(parent)
     local panel = UI.Panel(parent, "bg1", "line")
+    T.listPanel = panel
     panel:SetPoint("TOPLEFT", 8, -8)
     panel:SetPoint("BOTTOMLEFT", 8, 8)
     panel:SetWidth(LEFT_W)
@@ -913,11 +902,8 @@ function T.ShowItem(id, keepView)
     local own = FT.Port.Count(id)
     if own > 0 then parts[#parts + 1] = FT.C("text", string.format(L["you have %s"], FT.Num(own))) end
     local s = FT.An.Stats(id)
-    if s.spike then
-        table.insert(parts, 1, FT.C("accent", string.format(L["price jump (buyout?): fair ~%s"], FT.Money(s.fair, "short"))))
-    elseif s.falling then
-        table.insert(parts, 1, FT.C("down", string.format(L["falling fast: %s, fair ~%s"], FT.Pct(s.price / s.fair - 1, true), FT.Money(s.fair, "short"))))
-    end
+    local head = UI.RiskHead(s)
+    for i = #head, 1, -1 do table.insert(parts, 1, head[i]) end
     v.sub:SetText(table.concat(parts, FT.C("dim", "  ||  ")))
     v.craft:SetShown(rs ~= nil and rs[1] ~= nil)
 
@@ -928,7 +914,8 @@ function T.ShowItem(id, keepView)
     for _, p in ipairs(v.pairs) do
         local val = s[p.key]
         if p.key == "listed" or p.key == "auctions" or p.key == "sellers" then
-            p.value:SetText(val and FT.Num(val) or "—")
+            p.value:SetText(UI.CountText(s, p.key))
+            if p.key == "auctions" then p.label:SetText(UI.AuctionsLabel(id)) end
         else
             p.value:SetText(val and FT.Money(val, "short") or "—")
         end
@@ -957,7 +944,9 @@ function T.ShowItem(id, keepView)
     local liq = FT.An.Liquidity(s)
     local liqNames = { high = L["high"], medium = L["medium"], low = L["low"], unknown = L["no data"] }
     local liqColors = { high = "up", medium = "accent", low = "down", unknown = "dim" }
-    v.liq:SetText(FT.C(liqColors[liq], liqNames[liq]))
+    -- and how much really sells, when seen (FT.Sales)
+    v.liq:SetText(FT.C(liqColors[liq], liqNames[liq])
+        .. (s.sales and (FT.C("dim", "  ||  ") .. FT.C(s.slow and "down" or "text", FT.Sales.PerDayText(s.sales))) or ""))
 
     -- signals
     local sell, sellStrength, sellReason = FT.An.SellSignal(s)
@@ -992,6 +981,7 @@ function T.Build(p)
     itemView = BuildItemView(center)
     itemView:Hide()
     book = UI.OrderBook(p)
+    T.book = book
     book:SetPoint("TOPRIGHT", -8, -8)
     book:SetPoint("BOTTOMRIGHT", -8, 8)
     book:SetWidth(RIGHT_W)

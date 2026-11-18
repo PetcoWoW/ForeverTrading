@@ -1,7 +1,7 @@
 -- ForeverTrading: Selling page. On the left what you carry that the auction house takes, at market prices with
 -- a signal; in the middle one item to post: the market (the cheapest listing, the fair price, the vendor's, the
 -- signal), the quantity, the price per unit (a copper under the cheapest to begin with), how long, and what it
--- comes to - deposit, the 5% cut, what you get - with warnings (under the vendor price, far under the fair one,
+-- comes to - deposit, the auction house's cut, what you get - with warnings (under the vendor price, far under the fair one,
 -- above the cheapest, a price jump or a fast fall). Post asks once more with everything. Its order book on the
 -- right, live at the auction house.
 local ADDON, FT = ...
@@ -38,7 +38,7 @@ end
 local function Rows()
     entries = FT.BagItems()
     local out, sum = {}, 0
-    local search = state.search ~= "" and state.search:lower() or nil
+    local search = state.search ~= "" and FT.Fold(state.search) or nil
     for _, e in ipairs(entries) do
         local price, _, _, _, gone = FT.Price(e.id)
         e.price = price
@@ -47,9 +47,12 @@ local function Rows()
         if gone then e.signal = "NODATA" end
         if e.value then sum = sum + e.value end
         local name = FT.Name(e.id)
-        if not search or (name and name:lower():find(search, 1, true)) then out[#out + 1] = e end
+        if not search or (name and FT.Fold(name):find(search, 1, true)) then out[#out + 1] = e end
     end
+    -- taken off to post again and back from the mail: first
+    for _, e in ipairs(out) do e.repost = FT.Owned.Waiting(e.id) ~= nil end
     table.sort(out, function(a, b)
+        if a.repost ~= b.repost then return a.repost end
         local va, vb = a.value or -1, b.value or -1
         if va ~= vb then return va > vb end
         return a.id < b.id
@@ -75,6 +78,7 @@ local function BuildList(p)
     panel:SetWidth(LEFT_W)
     -- your bags or your auctions
     viewSeg = UI.Segmented(panel, { { "bags", L["Your bags"] }, { "owned", L["My auctions"] } }, function(v) T.SetView(v) end, 24)
+    T.viewSeg = viewSeg
     viewSeg:SetPoint("TOPLEFT", 8, -7)
     viewSeg:SetValue(state.view)
     totalText = UI.Text(panel, 11, "dim", "RIGHT")
@@ -109,7 +113,7 @@ local function BuildList(p)
         update = function(row, e)
             local c = row.cells.name
             c.icon:SetItem(e.id)
-            c.text:SetText(FT.ItemText(e.id))
+            c.text:SetText(FT.ItemText(e.id) .. (e.repost and FT.C("accent", " " .. L["post again"]) or ""))
             row.cells.count:SetText(FT.Num(e.count))
             row.cells.price:SetText(e.price and FT.Money(e.price, "short") or FT.C("dim", "—"))
             row.cells.signal:Set(e.signal, nil, e.strength)
@@ -274,7 +278,7 @@ local function BuildForm(p)
     -- what it comes to
     f.total = SumLine(f, L["For all"], -334)
     f.deposit = SumLine(f, L["Deposit (back when it sells)"], -354)
-    f.cut = SumLine(f, L["Auction house cut 5%"], -374)
+    f.cut = SumLine(f, L["Auction house cut"], -374)
     f.net = SumLine(f, L["You get"], -398, true)
 
     f.warn = UI.Text(f, 11, "accent")
@@ -332,7 +336,7 @@ local function Warnings(e, unit)
     local p, t, _, _, gone = FT.Price(e.id)
     local s = FT.An.Stats(e.id)
     local vendor = FT.VendorSell(e.id)
-    if vendor and vendor > 0 and unit * 0.95 < vendor then
+    if vendor and vendor > 0 and unit * (1 - FT.Cut()) < vendor then
         warns[#warns + 1] = FT.C("down", string.format(L["Less than a vendor pays (%s each, no cut, no waiting)."], FT.Money(vendor, "short")))
         severe = true
     end
@@ -348,6 +352,18 @@ local function Warnings(e, unit)
     elseif s.falling then
         warns[#warns + 1] = FT.C("down", string.format(L["The price is falling fast: %s vs its fair price."], FT.Pct(s.price / s.fair - 1, true)))
         severe = true
+    end
+    -- the competition: since the last check, and against what is usual
+    if s.dropped and not s.falling then
+        warns[#warns + 1] = FT.C("accent", string.format(L["The price went %s since the check %s: others undercut."], FT.Pct(s.sinceP, true), FT.Ago(s.prev.t)))
+    end
+    if s.flood then
+        warns[#warns + 1] = FT.C("accent", string.format(L["Flooded: %s listed, usually ~%s - it may sell slowly, and undercuts come."],
+            FT.Num(s.listed), FT.Num(math.floor(s.typicalQ + 0.5))))
+    end
+    if s.crowd then
+        warns[#warns + 1] = FT.C("accent", string.format(L["More sellers than usual: %d, usually ~%d - expect undercuts."],
+            s.sellersNow, math.floor(s.typicalS + 0.5)))
     end
     -- the market as last seen, not right now
     if t and time() - t > 1800 then
@@ -461,7 +477,7 @@ function T.UpdateSummary()
     local loc = FT.Sell.Location(e.bag, e.slot)
     local kind = FT.Sell.Kind(loc) or (e.gear and "item" or "commodity")
     local total = unit and unit * qty or nil
-    local cut = total and math.floor(total * 0.05)
+    local cut = total and math.floor(total * FT.Cut())
     local deposit = qty > 0 and FT.Sell.Deposit(kind, e.id, loc, dur, qty) or nil
     f.total:SetText(total and FT.Money(total) or FT.C("dim", "—"))
     f.deposit:SetText(deposit and FT.Money(deposit) or FT.C("dim", "—"))
@@ -654,13 +670,13 @@ end
 local function OwnedRows()
     local items, readAt = FT.Owned.List()
     local out, value, under = {}, 0, 0
-    local search = state.search ~= "" and state.search:lower() or nil
+    local search = state.search ~= "" and FT.Fold(state.search) or nil
     for _, a in ipairs(items) do
         a.low = FT.Owned.Undercut(a)
         if a.low then under = under + 1 end
         if a.unit and not a.sold then value = value + a.unit * a.qty end
         local name = FT.Name(a.itemID)
-        if not search or (name and name:lower():find(search, 1, true)) then out[#out + 1] = a end
+        if not search or (name and FT.Fold(name):find(search, 1, true)) then out[#out + 1] = a end
     end
     -- undercut first, then the most valuable
     table.sort(out, function(x, y)
@@ -712,6 +728,8 @@ function T.BuildOwnedList(panel)
             GameTooltip:AddLine(" ")
             if a.low then
                 GameTooltip:AddLine(string.format(L["Undercut: the lowest is %s, yours %s."], FT.Money(a.low), FT.Money(a.unit)), 0.96, 0.27, 0.36)
+                local advice = FT.Owned.Advice(a)
+                if advice then GameTooltip:AddLine(advice.text, 0.85, 0.87, 0.9, true) end
             elseif not a.sold then
                 GameTooltip:AddLine(L["Yours is the cheapest (as far as is known)."], 0.05, 0.8, 0.5)
             end
@@ -826,6 +844,15 @@ function T.BuildOwnedForm(p)
     f.cancel.label:SetFont(UI.FONT, 13, "")
     f.cancel:FitText(36)
     f.cancel:SetPoint("BOTTOMRIGHT", -16, 16)
+    -- undercut: take it off to post it again under the lowest (back from the mail, the Sell page has it first)
+    f.repost = UI.Button(f, L["Take off to post cheaper"], 10, 30, "primary", function()
+        local a = T.CurrentOwned()
+        if a then FT.Owned.CancelToRepost(a) end
+    end)
+    f.repost.label:SetFont(UI.FONT, 13, "")
+    f.repost:FitText(36)
+    f.repost:SetPoint("BOTTOMRIGHT", f.cancel, "TOPRIGHT", 0, 8)
+    f.repost:SetTip(L["Take off to post cheaper"], L["The auction is taken off (the deposit is lost) and the item comes back by mail; back in your bags, the Sell page has it first, at a copper under the lowest. Posting again needs your click there."])
     f.hint = UI.Text(f, 10, "dim")
     f.hint:SetPoint("BOTTOMLEFT", 16, 24)
     f.hint:SetPoint("RIGHT", f.cancel, "LEFT", -12, 0)
@@ -850,6 +877,7 @@ function T.ShowOwned()
     local a = T.CurrentOwned()
     local show = a ~= nil
     for _, r in ipairs({ f.icon, f.name, f.sub, f.yours, f.low, f.fair, f.verdict, f.advice, f.cancel, f.hint }) do r:SetShown(show) end
+    f.repost:Hide()
     f.empty:SetShown(not show)
     if not a then
         book:SetItem(nil)
@@ -885,7 +913,12 @@ function T.ShowOwned()
         f.advice:SetText("")
     elseif a.low then
         f.verdict:SetText(FT.C("down", string.format(L["Undercut by %s (%s)."], FT.Money(a.unit - a.low, "short"), FT.Pct(a.low / a.unit - 1, true))))
-        f.advice:SetText(L["To sell first: take it off and post it again a little under the lowest (the item comes back by mail, the deposit is lost) - or wait if the lowest is a single cheap lot that will go soon."])
+        -- wait or post again: what is under yours against what sells in the time yours has left
+        local advice = FT.Owned.Advice(a)
+        local color = advice and ((advice.kind == "repost" and "down") or (advice.kind == "wait" and "up") or "muted") or "muted"
+        f.advice:SetText(advice and FT.C(color, advice.text) or "")
+        f.repost:SetShown(advice ~= nil and advice.kind ~= "low")
+        f.repost:SetUsable(FT.Owned.Possible() and not FT.Owned.Blocked())
     elseif p and not gone then
         f.verdict:SetText(FT.C("up", L["Yours is the cheapest."]))
         f.advice:SetText(t and time() - t > 1800 and string.format(L["As of %s: Check the prices for now."], FT.Ago(t)) or "")
@@ -920,5 +953,14 @@ FT.On("FT_OWNED_CHANGED", function()
     if page and page:IsVisible() and state.view == "owned" then
         T.RefreshOwned()
         T.ShowOwned()
+    elseif page and page:IsVisible() then
+        -- an item taken off to post again: its mark in the bags follows
+        T.RefreshList()
     end
 end)
+
+-- an auction of yours from elsewhere (the Signals page): My auctions with it chosen
+function T.OpenOwned(auctionID)
+    if state.view ~= "owned" then T.SetView("owned") end
+    T.SelectOwned(auctionID)
+end

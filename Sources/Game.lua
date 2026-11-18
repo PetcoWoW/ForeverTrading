@@ -50,10 +50,27 @@ local function HasSkill(name)
     return collapsed
 end
 
-local function Store(prof, list)
+-- complete: the list is every recipe learned (the newer API gives them all, whatever the window shows).
+-- The older one reads what the window shows: with a search or "have materials" on that is a part, so the
+-- recipes read before stay (a recipe once learned isn't lost) - the poisons vanished that way.
+local function Store(prof, list, complete)
     if not (FT.charKey and prof and list and #list > 0) then return end
     FT.db.recipes[FT.charKey] = FT.db.recipes[FT.charKey] or {}
-    FT.db.recipes[FT.charKey][FT.ProfKey(prof)] = { scanned = time(), list = list, name = prof }
+    local key = FT.ProfKey(prof)
+    local old = FT.db.recipes[FT.charKey][key]
+    local kept = 0
+    if not complete and type(old) == "table" and type(old.list) == "table" then
+        local seen = {}
+        for _, r in ipairs(list) do seen[tostring(r.output) .. ":" .. tostring(r.name)] = true end
+        for _, r in ipairs(old.list) do
+            if type(r) == "table" and not seen[tostring(r.output) .. ":" .. tostring(r.name)] then
+                list[#list + 1] = r
+                kept = kept + 1
+            end
+        end
+    end
+    FT.db.recipes[FT.charKey][key] = { scanned = time(), list = list, name = prof }
+    FT.Debug("recipes:", prof, #list - kept, "read,", kept, "kept from before")
     FT.Debounce("recipesChanged", 0.5, function() FT.Fire("FT_RECIPES_CHANGED") end)
 end
 
@@ -123,8 +140,32 @@ local function ScanTradeModern()
     local base = T.GetBaseProfessionInfo and T.GetBaseProfessionInfo()
     local prof = base and base.professionName
     if not prof or prof == "" then return false end -- not this client's window: the classic API reads it
+    local ids = T.GetAllRecipeIDs() or {}
+    -- Switching windows, the game names the new profession while it still lists the previous one's recipes
+    -- for a moment (Mastercraft's author saw it too): saved under the new name, they overwrote its recipes and
+    -- the previous profession's were lost on the next read (poisons, 18 Nov 2026). Read again in a moment.
+    if T.GetProfessionInfoByRecipeID and ids[1] then
+        local ok, pinfo = pcall(T.GetProfessionInfoByRecipeID, ids[1])
+        if ok and type(pinfo) == "table" then
+            local known, match = false, false
+            for _, n in ipairs({ pinfo.professionName or "", pinfo.parentProfessionName or "" }) do
+                if type(n) == "string" and n ~= "" then
+                    known = true
+                    if n == prof or n:find(prof, 1, true) or prof:find(n, 1, true) then match = true end
+                end
+            end
+            if known and not match then
+                G.mismatch = (G.mismatch or 0) + 1
+                FT.Debug("recipes: the window is", prof, "but its recipes are still", tostring(pinfo.professionName),
+                    "- read again", G.mismatch <= 5 and "in a moment" or "no more")
+                if G.mismatch <= 5 then G.retry = true end
+                return true
+            end
+        end
+    end
+    G.mismatch = 0
     local list = {}
-    for _, id in ipairs(T.GetAllRecipeIDs() or {}) do
+    for _, id in ipairs(ids) do
         local info = T.GetRecipeInfo(id)
         if info and info.learned then
             local r = { id = id, name = info.name, icon = info.icon, reagents = {}, outputQty = 1 }
@@ -144,8 +185,9 @@ local function ScanTradeModern()
             list[#list + 1] = r
         end
     end
+    FT.Debug("recipes: window", prof, "-", #ids, "recipes listed,", #list, "learned")
     if #list == 0 then return false end
-    Store(prof, list)
+    Store(prof, list, true)
     return true
 end
 
@@ -402,14 +444,36 @@ FT.On("FT_LOGIN", SaveMoney)
 ---------------------------------------------------------------------------
 -- Merchants: what a vendor really charges for a material
 ---------------------------------------------------------------------------
-local function ScanMerchant()
-    if not (GetMerchantNumItems and GetMerchantItemInfo) then return end
-    for i = 1, GetMerchantNumItems() do
+-- price, stack size, paid in something other than money: the newer clients (Forever among them) answer with
+-- C_MerchantFrame.GetItemInfo, the older ones with GetMerchantItemInfo
+local function MerchantItem(i)
+    if C_MerchantFrame and C_MerchantFrame.GetItemInfo then
+        local ok, info = pcall(C_MerchantFrame.GetItemInfo, i)
+        if ok and type(info) == "table" then return info.price, info.stackCount, info.hasExtendedCost end
+        return nil
+    end
+    if GetMerchantItemInfo then
         local _, _, price, stack, _, _, _, extendedCost = GetMerchantItemInfo(i)
+        return price, stack, extendedCost
+    end
+end
+
+local function ScanMerchant()
+    if not GetMerchantNumItems then return end
+    local n = 0
+    for i = 1, GetMerchantNumItems() do
+        local price, stack, extendedCost = MerchantItem(i)
         local id = (GetMerchantItemID and GetMerchantItemID(i)) or ItemID(GetMerchantItemLink and GetMerchantItemLink(i))
         if id and price and price > 0 and not extendedCost then
-            FT.db.vendor[id] = math.floor(price / math.max(1, stack or 1) + 0.5)
+            local unit = math.floor(price / math.max(1, stack or 1) + 0.5)
+            if FT.db.vendor[id] ~= unit then n = n + 1 end
+            FT.db.vendor[id] = unit
         end
+    end
+    -- new vendor prices: craft costs count them
+    if n > 0 then
+        FT.Debug("merchant:", n, "prices recorded")
+        FT.Fire("FT_PRICES_CHANGED", "vendor")
     end
 end
 FT.On("MERCHANT_SHOW", function() C_Timer.After(0.3, ScanMerchant) end)

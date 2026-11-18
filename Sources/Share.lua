@@ -3,11 +3,20 @@
 -- group) is asked who has fresher ones. Those who have offer them; the freshest is picked and sends its last
 -- full scan in the background: hidden addon messages, one a second (far below what the game allows), paused
 -- in a fight. Everyone listening whose prices are older takes them in too, and can pass them on later.
---   Q  ask:    "Q", proto, side, the time of our newest market prices
+-- The live Forever realms restrict what an addon may send (C_ChatInfo.AreOutgoingAddonChatMessagesRestricted:
+-- LayerSwap's author found its messages in a chat channel refused there; a hidden whisper is the one message
+-- they surely carry). So when the guild and the group bring nothing, the same question goes as hidden whispers:
+-- to the group, to the ForeverTrading users met before who are online in the guild and, when you pressed
+-- Exchange, to the rest of the guild online. The answer and the transfer then go by whisper too.
+--   Q  ask:    "Q", proto, side, the time of our newest market prices, "m" when you pressed Exchange
 --   O  offer:  "O", proto, side, the time of theirs, how many items
+--   N  no:     "N", proto, side, the asker, why, the time of theirs: said only to a pressed Exchange, so that
+--              it can tell who is there and why nothing came ("old", "same", "off", "busy")
 --   P  pick:   "P", proto, the name picked, its time
 --   B  begin:  "B", proto, side, time, items          D  data: "D", n, "item,price,listed,age;..."
 --   E  end:    "E", messages, items                K  still here (the sender is in a fight)
+--   T  test:   "T", proto, a token: /ft share test sends it to itself every way it can and sees which come back
+-- A channel here is "GUILD", "PARTY", "RAID" or "W:<name>": a hidden whisper to that player.
 -- Times go over the wire as server time: players' clocks differ.
 local ADDON, FT = ...
 local L = FT.L
@@ -19,7 +28,8 @@ local PREFIX = "FTDATA"
 local PROTO = "1"
 local AUTO_EVERY = 3600       -- ask by itself when the prices are older than this, at most this often
 local NEWER_BY = 1200         -- an offer counts when it is at least 20 minutes newer than ours
-local MAX_AGE = 24 * 3600     -- older scans aren't offered or taken
+local MAX_AGE = 3 * 86400     -- older scans aren't offered or taken (a day was too little: one who scans
+                              -- every other day had nothing to give to one who has no prices at all)
 local WINDOW = 3 * 3600       -- what is sent: the prices seen in the 3 hours up to the scan, and since
 local OFFER_WAIT = 4          -- seconds the asker listens for offers
 local PICK_WAIT = 12          -- seconds the one picked has to begin
@@ -29,14 +39,20 @@ local STREAM_GAP = 300        -- we send to the same channel at most once in 5 m
 local MAX_ITEMS = 8000
 local MSG_MAX = 245           -- an addon message holds 255 characters
 local MAX_PRICE = 1e10        -- a million gold
+local WHISPER_BURST = 8       -- the game lets about 10 messages of an addon out at once, then about one a second
+local WHISPER_GAP = 1.1
+local WHISPER_MAX = 25        -- players whispered when you press Exchange
+local WHISPER_AUTO = 6        -- by itself: only the group and the ForeverTrading users met before
+local PEER_DAYS = 60          -- a ForeverTrading user not heard from for this long is forgotten
 
-local ask        -- { channels, i, channel, offers, picked, manual, round }
+local ask        -- { channels, i, channel, offers, picked, manual, round, replies, sentAny, heardBroadcast }
 local offer      -- { channel, t, count, beaten }: our offer, said after a short random wait
 local out        -- what we send: { channel, t, list, i, seq, fails, ticker }
 local streams = {} -- sender -> { t, count, got, taken, value, lastAt, from, manual }
 local lastAuto = 0
 local round = 0       -- each ask of a channel gets its own number: old timers can't touch a newer ask
 local lastStream = {} -- channel -> time we last sent our scan to it
+local test            -- /ft share test running: { token, sent = { keys }, heard = { key = true } }
 
 local function Enc(n) return FT.Hist.Enc(n) end
 local function Dec(s) return FT.Hist.Dec(s) end
@@ -48,12 +64,53 @@ end
 local function Wire(t) return t + Skew() end
 local function Local(w) return w - Skew() end
 
+-- Names. On Forever a character is "First Surname" and its realms are one world: chat writes a sender as
+-- "First Surname-Realm", and a whisper wants "First Surname" (it reads whatever follows a "-" as the surname).
 local function Short(name)
     return type(name) == "string" and (name:gsub("%-.*$", "")) or ""
 end
 
+local function NameSep()
+    local c = Constants and Constants.CharacterNameSeparatorConsts
+    local sep = c and c.CHARACTERNAME_SURNAME_SEPARATOR
+    return (type(sep) == "string" and sep ~= "") and sep or " "
+end
+
+-- a unit's name as chat writes it: UnitName gives the player's two parts at once, anyone else's apart
+local function UnitFull(unit)
+    local ok, name = pcall(function()
+        local first, second = UnitName(unit)
+        if type(first) ~= "string" or first == "" then return nil end
+        if type(second) == "string" and second ~= "" then return first .. NameSep() .. second end
+        return first
+    end)
+    return ok and name or nil
+end
+
+local me -- our own name as chat writes it
+local function FindMe()
+    me = UnitFull("player")
+    -- the guild roster writes it the way chat does (should UnitName leave the surname out)
+    if IsInGuild and IsInGuild() and GetNumGuildMembers and GetGuildRosterInfo and UnitGUID then
+        local guid = UnitGUID("player")
+        for i = 1, GetNumGuildMembers() do
+            local row = { GetGuildRosterInfo(i) }
+            if row[1] and row[17] == guid then
+                me = Short(row[1])
+                break
+            end
+        end
+    end
+end
+
+local function MyName()
+    if not me then FindMe() end
+    return me or UnitName("player")
+end
+
 local function IsMe(name)
-    return Short(name) == UnitName("player")
+    local s = Short(name)
+    return s ~= "" and (s == MyName() or s == UnitName("player"))
 end
 
 local function Fighting()
@@ -74,13 +131,31 @@ local function Channels()
     return out_
 end
 
+local function IsWhisper(channel)
+    return type(channel) == "string" and channel:sub(1, 2) == "W:"
+end
+
+local whispered = {} -- name -> GetTime(): our hidden whispers (the game's "no such player" for them is ours)
+
+-- sent or not, and the game's answer when not
 local function Send(channel, ...)
-    if not (C_ChatInfo and C_ChatInfo.SendAddonMessage) then return false end
-    local ok, res = pcall(C_ChatInfo.SendAddonMessage, PREFIX, table.concat({ ... }, "\t"), channel)
-    if not ok or res == false then return false end
-    -- newer clients answer with a result code: 0 is "sent"
-    if type(res) == "number" and res ~= 0 then return false end
+    if not (C_ChatInfo and C_ChatInfo.SendAddonMessage) then return false, "no API" end
+    local kind, target = channel, nil
+    if IsWhisper(channel) then
+        kind, target = "WHISPER", channel:sub(3)
+        whispered[target] = GetTime()
+    end
+    local ok, res = pcall(C_ChatInfo.SendAddonMessage, PREFIX, table.concat({ ... }, "\t"), kind, target)
+    if not ok or res == false then return false, res end
+    -- newer clients answer with a result code: Success (0) is "sent"
+    local success = Enum and Enum.SendAddonMessageResult and Enum.SendAddonMessageResult.Success or 0
+    if type(res) == "number" and res ~= success then return false, res end
     return true
+end
+
+-- after a short random wait (so that a guild's answers don't all come at once)
+local function Soon(fn)
+    C_Timer.After(0.3 + math.random() * 1.7, fn)
 end
 
 local function Count(t)
@@ -105,25 +180,166 @@ function X.Status()
 end
 
 ---------------------------------------------------------------------------
+-- Who can be whispered
+---------------------------------------------------------------------------
+-- ForeverTrading users heard before (this server and side): short name -> { n = full name, t = when }
+local function Peers()
+    local r = FT.R()
+    r.peers = r.peers or {}
+    return r.peers
+end
+
+-- a ForeverTrading user heard (anything of ours, or its version)
+function X.Met(sender)
+    local key = Short(sender)
+    if not FT.db or key == "" or IsMe(sender) then return end
+    local p = Peers()[key]
+    if p then
+        p.n, p.t = key, time()
+    else
+        Peers()[key] = { n = key, t = time() }
+    end
+end
+
+local function AskRoster()
+    if C_GuildInfo and C_GuildInfo.GuildRoster then
+        pcall(C_GuildInfo.GuildRoster)
+    elseif GuildRoster then
+        pcall(GuildRoster)
+    end
+end
+
+-- the group, then the ForeverTrading users met before who are online in the guild, then (asked by hand)
+-- the rest of the guild online
+local function WhisperTargets(manual)
+    local list, seen = {}, {}
+    local function Add(full)
+        if type(full) ~= "string" or full == "" then return end
+        local key = Short(full)
+        if seen[key] or IsMe(full) then return end
+        seen[key] = true
+        list[#list + 1] = full
+    end
+    local raid = IsInRaid and IsInRaid()
+    local n = GetNumGroupMembers and GetNumGroupMembers() or 0
+    for i = 1, n do
+        local unit = (raid and "raid" or "party") .. i
+        if UnitExists(unit) and UnitIsConnected(unit) then Add(UnitFull(unit)) end
+    end
+    local online = {}
+    if IsInGuild and IsInGuild() and GetNumGuildMembers and GetGuildRosterInfo then
+        for i = 1, GetNumGuildMembers() do
+            local name, _, _, _, _, _, _, _, isOnline = GetGuildRosterInfo(i)
+            if name and isOnline then online[#online + 1] = Short(name) end
+        end
+    end
+    local peers = Peers()
+    for _, name in ipairs(online) do
+        if peers[Short(name)] then Add(name) end
+    end
+    if manual then
+        for _, name in ipairs(online) do Add(name) end
+    end
+    local cap = manual and WHISPER_MAX or WHISPER_AUTO
+    while #list > cap do table.remove(list) end
+    return list
+end
+
+---------------------------------------------------------------------------
 -- Asking
 ---------------------------------------------------------------------------
 local NextChannel
 
-local function Pick(round)
-    if not ask or ask.round ~= round or ask.picked then return end
+-- an answer that belongs to the ask going on (a whisper ask hears each player on its own whisper)
+local function Asking(channel)
+    if not (ask and channel) then return false end
+    if ask.channel == channel then return true end
+    return ask.channel == "W" and IsWhisper(channel)
+end
+
+-- a pressed Exchange that brought nothing: who answered and why they had nothing to give
+local function Report(a)
+    local names = {}
+    for name in pairs(a.replies) do names[#names + 1] = name end
+    table.sort(names)
+    if #names == 0 then
+        if not a.sentAny then
+            FT.Print(L["The game didn't let the question out (it holds addon messages back for a while): try again in a minute."])
+        else
+            FT.Print(L["No ForeverTrading user in your guild or group answered: they have to be in the game right now, in your guild or group, on your server and side. (An older ForeverTrading stays silent when it has nothing to give: ask them to update it.)"])
+        end
+        return
+    end
+    FT.Print(L["Nobody in your guild or group has fresher prices right now."])
+    for i = 1, math.min(#names, 6) do
+        local name, r = names[i], a.replies[names[i]]
+        local text
+        if r.why == "old" and (r.t or 0) <= 0 then
+            text = L["hasn't scanned the whole auction house yet"]
+        elseif r.why == "old" then
+            text = string.format(L["their last scan is too old to pass on (%s, older than 3 days)"], FT.Ago(r.t))
+        elseif r.why == "same" then
+            text = string.format(L["their scan (%s) isn't fresher than your prices"], FT.Ago(r.t))
+        elseif r.why == "off" then
+            text = L["has Share my scans turned off"]
+        elseif r.why == "nostart" then
+            text = L["offered its prices but didn't begin sending: try again in a few minutes"]
+        else
+            text = L["busy (sending prices or in a fight): try again in a few minutes"]
+        end
+        FT.Print("  " .. name .. ": " .. text)
+    end
+end
+
+local function Pick(r)
+    if not ask or ask.round ~= r or ask.picked then return end
     local best
     for _, o in pairs(ask.offers) do
         if not best or o.t > best.t or (o.t == best.t and (o.count > best.count or (o.count == best.count and o.name < best.name))) then
             best = o
         end
     end
+    FT.Debug("share: offers on", ask.channel, "-", Count(ask.offers), best and ("picked " .. best.name) or "none")
     if not best then return NextChannel() end
     ask.picked = best.name
-    Send(ask.channel, "P", PROTO, best.name, Enc(best.wire))
+    Send(best.channel, "P", PROTO, best.name, Enc(best.wire))
     -- they don't begin: the next channel
     C_Timer.After(PICK_WAIT, function()
-        if ask and ask.round == round and ask.picked then NextChannel() end
+        if ask and ask.round == r and ask.picked then
+            FT.Debug("share:", ask.picked, "didn't begin")
+            ask.replies[Short(ask.picked)] = { why = "nostart" }
+            NextChannel()
+        end
     end)
+end
+
+-- the question itself (the same on every way)
+local function Question(channel)
+    local have = FT.Hist.MarketTime()
+    local ok, code = Send(channel, "Q", PROTO, FT.sideKey or "", Enc(have > 0 and Wire(have) or 0), ask.manual and "m" or "-")
+    if ok then ask.sentAny = true end
+    return ok, code, have
+end
+
+-- the question as hidden whispers: a burst, then one a second. The answers of the first burst are looked at
+-- once they are in (those asked first are the likeliest to have the addon), everyone's after the last.
+local function WhisperRound()
+    local targets = WhisperTargets(ask.manual)
+    FT.Debug("share: asking by whisper:", #targets > 0 and table.concat(targets, ", ") or "nobody to whisper")
+    if #targets == 0 then return NextChannel() end
+    local r = ask.round
+    for i, name in ipairs(targets) do
+        local delay = i <= WHISPER_BURST and 0 or (i - WHISPER_BURST) * WHISPER_GAP
+        C_Timer.After(delay, function()
+            if not (ask and ask.round == r and not ask.picked) then return end
+            local ok, code = Question("W:" .. name)
+            if not ok then FT.Debug("share: whisper to", name, "not sent:", tostring(code)) end
+        end)
+    end
+    C_Timer.After(OFFER_WAIT, function()
+        if ask and ask.round == r and next(ask.offers) then Pick(r) end
+    end)
+    C_Timer.After(math.max(0, #targets - WHISPER_BURST) * WHISPER_GAP + OFFER_WAIT, function() Pick(r) end)
 end
 
 NextChannel = function()
@@ -133,17 +349,22 @@ NextChannel = function()
     ask.round = round
     local ch = ask.channels[ask.i]
     if not ch then
-        if ask.manual then FT.Print(L["Nobody in your guild or group has fresher prices right now."]) end
+        if ask.manual then Report(ask) end
         ask = nil
         return
     end
+    -- someone answered in the guild or the group: those ways work here, and everyone there has heard us
+    if ch == "W" and ask.heardBroadcast then return NextChannel() end
     ask.channel, ask.offers, ask.picked = ch, {}, nil
-    if not Send(ch, "Q", PROTO, FT.sideKey or "", Enc(Wire(FT.Hist.MarketTime()))) then return NextChannel() end
-    local round = ask.round
-    C_Timer.After(OFFER_WAIT, function() Pick(round) end)
+    if ch == "W" then return WhisperRound() end
+    local ok, code, have = Question(ch)
+    FT.Debug("share: asking on", ch, "- ours:", FT.Ago(have), ok and "- sent" or ("- not sent: " .. tostring(code)))
+    if not ok then return NextChannel() end
+    local r = ask.round
+    C_Timer.After(OFFER_WAIT, function() Pick(r) end)
 end
 
--- ask guild, then group; manual: said in chat how it went
+-- ask guild, then group, then by whisper; manual: said in chat how it went
 function X.Ask(manual)
     if ask or out or X.Receiving() then
         if manual then FT.Print(L["The price exchange is already running."]) end
@@ -154,8 +375,10 @@ function X.Ask(manual)
         if manual then FT.Print(L["The price exchange needs a guild or a group with other ForeverTrading users."]) end
         return false
     end
+    AskRoster()
     if manual then FT.Print(L["Asking ForeverTrading users in your guild and group for fresher prices..."]) end
-    ask = { channels = channels, i = 0, manual = manual }
+    channels[#channels + 1] = "W"
+    ask = { channels = channels, i = 0, manual = manual, replies = {} }
     NextChannel()
     return true
 end
@@ -167,23 +390,39 @@ local function Fresh(t)
     return t and t > 0 and time() - t <= MAX_AGE
 end
 
-local function OnAsk(channel, side, haveWire)
-    if not FT.S.shareSend or out or offer or side ~= FT.sideKey or Fighting() then return end
-    if lastStream[channel] and time() - lastStream[channel] < STREAM_GAP then return end
+local function OnAsk(channel, sender, side, haveWire, flags)
+    if side ~= FT.sideKey then
+        FT.Debug("share:", Short(sender), "asks for another server or side:", side, "(ours:", tostring(FT.sideKey) .. ")")
+        return
+    end
     local mine = FT.Hist.MarketTime()
-    if not Fresh(mine) then return end
+    -- nothing to give: said in debug, and to the asker when they pressed Exchange
+    local function No(why)
+        FT.Debug("share:", Short(sender), "asks on", channel, "- ours:", FT.Ago(mine), "- not offered:", why)
+        if flags ~= "m" then return end
+        Soon(function()
+            Send(channel, "N", PROTO, FT.sideKey, sender, why, mine > 0 and Enc(Wire(mine)) or "0")
+        end)
+    end
+    if not FT.S.shareSend then return No("off") end
+    if out or offer or Fighting() or (lastStream[channel] and time() - lastStream[channel] < STREAM_GAP) then
+        return No("busy")
+    end
+    if not Fresh(mine) then return No("old") end
     local have = Local(Dec(haveWire) or 0)
-    if mine < have + NEWER_BY then return end
+    if mine < have + NEWER_BY then return No("same") end
     local n = 0
     FT.Hist.EachSince(mine - WINDOW, function() n = n + 1 end)
-    if n == 0 then return end
+    if n == 0 then return No("old") end
+    FT.Debug("share:", Short(sender), "asks on", channel, "- offering", n, "prices of", FT.Ago(mine))
     offer = { channel = channel, t = mine, count = math.min(n, MAX_ITEMS) }
     -- a short random wait: someone with fresher prices may speak first
-    C_Timer.After(0.3 + math.random() * 1.7, function()
+    Soon(function()
         local o = offer
         offer = nil
         if o and not o.beaten and not out then
-            Send(o.channel, "O", PROTO, FT.sideKey, Enc(Wire(o.t)), Enc(o.count))
+            local ok, code = Send(o.channel, "O", PROTO, FT.sideKey, Enc(Wire(o.t)), Enc(o.count))
+            if not ok then FT.Debug("share: offer not sent:", tostring(code)) end
         end
     end)
 end
@@ -193,11 +432,22 @@ local function OnOffer(channel, sender, side, tWire, countText)
     local w = Dec(tWire)
     if not w then return end
     local t = Local(w)
+    FT.Debug("share: offer from", Short(sender), "on", channel, "-", FT.Ago(t), Dec(countText) or 0, "prices")
     -- someone offers the same or fresher: ours isn't needed
     if offer and offer.channel == channel and t >= offer.t - 60 then offer.beaten = true end
-    if ask and ask.channel == channel and not ask.picked and Fresh(t) then
-        ask.offers[sender] = { name = sender, t = t, wire = w, count = Dec(countText) or 0 }
+    if Asking(channel) and not IsWhisper(channel) then ask.heardBroadcast = true end
+    if Asking(channel) and not ask.picked and Fresh(t) then
+        ask.offers[sender] = { name = sender, t = t, wire = w, count = Dec(countText) or 0, channel = channel }
     end
+end
+
+-- someone has nothing to give us (we pressed Exchange): why, for the report
+local function OnNo(channel, sender, side, target, why, tWire)
+    if not (ask and ask.manual) or side ~= FT.sideKey or not IsMe(target) then return end
+    local w = Dec(tWire) or 0
+    FT.Debug("share:", Short(sender), "has nothing to give:", why)
+    if not IsWhisper(channel) then ask.heardBroadcast = true end
+    ask.replies[Short(sender)] = { why = why, t = w > 0 and Local(w) or 0 }
 end
 
 local function ItemText(e)
@@ -258,14 +508,20 @@ local function StartSending(channel)
     table.sort(list, function(a, b) return a[2] * math.max(1, a[3]) > b[2] * math.max(1, b[3]) end)
     while #list > MAX_ITEMS do table.remove(list) end
     lastStream[channel] = time()
-    if not Send(channel, "B", PROTO, FT.sideKey, Enc(Wire(mine)), Enc(#list)) then return end
+    local ok, code = Send(channel, "B", PROTO, FT.sideKey, Enc(Wire(mine)), Enc(#list))
+    FT.Debug("share: sending", #list, "prices on", channel, ok and "" or ("- not sent: " .. tostring(code)))
+    if not ok then return end
     out = { channel = channel, t = mine, list = list, i = 1, seq = 0, fails = 0 }
     out.ticker = C_Timer.NewTicker(SEND_EVERY, SendStep)
 end
 
 local function OnPick(channel, target)
-    if out or not FT.S.shareSend or not IsMe(target) then return end
-    if lastStream[channel] and time() - lastStream[channel] < STREAM_GAP then return end
+    if not IsMe(target) then return end
+    if out or not FT.S.shareSend then return end
+    if lastStream[channel] and time() - lastStream[channel] < STREAM_GAP then
+        FT.Debug("share: picked on", channel, "- sent there less than 5 minutes ago")
+        return
+    end
     StartSending(channel)
 end
 
@@ -287,12 +543,16 @@ local function OnBegin(channel, sender, side, tWire, countText)
     if not Fresh(t) then return end
     -- the one we picked begins: asking is over
     local manual = false
-    if ask and ask.channel == channel and Short(ask.picked) == Short(sender) then
+    if Asking(channel) and Short(ask.picked) == Short(sender) then
         manual = ask.manual
         ask = nil
     end
     -- not fresher than ours: nothing to take
-    if t < FT.Hist.MarketTime() + NEWER_BY or Count(streams) >= 2 then return end
+    if t < FT.Hist.MarketTime() + NEWER_BY or Count(streams) >= 2 then
+        if manual then FT.Print(L["Nobody in your guild or group has fresher prices right now."]) end
+        return
+    end
+    FT.Debug("share: receiving", count, "prices from", Short(sender), "-", FT.Ago(t))
     streams[sender] = { t = t, count = count, got = 0, taken = 0, value = 0, lastAt = GetTime(), shownAt = GetTime(),
         from = Short(sender) }
     if manual then FT.Print(string.format(L["Receiving prices from %s (their scan: %s)..."], Short(sender), FT.Ago(t))) end
@@ -344,8 +604,17 @@ local function Finish(sender, complete)
 end
 
 FT.On("CHAT_MSG_ADDON", function(prefix, text, channel, sender)
-    if prefix ~= PREFIX or type(text) ~= "string" or not sender or IsMe(sender) then return end
-    local kind, a, b, c, d = strsplit("\t", text)
+    if prefix ~= PREFIX or type(text) ~= "string" or not sender then return end
+    local kind, a, b, c, d, e = strsplit("\t", text)
+    if IsMe(sender) then
+        -- our own test message came back: that way works
+        if kind == "T" and test and b == test.token then test.heard[channel == "WHISPER" and "W" or channel] = true end
+        return
+    end
+    if kind == "T" then return end
+    X.Met(sender)
+    if channel == "WHISPER" then channel = "W:" .. Short(sender) end
+    if kind ~= "D" and kind ~= "K" then FT.Debug("share: heard", kind, "from", Short(sender), "on", channel) end
     if kind == "D" then
         OnData(sender, b)
     elseif kind == "K" then
@@ -355,15 +624,92 @@ FT.On("CHAT_MSG_ADDON", function(prefix, text, channel, sender)
     elseif a ~= PROTO then
         return -- a newer exchange than ours
     elseif kind == "Q" then
-        OnAsk(channel, b, c)
+        OnAsk(channel, sender, b, c, d)
     elseif kind == "O" then
         OnOffer(channel, sender, b, c, d)
+    elseif kind == "N" then
+        OnNo(channel, sender, b, c, d, e)
     elseif kind == "P" then
         OnPick(channel, b)
     elseif kind == "B" then
         OnBegin(channel, sender, b, c, d)
     end
 end)
+
+---------------------------------------------------------------------------
+-- /ft share test: which ways the game carries our hidden messages here
+---------------------------------------------------------------------------
+local function WayName(key)
+    if key == "GUILD" then return L["guild"] end
+    if key == "PARTY" or key == "RAID" then return L["group"] end
+    return L["whisper"]
+end
+
+function X.Test()
+    if not (C_ChatInfo and C_ChatInfo.SendAddonMessage) then return end
+    local restricted = L["unknown"]
+    local f = C_ChatInfo.AreOutgoingAddonChatMessagesRestricted
+    if type(f) == "function" then
+        -- the answer may be a value an addon can't compare (then it stays "unknown")
+        local ok, v = pcall(function()
+            local r = f()
+            if r == true then return "yes" elseif r == false then return "no" end
+        end)
+        if ok and v == "yes" then
+            restricted = L["yes"]
+        elseif ok and v == "no" then
+            restricted = L["no"]
+        end
+    end
+    FT.Print(string.format(L["Exchange test: which ways the game carries ForeverTrading's hidden messages (the realm restricts addon messages: %s)..."], restricted))
+    FindMe()
+    local t = { token = tostring(math.random(100000, 999999)), sent = {}, heard = {}, self = MyName() }
+    test = t
+    local ways = Channels()
+    ways[#ways + 1] = "W:" .. t.self
+    for _, ch in ipairs(ways) do
+        local key = IsWhisper(ch) and "W" or ch
+        local ok, code = Send(ch, "T", PROTO, t.token)
+        if ok then
+            t.sent[#t.sent + 1] = key
+        else
+            FT.Print("  " .. WayName(key) .. ": " .. string.format(L["the game refused to send it (code %s)"], tostring(code)))
+        end
+    end
+    C_Timer.After(3, function()
+        if test ~= t then return end
+        test = nil
+        for _, key in ipairs(t.sent) do
+            local text
+            if t.heard[key] then
+                text = L["works"]
+            elseif key == "W" and t.notFound then
+                text = string.format(L["the game found no player named %s"], t.self)
+            else
+                text = L["sent, but it didn't come back: this way seems not to work here"]
+            end
+            FT.Print("  " .. WayName(key) .. (key == "W" and (" (" .. t.self .. ")") or "") .. ": " .. text)
+        end
+    end)
+end
+
+-- The game answers a whisper to nobody with "No player named X": for our hidden whispers that goes to debug,
+-- not to your chat.
+local notFound
+if type(ERR_CHAT_PLAYER_NOT_FOUND_S) == "string" then
+    local p = ERR_CHAT_PLAYER_NOT_FOUND_S:gsub("[%^%$%(%)%%%.%[%]%*%+%-%?]", "%%%0")
+    notFound = "^" .. p:gsub("%%%%s", "(.+)") .. "$"
+end
+
+local function NotFoundFilter(_, _, msg)
+    if not notFound or type(msg) ~= "string" then return false end
+    local name = msg:match(notFound)
+    local at = name and whispered[name]
+    if not at or GetTime() - at > 10 then return false end
+    if test and test.self == name then test.notFound = true end
+    FT.Debug("share: whisper to", name, "- the game says there is no such player")
+    return true
+end
 
 ---------------------------------------------------------------------------
 -- By itself: prices older than an hour, at most once an hour
@@ -389,7 +735,18 @@ FT.On("FT_LOGIN", function()
     end
 end)
 
+-- the guild roster came: our own name as chat writes it is read again
+FT.On("GUILD_ROSTER_UPDATE", function() FT.Debounce("shareMe", 2, FindMe) end)
+
 FT.On("FT_READY", function()
+    -- users not heard from for a long time are forgotten
+    local peers, old = Peers(), time() - PEER_DAYS * 86400
+    for key, p in pairs(peers) do
+        if type(p) ~= "table" or (p.t or 0) < old then peers[key] = nil end
+    end
+    AskRoster()
+    local filter = ChatFrame_AddMessageEventFilter or (ChatFrameUtil and ChatFrameUtil.AddMessageEventFilter)
+    if filter then pcall(filter, "CHAT_MSG_SYSTEM", NotFoundFilter) end
     C_Timer.After(40, AutoCheck)
     C_Timer.NewTicker(60, AutoCheck)
     C_Timer.NewTicker(5, Timeouts)

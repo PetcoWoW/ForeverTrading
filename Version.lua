@@ -72,7 +72,10 @@ FT.On("FT_READY", function() C_Timer.After(10, SayAll) end)
 FT.On("GROUP_ROSTER_UPDATE", function() FT.Debounce("verGroup", 5, function() Say(GroupChannel()) end) end)
 
 FT.On("CHAT_MSG_ADDON", function(prefix, text, channel, sender)
-    if prefix ~= PREFIX or not On() or type(text) ~= "string" then return end
+    if prefix ~= PREFIX or type(text) ~= "string" then return end
+    -- whoever says its version uses ForeverTrading: the price exchange can whisper them later
+    if sender and FT.Share and text:find("^V\t") then FT.Share.Met(sender) end
+    if not On() then return end
     local theirs = text:match("^V\t(.+)$")
     if not theirs then return end
     if V.Newer(theirs, FT.VERSION) then
@@ -85,6 +88,7 @@ FT.On("CHAT_MSG_ADDON", function(prefix, text, channel, sender)
     elseif V.Newer(FT.VERSION, theirs) and sender and not answered[sender] then
         -- they are behind: tell them ours, once
         answered[sender] = true
-        Say("WHISPER", sender)
+        -- a whisper wants the name without "-Realm" (on Forever what follows a "-" is read as the surname)
+        Say("WHISPER", (sender:gsub("%-.*$", "")))
     end
 end)

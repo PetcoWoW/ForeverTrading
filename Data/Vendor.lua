@@ -19,6 +19,9 @@ local VENDOR_REAGENTS = {
     -- salt, spices, drinks used in cooking
     [4289] = true, [2678] = true, [2692] = true, [3713] = true, [2665] = true, [159] = true,
     [1179] = true, [2596] = true, [17194] = true, [17196] = true,
+    -- poisons (the poison supplier): Dust of Decay, Essence of Pain, Deathweed, Essence of Agony,
+    -- Dust of Deterioration
+    [2928] = true, [2930] = true, [5173] = true, [8923] = true, [8924] = true,
 }
 FT.VENDOR_REAGENTS = VENDOR_REAGENTS
 

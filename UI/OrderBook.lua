@@ -165,7 +165,7 @@ function UI.OrderBook(parent)
             local qtyText = FT.Num(book.qty or total) .. (book.partial and "+" or "")
             -- two short lines that fit the narrow panel: how many / in how many auctions, then sellers / when
             local parts = { string.format(L["%s pcs listed"], qtyText) }
-            if book.auctions and book.auctions > 0 then parts[#parts + 1] = string.format(L["%d auctions"], book.auctions) end
+            if book.auctions and book.auctions > 0 then parts[#parts + 1] = UI.AuctionsText(self.itemID, book.auctions) end
             self.listed:SetText(table.concat(parts, "  ||  "))
             local when = string.format(L["Updated %s"], FT.Ago(book.t))
             if book.sellers and book.sellers > 0 then

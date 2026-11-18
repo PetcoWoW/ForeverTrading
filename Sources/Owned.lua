@@ -79,13 +79,188 @@ function O.Add(a)
     FT.Fire("FT_OWNED_CHANGED")
 end
 
--- the market's lowest price under yours: someone undercut you (nil: you are the cheapest, or no price known)
-function O.Undercut(a)
+-- your own lots of an item: unit price -> how many
+local function MineOf(itemID)
+    local mine = {}
+    for _, b in ipairs((O.List())) do
+        if b.itemID == itemID and b.unit and not b.sold then
+            local u = math.ceil(b.unit)
+            mine[u] = (mine[u] or 0) + (b.qty or 1)
+        end
+    end
+    return mine
+end
+
+-- How your auction stands against the others' (your own lots left out): { low = the others' lowest, ahead = how
+-- many of theirs are cheaper than yours (nil: unknown), sure = from an order book as new as the price } - nil
+-- when no price is known
+function O.Competition(a)
     if a.sold or not a.unit then return nil end
-    local p, _, _, _, gone = FT.Price(a.itemID)
-    if p and not gone and p < a.unit then return p end
+    local p, t, _, _, gone = FT.Price(a.itemID)
+    local mine = MineOf(a.itemID)
+    local book = FT.Hist.Book(a.itemID)
+    if book and book.levels and #book.levels > 0 and book.source ~= "mastercraft" and (book.t or 0) >= (t or 0) - 600 then
+        local ours, low, ahead = math.ceil(a.unit), nil, 0
+        for _, lv in ipairs(book.levels) do
+            local q = lv[2] - (mine[lv[1]] or 0)
+            if q > 0 then
+                low = low or lv[1]
+                if lv[1] < ours then ahead = ahead + q end
+            end
+        end
+        return { low = low, ahead = ahead, sure = true, t = book.t }
+    end
+    if p and not gone then
+        -- the lowest price may be one of yours: then nobody else is known to be under you
+        if mine[math.ceil(p)] then return { low = nil, sure = false, t = t } end
+        return { low = p, sure = false, t = t }
+    end
     return nil
 end
+
+-- the others' lowest price under yours: someone undercut you (nil: you are the cheapest, or no price known);
+-- and the competition as above
+function O.Undercut(a)
+    local c = O.Competition(a)
+    if c and c.low and a.unit and c.low < math.ceil(a.unit) then return c.low, c end
+    return nil
+end
+
+-- seconds an auction has left (the band's least when only that is known), nil when unknown
+local BAND_LEAST = { [0] = 0, [1] = 1800, [2] = 7200, [3] = 28800 }
+function O.SecondsLeft(a)
+    if a.sold then return 0 end
+    if a.seconds and a.seconds > 0 then
+        local _, readAt = O.List()
+        local from = a.at or readAt
+        return math.max(0, a.seconds - (from and (time() - from) or 0))
+    end
+    return a.timeLeft ~= nil and BAND_LEAST[a.timeLeft] or nil
+end
+
+local function Hours(sec)
+    if sec >= 3600 then return string.format(L["%d h"], math.floor(sec / 3600 + 0.5)) end
+    return string.format(L["%d min"], math.max(1, math.floor(sec / 60)))
+end
+
+-- Undercut: wait, or take it off and post it again? { kind = "wait" / "repost" / "low" / "check", target (the price
+-- to post again at), text }. It weighs what is listed under yours against what sells in the time yours has left
+-- (FT.Sales), and a price posted again far under the fair or the vendor's price.
+function O.Advice(a)
+    local low, c = O.Undercut(a)
+    if not low then return nil end
+    local target = low - 1
+    local s = FT.An.Stats(a.itemID)
+    local vendor = FT.SellPriceKnown(a.itemID)
+    if (vendor and target * (1 - FT.Cut()) < vendor) or (s.fair and target < s.fair * 0.8) then
+        return { kind = "low", target = target, text = string.format(L["Under the lowest would be %s: far under its fair price (or the vendor's). Rather wait for the cheap lots to go, or let yours run out."], FT.Money(target, "short")) }
+    end
+    local r, left = s.sales, O.SecondsLeft(a)
+    if c.sure and r and r.hours >= 3 and left then
+        local willSell = r.perDay * left / 86400
+        local ahead = string.format(L["%s cheaper than yours"], FT.Num(c.ahead))
+        if willSell >= c.ahead + a.qty then
+            return { kind = "wait", target = target, text = string.format(L["%s; at %s, about %s sell in the %s yours has left - yours too, likely. Waiting costs nothing; posting again costs a deposit."],
+                ahead, FT.Sales.PerDayText(r), FT.Num(math.floor(willSell)), Hours(left)) }
+        end
+        return { kind = "repost", target = target, text = string.format(L["%s; at %s, only about %s sell in the %s yours has left - yours likely won't. Take it off and post it again at %s (the deposit is lost, a new one is paid)."],
+            ahead, FT.Sales.PerDayText(r), FT.Num(math.floor(willSell)), Hours(left), FT.Money(target, "short")) }
+    end
+    if c.sure then
+        return { kind = "check", target = target, text = string.format(L["%s cheaper than yours. To sell first: take it off and post it again at %s (the deposit is lost) - or wait if they are few and go fast."],
+            FT.Num(c.ahead), FT.Money(target, "short")) }
+    end
+    return { kind = "check", target = target, text = L["Check the prices first: how many are listed under yours, now."] }
+end
+
+---------------------------------------------------------------------------
+-- Taken off to post again: when the item is back in the bags, the Sell page has it first
+---------------------------------------------------------------------------
+O.repost = {} -- itemID -> { at, target }
+
+local GetCount = (C_Item and C_Item.GetItemCount) or GetItemCount
+
+function O.CancelToRepost(a)
+    local advice = O.Advice(a)
+    local ok = O.Cancel(a)
+    if ok then
+        O.repost[a.itemID] = { at = time(), target = advice and advice.target, pending = a.auctionID,
+            count = GetCount and GetCount(a.itemID) or 0 }
+    end
+    return ok
+end
+
+-- the auction taken off: the item is on its way by mail
+local function TakenOff(itemID)
+    local w = itemID and O.repost[itemID]
+    if not (w and w.pending) then return end
+    w.pending = nil
+    FT.Print(L["Take it from your mailbox: back in your bags, the Sell page has it first, at a copper under the lowest."])
+end
+
+-- posted again (or given up after a while): no longer waited for
+function O.Reposted(itemID)
+    if itemID and O.repost[itemID] then
+        O.repost[itemID] = nil
+        FT.Fire("FT_OWNED_CHANGED")
+    end
+end
+
+function O.Waiting(itemID)
+    local w = itemID and O.repost[itemID]
+    if w and time() - w.at > 6 * 3600 then
+        O.repost[itemID] = nil
+        return nil
+    end
+    return w
+end
+
+-- the item came back from the mail: said once
+FT.On("BAG_UPDATE_DELAYED", function()
+    for itemID, w in pairs(O.repost) do
+        if not w.pending and not w.back and GetCount and GetCount(itemID) > (w.count or 0) then
+            w.back = true
+            FT.Print(string.format(L["%s is back in your bags: the Sell page has it first, at a copper under the lowest."],
+                FT.ItemText(itemID, 40)))
+            FT.Fire("FT_OWNED_CHANGED")
+        end
+    end
+end)
+
+---------------------------------------------------------------------------
+-- Undercut: said in chat when it is seen (once per auction and price), at the auction house
+---------------------------------------------------------------------------
+local told = {} -- auctionID -> the lowest price it was told for
+
+local function TellUndercuts()
+    if FT.S.undercutAlert == false or not list then return end
+    local news = {}
+    for _, a in ipairs(list) do
+        local low = (not a.sold) and O.Undercut(a)
+        if low and a.auctionID and told[a.auctionID] ~= low then
+            told[a.auctionID] = low
+            news[#news + 1] = a
+        end
+    end
+    if #news == 0 then return end
+    for i = 1, math.min(#news, 4) do
+        local a = news[i]
+        local low = O.Undercut(a)
+        FT.Print(string.format(L["Undercut: %s - yours %s, now %s."], a.link or FT.ItemText(a.itemID, 40),
+            FT.Money(math.ceil(a.unit), "short"), FT.Money(low, "short")))
+    end
+    if #news > 4 then FT.Print(string.format(L["...and %d more: Sell > My auctions."], #news - 4)) end
+end
+
+local function SoonTell() FT.Debounce("undercuts", 2, TellUndercuts) end
+FT.On("FT_OWNED_CHANGED", SoonTell)
+FT.On("FT_SCAN_DONE", SoonTell)
+FT.On("FT_LIVE_UPDATED", function(itemID)
+    if not list then return end
+    for _, a in ipairs(list) do
+        if a.itemID == itemID then return SoonTell() end
+    end
+end)
 
 local function Sorts()
     local order = Enum and Enum.AuctionHouseSortOrder and Enum.AuctionHouseSortOrder.Name or 1
@@ -238,6 +413,9 @@ function O.Cancel(a)
         end,
         onCancel = function()
             if cancelling == p and not p.sent then cancelling = nil end
+            -- not taken off: not waited for to post again
+            local w = O.repost[p.itemID]
+            if w and w.pending == p.auctionID and not p.sent then O.repost[p.itemID] = nil end
         end,
     })
     return true
@@ -261,6 +439,7 @@ FT.On("AUCTION_CANCELED", function(auctionID)
         FT.Print(string.format(L["Taken off: %s x %s (it comes by mail)."], FT.Num(p.qty), p.link or FT.ItemText(p.itemID, 40)))
         cancelling = nil
         O.Remove(p.auctionID)
+        TakenOff(p.itemID)
     elseif auctionID then
         O.Remove(auctionID)
     end
@@ -285,6 +464,7 @@ FT.On("CHAT_MSG_SYSTEM", function(message)
         FT.Print(string.format(L["Taken off: %s x %s (it comes by mail)."], FT.Num(p.qty), p.link or FT.ItemText(p.itemID, 40)))
         cancelling = nil
         O.Remove(p.auctionID)
+        TakenOff(p.itemID)
         C_Timer.After(0.5, O.Query)
     end
 end)

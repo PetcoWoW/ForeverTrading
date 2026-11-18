@@ -533,6 +533,8 @@ local function Build()
     scanDot:SetPoint("RIGHT", scanText, "LEFT", -7, 0)
     BuildScanBox(header, scanDot, gearBtn)
     FT.UpdateScanBox()
+    -- what the tour points at
+    FT.MainRefs = { nav = nav, pill = pill, gear = gearBtn, scan = scanBox }
 
     -- ticker tape
     ticker = BuildTicker(win)
@@ -645,6 +647,8 @@ function FT.Show(tab)
     win:Show()
     win:Raise()
     FT.SelectTab(tab or FT.currentTab or "market")
+    -- once a version: what's new (or, on a first install, the tour)
+    if FT.News then C_Timer.After(0.4, FT.News.OnWindow) end
 end
 
 function FT.Toggle()

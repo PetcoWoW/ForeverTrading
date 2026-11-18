@@ -80,6 +80,55 @@ function UI.PriceAgeText(id, s)
     return FT.SourceName(s.source) .. " || " .. FT.Ago(s.t)
 end
 
+-- Stackable goods come from the auction house as one row per price, not per auction: "auctions" of them are
+-- the prices the order book has. Gear comes auction by auction.
+function UI.AuctionsLabel(id)
+    return (id and FT.Buy.IsCommodity(id)) and L["Price levels"] or L["Auctions"]
+end
+function UI.AuctionsText(id, n)
+    return string.format((id and FT.Buy.IsCommodity(id)) and L["%d price levels"] or L["%d auctions"], n)
+end
+
+-- how much really sells, as estimated from the listings seen go (FT.Sales): "Sells ~4.2 a day (14 h watched)"
+function UI.SalesText(s)
+    local r = s and s.sales
+    if not r then return L["Sells"] .. " " .. FT.C("dim", L["not seen yet"]) end
+    return L["Sells"] .. " " .. FT.C(s.slow and "down" or "text", FT.Sales.PerDayText(r))
+        .. FT.C("dim", " " .. string.format(L["(%d h watched)"], math.max(1, math.floor(r.hours + 0.5))))
+end
+
+-- listed / auctions / sellers of the newest measurement, and how many more (+, red: competition) or fewer
+-- (-, green) than at the last check half an hour or more ago
+function UI.CountText(s, key)
+    local val, d
+    if key == "listed" then
+        val, d = s.listed, s.sinceQ
+    elseif key == "auctions" then
+        val, d = s.auctionsNow or s.auctions, s.auctionsNow and s.sinceN
+    else
+        val, d = s.sellersNow or s.sellers, s.sellersNow and s.sinceS
+    end
+    if not val then return "—" end
+    local text = FT.Num(val)
+    if d and d ~= 0 then
+        text = text .. " " .. FT.C(d > 0 and "down" or "up", (d > 0 and "+" or "-") .. FT.Num(math.abs(d)))
+    end
+    return text
+end
+
+-- what to know first, before the item's name line: a price jump or a fast fall, a fall since the last check,
+-- a flooded market, more sellers than usual
+function UI.RiskHead(s)
+    local head = {}
+    if s.spike then
+        head[#head + 1] = FT.C("accent", string.format(L["price jump (buyout?): fair ~%s"], FT.Money(s.fair, "short")))
+    elseif s.falling then
+        head[#head + 1] = FT.C("down", string.format(L["falling fast: %s, fair ~%s"], FT.Pct(s.price / s.fair - 1, true), FT.Money(s.fair, "short")))
+    end
+    for _, note in ipairs(FT.An.RiskNotes(s)) do head[#head + 1] = FT.C("down", note) end
+    return head
+end
+
 -- "More" in the corner of a chart: the item in its own window
 function UI.MoreButton(chart, getID)
     local b = UI.Button(chart, L["More"], 10, 18, "default", function()
@@ -316,11 +365,8 @@ function D.Refresh(keepView)
     local own = FT.Port.Count(id)
     if own > 0 then parts[#parts + 1] = FT.C("text", string.format(L["you have %s"], FT.Num(own))) end
     local s = FT.An.Stats(id)
-    if s.spike then
-        table.insert(parts, 1, FT.C("accent", string.format(L["price jump (buyout?): fair ~%s"], FT.Money(s.fair, "short"))))
-    elseif s.falling then
-        table.insert(parts, 1, FT.C("down", string.format(L["falling fast: %s, fair ~%s"], FT.Pct(s.price / s.fair - 1, true), FT.Money(s.fair, "short"))))
-    end
+    local head = UI.RiskHead(s)
+    for i = #head, 1, -1 do table.insert(parts, 1, head[i]) end
     win.sub:SetText(table.concat(parts, FT.C("dim", "  ||  ")))
 
     win.price:SetText(s.price and FT.Money(s.price) or "—")
@@ -329,7 +375,8 @@ function D.Refresh(keepView)
     for _, pr in ipairs(win.pairs) do
         local val = s[pr.key]
         if pr.key == "listed" or pr.key == "auctions" or pr.key == "sellers" then
-            pr.value:SetText(val and FT.Num(val) or "—")
+            pr.value:SetText(UI.CountText(s, pr.key))
+            if pr.key == "auctions" then pr.label:SetText(UI.AuctionsLabel(id)) end
         else
             pr.value:SetText(val and FT.Money(val, "short") or "—")
         end
@@ -344,6 +391,7 @@ function D.Refresh(keepView)
     if s.vol then ind[#ind + 1] = L["Daily volatility"] .. " " .. FT.C("text", string.format("%.1f%%", s.vol * 100)) end
     local liq = FT.An.Liquidity(s)
     ind[#ind + 1] = L["Liquidity"] .. " " .. FT.C(LIQ_COLORS[liq], L[LIQ_NAMES[liq]])
+    ind[#ind + 1] = UI.SalesText(s)
     win.ind:SetText(table.concat(ind, FT.C("dim", "   ||   ")))
 
     win.tf:SetValue(FT.S.chartTF)

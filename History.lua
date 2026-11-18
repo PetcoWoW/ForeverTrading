@@ -11,7 +11,8 @@ local H = {}
 FT.Hist = H
 
 local EPOCH = 1704067200 -- 2024-01-01: times inside the strings are minutes since then
-local MERGE_WINDOW = 600 -- intraday: observations within 10 minutes of the last one replace it
+local MERGE_WINDOW = 600 -- intraday: one record per 10 minutes of the clock (the newest look of them wins)
+local PREV_GAP = 1800    -- "since the last check": the newest measurement at least half an hour older than now
 
 ---------------------------------------------------------------------------
 -- base 36
@@ -211,31 +212,36 @@ end
 -- Intraday observations (the items that matter to you): r.snaps[id] = "t,p,q,n;..."
 ---------------------------------------------------------------------------
 local cache = {}  -- itemID -> parsed { t = {}, p = {}, q = {}, n = {} }
-local latest = {} -- itemID -> { p, q, n, t, source, gone } this session, every item
+local latest = {} -- itemID -> { p, q, n, sl, t, source, gone } this session, every item
+local before = {} -- itemID -> the latest entry before the newest measurement (this session, every item)
 
+-- s = { t, p, q (listed), n (auctions), sl (sellers) }: "t,p,q,n,sl;" (sellers since 1.1.1, may be missing)
 local function ParseSnaps(str)
-    local s = { t = {}, p = {}, q = {}, n = {} }
+    local s = { t = {}, p = {}, q = {}, n = {}, sl = {} }
     if type(str) ~= "string" then return s end
     for rec in str:gmatch("([^;]+);") do
-        local a, b, c, d = rec:match("^(%w+),(%w+),(%w*),?(%w*)$")
+        local a, b, c, d, e = rec:match("^(%w+),(%w+),(%w*),?(%w*),?(%w*)$")
         if a then
             local i = #s.t + 1
             s.t[i] = Dec(a) * 60 + EPOCH
             s.p[i] = Dec(b)
             s.q[i] = Dec(c)
             s.n[i] = Dec(d)
+            s.sl[i] = Dec(e)
         end
     end
     return s
 end
 
-local function SnapRecord(t, p, q, n)
-    return Enc(Minutes(t)) .. "," .. Enc(p) .. "," .. Opt(q) .. "," .. Opt(n) .. ";"
+local function SnapRecord(t, p, q, n, sl)
+    local rec = Enc(Minutes(t)) .. "," .. Enc(p) .. "," .. Opt(q) .. "," .. Opt(n)
+    if sl then rec = rec .. "," .. Enc(sl) end
+    return rec .. ";"
 end
 
 local function SerializeSnaps(s)
     local parts = {}
-    for i = 1, #s.t do parts[#parts + 1] = SnapRecord(s.t[i], s.p[i], s.q[i], s.n[i]) end
+    for i = 1, #s.t do parts[#parts + 1] = SnapRecord(s.t[i], s.p[i], s.q[i], s.n[i], s.sl[i]) end
     return table.concat(parts)
 end
 
@@ -258,10 +264,10 @@ local function PruneSnaps(itemID, s)
         first = first + 1
     end
     if first > 1 then
-        local n = { t = {}, p = {}, q = {}, n = {} }
+        local n = { t = {}, p = {}, q = {}, n = {}, sl = {} }
         for i = first, #s.t do
             local k = #n.t + 1
-            n.t[k], n.p[k], n.q[k], n.n[k] = s.t[i], s.p[i], s.q[i], s.n[i]
+            n.t[k], n.p[k], n.q[k], n.n[k], n.sl[k] = s.t[i], s.p[i], s.q[i], s.n[i], s.sl[i]
         end
         cache[itemID] = n
         FT.R().snaps[itemID] = #n.t > 0 and SerializeSnaps(n) or nil
@@ -270,27 +276,30 @@ local function PruneSnaps(itemID, s)
     return s
 end
 
-local function ObserveIntraday(itemID, p, q, n, t)
+local function ObserveIntraday(itemID, p, q, n, t, sl)
     local snaps = FT.R().snaps
     local s = H.Snaps(itemID)
     if not s then
-        s = { t = {}, p = {}, q = {}, n = {} }
+        s = { t = {}, p = {}, q = {}, n = {}, sl = {} }
         cache[itemID] = s
     end
     local last = #s.t
-    if last > 0 and t < s.t[last] - MERGE_WINDOW then return end -- older than what we have
-    if last > 0 and t - s.t[last] < MERGE_WINDOW then
+    if last > 0 and t < s.t[last] then return end -- older than what we have
+    -- one record per 10 minutes of the clock (a window that moved with every look would make the live updates
+    -- of an hour one record, and nothing to compare with)
+    if last > 0 and math.floor(t / MERGE_WINDOW) == math.floor(s.t[last] / MERGE_WINDOW) then
         -- the same moment of the market: the newest value wins
-        s.t[last], s.p[last] = math.max(t, s.t[last]), p
+        s.t[last], s.p[last] = t, p
         if q then s.q[last] = q end
         if n then s.n[last] = n end
+        if sl then s.sl[last] = sl end
         local str = snaps[itemID] or ""
         local prefix = str:match("^(.*;)[^;]*;$") or ""
-        snaps[itemID] = prefix .. SnapRecord(s.t[last], s.p[last], s.q[last], s.n[last])
+        snaps[itemID] = prefix .. SnapRecord(s.t[last], s.p[last], s.q[last], s.n[last], s.sl[last])
     else
         last = last + 1
-        s.t[last], s.p[last], s.q[last], s.n[last] = t, p, q, n
-        snaps[itemID] = (snaps[itemID] or "") .. SnapRecord(t, p, q, n)
+        s.t[last], s.p[last], s.q[last], s.n[last], s.sl[last] = t, p, q, n, sl
+        snaps[itemID] = (snaps[itemID] or "") .. SnapRecord(t, p, q, n, sl)
         if last > FT.S.maxSnaps then PruneSnaps(itemID, s) end
     end
 end
@@ -300,17 +309,20 @@ end
 local QUIET = { live = true, peer = true }
 
 -- The one way prices come in: the lowest unit buyout `p` of an item, how many are listed `q`, in how many
--- auctions `n` (q and n may be unknown), seen at time `t`, by `source` ("full", "mine", "auctionator"...)
-function H.Observe(itemID, p, q, n, t, source)
+-- auctions `n` by how many sellers `sl` (q, n and sl may be unknown), seen at time `t`, by `source`
+-- ("full", "mine", "live", "auctionator"...)
+function H.Observe(itemID, p, q, n, t, source, sl)
     itemID = type(itemID) == "number" and itemID or tonumber(itemID)
     if not itemID or type(p) ~= "number" or p <= 0 then return end
     t = t or time()
     local cur = latest[itemID]
     if not cur or t >= cur.t then
-        latest[itemID] = { p = p, q = q, n = n, t = t, source = source }
+        -- the measurement before this one stays at hand (what changed since)
+        if cur and not cur.gone and t - cur.t >= PREV_GAP then before[itemID] = cur end
+        latest[itemID] = { p = p, q = q, n = n, sl = sl, t = t, source = source }
     end
     ObserveDay(itemID, p, q, n, t)
-    if H.Tracked(itemID) then ObserveIntraday(itemID, p, q, n, t) end
+    if H.Tracked(itemID) then ObserveIntraday(itemID, p, q, n, t, sl) end
     if not QUIET[source] then
         FT.Debounce("pricesChanged", 1.0, function() FT.Fire("FT_PRICES_CHANGED", source) end)
     end
@@ -345,6 +357,25 @@ end
 
 function H.Latest(itemID)
     return latest[itemID]
+end
+
+-- The measurement before the newest one, at least half an hour older: { t, p, q, n, sl } (nil: none known).
+-- An item that matters to you has every measurement (the last scan, or the live update of half an hour ago);
+-- any other one the one before the newest of this session.
+function H.Previous(itemID)
+    local cur = latest[itemID]
+    local s = H.Snaps(itemID)
+    local curT = (cur and cur.t) or (s and s.t[#s.t])
+    if s and curT then
+        for i = #s.t, 1, -1 do
+            if s.t[i] <= curT - PREV_GAP then
+                return { t = s.t[i], p = s.p[i], q = s.q[i], n = s.n[i], sl = s.sl[i] }
+            end
+        end
+    end
+    local b = before[itemID]
+    if b and curT and b.t <= curT - PREV_GAP then return { t = b.t, p = b.p, q = b.q, n = b.n, sl = b.sl } end
+    return nil
 end
 
 -- every item we have a day candle of
@@ -492,13 +523,15 @@ end
 -- forget all of our history of this server
 function H.ClearAll()
     local r = FT.R()
-    r.snaps, r.books, r.scans, r.days, r.today, r.listed = {}, {}, {}, {}, {}, nil
+    r.snaps, r.books, r.scans, r.days, r.today, r.listed, r.sales = {}, {}, {}, {}, {}, nil, nil
     r.meta.listedAt = nil
     wipe(cache)
     wipe(latest)
+    wipe(before)
     wipe(books)
     wipe(todayCache)
     wipe(daysCache)
+    FT.Fire("FT_DATA_CLEARED")
     FT.Fire("FT_PRICES_CHANGED", "clear")
 end
 

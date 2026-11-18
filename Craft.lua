@@ -24,20 +24,30 @@ FT.On("FT_SETTINGS_CHANGED", function() wipe(evalCache) end)
 local function Build()
     local byKey = {}
     recipes, byOutput = {}, {}
+    local nameIndex
     local function Add(prof, r, charName)
-        if type(r) ~= "table" or not r.output or type(r.reagents) ~= "table" or #r.reagents == 0 then return end
-        local key = r.output .. ":" .. tostring(r.name)
+        if type(r) ~= "table" or type(r.reagents) ~= "table" or #r.reagents == 0 then return end
+        -- The classic "craft" window (poisons) doesn't always say the item a recipe makes - Mastercraft reads it
+        -- without one: then the item of the recipe's own name ("Deadly Poison" makes Deadly Poison).
+        -- Enchantments make no item and stay out.
+        local output = r.output
+        if not output and type(r.name) == "string" then
+            nameIndex = nameIndex or FT.NameIndex()
+            output = nameIndex[r.name]
+        end
+        if type(output) ~= "number" then return end
+        local key = output .. ":" .. tostring(r.name)
         local e = byKey[key]
         if not e then
             e = {
-                key = key, name = r.name, icon = r.icon, prof = FT.ProfKey(prof), output = r.output,
+                key = key, name = r.name, icon = r.icon, prof = FT.ProfKey(prof), output = output,
                 outputQty = (type(r.outputQty) == "number" and r.outputQty > 0) and r.outputQty or 1,
                 reagents = r.reagents, incomplete = r.incomplete, knownBy = {},
             }
             byKey[key] = e
             recipes[#recipes + 1] = e
-            byOutput[r.output] = byOutput[r.output] or {}
-            table.insert(byOutput[r.output], e)
+            byOutput[output] = byOutput[output] or {}
+            table.insert(byOutput[output], e)
         elseif e.incomplete and not r.incomplete then
             e.reagents, e.incomplete = r.reagents, nil
         end
@@ -182,7 +192,7 @@ function C.UnitCost(itemID)
 end
 
 local function Cut()
-    return FT.S.ahCut and 0.95 or 1
+    return FT.S.ahCut and (1 - FT.Cut()) or 1
 end
 
 ---------------------------------------------------------------------------
@@ -217,6 +227,7 @@ function C.Eval(r)
         e.roi = e.cost > 0 and e.profit / e.cost or nil
     end
     e.liquidity = FT.An.Liquidity(e.stats)
+    e.risks = FT.An.Risks(e.stats, e.liquidity)
 
     if not e.complete then
         e.signal, e.strength = "NODATA", 0
@@ -230,19 +241,11 @@ function C.Eval(r)
     elseif e.profit < FT.S.minProfit or (e.margin or 0) * 100 < FT.S.minMargin then
         e.signal, e.strength = "WATCH", 1
         e.reason = string.format(L["Small profit: %s (%d%%)"], FT.Money(e.profit, "short"), math.floor((e.margin or 0) * 100 + 0.5))
-    elseif e.via == "ah" and e.stats.falling then
-        -- other crafters undercut: by the time yours is listed it may be lower still
+    elseif e.via == "ah" and #e.risks > 0 then
+        -- falling fast, fallen since the last check, flooded, more sellers, rarely listed, falling for a week:
+        -- by the time yours is listed the price may be lower still, or it may not sell
         e.signal, e.strength = "RISKY", 2
-        e.reason = string.format(L["Price falling fast: %s vs its fair price"], FT.Pct(e.stats.price / e.stats.fair - 1, true))
-        if e.stats.moreListed then
-            e.reason = e.reason .. ", " .. string.format(L["%s more listed"], FT.Pct(e.stats.moreListed, true))
-        end
-    elseif e.via == "ah" and e.liquidity == "low" then
-        e.signal, e.strength = "RISKY", 2
-        e.reason = L["Rarely listed: it may not sell"]
-    elseif e.via == "ah" and e.stats.ch7 and e.stats.ch7 <= -0.10 then
-        e.signal, e.strength = "RISKY", 2
-        e.reason = string.format(L["Price falling: %s in 7 days"], FT.Pct(e.stats.ch7, true))
+        e.reason = table.concat(e.risks, "; ")
     else
         e.signal = "CRAFT"
         e.strength = ((e.margin or 0) >= 0.3) and 3 or 2

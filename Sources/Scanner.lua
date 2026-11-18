@@ -43,8 +43,9 @@ function S.NewAcc()
     return { items = {}, auctions = 0, value = 0 }
 end
 
--- `count` items at `unit` copper each in `auctions` auctions (several sellers: `owners` = list of names)
-function S.AddLevel(acc, itemID, unit, count, auctions, owners)
+-- `count` items at `unit` copper each in `auctions` auctions (several sellers: `owners` = list of names,
+-- `ownerCount` = how many the game counts there: its list of names may be shorter)
+function S.AddLevel(acc, itemID, unit, count, auctions, owners, ownerCount)
     if not (itemID and itemID > 0 and unit and unit > 0 and count and count > 0) then return end
     unit = math.ceil(unit)
     auctions = auctions or 1
@@ -71,6 +72,8 @@ function S.AddLevel(acc, itemID, unit, count, auctions, owners)
             end
         end
     end
+    -- a price step with more sellers than its names: at least that many sell the item
+    if type(ownerCount) == "number" and ownerCount > it.sellerCount then it.sellerCount = ownerCount end
     acc.auctions = acc.auctions + auctions
     acc.value = acc.value + unit * count
 end
@@ -79,6 +82,14 @@ end
 function S.Add(acc, itemID, count, buyout, owner)
     if not (count and count > 0 and buyout and buyout > 0) then return end
     S.AddLevel(acc, itemID, buyout / count, count, 1, owner)
+    -- auction by auction, for the items that matter to you: what sells (FT.Sales)
+    if FT.Hist.Tracked(itemID) then
+        local it = acc.items[itemID]
+        if it then
+            it.rows = it.rows or {}
+            it.rows[#it.rows + 1] = { p = math.ceil(buyout / count), q = count, o = FT.Sales.OwnersKey(owner) }
+        end
+    end
 end
 
 local function Ladder(it)
@@ -102,7 +113,9 @@ function S.Ingest(acc, t, source, done)
             local ladder = Ladder(it)
             FT.Hist.SetBook(itemID, { t = t, levels = ladder, auctions = it.auctions, qty = it.qty,
                 sellers = it.sellerCount, source = source, partial = it.partial })
-            FT.Hist.Observe(itemID, ladder[1][1], it.qty, it.auctions, t, source)
+            FT.Hist.Observe(itemID, ladder[1][1], it.qty, it.auctions, t, source,
+                (not it.partial and it.sellerCount > 0) and it.sellerCount or nil)
+            if it.rows then FT.Sales.Observe(itemID, it.rows, t, it.partial, "full") end
         end
         i = last + 1
         if i > #ids then
@@ -248,11 +261,19 @@ end
 local function ReadCommodity(itemID)
     local acc = S.NewAcc()
     local n = AH.GetNumCommoditySearchResults and AH.GetNumCommoditySearchResults(itemID) or 0
+    local rows = {}
     for i = 1, math.min(n, MaxRows()) do
         local info = AH.GetCommoditySearchResultInfo(itemID, i)
-        if info then S.AddLevel(acc, itemID, info.unitPrice, info.quantity, 1, info.owners) end
+        if info then
+            S.AddLevel(acc, itemID, info.unitPrice, info.quantity, 1, info.owners, info.totalNumberOfOwners)
+            if info.unitPrice and info.quantity then
+                rows[#rows + 1] = { p = math.ceil(info.unitPrice), q = info.quantity,
+                    o = FT.Sales.OwnersKey(info.owners, info.totalNumberOfOwners), tl = FT.Sales.TimeLeft(info) }
+            end
+        end
     end
     local full = not AH.HasFullCommoditySearchResults or AH.HasFullCommoditySearchResults(itemID)
+    if acc.items[itemID] then acc.items[itemID].rows = rows end
     return acc.items[itemID], n, full
 end
 
@@ -261,14 +282,18 @@ local function ReadItemKey(itemKey)
     local acc = S.NewAcc()
     local itemID = itemKey.itemID
     local n = AH.GetNumItemSearchResults and AH.GetNumItemSearchResults(itemKey) or 0
+    local rows = {}
     for i = 1, math.min(n, MaxRows()) do
         local info = AH.GetItemSearchResultInfo(itemKey, i)
         -- buyoutAmount is the price of one; quantity is how many are listed at it (no buyout: bid only)
         if info and info.buyoutAmount and info.buyoutAmount > 0 then
-            S.AddLevel(acc, itemID, info.buyoutAmount, info.quantity or 1, 1, info.owners)
+            S.AddLevel(acc, itemID, info.buyoutAmount, info.quantity or 1, 1, info.owners, info.totalNumberOfOwners)
+            rows[#rows + 1] = { p = math.ceil(info.buyoutAmount), q = info.quantity or 1,
+                o = FT.Sales.OwnersKey(info.owners, info.totalNumberOfOwners), tl = FT.Sales.TimeLeft(info) }
         end
     end
     local full = not AH.HasFullItemSearchResults or AH.HasFullItemSearchResults(itemKey)
+    if acc.items[itemID] then acc.items[itemID].rows = rows end
     return acc.items[itemID], n, full
 end
 
@@ -280,7 +305,9 @@ local function SaveItem(itemID, it, n, full, source)
     local ladder = Ladder(it)
     FT.Hist.SetBook(itemID, { t = t, levels = ladder, auctions = it.auctions, qty = it.qty, sellers = it.sellerCount,
         source = source, partial = it.partial })
-    FT.Hist.Observe(itemID, ladder[1][1], it.qty, (not it.partial) and it.auctions or nil, t, source)
+    FT.Hist.Observe(itemID, ladder[1][1], it.qty, (not it.partial) and it.auctions or nil, t, source,
+        (not it.partial and it.sellerCount > 0) and it.sellerCount or nil)
+    if it.rows then FT.Sales.Observe(itemID, it.rows, t, it.partial, "search") end
     return true
 end
 
@@ -575,6 +602,7 @@ local function ItemDone(found)
     if found == false and S.current then
         FT.Hist.Gone(S.current, time())
         FT.Hist.SetBook(S.current, { t = time(), levels = {}, auctions = 0, qty = 0, sellers = 0, source = "mine" })
+        FT.Sales.Observe(S.current, {}, time(), false, "search")
     end
     NextItem()
 end
@@ -914,6 +942,7 @@ local function LiveAnswer(itemID, it, n, full, commodity)
         -- none listed any more
         FT.Hist.Gone(itemID, time(), "live")
         FT.Hist.SetBook(itemID, { t = time(), levels = {}, auctions = 0, qty = 0, sellers = 0, source = "live" })
+        FT.Sales.Observe(itemID, {}, time(), false, "search")
     else
         -- gear with nothing under this key (that version sold, or it is listed under a key we don't know):
         -- what we know stays; its versions are looked up by name once, else it rests for two minutes
