@@ -17,6 +17,17 @@ end
 FT.On("FT_RECIPES_CHANGED", Invalidate)
 FT.On("FT_SOURCES_CHANGED", Invalidate)
 FT.On("FT_PRICES_CHANGED", function() wipe(evalCache) end)
+-- per auction house (an item window may look at the other one for a moment)
+local evalCaches, evalKey = {}, nil
+local function UseEvalCache()
+    local key = FT.houseKey or "?"
+    if key == evalKey then return end
+    if evalKey then evalCaches[evalKey] = evalCache end
+    evalCache = evalCaches[key] or {}
+    evalKey = key
+end
+FT.On("FT_HOUSE_CHANGED", UseEvalCache)
+FT.On("FT_HOUSE_USE", UseEvalCache)
 FT.On("FT_LIVE_UPDATED", function() wipe(evalCache) end)
 FT.On("FT_SCAN_DONE", function() wipe(evalCache) end)
 FT.On("FT_SETTINGS_CHANGED", function() wipe(evalCache) end)

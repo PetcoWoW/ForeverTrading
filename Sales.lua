@@ -55,11 +55,8 @@ local function Store()
     return r.sales
 end
 
-local function Days(itemID)
-    local d = cache[itemID]
-    if d then return d end
-    d = {}
-    local str = Store()[itemID]
+local function Parse(str)
+    local d = {}
     if type(str) == "string" then
         for rec in str:gmatch("([^;]+);") do
             local a, b, c, e, f, g, h = rec:match("^(%w+),(%w*),(%w*),(%w*),(%w*),(%w*),(%w*)$")
@@ -69,6 +66,13 @@ local function Days(itemID)
             end
         end
     end
+    return d
+end
+
+local function Days(itemID)
+    local d = cache[itemID]
+    if d then return d end
+    d = Parse(Store()[itemID])
     cache[itemID] = d
     return d
 end
@@ -220,9 +224,7 @@ end
 ---------------------------------------------------------------------------
 -- Over the last `days` (7): { perDay, sold, avgPrice (what they sold for), hours (watched), relisted, expired,
 -- added }; nil while the item was watched less than an hour
-function Sa.Rate(itemID, days)
-    if not (itemID and FT.db) then return nil end
-    local d = Days(itemID)
+local function RateOf(d, days)
     local from = FT.Day() - (days or 7) + 1
     local s = { sold = 0, value = 0, watched = 0, relisted = 0, expired = 0, added = 0 }
     for day, x in pairs(d) do
@@ -237,6 +239,21 @@ function Sa.Rate(itemID, days)
     }
 end
 
+function Sa.Rate(itemID, days)
+    if not (itemID and FT.db) then return nil end
+    return RateOf(Days(itemID), days)
+end
+
+-- what sells at either auction house (House.lua): the other one's as it was saved
+function Sa.RateIn(house, itemID, days)
+    if house == FT.house then return Sa.Rate(itemID, days) end
+    if not (itemID and FT.db) then return nil end
+    local r = FT.db.realms[FT.HouseKey(house)]
+    local str = r and r.sales and r.sales[itemID]
+    if not str then return nil end
+    return RateOf(Parse(str), days)
+end
+
 -- "~12 a day" (with a decimal under 10), for the pages
 function Sa.PerDayText(rate)
     if not rate then return nil end
@@ -249,3 +266,15 @@ FT.On("FT_DATA_CLEARED", function()
     wipe(last)
     wipe(cache)
 end)
+-- per auction house (an item window may look at the other one for a moment)
+local saved, savedKey = {}, nil
+local function UseHouse()
+    local key = FT.houseKey or "?"
+    if key == savedKey then return end
+    if savedKey then saved[savedKey] = { last = last, cache = cache } end
+    local s = saved[key]
+    last, cache = s and s.last or {}, s and s.cache or {}
+    savedKey = key
+end
+FT.On("FT_HOUSE_CHANGED", UseHouse)
+FT.On("FT_HOUSE_USE", UseHouse)

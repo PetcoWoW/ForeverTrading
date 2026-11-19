@@ -38,7 +38,7 @@ local function Column(parent, title, sub)
     c.sub:SetPoint("TOPLEFT", 12, -28)
     c.sub:SetPoint("RIGHT", c, "RIGHT", -12, 0)
     c.sub:SetText(sub)
-    c.accent = UI.Tex(c, "ARTWORK", "accent", 1)
+    c.accent = UI.RoundTex(c, "ARTWORK", "accent", 1, nil, "top", UI.RADIUS - 1)
     c.accent:SetHeight(2)
     c.accent:SetPoint("TOPLEFT", 1, -1)
     c.accent:SetPoint("TOPRIGHT", -1, -1)
@@ -162,6 +162,7 @@ end
 ---------------------------------------------------------------------------
 local dealsView
 local dstate = { kind = "all", age = 21600 }
+local DEALS_HINT
 local MAX_CHECK = 60 -- items "Check order books" searches at most
 
 local function Money(v)
@@ -170,7 +171,16 @@ end
 
 local function DealText(d)
     local text
-    if d.kind == "VENDOR" then
+    if d.kind == "HOUSES" then
+        local H = FT.House
+        text = string.format(L["%s each at %s, %s at %s: +%s each after its cut"], Money(d.unit), H.Name(d.buyHouse),
+            Money(d.target), H.Name(d.sellHouse), Money(d.perUnit))
+        local qty = d.noBook and L["the cheapest lot"] or string.format(L["%s pcs"], FT.Num(d.qty))
+        local sells = d.sales and ("  ||  " .. L["sells there"] .. " " .. FT.Sales.PerDayText(d.sales)) or ""
+        local ages = string.format(L["here %s, there %s"], FT.Ago(d.buyHouse == FT.house and d.t or d.sellT),
+            FT.Ago(d.buyHouse == FT.house and d.sellT or d.t))
+        return text .. FT.C("dim", "  ||  " .. qty .. sells .. "  ||  " .. ages)
+    elseif d.kind == "VENDOR" then
         text = string.format(L["%s each, a vendor pays %s: +%s each"], Money(d.unit), Money(d.target), Money(d.perUnit))
     else
         text = string.format(L["%s each, fair ~%s: list at %s, +%s each after the cut"], Money(d.unit), Money(d.fair),
@@ -186,6 +196,33 @@ local function DealTip(row, d)
     UI.TipItem(row, d.id)
     local qty = d.noBook and L["the cheapest lot"] or string.format(L["%s pcs"], FT.Num(d.qty))
     GameTooltip:AddLine(" ")
+    if d.kind == "HOUSES" then
+        local H = FT.House
+        GameTooltip:AddLine(string.format(L["Buy at %s: %s for %s (price of %s)"], H.Name(d.buyHouse), qty, Money(d.cost),
+            FT.Ago(d.t)), 0.85, 0.87, 0.9, true)
+        GameTooltip:AddLine(string.format(L["Carry it to %s and list it at %s each: its cut there is %s (the deposit comes back when it sells; unsold, it is lost)."],
+            H.Name(d.sellHouse), Money(d.target), string.format("%.0f%%", (d.cut or 0) * 100)), 0.85, 0.87, 0.9, true)
+        local there = {}
+        if d.there then there[#there + 1] = string.format(L["listed there: %s"], FT.Num(d.there)) end
+        if d.usual then there[#there + 1] = string.format(L["usual there: %s"], Money(d.usual)) end
+        if d.sales then there[#there + 1] = L["sells there"] .. " " .. FT.Sales.PerDayText(d.sales) end
+        there[#there + 1] = string.format(L["price there: %s"], FT.Ago(d.sellT))
+        GameTooltip:AddLine(table.concat(there, ", "), 0.6, 0.62, 0.66, true)
+        if d.cheap and d.cheap > d.qty then
+            GameTooltip:AddLine(string.format(L["%s pcs are this cheap: no more than %s - more doesn't sell there in two days."],
+                FT.Num(d.cheap), FT.Num(d.qty)), 0.95, 0.75, 0.3, true)
+        end
+        if d.thin then
+            GameTooltip:AddLine(L["Fewer than 3 days of prices there: look at its order book before buying much."], 0.95, 0.75, 0.3, true)
+        end
+        GameTooltip:AddLine(string.format(L["Profit: %s"], Money(d.profit)), 0.4, 0.85, 0.5, true)
+        if d.noBook then
+            GameTooltip:AddLine(L["Only the cheapest lot is sure: open the item (or Check order books) for its whole order book."], 0.6, 0.62, 0.66, true)
+        end
+        GameTooltip:AddLine(L["Click: the item with its order book - buy there."], 0.6, 0.62, 0.66, true)
+        GameTooltip:Show()
+        return
+    end
     GameTooltip:AddLine(string.format(L["Buy: %s for %s"], qty, Money(d.cost)), 0.85, 0.87, 0.9, true)
     if d.kind == "VENDOR" then
         GameTooltip:AddLine(string.format(L["Sell them to a vendor for %s each: no cut, no waiting."], Money(d.target)), 0.85, 0.87, 0.9, true)
@@ -206,7 +243,8 @@ local function BuildDeals(p)
     f:SetPoint("TOPLEFT", 8, -56)
     f:SetPoint("BOTTOMRIGHT", -8, 8)
     f:Hide()
-    f.kind = UI.Segmented(f, { { "all", L["All"] }, { "VENDOR", L["To a vendor"] }, { "RESELL", L["Resell"] } }, function(v)
+    f.kind = UI.Segmented(f, { { "all", L["All"] }, { "VENDOR", L["To a vendor"] }, { "RESELL", L["Resell"] },
+        { "HOUSES", L["Between houses"] } }, function(v)
         dstate.kind = v
         T.RefreshDeals()
     end, 22)
@@ -231,7 +269,8 @@ local function BuildDeals(p)
     f.hint:SetPoint("TOPLEFT", 0, -32)
     f.hint:SetPoint("RIGHT", 0, 0)
     if f.hint.SetWordWrap then f.hint:SetWordWrap(false) end
-    f.hint:SetText(L["To a vendor: buy and sell to a vendor at once - a sure profit. Resell: buy the cheap lots of a steady market and list them again near the fair price."])
+    DEALS_HINT = L["To a vendor: a sure profit. Resell: the cheap lots of a steady market, listed again near the fair price. Between houses: cheaper at one auction house than the other sells it for."]
+    f.hint:SetText(DEALS_HINT)
     local box = UI.Panel(f, "bg1", "line")
     box:SetPoint("TOPLEFT", 0, -50)
     box:SetPoint("BOTTOMRIGHT", 0, 0)
@@ -253,32 +292,80 @@ local function BuildDeals(p)
     })
     f.list:SetPoint("TOPLEFT", 1, -2)
     f.list:SetPoint("BOTTOMRIGHT", -1, 2)
+    if f.list.empty then f.list.empty:SetWidth(460) end
     return f
 end
 
--- the deals that pass the view's choices and the search
+-- the deals that pass the view's choices and the search (and how many only their prices' age hides)
 local function ShownDeals()
     local list, _, building = FT.Deals.List()
     local matches = FT.NameMatcher(T.search)
     local since = time() - dstate.age
-    local out, noBook, total = {}, {}, 0
+    local out, noBook, total, older = {}, {}, 0, 0
     for _, d in ipairs(list) do
-        if (dstate.kind == "all" or d.kind == dstate.kind) and d.t >= since and (not matches or matches(d.id)) then
-            out[#out + 1] = d
-            total = total + d.profit
-            if d.noBook then noBook[#noBook + 1] = d.id end
+        if (dstate.kind == "all" or d.kind == dstate.kind) and (not matches or matches(d.id)) then
+            if d.t >= since then
+                out[#out + 1] = d
+                total = total + d.profit
+                -- only the house open here can be searched (between the houses: the one it is bought at)
+                if d.noBook and (d.kind ~= "HOUSES" or d.buyHouse == FT.house) then noBook[#noBook + 1] = d.id end
+            else
+                older = older + 1
+            end
         end
     end
-    return out, total, noBook, building
+    return out, total, noBook, building, older
+end
+
+-- no deals on the page: why (no prices yet, old prices, vendor prices still coming, too little history, the
+-- minimum profit)
+local function WhyNoDeals(older)
+    if T.search ~= "" then return L["Nothing matches"] end
+    local info = FT.Deals.Info()
+    if info and info.items == 0 then
+        return L["No prices yet: deals are looked for in the auction house's prices - scan it at the auction house."]
+    end
+    local why = { L["No good deals right now."] }
+    if older > 0 then
+        why[#why + 1] = string.format(L["%d more with older prices: choose 24 h, or scan the auction house again."], older)
+    elseif info and info.newest and info.newest < time() - dstate.age then
+        why[#why + 1] = string.format(L["Newest prices: %s - scan the auction house again."], FT.Ago(info.newest))
+    end
+    if FT.Deals.Loading() > 0 then
+        why[#why + 1] = L["Vendor prices are still loading: deals to a vendor follow."]
+    end
+    if info and info.history == 0 and (dstate.kind == "all" or dstate.kind == "RESELL") then
+        why[#why + 1] = L["Reselling needs at least 3 days of prices: a full scan every day."]
+    end
+    if dstate.kind == "all" or dstate.kind == "HOUSES" then
+        local other = FT.House.IsNeutral() and "faction" or "neutral"
+        local seen = FT.Hist.MarketTimeIn(other)
+        if not seen then
+            why[#why + 1] = string.format(L["No prices of %s yet: scan there once - deals between the houses compare both."], FT.House.Name(other))
+        elseif time() - seen > 3 * 86400 then
+            why[#why + 1] = string.format(L["The prices of %s are from %s: deals between the houses take them up to 3 days old."],
+                FT.House.Name(other), FT.Ago(seen))
+        end
+    end
+    if info and info.small > 0 and (FT.S.dealMin or 0) > 0 then
+        why[#why + 1] = string.format(L["%d smaller ones (under %s profit) are hidden: Settings > Signals."], info.small,
+            Money(FT.S.dealMin))
+    end
+    if #why == 1 then
+        return L["No good deals right now. They are looked for in the latest prices: scan the auction house, or open items while it is open."]
+    end
+    return table.concat(why, "\n\n")
 end
 
 function T.RefreshDeals()
     local f = dealsView
     if not (f and f:IsShown()) then return end
-    local shown, total, noBook, building = ShownDeals()
-    f.list:SetEmptyText((building and #shown == 0) and L["Looking for deals..."]
-        or (T.search ~= "" and L["Nothing matches"])
-        or L["No good deals right now. They are looked for in the latest prices: scan the auction house, or open items while it is open."])
+    local shown, total, noBook, building, older = ShownDeals()
+    f.list:SetEmptyText((building and #shown == 0) and L["Looking for deals..."] or WhyNoDeals(older))
+    -- vendor prices still coming: said in place of the hint
+    local left = FT.Deals.Loading()
+    f.hint:SetText(left > 0 and string.format(L["Loading vendor prices: %s items left - deals to a vendor follow as they come."],
+        FT.Num(left)) or DEALS_HINT)
     f.list:SetItems(shown, true)
     if #shown > 0 then
         f.count:SetText(string.format(L["%d deals, +%s in all"], #shown, Money(total)))
@@ -295,11 +382,18 @@ function T.CheckBooks()
     local _, _, noBook = ShownDeals()
     if #noBook == 0 then return end
     if not FT.ahOpen then
-        FT.Print(L["Talk to an auctioneer to check the order books."])
+        FT.Print(FT.House.Why(L["Talk to an auctioneer to check the order books."]))
         return
     end
     while #noBook > MAX_CHECK do table.remove(noBook) end
     FT.Scanner.StartMine(false, noBook)
+end
+
+-- one kind of deals on the page (What's new opens it)
+function T.SetDealKind(kind)
+    dstate.kind = kind
+    if dealsView then dealsView.kind:SetValue(kind) end
+    T.RefreshDeals()
 end
 
 function T.SetView(view)
@@ -419,10 +513,14 @@ function T.OnItems()
         return
     end
     for _, c in ipairs(cols) do c.list:Refresh() end
-    if dealsView and dealsView:IsShown() then dealsView.list:Refresh() end
+    if dealsView and dealsView:IsShown() then
+        dealsView.list:Refresh()
+        FT.Debounce("dealsHint", 1, T.RefreshDeals)
+    end
 end
 
 -- the deals were looked for again; the auction house opened or closed (Check order books needs it)
 FT.On("FT_DEALS_READY", function() T.RefreshDeals() end)
 FT.On("AUCTION_HOUSE_SHOW", function() C_Timer.After(0.5, T.RefreshDeals) end)
 FT.On("AUCTION_HOUSE_CLOSED", function() C_Timer.After(0.5, T.RefreshDeals) end)
+FT.On("FT_AH_CHANGED", function() C_Timer.After(0.1, T.RefreshDeals) end)

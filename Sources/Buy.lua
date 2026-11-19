@@ -111,7 +111,7 @@ end
 -- Buy: qty of itemID (gear: one auction); expectedUnit: what the book showed, to warn when it went up
 function B.Start(itemID, qty, expectedUnit)
     if not B.Possible() then
-        FT.Print(L["Talk to an auctioneer to buy."])
+        FT.Print(FT.House.Why(L["Talk to an auctioneer to buy."]))
         return false
     end
     if pending then

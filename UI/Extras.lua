@@ -316,7 +316,7 @@ local function NewToast()
     t:SetFrameStrata("FULLSCREEN_DIALOG")
     UI.Fill(t, "bg1")
     UI.Border(t, "line")
-    local bar = UI.Tex(t, "ARTWORK", "accent", 1)
+    local bar = UI.RoundTex(t, "ARTWORK", "accent", 1, nil, "left", UI.RADIUS - 1)
     bar:SetWidth(3)
     bar:SetPoint("TOPLEFT", 1, -1)
     bar:SetPoint("BOTTOMLEFT", 1, 1)
@@ -389,7 +389,8 @@ FT.On("FT_READY", function()
 end)
 
 function FT.DebugReport()
-    FT.Print("side " .. tostring(FT.sideKey) .. ", char " .. tostring(FT.charKey))
+    FT.Print("side " .. tostring(FT.sideKey) .. ", house " .. tostring(FT.house) .. " (" .. tostring(FT.houseKey)
+        .. "), cut " .. string.format("%.1f%%", FT.Cut() * 100) .. ", char " .. tostring(FT.charKey))
     FT.Print("Auctionator " .. tostring(FT.Atr.Loaded()) .. ", days " .. tostring(FT.Atr.HistoryDays()))
     FT.Print("Mastercraft " .. tostring(FT.MC.Loaded()) .. ", last scan " .. tostring(FT.MC.LastScan()))
     FT.Print("recipes " .. #FT.Craft.List() .. ", tracked " .. FT.Hist.UniverseSize())
@@ -410,7 +411,20 @@ function FT.DebugReport()
     local items, size = FT.Hist.Footprint()
     FT.Print("history items " .. items .. ", saved " .. size .. " chars, font " .. tostring(UI.FONT))
     local rows = FT.Market.Rows()
-    FT.Print("market rows " .. tostring(rows and #rows))
+    FT.Print("market rows " .. tostring(rows and #rows) .. (FT.Market.Building() and ", building" or "")
+        .. ((FT.Market.errors or 0) > 0 and (", errors " .. FT.Market.errors .. " (" .. tostring(FT.Market.firstError) .. ")") or ""))
+    -- the good deals: what the last look saw
+    local list, at, building = FT.Deals.List()
+    local info = FT.Deals.Info()
+    local kinds = {}
+    for _, d in ipairs(list) do kinds[d.kind] = (kinds[d.kind] or 0) + 1 end
+    FT.Print(string.format("deals %d (vendor %d, resell %d, between houses %d), looked %s%s", #list, kinds.VENDOR or 0,
+        kinds.RESELL or 0, kinds.HOUSES or 0, at and FT.Ago(at) or "never", building and ", looking now" or ""))
+    if info then
+        FT.Print(string.format("deals: items %d, newest price %s, 3+ days %d, under the minimum %d, vendor prices to load %d, errors %d%s",
+            info.items, FT.Ago(info.newest), info.history, info.small, FT.Deals.Loading(), info.errors,
+            info.firstError and (" (" .. info.firstError .. ")") or ""))
+    end
     FT.Print(FT.Scanner.LiveState())
 end
 
@@ -434,7 +448,7 @@ local function LinkDialog()
     d:SetScript("OnDragStop", d.StopMovingOrSizing)
     UI.Fill(d, "bg1")
     UI.Border(d, "line")
-    local bar = UI.Tex(d, "ARTWORK", "accent", 1)
+    local bar = UI.RoundTex(d, "ARTWORK", "accent", 1, nil, "top", UI.RADIUS - 1)
     bar:SetHeight(2)
     bar:SetPoint("TOPLEFT", 1, -1)
     bar:SetPoint("TOPRIGHT", -1, -1)

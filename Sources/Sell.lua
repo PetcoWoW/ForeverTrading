@@ -206,7 +206,7 @@ end
 -- p = { kind, itemID, loc, guid, qty, unit, duration, deposit, link, warnings, severe }: asks, then posts
 function Sell.Post(p)
     if not Sell.Possible() then
-        FT.Print(L["Talk to an auctioneer to sell."])
+        FT.Print(FT.House.Why(L["Talk to an auctioneer to sell."]))
         return false
     end
     if pending or (FT.Buy and FT.Buy.Busy()) or (FT.Owned and FT.Owned.Busy()) then

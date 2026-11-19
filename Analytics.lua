@@ -84,7 +84,18 @@ end
 -- Everything about one item, cached until prices change
 ---------------------------------------------------------------------------
 local cache = {}
+-- per auction house (an item window may look at the other one for a moment)
+local caches, cacheKey = {}, nil
+local function UseCache()
+    local key = FT.houseKey or "?"
+    if key == cacheKey then return end
+    if cacheKey then caches[cacheKey] = cache end
+    cache = caches[key] or {}
+    cacheKey = key
+end
 FT.On("FT_PRICES_CHANGED", function() wipe(cache) end)
+FT.On("FT_HOUSE_CHANGED", UseCache)
+FT.On("FT_HOUSE_USE", UseCache)
 FT.On("FT_LIVE_UPDATED", function(itemID) if itemID then cache[itemID] = nil end end)
 FT.On("FT_SCAN_DONE", function() wipe(cache) end)
 FT.On("FT_SETTINGS_CHANGED", function() wipe(cache) end)
@@ -440,7 +451,7 @@ FT.SIGNAL_COLORS = {
     HOLD = "accent", WATCH = "accent", EXPENSIVE = "accent", RISKY = "accent",
     AVOID = "down", LOSS = "down",
     FAIR = "muted", NODATA = "dim",
-    VENDOR = "up", RESELL = "blue", UNDERCUT = "down",
+    VENDOR = "up", RESELL = "blue", UNDERCUT = "down", HOUSES = "accent",
 }
 
 function FT.SignalText(kind)
@@ -448,6 +459,7 @@ function FT.SignalText(kind)
         SELL = L["SELL"], BUY = L["BUY"], CRAFT = L["CRAFT"], HOLD = L["HOLD"], WATCH = L["WATCH"],
         EXPENSIVE = L["PRICEY"], RISKY = L["RISKY"], AVOID = L["AVOID"], LOSS = L["LOSS"], FAIR = L["FAIR"],
         NODATA = L["NO DATA"], VENDOR = L["TO VENDOR"], RESELL = L["RESELL"], UNDERCUT = L["UNDERCUT"],
+        HOUSES = L["CARRY OVER"],
     }
     return names[kind] or kind
 end

@@ -11,8 +11,8 @@ local STYLES = {
     default = { bg = "bg2", bgA = 1, hover = "bg3", hoverA = 1, text = "text", border = "line" },
     primary = { bg = "accent", bgA = 1, hover = { 1, 0.80, 0.25 }, hoverA = 1, text = { 0.08, 0.08, 0.08 } },
     ghost = { bg = "bg2", bgA = 0, hover = "bg2", hoverA = 1, text = "muted", hoverText = "text" },
-    up = { bg = "up", bgA = 0.14, hover = "up", hoverA = 0.26, text = "up" },
-    down = { bg = "down", bgA = 0.14, hover = "down", hoverA = 0.26, text = "down" },
+    up = { bg = "up", bgA = 0.14, hover = "up", hoverA = 0.26, text = "up", border = "up", borderA = 0.45 },
+    down = { bg = "down", bgA = 0.14, hover = "down", hoverA = 0.26, text = "down", border = "down", borderA = 0.45 },
 }
 
 local function Paint(b, hover)
@@ -23,7 +23,7 @@ local function Paint(b, hover)
         return
     end
     if b.disabled then
-        UI.SetTexColor(b.bg, s.bg, (s.bgA or 1) * 0.5)
+        UI.SetTexColor(b.bg, "bg2", (s.bgA or 1) > 0 and 0.7 or 0)
         UI.SetTextColor(b.label, "dim")
         return
     end
@@ -43,11 +43,12 @@ end
 
 function UI.Button(parent, text, w, h, style, onClick)
     local b = CreateFrame("Button", nil, parent)
-    b:SetSize(w or 80, h or 24)
+    h = UI.ControlH(h)
+    b:SetSize(w or 80, h)
     b.style = STYLES[style or "default"] or STYLES.default
-    b.bg = UI.Tex(b, "BACKGROUND", "bg2", 1)
+    b.bg = UI.RoundTex(b, "BACKGROUND", "bg2", 1)
     b.bg:SetAllPoints()
-    if b.style.border then UI.Border(b, b.style.border) end
+    if b.style.border then UI.Border(b, b.style.border, b.style.borderA) end
     b.label = UI.Text(b, 12, b.style.text, "CENTER")
     b.label:SetPoint("CENTER")
     b.label:SetText(text or "")
@@ -88,14 +89,17 @@ end
 
 -- a row of buttons where one is chosen: options = { { value, label }, ... }
 function UI.Segmented(parent, options, onChange, h)
+    h = h or 22
     local f = CreateFrame("Frame", nil, parent)
+    UI.Fill(f, "bg2")
+    UI.Border(f, "line")
     f.buttons = {}
-    local x = 0
+    local x = 2
     for i, opt in ipairs(options) do
-        local b = UI.Button(f, opt[2], 10, h or 22, "ghost")
-        b.style = { bg = "bg2", bgA = 0, hover = "bg2", hoverA = 1, text = "muted", hoverText = "text",
+        local b = UI.Button(f, opt[2], 10, h - 4, "ghost")
+        b.style = { bg = "bg3", bgA = 0, hover = "bg3", hoverA = 0.6, text = "muted", hoverText = "text",
             activeBg = "bg3", activeText = "accent" }
-        b:FitText(16)
+        b:FitText(18)
         b:SetPoint("LEFT", x, 0)
         x = x + b:GetWidth() + 2
         b.value = opt[1]
@@ -105,7 +109,7 @@ function UI.Segmented(parent, options, onChange, h)
         end
         f.buttons[i] = b
     end
-    f:SetSize(math.max(1, x - 2), h or 22)
+    f:SetSize(x, h)
     function f:SetValue(v)
         self.value = v
         for _, b in ipairs(self.buttons) do b:SetActive(b.value == v) end
@@ -152,7 +156,7 @@ end
 -- a filter pill
 function UI.Chip(parent, text, onClick)
     local b = CreateFrame("Button", nil, parent)
-    b.bg = UI.Tex(b, "BACKGROUND", "bg2", 1)
+    b.bg = UI.RoundTex(b, "BACKGROUND", "bg2", 1)
     b.bg:SetAllPoints()
     UI.Border(b, "line")
     b.label = UI.Text(b, 11, "muted", "CENTER")
@@ -200,7 +204,7 @@ end
 ---------------------------------------------------------------------------
 function UI.Input(parent, w, h, placeholder, onChange, onEnter)
     local e = CreateFrame("EditBox", nil, parent)
-    e:SetSize(w or 160, h or 24)
+    e:SetSize(w or 160, UI.ControlH(h))
     e:SetAutoFocus(false)
     e:SetFont(UI.FONT, 12, "")
     e:SetTextColor(UI.RGB("text"))
@@ -262,7 +266,7 @@ function UI.Confirm(opts)
         if not UI.ClassicEdge(d, "line", { edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border", edgeSize = 16,
             insets = { left = 4, right = 4, top = 4, bottom = 4 } }) then
             UI.Border(d, "line")
-            d.accent = UI.Tex(d, "ARTWORK", "accent", 1)
+            d.accent = UI.RoundTex(d, "ARTWORK", "accent", 1, nil, "top", UI.RADIUS - 1)
             d.accent:SetHeight(2)
             d.accent:SetPoint("TOPLEFT", 1, -1)
             d.accent:SetPoint("TOPRIGHT", -1, -1)
@@ -462,7 +466,7 @@ function UI.Check(parent, label, onChange)
     b.box:SetPoint("LEFT")
     UI.Fill(b.box, "bg2")
     UI.Border(b.box, "line")
-    b.mark = UI.Tex(b.box, "OVERLAY", "accent", 1)
+    b.mark = UI.RoundTex(b.box, "OVERLAY", "accent", 1, nil, nil, 2)
     b.mark:SetPoint("TOPLEFT", 3, -3)
     b.mark:SetPoint("BOTTOMRIGHT", -3, 3)
     b.text = UI.Text(b, 12, "text")
@@ -552,7 +556,7 @@ function UI.Dropdown(parent, w, options, onSelect)
             if not it then
                 it = CreateFrame("Button", nil, m)
                 it:SetHeight(22)
-                it.hl = UI.Tex(it, "BACKGROUND", "bg3", 1)
+                it.hl = UI.RoundTex(it, "BACKGROUND", "hl", 1)
                 it.hl:SetAllPoints()
                 it.hl:Hide()
                 it.text = UI.Text(it, 12, "text")
@@ -638,7 +642,8 @@ end
 function UI.Header(parent, cols, onSort)
     local h = CreateFrame("Frame", nil, parent)
     h:SetHeight(24)
-    UI.Fill(h, "bg1")
+    -- at the top of a panel: its corners follow the panel's
+    UI.Fill(h, "bg1", nil, "top", UI.RADIUS - 1)
     local line = UI.HLine(h, "line")
     line:SetPoint("BOTTOMLEFT")
     line:SetPoint("BOTTOMRIGHT")
@@ -692,7 +697,7 @@ function UI.Header(parent, cols, onSort)
             end
         end
     end
-    h:SetScript("OnSizeChanged", function(self) self:Layout() end)
+    h:HookScript("OnSizeChanged", function(self) self:Layout() end)
     return h
 end
 
@@ -779,7 +784,7 @@ function UI.List(parent, opts)
     f.track:SetPoint("BOTTOMRIGHT", -2, 2)
     f.thumb = CreateFrame("Button", nil, f.track)
     f.thumb:SetWidth(6)
-    f.thumb.tex = UI.Tex(f.thumb, "OVERLAY", "line", 1)
+    f.thumb.tex = UI.RoundTex(f.thumb, "OVERLAY", "line", 1)
     f.thumb.tex:SetAllPoints()
     f.thumb:SetScript("OnEnter", function(s) UI.SetTexColor(s.tex, "muted", 1) end)
     f.thumb:SetScript("OnLeave", function(s) if not s.drag then UI.SetTexColor(s.tex, "line", 1) end end)
@@ -801,13 +806,13 @@ function UI.List(parent, opts)
         local row = CreateFrame("Button", nil, f)
         row:SetHeight(rh)
         row:RegisterForClicks("LeftButtonUp", "RightButtonUp")
-        row.hover = UI.Tex(row, "BACKGROUND", "bg2", 1)
+        row.hover = UI.RoundTex(row, "BACKGROUND", "hl", 1)
         row.hover:SetAllPoints()
         row.hover:Hide()
-        row.sel = UI.Tex(row, "BACKGROUND", "accent", 0.07, 1)
+        row.sel = UI.RoundTex(row, "BACKGROUND", "sel", UI.SEL_A, 1)
         row.sel:SetAllPoints()
         row.sel:Hide()
-        row.selBar = UI.Tex(row, "ARTWORK", "accent", 1)
+        row.selBar = UI.RoundTex(row, "ARTWORK", "accent", 1, nil, "left")
         row.selBar:SetWidth(2)
         row.selBar:SetPoint("TOPLEFT")
         row.selBar:SetPoint("BOTTOMLEFT")
@@ -981,7 +986,7 @@ end
 function UI.Badge(parent, w, h)
     local f = CreateFrame("Frame", nil, parent)
     f:SetSize(w or 64, h or 18)
-    f.bg = UI.Tex(f, "BACKGROUND", "muted", 0.15)
+    f.bg = UI.RoundTex(f, "BACKGROUND", "muted", 0.15)
     f.bg:SetAllPoints()
     f.text = UI.Text(f, 10, "muted", "CENTER")
     f.text:SetPoint("CENTER", 0, 0)
@@ -1041,6 +1046,12 @@ function UI.Stat(parent, title)
         self.value:SetText(value or "—")
         self.sub:SetText(sub or "")
     end
+    f:EnableMouse(true)
+    f:SetScript("OnEnter", function(self)
+        local cut = (self.sub.IsTruncated and self.sub:IsTruncated()) or (self.value.IsTruncated and self.value:IsTruncated())
+        if cut then UI.TipText(self, self.title:GetText(), (self.value:GetText() or "") .. "\n" .. (self.sub:GetText() or "")) end
+    end)
+    f:SetScript("OnLeave", function() GameTooltip:Hide() end)
     return f
 end
 
@@ -1067,9 +1078,10 @@ function UI.ScrollArea(parent)
     return s, content
 end
 
--- run fn(frame, w, h) whenever the frame's size changes, and once now if it already has one
+-- run fn(frame, w, h) whenever the frame's size changes, and once now if it already has one (hooked: the rounded
+-- corners of its fill and border follow its size too)
 function UI.OnSize(frame, fn)
-    frame:SetScript("OnSizeChanged", fn)
+    frame:HookScript("OnSizeChanged", fn)
     local w, h = frame:GetWidth(), frame:GetHeight()
     if w and w > 0 and h and h > 0 then fn(frame, w, h) end
 end

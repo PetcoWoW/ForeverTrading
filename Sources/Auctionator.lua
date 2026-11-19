@@ -18,7 +18,9 @@ function A.On()
     return FT.S ~= nil and FT.S.useAuctionator ~= false and A.Loaded()
 end
 
+-- its price history (one per faction: of your faction's auction house, not Blackwater's)
 function A.DB()
+    if FT.house == "neutral" then return nil end
     return A.On() and Auctionator.Database.db or nil
 end
 
@@ -91,7 +93,7 @@ end
 
 function A.OnFullScan(raw)
     FT.atrScanning = false
-    if not (A.On() and type(raw) == "table") then
+    if not (A.On() and FT.ahOpen and type(raw) == "table") then
         FT.Fire("FT_SCAN_DONE", "auctionator")
         return
     end
@@ -106,7 +108,7 @@ end
 -- its summary scan (the default "full scan" on the modern auction house): the browse list of every item
 function A.OnSummaryScan(results)
     FT.atrScanning = false
-    if not (A.On() and type(results) == "table" and #results > 0) then
+    if not (A.On() and FT.ahOpen and type(results) == "table" and #results > 0) then
         FT.Fire("FT_SCAN_DONE", "auctionator")
         return
     end
@@ -118,7 +120,7 @@ function A.OnSummaryScan(results)
 end
 
 function A.OnSearchResults(results)
-    if not (A.On() and type(results) == "table" and #results > 0) then return end
+    if not (A.On() and FT.ahOpen and type(results) == "table" and #results > 0) then return end
     local t = time()
     FT.Scanner.ReadList(results, Info, function(acc)
         FT.Scanner.Ingest(acc, t, "auctionator")
@@ -153,7 +155,7 @@ local function TryHook()
     hooked = true
     -- a price it saves outside a full scan (its shopping and selling tabs); the full scan itself is read whole
     hooksecurefunc(Auctionator.Database, "SetPrice", function(_, dbKey, price, available)
-        if A.On() and not FT.atrScanning then
+        if A.On() and FT.ahOpen and not FT.atrScanning then
             FT.Hist.Observe(dbKey, price, available, nil, time(), "auctionator")
         end
     end)

@@ -1,7 +1,8 @@
 -- ForeverTrading: the deals journal - what you really bought and sold at the auction house, and what it brought.
 -- The auction house's mail says it exactly (its invoice: the price, the cut, the deposit back, how many, who),
 -- read when you open your mailbox; the deposits of what you post here are written when you post. Kept per server
--- and side (all your characters), 90 days.
+-- and side (all your characters, both auction houses), 90 days. The cut is learned per house (by the letter's
+-- sender: Blackwater signs with its name).
 --   S sold: v = the price, f = the cut          B bought: v = the price paid
 --   D deposit paid: v                            R deposit back (with a sale): v
 --   X expired, C cancelled (came back by mail): how many
@@ -18,7 +19,7 @@ local events      -- parsed: { { t, k, id, q, v, f }, ... } oldest first
 local Enc, Dec = FT.Hist.Enc, FT.Hist.Dec
 
 local function R()
-    local r = FT.R()
+    local r = FT.Side()
     r.journal = r.journal or ""
     r.journalSeen = r.journalSeen or {}
     return r
@@ -30,7 +31,10 @@ local function Load()
     for rec in R().journal:gmatch("([^;]+);") do
         local t, k, id, q, v, f = rec:match("^(%w+),(%a),(%w*),(%w*),(%w*),(%w*)$")
         if t then
-            events[#events + 1] = { t = Dec(t), k = k, id = Dec(id), q = Dec(q) or 0, v = Dec(v) or 0, f = Dec(f) or 0 }
+            local e = { t = Dec(t), k = k, id = Dec(id), q = Dec(q) or 0, v = Dec(v) or 0, f = Dec(f) or 0 }
+            -- a sale or a purchase written with no count (Forever's letters say 0): one
+            if (k == "S" or k == "B") and e.q <= 0 then e.q = 1 end
+            events[#events + 1] = e
         end
     end
     return events
@@ -136,7 +140,7 @@ local function ReadMail()
     local index
     local twins = {} -- letters alike in this read (two auctions of one item ending together): each counts
     for i = 1, n do
-        local _, _, _, subject, money, _, daysLeft = GetInboxHeaderInfo(i)
+        local _, _, sender, subject, money, _, daysLeft = GetInboxHeaderInfo(i)
         local kind, name = Classify(subject)
         if kind and type(daysLeft) == "number" then
             local expires = now + math.floor(daysLeft * 86400)
@@ -154,12 +158,14 @@ local function ReadMail()
                 MarkSeen(key, expires)
                 if kind == "sold" then
                     -- the cut this auction house takes: learned from the sale (a price large enough to tell it)
-                    local seenCut = FT.db.cutSeen
+                    local field = (FT.House.OfSender(sender) == "neutral") and "cutSeenNeutral" or "cutSeen"
+                    local seenCut = FT.db[field]
                     if bid and type(cut) == "number" and bid >= 1000 and not (seenCut and (seenCut.at or 0) > at) then
-                        FT.db.cutSeen = { rate = cut / bid, at = at }
+                        FT.db[field] = { rate = cut / bid, at = at }
                     end
                     if invType and bid then
-                        J.Add("S", id, type(count) == "number" and count or 1, bid, cut, at)
+                        -- how many: the letter's count when it says one (Forever's say 0 for an item sold whole)
+                        J.Add("S", id, (type(count) == "number" and count > 0) and count or 1, bid, cut, at)
                         if deposit and deposit > 0 then J.Add("R", id, 0, deposit, 0, at) end
                     elseif type(money) == "number" and money > 0 then
                         -- no invoice to read: the gold that came (the price less the cut, with the deposit back)
@@ -169,7 +175,7 @@ local function ReadMail()
                 elseif kind == "won" then
                     local itemID, qty = ItemOf(i, name)
                     if invType and bid then
-                        J.Add("B", itemID or id, type(count) == "number" and count or qty or 1, bid, 0, at)
+                        J.Add("B", itemID or id, (type(count) == "number" and count > 0) and count or qty or 1, bid, 0, at)
                         added = added + 1
                     end
                 else
@@ -184,8 +190,23 @@ local function ReadMail()
     PruneSeen()
 end
 
-FT.On("MAIL_INBOX_UPDATE", function() FT.Debounce("journalMail", 1, ReadMail) end)
-FT.On("MAIL_SHOW", function() C_Timer.After(1, ReadMail) end)
+-- Read at once whenever the inbox changes, and the moment a letter is taken or deleted - before it goes ("Open all"
+-- and mail addons' "Collect all" take letters faster than any wait); a letter read before isn't written twice.
+FT.On("MAIL_INBOX_UPDATE", function() ReadMail() end)
+FT.On("MAIL_SHOW", function()
+    ReadMail()
+    C_Timer.After(1, ReadMail)
+end)
+local hooked = false
+FT.On("FT_READY", function()
+    if hooked then return end
+    hooked = true
+    for _, name in ipairs({ "TakeInboxMoney", "TakeInboxItem", "AutoLootMailItem", "DeleteInboxItem" }) do
+        if type(_G[name]) == "function" then
+            hooksecurefunc(name, function() pcall(ReadMail) end)
+        end
+    end
+end)
 
 -- what you post here: its deposit
 function J.Posted(itemID, qty, deposit)

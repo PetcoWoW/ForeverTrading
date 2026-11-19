@@ -15,6 +15,7 @@
 Locale.lua
 Core.lua
 Version.lua
+House.lua
 Data\Vendor.lua
 Sources\Scanner.lua
 Sources\Auctionator.lua

@@ -315,7 +315,11 @@ local function BuildList(parent)
     panel:SetPoint("BOTTOMLEFT", 8, 8)
     panel:SetWidth(LEFT_W)
 
-    local search = UI.Input(panel, LEFT_W - 20 - 84, 26, L["Search item..."], function(text)
+    -- the filters: a grid of four columns, rows of one height, one gap between them all
+    local IW, GAP, RH = LEFT_W - 20, 6, 20
+    local CW = math.floor((IW - 3 * GAP) / 4)
+    local function Cell(col, span) return 10 + (col - 1) * (CW + GAP), span * CW + (span - 1) * GAP end
+    local search = UI.Input(panel, IW - 84, 24, L["Search item..."], function(text)
         state.search = text or ""
         state.focusFor = nil
         FT.Debounce("marketSearch", 0.25, function()
@@ -325,7 +329,7 @@ local function BuildList(parent)
     end)
     search:SetPoint("TOPLEFT", 10, -10)
     T.searchBox = search
-    T.filterBtn = UI.Button(panel, L["Filter"], 78, 26, "default", function(self) T.ToggleFilters(self) end)
+    T.filterBtn = UI.Button(panel, L["Filter"], 78, 24, "default", function(self) T.ToggleFilters(self) end)
     T.filterBtn:SetPoint("LEFT", search, "RIGHT", 6, 0)
     T.filterBtn:SetTip(L["Filter"], L["Required level, usable, not collected, quality - as on the auction house."])
     panel:HookScript("OnHide", function() if T.filterPanel then T.filterPanel:Hide() end end)
@@ -350,8 +354,19 @@ local function BuildList(parent)
     local row1 = { Chip("all", L["All"]), Chip("fav", L["Watchlist"]), Chip("mine", L["My recipes"]),
         Chip("bags", L["I own"]) }
     local row2 = { Chip("up", L["Rising"]), Chip("down", L["Falling"]) }
-    UI.RowLayout(panel, row1, 10, -44, 6)
-    UI.RowLayout(panel, row2, 10, -70, 6)
+    local Y1, Y2, Y3 = -42, -42 - RH - GAP, -42 - 2 * (RH + GAP)
+    for i, c in ipairs(row1) do
+        local x, w = Cell(i, 1)
+        c:SetSize(w, RH)
+        c:ClearAllPoints()
+        c:SetPoint("TOPLEFT", x, Y1)
+    end
+    for i, c in ipairs(row2) do
+        local x, w = Cell(i, 1)
+        c:SetSize(w, RH)
+        c:ClearAllPoints()
+        c:SetPoint("TOPLEFT", x, Y2)
+    end
     for _, c in ipairs(chips) do c:SetOn(c.key == state.filter) end
     T.chips = chips
 
@@ -359,13 +374,13 @@ local function BuildList(parent)
     for _, c in ipairs(CLASSES) do clsOptions[#clsOptions + 1] = { c, ClassName(c) } end
     clsOptions[#clsOptions + 1] = { "other", L["Other"] }
     -- what kind: the category and its subcategory side by side (the row under the chips)
-    local half = math.floor((LEFT_W - 20 - 6) / 2)
+    local half = select(2, Cell(1, 2))
     local cls = UI.Dropdown(panel, half, clsOptions, function(v)
         state.cls, state.sub = v, "all"
         T.RefreshList()
     end)
-    cls:SetHeight(20)
-    cls:SetPoint("TOPLEFT", 10, -96)
+    cls:SetHeight(RH)
+    cls:SetPoint("TOPLEFT", Cell(1, 2), Y3)
     cls:SetValue("all")
     T.clsDD = cls
 
@@ -373,15 +388,15 @@ local function BuildList(parent)
         { "cap", L["Sort: market value"] }, { "ch1", L["Sort: 24h change"] }, { "ch7", L["Sort: 7d change"] },
         { "price", L["Sort: price"] }, { "qty", L["Sort: listed"] }, { "name", L["Sort: name"] },
     }
-    local sortDD = UI.Dropdown(panel, 170, sortOptions, function(v)
+    local sortDD = UI.Dropdown(panel, half, sortOptions, function(v)
         state.sort = v
         state.desc = v ~= "name"
         T.header:SetSort(v, state.desc)
         T.RefreshList()
     end)
     -- the order: on the right of the rising / falling chips
-    sortDD:SetHeight(20)
-    sortDD:SetPoint("TOPRIGHT", -10, -70)
+    sortDD:SetHeight(RH)
+    sortDD:SetPoint("TOPLEFT", Cell(3, 2), Y2)
     sortDD:SetValue(state.sort)
     T.sortDD = sortDD
     -- the subcategory of the chosen category (armor: cloth, leather...; trade goods: cloth, metal...)
@@ -389,8 +404,8 @@ local function BuildList(parent)
         state.sub = v
         T.RefreshList()
     end)
-    subDD:SetHeight(20)
-    subDD:SetPoint("LEFT", cls, "RIGHT", 6, 0)
+    subDD:SetHeight(RH)
+    subDD:SetPoint("TOPLEFT", Cell(3, 2), Y3)
     subDD:SetValue("all")
     T.subDD = subDD
     countText = UI.Text(panel, 11, "dim", "RIGHT")
@@ -412,8 +427,8 @@ local function BuildList(parent)
         T.sortDD:SetValue(state.sort)
         T.RefreshList()
     end)
-    T.header:SetPoint("TOPLEFT", 1, -124)
-    T.header:SetPoint("TOPRIGHT", -1, -124)
+    T.header:SetPoint("TOPLEFT", 1, Y3 - RH - 8)
+    T.header:SetPoint("TOPRIGHT", -1, Y3 - RH - 8)
     T.header:SetSort(state.sort, state.desc)
 
     list = UI.List(panel, {
@@ -536,14 +551,14 @@ local function BuildOverview(parent)
     local titles = { L["Items on the market"], L["Listed value"], L["Market mood"], L["Last scan"] }
     for i, t in ipairs(titles) do
         local c = UI.Stat(v, t)
-        c:SetHeight(64)
+        c:SetHeight(70)
         v.cards[i] = c
     end
     v.moodBar = CreateFrame("Frame", nil, v.cards[3])
     v.moodBar:SetHeight(3)
     v.moodBar:SetPoint("BOTTOMLEFT", 10, 6)
     v.moodBar:SetPoint("BOTTOMRIGHT", -10, 6)
-    UI.Fill(v.moodBar, "bg3")
+    UI.Fill(v.moodBar, "bg3", nil, "none")
     v.moodFill = UI.Tex(v.moodBar, "ARTWORK", "up", 1)
     v.moodFill:SetPoint("TOPLEFT")
     v.moodFill:SetPoint("BOTTOMLEFT")
@@ -562,10 +577,10 @@ local function BuildOverview(parent)
             c:SetWidth(cw)
         end
         self.chartTitle:ClearAllPoints()
-        self.chartTitle:SetPoint("TOPLEFT", 4, -110)
+        self.chartTitle:SetPoint("TOPLEFT", 4, -116)
         self.chart:ClearAllPoints()
-        self.chart:SetPoint("TOPLEFT", 0, -128)
-        self.chart:SetPoint("TOPRIGHT", 0, -128)
+        self.chart:SetPoint("TOPLEFT", 0, -134)
+        self.chart:SetPoint("TOPRIGHT", 0, -134)
         local listsH = math.max(180, math.floor(h * 0.36))
         self.chart:SetPoint("BOTTOM", 0, listsH + 8)
         local half = (w - 8) / 2
@@ -729,6 +744,7 @@ local function BuildItemView(parent)
     v.chart:SetPoint("TOPRIGHT", 0, -128)
     UI.Border(v.chart, "line")
     v.more = UI.MoreButton(v.chart, function() return state.selected end)
+    T.more = v.more
     v.pchart = UI.Chart(v)
     v.pchart:SetPoint("TOPLEFT", v.chart, "BOTTOMLEFT", 0, -6)
     v.pchart:SetPoint("BOTTOMRIGHT", 0, CARDS_H)
@@ -769,7 +785,7 @@ local function BuildItemView(parent)
     v.rsiBar:SetHeight(3)
     v.rsiBar:SetPoint("TOPLEFT", 10, -44)
     v.rsiBar:SetPoint("TOPRIGHT", -10, -44)
-    UI.Fill(v.rsiBar, "bg3")
+    UI.Fill(v.rsiBar, "bg3", nil, "none")
     v.rsiZoneL = UI.Tex(v.rsiBar, "ARTWORK", "up", 0.35)
     v.rsiZoneL:SetPoint("TOPLEFT")
     v.rsiZoneL:SetPoint("BOTTOMLEFT")
@@ -1253,6 +1269,11 @@ function T.Refresh()
 end
 
 -- Escape-like: back to the overview
+-- the item open (nil: the overview)
+function T.Selected()
+    return state.selected
+end
+
 function T.ClearSelection()
     state.selected = nil
     if list then list:Refresh() end

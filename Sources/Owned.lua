@@ -44,6 +44,15 @@ local function Saved()
     return FT.db.owned
 end
 
+-- your auctions are kept per character and auction house (your faction's under the character, as always)
+local function KeyOf(house)
+    if not FT.charKey then return nil end
+    return (house == "neutral") and (FT.charKey .. "@neutral") or FT.charKey
+end
+local function MyKey()
+    return KeyOf(FT.house)
+end
+
 function O.Possible()
     return FT.ahOpen and AH ~= nil and AH.QueryOwnedAuctions ~= nil
 end
@@ -54,8 +63,8 @@ end
 
 -- the list and when it was read (from the last visit when away from the auction house)
 function O.List()
-    if list then return list, readAt, true end
-    local s = FT.charKey and Saved()[FT.charKey]
+    if list and FT.ahOpen then return list, readAt, true end
+    local s = MyKey() and Saved()[MyKey()]
     if s then return s.list or {}, s.t, false end
     return {}, nil, false
 end
@@ -295,6 +304,8 @@ local function IsCommodity(itemKey)
 end
 
 FT.On("OWNED_AUCTIONS_UPDATED", function()
+    -- read by the game's own window while the other house's prices are on: not ours to keep
+    if not FT.ahOpen then return end
     if not (AH and AH.GetNumOwnedAuctions and AH.GetOwnedAuctionInfo) then return end
     local out = {}
     local sold = Enum and Enum.AuctionStatus and Enum.AuctionStatus.Sold or 1
@@ -313,7 +324,7 @@ FT.On("OWNED_AUCTIONS_UPDATED", function()
     end
     list, readAt = out, time()
     FT.Debug("owned: the server sent", #out, "auctions")
-    if FT.charKey then Saved()[FT.charKey] = { t = readAt, list = out } end
+    if MyKey() then Saved()[MyKey()] = { t = readAt, list = out } end
     FT.Fire("FT_OWNED_CHANGED")
     -- the auction you wanted to cancel while the list was being read: its question now
     local w = O.wanted
@@ -329,15 +340,34 @@ FT.On("OWNED_AUCTIONS_UPDATED", function()
     end
 end)
 
--- fresh after posting, and a few seconds after the auction house opens
-FT.On("AUCTION_HOUSE_AUCTION_CREATED", function() C_Timer.After(0.5, O.Query) end)
-FT.On("AUCTION_HOUSE_SHOW", function()
-    C_Timer.After(3, function() if FT.ahOpen then O.Query() end end)
+-- fresh after posting, and a few seconds after going online at the auction house (it opened, or its own prices
+-- are on again); offline: the list of the house whose prices are on, as last read
+FT.On("AUCTION_HOUSE_AUCTION_CREATED", function() C_Timer.After(0.5, function() if FT.ahOpen then O.Query() end end) end)
+FT.On("FT_AH_CHANGED", function()
+    if FT.ahOpen then
+        C_Timer.After(3, function() if FT.ahOpen then O.Query() end end)
+    elseif list then
+        list, readAt = nil, nil
+        FT.Fire("FT_OWNED_CHANGED")
+    end
 end)
 FT.On("AUCTION_HOUSE_CLOSED", function()
     list = nil
     FT.Fire("FT_OWNED_CHANGED")
 end)
+
+-- the other house's prices on: its list as last read (read again when online there)
+FT.On("FT_HOUSE_CHANGED", function()
+    list, readAt = nil, nil
+    FT.Fire("FT_OWNED_CHANGED")
+end)
+
+-- the auction house here was taken for `wrong` (put right on the chip): the list read here goes from there
+function O.Misfiled(wrong)
+    local key = KeyOf(wrong)
+    local s = key and Saved()[key]
+    if s and readAt and s.t == readAt then Saved()[key] = nil end
+end
 
 ---------------------------------------------------------------------------
 -- Cancelling
@@ -358,7 +388,7 @@ function O.Cancel(a)
         return false
     end
     if not O.Possible() or not Game.CancelAuction then
-        FT.Print(L["Talk to an auctioneer to cancel."])
+        FT.Print(FT.House.Why(L["Talk to an auctioneer to cancel."]))
         return false
     end
     if cancelling or (FT.Buy and FT.Buy.Busy()) or (FT.Sell and FT.Sell.Busy()) then

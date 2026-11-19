@@ -12,26 +12,32 @@ UI.C = {
     bg3 = { 0.137, 0.157, 0.192 },   -- pressed, selected
     line = { 0.157, 0.180, 0.220 },  -- borders and grid
     text = { 0.918, 0.925, 0.937 },
-    muted = { 0.518, 0.557, 0.612 },
-    dim = { 0.369, 0.400, 0.451 },
+    muted = { 0.600, 0.635, 0.690 },
+    dim = { 0.455, 0.490, 0.545 },
     up = { 0.055, 0.796, 0.506 },
     down = { 0.965, 0.275, 0.365 },
     accent = { 0.941, 0.725, 0.043 },
     blue = { 0.231, 0.510, 0.965 },
     purple = { 0.655, 0.545, 0.980 },
     black = { 0, 0, 0 },
+    -- a row under the mouse, a chosen row (with its alpha: UI.SEL_A)
+    hl = { 0.098, 0.114, 0.141 },
+    sel = { 0.941, 0.725, 0.043 },
 }
 local C = UI.C
+UI.SEL_A = 0.07
 
 -- the other styles: the same names, other colours
 local THEMES = {
     light = {
-        bg0 = { 0.957, 0.961, 0.969 }, bg1 = { 1, 1, 1 }, bg2 = { 0.937, 0.945, 0.957 }, bg3 = { 0.890, 0.902, 0.922 },
-        line = { 0.851, 0.863, 0.886 }, text = { 0.118, 0.137, 0.161 }, muted = { 0.420, 0.459, 0.522 },
-        dim = { 0.600, 0.635, 0.686 }, up = { 0.012, 0.620, 0.408 }, down = { 0.812, 0.188, 0.290 },
+        bg0 = { 0.925, 0.933, 0.945 }, bg1 = { 1, 1, 1 }, bg2 = { 0.906, 0.918, 0.933 }, bg3 = { 0.827, 0.843, 0.867 },
+        line = { 0.765, 0.784, 0.816 }, text = { 0.098, 0.114, 0.137 }, muted = { 0.337, 0.373, 0.427 },
+        dim = { 0.494, 0.529, 0.584 }, up = { 0.012, 0.580, 0.380 }, down = { 0.780, 0.165, 0.267 },
+        hl = { 0.800, 0.820, 0.855 }, sel = { 0.984, 0.851, 0.490 },
         accent = { 0.780, 0.565, 0.0 }, blue = { 0.145, 0.388, 0.922 }, purple = { 0.486, 0.227, 0.929 },
     },
     classic = {
+        hl = { 0.135, 0.118, 0.095 }, sel = { 1.0, 0.820, 0.0 },
         bg0 = { 0.035, 0.032, 0.030 }, bg1 = { 0.075, 0.068, 0.060 }, bg2 = { 0.135, 0.118, 0.095 },
         bg3 = { 0.200, 0.170, 0.125 }, line = { 0.420, 0.345, 0.205 }, text = { 1.0, 0.953, 0.855 },
         muted = { 0.800, 0.725, 0.560 }, dim = { 0.560, 0.505, 0.400 }, up = { 0.118, 1.0, 0.118 },
@@ -41,6 +47,19 @@ local THEMES = {
 }
 UI.theme = "dark"
 UI.INSET = 1 -- how far the window's content keeps from its edge
+
+-- the height of a control when none is given
+UI.H, UI.HS = 24, 20
+function UI.ControlH(h)
+    return h or UI.H
+end
+
+-- A faint tint (a chosen row, a badge, a tinted button) shows on a dark background; on white it is gone: the light
+-- style makes it stronger
+function UI.Alpha(a)
+    if UI.theme == "light" and a and a > 0 and a < 0.35 then return math.min(0.4, a * 2.2) end
+    return a
+end
 
 local function Hex(c)
     return string.format("%02x%02x%02x", math.floor(c[1] * 255 + 0.5), math.floor(c[2] * 255 + 0.5), math.floor(c[3] * 255 + 0.5))
@@ -54,6 +73,8 @@ function UI.ApplyTheme()
     for k, v in pairs(palette or {}) do C[k] = v end
     UI.theme = name
     UI.INSET = (name == "classic") and 4 or 1
+    -- the chosen row: a faint gold on dark, a solid light gold on white
+    UI.SEL_A = (name == "light") and 1 or 0.07
     -- the colours of coloured text follow
     for k in pairs(FT.HEX) do
         if C[k] then FT.HEX[k] = Hex(C[k]) end
@@ -105,13 +126,187 @@ end
 function UI.Tex(parent, layer, color, alpha, sub)
     local t = parent:CreateTexture(nil, layer or "ARTWORK", nil, sub)
     local c = type(color) == "table" and color or C[color or "bg1"]
-    t:SetColorTexture(c[1], c[2], c[3], alpha or 1)
+    t:SetColorTexture(c[1], c[2], c[3], UI.Alpha(alpha or 1))
     return t
 end
 
 function UI.SetTexColor(tex, color, alpha)
     local c = type(color) == "table" and color or C[color] or C.text
-    tex:SetColorTexture(c[1], c[2], c[3], alpha or 1)
+    if tex.isRound then
+        tex:SetColor(c, alpha)
+    elseif tex.tinted then
+        tex:SetVertexColor(c[1], c[2], c[3], UI.Alpha(alpha or 1))
+    else
+        tex:SetColorTexture(c[1], c[2], c[3], UI.Alpha(alpha or 1))
+    end
+end
+
+---------------------------------------------------------------------------
+-- Slightly rounded corners (in the classic style too: its windows and panels keep the game's edges, the rounded
+-- fill hides under them). A rounded rectangle is its
+-- rounded corners - quarters of a disc (media\round.tga) - and up to three bands between them; a rounded border
+-- is quarters of a ring (media\ringN.tga: 1 wide at radius N) and four lines. The radius shrinks to fit a small
+-- rectangle. corners: "all" (the default), "top", "bottom", "left", "right", "none" (square).
+---------------------------------------------------------------------------
+UI.RADIUS = 3
+local WHITE = "Interface\\Buttons\\WHITE8X8"
+local DISC = FT.MEDIA .. "round.tga"
+local QUARTER = {
+    TOPLEFT = { 0, 0.5, 0, 0.5 }, TOPRIGHT = { 0.5, 1, 0, 0.5 },
+    BOTTOMLEFT = { 0, 0.5, 0.5, 1 }, BOTTOMRIGHT = { 0.5, 1, 0.5, 1 },
+}
+local CORNERS = { "TOPLEFT", "TOPRIGHT", "BOTTOMLEFT", "BOTTOMRIGHT" }
+local SETS = {
+    all = { TOPLEFT = true, TOPRIGHT = true, BOTTOMLEFT = true, BOTTOMRIGHT = true },
+    top = { TOPLEFT = true, TOPRIGHT = true }, bottom = { BOTTOMLEFT = true, BOTTOMRIGHT = true },
+    left = { TOPLEFT = true, BOTTOMLEFT = true }, right = { TOPRIGHT = true, BOTTOMRIGHT = true },
+}
+
+function UI.Rounded()
+    return UI.RADIUS > 0
+end
+
+local function Ring(r)
+    if r <= 1 then return DISC end
+    return FT.MEDIA .. "ring" .. math.min(r, 6) .. ".tga"
+end
+
+-- the radius of a rectangle w x h with these corners rounded (two rounded corners on a side share it)
+local function Fit(set, w, h, want)
+    local r = want or UI.RADIUS
+    local cols = ((set.TOPLEFT or set.BOTTOMLEFT) and 1 or 0) + ((set.TOPRIGHT or set.BOTTOMRIGHT) and 1 or 0)
+    local rows = ((set.TOPLEFT or set.TOPRIGHT) and 1 or 0) + ((set.BOTTOMLEFT or set.BOTTOMRIGHT) and 1 or 0)
+    if w and w > 0 and cols > 0 then r = math.min(r, math.floor(w / cols)) end
+    if h and h > 0 and rows > 0 then r = math.min(r, math.floor(h / rows)) end
+    return math.max(0, r)
+end
+
+-- a rounded rectangle: used like a texture (points, shown, colour through UI.SetTexColor)
+local Round = {}
+Round.__index = Round
+
+function Round:Layout()
+    local b, s = self.base, self.set
+    local r = Fit(s, b:GetWidth(), b:GetHeight(), self.want)
+    if r == self.r then return end
+    self.r = r
+    local tl, tr = s.TOPLEFT and r or 0, s.TOPRIGHT and r or 0
+    local bl, br = s.BOTTOMLEFT and r or 0, s.BOTTOMRIGHT and r or 0
+    local top, bottom = math.max(tl, tr), math.max(bl, br)
+    for _, t in pairs(self.corners) do
+        if r > 0 then t:SetSize(r, r) end
+        self.vis[t] = r > 0
+    end
+    self.top:ClearAllPoints()
+    self.top:SetPoint("TOPLEFT", b, "TOPLEFT", tl, 0)
+    self.top:SetPoint("BOTTOMRIGHT", b, "TOPRIGHT", -tr, -top)
+    self.vis[self.top] = top > 0
+    self.bottom:ClearAllPoints()
+    self.bottom:SetPoint("TOPLEFT", b, "BOTTOMLEFT", bl, bottom)
+    self.bottom:SetPoint("BOTTOMRIGHT", b, "BOTTOMRIGHT", -br, 0)
+    self.vis[self.bottom] = bottom > 0
+    self.mid:ClearAllPoints()
+    self.mid:SetPoint("TOPLEFT", b, "TOPLEFT", 0, -top)
+    self.mid:SetPoint("BOTTOMRIGHT", b, "BOTTOMRIGHT", 0, bottom)
+    self:SetShown(self.shown)
+end
+
+-- its place changed: laid out now, and again once the game has placed it
+function Round:Relayout()
+    self.r = nil
+    self:Layout()
+    C_Timer.After(0, function()
+        self.r = nil
+        self:Layout()
+    end)
+end
+
+function Round:SetColor(color, alpha)
+    local c = type(color) == "table" and color or C[color] or C.text
+    alpha = UI.Alpha(alpha or 1)
+    for _, t in ipairs(self.parts) do t:SetVertexColor(c[1], c[2], c[3], alpha) end
+end
+function Round:SetColorTexture(r, g, b, a) self:SetColor({ r, g, b }, a) end
+function Round:SetVertexColor(r, g, b, a) self:SetColor({ r, g, b }, a) end
+-- (never an explicit nil to the game: SetAllPoints(nil) is the whole screen, not the parent)
+function Round:SetAllPoints(rel)
+    self.base:SetAllPoints(rel or self.parent)
+    self:Relayout()
+end
+function Round:SetPoint(...)
+    self.base:SetPoint(...)
+    self:Relayout()
+end
+function Round:ClearAllPoints() self.base:ClearAllPoints() end
+function Round:SetSize(w, h)
+    self.base:SetSize(w, h)
+    self:Relayout()
+end
+function Round:SetWidth(w)
+    self.base:SetWidth(w)
+    self:Relayout()
+end
+function Round:SetHeight(h)
+    self.base:SetHeight(h)
+    self:Relayout()
+end
+function Round:GetWidth() return self.base:GetWidth() end
+function Round:GetHeight() return self.base:GetHeight() end
+function Round:SetShown(on)
+    self.shown = on and true or false
+    for _, t in ipairs(self.parts) do t:SetShown(self.shown and self.vis[t] ~= false) end
+end
+function Round:Show() self:SetShown(true) end
+function Round:Hide() self:SetShown(false) end
+function Round:IsShown() return self.shown end
+function Round:IsVisible() return self.shown and self.base:IsVisible() end
+function Round:SetAlpha(a)
+    for _, t in ipairs(self.parts) do t:SetAlpha(a) end
+end
+function Round:SetDrawLayer(layer, sub)
+    self.base:SetDrawLayer(layer, sub)
+    for _, t in ipairs(self.parts) do t:SetDrawLayer(layer, sub) end
+end
+
+-- like UI.Tex, slightly rounded (radius: `radius`, else UI.RADIUS); square in the classic style or with "none"
+function UI.RoundTex(parent, layer, color, alpha, sub, corners, radius)
+    local set = SETS[corners or "all"]
+    if not (UI.Rounded() and set) then return UI.Tex(parent, layer, color, alpha, sub) end
+    local o = setmetatable({ isRound = true, parent = parent, set = set, want = radius, parts = {}, corners = {},
+        vis = {}, shown = true }, Round)
+    layer = layer or "ARTWORK"
+    -- the rectangle itself: where the pieces go (never drawn)
+    o.base = parent:CreateTexture(nil, layer, nil, sub)
+    o.base:SetColorTexture(0, 0, 0, 0)
+    local function Piece(file)
+        local t = parent:CreateTexture(nil, layer, nil, sub)
+        t:SetTexture(file)
+        o.parts[#o.parts + 1] = t
+        return t
+    end
+    for _, key in ipairs(CORNERS) do
+        if set[key] then
+            local t = Piece(DISC)
+            t:SetTexCoord(unpack(QUARTER[key]))
+            t:SetPoint(key, o.base, key)
+            o.corners[key] = t
+        end
+    end
+    o.top, o.bottom, o.mid = Piece(WHITE), Piece(WHITE), Piece(WHITE)
+    o:SetColor(color or "bg1", alpha)
+    -- the frame it fills changes size: the radius follows
+    if parent.HookScript then parent:HookScript("OnSizeChanged", function() o:Layout() end) end
+    return o
+end
+
+-- a small round dot (a status light)
+function UI.Dot(parent, size, color, alpha, layer)
+    local t = parent:CreateTexture(nil, layer or "ARTWORK")
+    t:SetTexture(DISC)
+    t:SetSize(size or 7, size or 7)
+    t.tinted = true
+    UI.SetTexColor(t, color or "dim", alpha)
+    return t
 end
 
 -- vertical or horizontal fade from (color, a1) to (color, a2)
@@ -131,15 +326,65 @@ function UI.Gradient(tex, orientation, color, a1, a2, color2)
     tex:SetColorTexture(c1[1], c1[2], c1[3], (a1 + a2) / 2)
 end
 
-function UI.Fill(frame, color, alpha)
-    local t = UI.Tex(frame, "BACKGROUND", color, alpha, -8)
+function UI.Fill(frame, color, alpha, corners, radius)
+    local t = UI.RoundTex(frame, "BACKGROUND", color, alpha, -8, corners, radius)
     t:SetAllPoints()
     frame.bg = t
     return t
 end
 
--- 1px border of four textures
-function UI.Border(frame, color, alpha)
+-- 1px border, slightly rounded (see UI.RoundTex; "none": square)
+function UI.Border(frame, color, alpha, corners, radius)
+    local set = SETS[corners or "all"]
+    if UI.Rounded() and set then
+        local lines, rings, all = {}, {}, {}
+        for i = 1, 4 do
+            lines[i] = frame:CreateTexture(nil, "BORDER")
+            lines[i]:SetTexture(WHITE)
+            all[#all + 1] = lines[i]
+        end
+        for _, key in ipairs(CORNERS) do
+            if set[key] then
+                rings[key] = frame:CreateTexture(nil, "BORDER")
+                all[#all + 1] = rings[key]
+            end
+        end
+        local lastR
+        local function Layout()
+            local r = Fit(set, frame:GetWidth(), frame:GetHeight(), radius)
+            if r == lastR then return end
+            lastR = r
+            local tl, tr = set.TOPLEFT and r or 0, set.TOPRIGHT and r or 0
+            local bl, br = set.BOTTOMLEFT and r or 0, set.BOTTOMRIGHT and r or 0
+            local top, bottom, left, right = lines[1], lines[2], lines[3], lines[4]
+            top:ClearAllPoints(); top:SetPoint("TOPLEFT", tl, 0); top:SetPoint("TOPRIGHT", -tr, 0); top:SetHeight(1)
+            bottom:ClearAllPoints(); bottom:SetPoint("BOTTOMLEFT", bl, 0); bottom:SetPoint("BOTTOMRIGHT", -br, 0); bottom:SetHeight(1)
+            left:ClearAllPoints(); left:SetPoint("TOPLEFT", 0, -tl); left:SetPoint("BOTTOMLEFT", 0, bl); left:SetWidth(1)
+            right:ClearAllPoints(); right:SetPoint("TOPRIGHT", 0, -tr); right:SetPoint("BOTTOMRIGHT", 0, br); right:SetWidth(1)
+            for key, t in pairs(rings) do
+                t:SetTexture(Ring(r))
+                t:SetTexCoord(unpack(QUARTER[key]))
+                t:ClearAllPoints()
+                t:SetPoint(key)
+                if r > 0 then t:SetSize(r, r) end
+                t:SetShown(r > 0)
+            end
+        end
+        frame.border = all
+        function frame:SetBorderColor(c, a)
+            local cc = type(c) == "table" and c or C[c] or C.line
+            a = UI.Alpha(a or 1)
+            for _, t in ipairs(all) do t:SetVertexColor(cc[1], cc[2], cc[3], a) end
+        end
+        frame:SetBorderColor(color or "line", alpha or 1)
+        Layout()
+        if frame.HookScript then frame:HookScript("OnSizeChanged", Layout) end
+        C_Timer.After(0, function()
+            lastR = nil
+            Layout()
+        end)
+        return all
+    end
     local b = {}
     for i = 1, 4 do b[i] = UI.Tex(frame, "BORDER", color or "line", alpha or 1) end
     b[1]:SetPoint("TOPLEFT"); b[1]:SetPoint("TOPRIGHT"); b[1]:SetHeight(1)
@@ -175,6 +420,7 @@ function UI.EdgeTemplate()
     return (UI.theme == "classic" and BackdropTemplateMixin) and "BackdropTemplate" or nil
 end
 
+-- a filled frame with a border (border false: none), slightly rounded
 function UI.Panel(parent, color, border)
     local f = CreateFrame("Frame", nil, parent, border ~= false and UI.EdgeTemplate() or nil)
     UI.Fill(f, color or "bg1")

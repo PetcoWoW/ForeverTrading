@@ -12,6 +12,22 @@ FT.News = N
 -- start, after the files are read (a table made with them would keep the English)
 local function News()
     return {
+        ["v1.1.2"] = {
+            { L["Blackwater apart"], L["The neutral auction house keeps its own prices, history, deals and your auctions: a scan there doesn't touch your faction's. Talking to an auctioneer picks its house; the chip next to the auction house status switches whose prices you see, the pencil on it puts a wrong auction house right."],
+                nil },
+            { L["Between the auction houses"], L["Signals > Deals > Between houses: cheaper at one auction house than the other sells it for - buy, carry it over, list it there; each house's cut counted, no more than sells there in two days."],
+                function() FT.Show("signals"); FT.Tabs.signals.SetView("deals"); FT.Tabs.signals.SetDealKind("HOUSES") end },
+            { L["Item windows"], L["More opens up to four item windows at once - two items side by side. Each has a compact mode (the charts alone) and its own auction house."],
+                nil },
+            { L["A faster exchange"], L["Prices go three times as fast between two players with 1.1.2 (three lanes at once). Exchange pressed again stops it; what has come stays."],
+                nil },
+            { L["Deals on any computer"], L["Signals > Deals asks the game for what vendors pay (a new computer or game knows hardly any), and says why there are none: old prices, too little history, the minimum profit."],
+                function() FT.Show("signals"); FT.Tabs.signals.SetView("deals") end },
+            { L["A tidier look"], L["Choices are one framed switch, tinted buttons have an edge, corners are slightly rounded, rows and filters line up; the light style shows hovered and chosen rows."],
+                nil },
+            { L["Fixes"], L["The deals journal counts what was sold (Forever's letters say 0) and keeps up with Collect all; no exchange during your own scan; the Settings columns stay; the ticker shows the market's most valuable listings while there are no moves yet."],
+                nil },
+        },
         ["v1.1.1"] = {
             { L["Good deals"], L["Signals > Deals: what to buy right now for a profit - under what a vendor pays, or far under the fair price on a steady market."],
                 function() FT.Show("signals"); FT.Tabs.signals.SetView("deals") end },

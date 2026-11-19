@@ -489,7 +489,7 @@ function T.UpdateSummary()
     local can = FT.Sell.Possible() and unit and unit > 0 and qty > 0 and not FT.Sell.Busy() and not FT.Buy.Busy()
     f.post:SetUsable(can and true or false)
     if not FT.Sell.Possible() then
-        f.post:SetTip(L["Post"], L["Talk to an auctioneer to sell."])
+        f.post:SetTip(L["Post"], FT.House.Why(L["Talk to an auctioneer to sell."]))
     else
         f.post:SetTip(L["Post"], L["Post asks once more with everything before anything happens."])
     end
@@ -745,7 +745,7 @@ function T.BuildOwnedList(panel)
     ownButtons:SetPoint("BOTTOMRIGHT", -10, 8)
     ownButtons:SetHeight(24)
     ownButtons.refresh = UI.Button(ownButtons, L["Refresh"], 10, 24, "default", function()
-        if not FT.Owned.Query() then FT.Print(L["Talk to an auctioneer to see your auctions as they are now."]) end
+        if not FT.Owned.Query() then FT.Print(FT.House.Why(L["Talk to an auctioneer to see your auctions as they are now."])) end
     end)
     ownButtons.refresh:FitText(24)
     ownButtons.refresh:SetPoint("LEFT", 0, 0)
@@ -930,7 +930,7 @@ function T.ShowOwned()
     f.cancel:SetLabel(FT.Owned.Blocked() and L["Cancel in the game's window"] or L["Cancel the auction"])
     f.cancel:FitText(36)
     if not FT.Owned.Possible() then
-        f.cancel:SetTip(L["Cancel the auction"], L["Talk to an auctioneer to cancel."])
+        f.cancel:SetTip(L["Cancel the auction"], FT.House.Why(L["Talk to an auctioneer to cancel."]))
     elseif FT.Owned.Blocked() then
         f.cancel:SetTip(L["Cancel in the game's window"], L["WoW Forever lets only its own auction house window cancel auctions: open its Auctions tab and cancel there."])
     else

@@ -78,13 +78,15 @@ local function LayoutPages()
     end
 end
 
--- the brand: in the compact window only the coin (the pages need the room)
+-- the brand: its name only in the full-screen window, else the coin (the pages' names need the room); in the
+-- compact window the auction house pill is its light alone
 function FT.LayoutBrand()
     if not brand then return end
-    local compact = FT.Compact()
-    for _, w in ipairs(brand.words) do w:SetShown(not compact) end
+    local roomy = FT.WindowMaximized()
+    for _, w in ipairs(brand.words) do w:SetShown(roomy) end
+    FT.UpdateAHPill()
     brand.pill:ClearAllPoints()
-    if compact then
+    if not roomy then
         brand.pill:SetPoint("LEFT", brand.logo, "RIGHT", 10, 0)
     else
         brand.pill:SetPoint("LEFT", brand.words[2], "RIGHT", 16, 0)
@@ -123,13 +125,13 @@ local function BuildSizeButtons(header, anchor)
         b:SetSize(24, 24)
         b:SetPoint("LEFT", (i - 1) * 26, 0)
         b.mode = mode
-        b.hover = UI.Tex(b, "BACKGROUND", "bg2", 1)
+        b.hover = UI.RoundTex(b, "BACKGROUND", "bg2", 1)
         b.hover:SetAllPoints()
         b.hover:Hide()
         b.box = CreateFrame("Frame", nil, b)
         b.box:SetSize(frames[mode][1], frames[mode][2])
         b.box:SetPoint("CENTER")
-        UI.Border(b.box, "muted")
+        UI.Border(b.box, "muted", nil, "none")
         b.fill = UI.Tex(b.box, "ARTWORK", "accent", 0.25)
         b.fill:SetAllPoints()
         b:SetScript("OnEnter", function(self)
@@ -154,7 +156,7 @@ end
 local function BuildTicker(parent)
     local t = CreateFrame("Frame", nil, parent)
     t:SetHeight(26)
-    UI.Fill(t, "bg1")
+    UI.Fill(t, "bg1", nil, "none")
     if t.SetClipsChildren then pcall(t.SetClipsChildren, t, true) end
     t.entries = {}
     t.speed = 28
@@ -257,22 +259,29 @@ function FT.UpdateTicker()
             seen[id] = true
         end
     end
+    local movers = 0
     for _, r in ipairs(FT.Market.Movers(8, "ch1", true)) do
         if not seen[r.id] and r.ch1 > 0 then
             list[#list + 1] = { id = r.id, text = TickerText(r.id, r.price, r.ch1) }
             seen[r.id] = true
+            movers = movers + 1
         end
     end
     for _, r in ipairs(FT.Market.Movers(8, "ch1", false)) do
         if not seen[r.id] and r.ch1 < 0 then
             list[#list + 1] = { id = r.id, text = TickerText(r.id, r.price, r.ch1) }
             seen[r.id] = true
+            movers = movers + 1
         end
     end
-    if #list == 0 then
-        -- no moves known yet (the first days): the most valuable listings
+    if movers == 0 then
+        -- no moves known yet (the first days of prices - of this auction house too): the most valuable listings,
+        -- after the watchlist
         for _, r in ipairs(FT.Market.TopByValue(14)) do
-            list[#list + 1] = { id = r.id, text = TickerText(r.id, r.price, r.ch1) }
+            if not seen[r.id] then
+                list[#list + 1] = { id = r.id, text = TickerText(r.id, r.price, r.ch1) }
+                seen[r.id] = true
+            end
         end
     end
     if #list == 0 then
@@ -334,7 +343,10 @@ local function BuildScanBox(header, anchor, closeButton)
     f.full = UI.Button(f, L["Full scan"], 10, 24, "primary", function() FT.Scanner.StartFull() end)
     f.full:FitText(24)
     f.full:SetPoint("RIGHT", f.mine, "LEFT", -6, 0)
-    f.share = UI.Button(f, L["Exchange"], 10, 24, "default", function() FT.Share.Ask(true) end)
+    -- pressed again while it runs: it stops
+    f.share = UI.Button(f, L["Exchange"], 10, 24, "default", function()
+        if FT.Share.Status() then FT.Share.Stop() else FT.Share.Ask(true) end
+    end)
     f.share:FitText(24)
     f.share.text = L["Exchange"]
     f.share:SetTip(L["Price exchange"], L["Ask ForeverTrading users in your guild and group for fresher prices of the whole market. Works anywhere, no auction house needed. (Settings > Exchange: by itself when your prices are more than an hour old.)"])
@@ -344,7 +356,7 @@ local function BuildScanBox(header, anchor, closeButton)
     f.bar = CreateFrame("Frame", nil, f)
     f.bar:SetSize(160, 4)
     f.bar:SetPoint("BOTTOMRIGHT", f.stop, "BOTTOMLEFT", -10, 3)
-    UI.Fill(f.bar, "bg3")
+    UI.Fill(f.bar, "bg3", nil, "none")
     f.fill = UI.Tex(f.bar, "ARTWORK", "accent", 1)
     f.fill:SetPoint("TOPLEFT")
     f.fill:SetPoint("BOTTOMLEFT")
@@ -369,16 +381,16 @@ function FT.UpdateScanBox()
     local S = FT.Scanner
     local mode = S.mode
     local running = mode ~= nil
-    local compact = FT.Compact()
-    -- Full scan is always there (during My items it takes over - not in the compact window: no room next to
-    -- the progress); My items while nothing runs
-    f.full:SetShown(mode ~= "full" and not (compact and running))
+    -- only the full-screen window has room for Full scan and Exchange next to a running scan's progress (during
+    -- My items Full scan takes over there); My items while nothing runs
+    local roomy = SizeMode() == "max"
+    local crowded = running and not roomy
+    f.full:SetShown(mode ~= "full" and not crowded)
     f.mine:SetShown(not running)
     f.stop:SetShown(running)
     f.bar:SetShown(running)
     f.text:SetShown(running)
     -- the scan status next to it: only in the full-screen window (the status bar at the bottom has it too)
-    local roomy = SizeMode() == "max"
     scanText:SetShown(not running and roomy)
     scanDot:SetShown(not running and roomy)
     f:ClearAllPoints()
@@ -412,8 +424,18 @@ function FT.UpdateScanBox()
         f.share:FitText(24)
     end
     f.share:SetActive(kind ~= nil)
-    -- the compact window has no room for it next to a running scan
-    f.share:SetShown(not (compact and running))
+    if (kind ~= nil) ~= f.share.running then
+        f.share.running = kind ~= nil
+        if kind then
+            f.share:SetTip(L["Price exchange"], L["Click: stop the exchange. What has come stays."])
+        else
+            f.share:SetTip(L["Price exchange"], L["Ask ForeverTrading users in your guild and group for fresher prices of the whole market. Works anywhere, no auction house needed. (Settings > Exchange: by itself when your prices are more than an hour old.)"])
+        end
+        -- the tooltip on screen follows
+        if GameTooltip:IsOwned(f.share) and f.share:GetScript("OnEnter") then f.share:GetScript("OnEnter")(f.share) end
+    end
+    -- no room for it next to a running scan but in the full-screen window
+    f.share:SetShown(not crowded)
     f.share:ClearAllPoints()
     if f.full:IsShown() then
         f.share:SetPoint("RIGHT", f.full, "LEFT", -6, 0)
@@ -457,7 +479,7 @@ local function Build()
     header:SetPoint("TOPLEFT", UI.INSET, -UI.INSET)
     header:SetPoint("TOPRIGHT", -UI.INSET, -UI.INSET)
     header:SetHeight(44)
-    UI.Fill(header, "bg0")
+    UI.Fill(header, "bg0", nil, "top", UI.RADIUS - UI.INSET)
     header:EnableMouse(true)
     header:RegisterForDrag("LeftButton")
     header:SetScript("OnDragStart", function()
@@ -490,8 +512,10 @@ local function Build()
     local pill = FT.BuildAHPill(header)
     brand = { logo = logo, words = { brand1, brand2 }, pill = pill }
     FT.LayoutBrand()
+    local houseChip = FT.BuildHouseChip(header)
+    houseChip:SetPoint("LEFT", pill, "RIGHT", 6, 0)
     nav = UI.NavTabs(header, items, function(key) FT.SelectTab(key) end)
-    nav:SetPoint("LEFT", pill, "RIGHT", 14, 0)
+    nav:SetPoint("LEFT", houseChip, "RIGHT", 14, 0)
 
     local close = UI.Button(header, "×", 30, 30, "ghost", function() win:Hide() end)
     close.label:SetFont(UI.FONT, 18, "")
@@ -503,7 +527,7 @@ local function Build()
     gearBtn = CreateFrame("Button", nil, header)
     gearBtn:SetSize(28, 28)
     gearBtn:SetPoint("RIGHT", sizes, "LEFT", -6, 0)
-    gearBtn.hover = UI.Tex(gearBtn, "BACKGROUND", "bg2", 1)
+    gearBtn.hover = UI.RoundTex(gearBtn, "BACKGROUND", "bg2", 1)
     gearBtn.hover:SetAllPoints()
     gearBtn.hover:Hide()
     gearBtn.gear = UI.Gear(gearBtn, 18, "muted")
@@ -528,13 +552,12 @@ local function Build()
 
     scanText = UI.Text(header, 11, "muted", "RIGHT")
     scanText:SetPoint("RIGHT", gearBtn, "LEFT", -14, 0)
-    scanDot = UI.Tex(header, "OVERLAY", "dim", 1)
-    scanDot:SetSize(7, 7)
+    scanDot = UI.Dot(header, 7, "dim", 1, "OVERLAY")
     scanDot:SetPoint("RIGHT", scanText, "LEFT", -7, 0)
     BuildScanBox(header, scanDot, gearBtn)
     FT.UpdateScanBox()
     -- what the tour points at
-    FT.MainRefs = { nav = nav, pill = pill, gear = gearBtn, scan = scanBox }
+    FT.MainRefs = { nav = nav, pill = pill, house = houseChip, gear = gearBtn, scan = scanBox }
 
     -- ticker tape
     ticker = BuildTicker(win)
@@ -550,7 +573,7 @@ local function Build()
     status:SetPoint("BOTTOMLEFT", UI.INSET, UI.INSET)
     status:SetPoint("BOTTOMRIGHT", -UI.INSET, UI.INSET)
     status:SetHeight(22)
-    UI.Fill(status, "bg1")
+    UI.Fill(status, "bg1", nil, "bottom", UI.RADIUS - UI.INSET)
     local sl = UI.HLine(status, "line")
     sl:SetPoint("TOPLEFT")
     sl:SetPoint("TOPRIGHT")
@@ -790,27 +813,37 @@ end
 function FT.UpdateAHPill()
     if not pill then return end
     local online = FT.ahOpen and true or false
-    UI.SetTexColor(pill.dot, online and "up" or "dim", 1)
-    UI.SetTextColor(pill.text, online and "up" or "dim")
-    pill.text:SetText(online and L["AH: online"] or L["AH: offline"])
-    pill:SetWidth(math.ceil(pill.text:GetStringWidth()) + 30)
+    -- at an auction house, the other house's prices on: offline here, a yellow light
+    local elsewhere = FT.ahHere and not online
+    UI.SetTexColor(pill.dot, online and "up" or (elsewhere and "accent" or "dim"), 1)
+    UI.SetTextColor(pill.text, online and "up" or (elsewhere and "accent" or "dim"))
+    if FT.Compact() then
+        pill.text:SetText("")
+        pill:SetWidth(25)
+    else
+        pill.text:SetText(online and L["AH: online"] or L["AH: offline"])
+        pill:SetWidth(math.ceil(pill.text:GetStringWidth()) + 30)
+    end
 end
 
 function FT.BuildAHPill(header)
     pill = CreateFrame("Button", nil, header)
     pill:SetHeight(22)
-    pill.bg = UI.Tex(pill, "BACKGROUND", "bg2", 1)
+    pill.bg = UI.RoundTex(pill, "BACKGROUND", "bg2", 1)
     pill.bg:SetAllPoints()
     UI.Border(pill, "line")
-    pill.dot = UI.Tex(pill, "ARTWORK", "dim", 1)
-    pill.dot:SetSize(7, 7)
+    pill.dot = UI.Dot(pill, 7, "dim", 1)
     pill.dot:SetPoint("LEFT", 9, 0)
     pill.text = UI.Text(pill, 11, "dim")
     pill.text:SetPoint("LEFT", pill.dot, "RIGHT", 6, 0)
     pill:SetScript("OnClick", function() FT.ToggleAHWindow() end)
     pill:SetScript("OnEnter", function(self)
         UI.SetTexColor(self.bg, "bg3", 1)
-        if not FT.ahOpen then
+        local H = FT.House
+        if FT.ahHere and not FT.ahOpen then
+            UI.TipText(self, L["Auction house: offline"], string.format(L["You stand at %s, the prices of %s are on: nothing is read here, bought or posted. The chip next to it switches back."],
+                H.Name(FT.atHouse), H.Name()))
+        elseif not FT.ahOpen then
             UI.TipText(self, L["Auction house: offline"], L["Talk to an auctioneer. Until then: the last known prices."])
         elseif ahHidden then
             UI.TipText(self, L["Auction house: online"], L["The game's auction house window is hidden behind ForeverTrading. Click: show it (buying, selling, Auctionator)."])
@@ -826,9 +859,131 @@ function FT.BuildAHPill(header)
     return pill
 end
 
+-- Which auction house (House.lua): your faction's or Blackwater - whose prices the pages show. Coloured by it. One
+-- in the header, one in every item window: they all follow.
+local chips = {}
+local HOUSE_COLORS = { Alliance = "blue", Horde = "down", Neutral = "accent" }
+
+local function UpdateChip(c)
+    local house = c.get and c.get() or FT.house
+    local color = HOUSE_COLORS[FT.House.Faction(house)] or "accent"
+    UI.SetTexColor(c.dot, color, 1)
+    c.text:SetText(FT.House.Name(house))
+    -- the pencil: the header's only (the auction house you stand at is the whole addon's)
+    local fix = FT.ahHere == true and not c.own
+    c.fix:SetShown(fix)
+    c.sep:SetShown(fix)
+    c:SetWidth(math.ceil(c.text:GetStringWidth()) + 30 + (fix and 22 or 0))
+end
+
+function FT.UpdateHouseChip()
+    for _, c in ipairs(chips) do UpdateChip(c) end
+end
+
+-- a small pencil drawn with lines
+local function Pencil(parent, size)
+    local f = CreateFrame("Frame", nil, parent)
+    f:SetSize(size, size)
+    f.lines = { UI.NewLine(f, "OVERLAY"), UI.NewLine(f, "OVERLAY"), UI.NewLine(f, "OVERLAY") }
+    function f:SetColor(c)
+        local sz = self:GetWidth()
+        UI.PlaceLine(self.lines[1], sz * 0.30, sz * 0.30, sz * 0.72, sz * 0.72, sz * 0.22, c) -- the body
+        UI.PlaceLine(self.lines[2], sz * 0.12, sz * 0.12, sz * 0.27, sz * 0.27, sz * 0.10, c) -- the tip
+        UI.PlaceLine(self.lines[3], sz * 0.78, sz * 0.78, sz * 0.90, sz * 0.90, sz * 0.22, c) -- the end
+    end
+    f:SetColor("muted")
+    return f
+end
+
+-- opts (an item window's own house): get() - its house, toggle() - to the other; no pencil
+function UI.HouseChip(parent, opts)
+    local c = CreateFrame("Button", nil, parent)
+    opts = opts or {}
+    c.get, c.toggle, c.own = opts.get, opts.toggle, opts.get ~= nil
+    function c:Update() UpdateChip(self) end
+    c:SetHeight(22)
+    c.bg = UI.RoundTex(c, "BACKGROUND", "bg2", 1)
+    c.bg:SetAllPoints()
+    UI.Border(c, "line")
+    c.dot = UI.Dot(c, 7, "accent", 1)
+    c.dot:SetPoint("LEFT", 9, 0)
+    c.text = UI.Text(c, 11, "muted")
+    c.text:SetPoint("LEFT", c.dot, "RIGHT", 6, 0)
+    c:SetScript("OnClick", function(self)
+        if self.toggle then self.toggle() else FT.House.Toggle() end
+    end)
+    c:SetScript("OnEnter", function(self)
+        UI.SetTexColor(self.bg, "bg3", 1)
+        local H = FT.House
+        local house = self.get and self.get() or FT.house
+        local other = H.Name(house == "neutral" and "faction" or "neutral")
+        local text
+        if self.own then
+            text = string.format(L["Whose prices this window shows, whatever the main window and the other windows show. Click: %s."], other)
+        else
+            text = string.format(L["Whose prices the pages show: your faction's auction house or Blackwater, the neutral one shared by both factions. Each keeps its own prices, history, deals and your auctions. Click: %s."], other)
+            if FT.ahHere then
+                text = text .. "\n\n" .. string.format(L["You stand at %s: online while its prices are on, offline with the other's."], H.Name(FT.atHouse))
+            end
+        end
+        UI.TipText(self, string.format(L["Auction house: %s"], H.Name(house)), text)
+    end)
+    c:SetScript("OnLeave", function(self)
+        UI.SetTexColor(self.bg, "bg2", 1)
+        GameTooltip:Hide()
+    end)
+    -- at an auctioneer: the pencil - this auction house is the other one
+    c.sep = UI.VLine(c, "line")
+    c.sep:SetPoint("TOPRIGHT", -22, -4)
+    c.sep:SetPoint("BOTTOMRIGHT", -22, 4)
+    c.fix = CreateFrame("Button", nil, c)
+    c.fix:SetSize(20, 20)
+    c.fix:SetPoint("RIGHT", -1, 0)
+    c.fix.icon = Pencil(c.fix, 12)
+    c.fix.icon:SetPoint("CENTER")
+    c.fix:SetScript("OnClick", function() FT.House.Fix() end)
+    c.fix:SetScript("OnEnter", function(self)
+        self.icon:SetColor("text")
+        local H = FT.House
+        local here = FT.atHouse or "faction"
+        UI.TipText(self, L["Wrong auction house?"], string.format(L["Click if this auctioneer is of %s, not %s: ForeverTrading puts it right and remembers it for the auctioneers here."],
+            H.Name(here == "neutral" and "faction" or "neutral"), H.Name(here)))
+    end)
+    c.fix:SetScript("OnLeave", function(self)
+        self.icon:SetColor("muted")
+        GameTooltip:Hide()
+    end)
+    chips[#chips + 1] = c
+    UpdateChip(c)
+    return c
+end
+
+function FT.BuildHouseChip(header)
+    return UI.HouseChip(header)
+end
+
+FT.On("FT_LOGIN", function() FT.UpdateHouseChip() end)
+-- at an auctioneer or not (the pencil), online or not (the pill)
+FT.On("FT_AH_CHANGED", function()
+    FT.UpdateHouseChip()
+    FT.UpdateAHPill()
+end)
+FT.On("FT_HOUSE_CHANGED", function()
+    FT.UpdateHouseChip()
+    FT.UpdateAHPill()
+    if pill and GameTooltip:IsOwned(pill) then pill:GetScript("OnEnter")(pill) end
+    for _, c in ipairs(chips) do
+        if GameTooltip:IsOwned(c) then c:GetScript("OnEnter")(c) end
+    end
+    if FT.IsShown() then
+        FT.UpdateScanBox()
+        Later()
+    end
+end)
+
 -- the game's window or ours in front, while you are at the auction house
 function FT.ToggleAHWindow()
-    if not FT.ahOpen then return end
+    if not FT.ahHere then return end
     if ahHidden then
         ShowAHWindow()
     else
@@ -841,12 +996,12 @@ end
 
 -- the game's window on the screen (when it was hidden behind ForeverTrading)
 function FT.ShowGameAH()
-    if FT.ahOpen and ahHidden then ShowAHWindow() end
+    if FT.ahHere and ahHidden then ShowAHWindow() end
 end
 
 -- the terminal closed with the game's window hidden: the visit ends (no unseen auction house left open)
 function FT.LeaveAH()
-    if not (ahHidden and FT.ahOpen) then return end
+    if not (ahHidden and FT.ahHere) then return end
     local f = AHFrame()
     ShowAHWindow()
     if f and HideUIPanel then
@@ -858,7 +1013,7 @@ end
 
 -- in place of the game's window: hidden, ours shown
 local function Replace()
-    if not (FT.ahOpen and FT.S.replaceAH) then return end
+    if not (FT.ahHere and FT.S.replaceAH) then return end
     -- ours first (made now the first time), then the game's hidden
     FT.Show()
     HookPanels()
@@ -872,7 +1027,7 @@ local function KeepReplaced()
     for _, delay in ipairs({ 0.15, 0.4, 0.8, 1.3, 2 }) do
         C_Timer.After(delay, function()
             local f = AHFrame()
-            if not (ahHidden and f and FT.ahOpen) then return end
+            if not (ahHidden and f and FT.ahHere) then return end
             local left = f:GetLeft()
             if f:GetAlpha() > 0.05 or (left and left > -10) then OffScreen(f) end
         end)
@@ -909,6 +1064,7 @@ FT.On("AUCTION_HOUSE_CLOSED", function()
     -- the game closed its window: back in place for the next time
     ShowAHWindow()
     FT.UpdateAHPill()
+    FT.UpdateHouseChip()
 end)
 FT.On("FT_MARKET_READY", function()
     if FT.IsShown() then

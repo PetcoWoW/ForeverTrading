@@ -24,12 +24,26 @@ local function MakeSteps() return {
     { title = L["The auction house"],
       text = L["Green while you are at an auctioneer: the item you have open is searched again every few seconds, and you can buy, post and cancel right here. Click: the game's own auction house window."],
       target = function() return FT.MainRefs and FT.MainRefs.pill end },
+    { title = L["Which auction house"],
+      text = L["Your faction's or Blackwater, the neutral one: each keeps its own prices. Talking to an auctioneer picks its house; a click shows the other one's prices (at an auctioneer: offline there). The pencil: this auctioneer is of the other house."],
+      target = function() return FT.MainRefs and FT.MainRefs.house end },
     { title = L["Scan and exchange"],
       text = L["Full scan: the prices of the whole market in a couple of minutes (at an auctioneer). Exchange: fresh prices from ForeverTrading users in your guild and group, anywhere."],
       target = function() return FT.MainRefs and FT.MainRefs.scan end },
     { title = L["Market"], tab = "market",
       text = L["Search by name (in quotes: that name exactly), categories, filters as at the auction house. Click an item: its chart, signals and order book; right-click: watchlist."],
       target = function() return Tab("market").listPanel end },
+    { title = L["Item windows"], tab = "market",
+      -- an item open on the Market (the first of the list when none is): its More button
+      prep = function()
+          local M = Tab("market")
+          if not M.Selected() then
+              local rows = FT.Market.Rows()
+              if rows and rows[1] then M.Select(rows[1].id) end
+          end
+      end,
+      text = L["More: the item in a window of its own - up to four at once, two items side by side. Each window has its own auction house (its chip) and a compact mode with the charts alone."],
+      target = function() return Tab("market").more end },
     { title = L["The order book"], tab = "market",
       text = L["Every listing by price, how many, by how many sellers. Click a price: how many to buy; Buy: at an auctioneer, at the server's exact price."],
       target = function() return Tab("market").book end },
@@ -37,7 +51,7 @@ local function MakeSteps() return {
       text = L["What each recipe costs with its cheapest materials (auction house, vendor or crafting it yourself), what it brings, its risks. Queue: the materials to buy for several crafts at once."],
       target = function() return Tab("craft").viewSeg end },
     { title = L["Signals and deals"], tab = "signals", prep = function() Tab("signals").SetView("signals") end,
-      text = L["What to sell, craft and buy now, your auctions undercut, risky recipes. Deals: what to buy right now for a profit - under what a vendor pays, or far under the fair price."],
+      text = L["What to sell, craft and buy now, your auctions undercut, risky recipes. Deals: what to buy right now for a profit - under what a vendor pays, far under the fair price, or cheaper than the other auction house sells it for."],
       target = function() return Tab("signals").viewSeg end },
     { title = L["Selling"], tab = "sell", prep = function() Tab("sell").SetView("bags") end,
       text = L["Your bags at market prices: a copper under the lowest, the deposit, the cut, and warnings. My auctions: who undercut you, and whether to wait or post again."],
@@ -131,7 +145,7 @@ local function Build()
     note.back = UI.Button(note, L["Back"], 10, 24, "default", function() TR.Go(step - 1, -1) end)
     note.back:FitText(24)
     note.back:SetPoint("RIGHT", note.next, "LEFT", -8, 0)
-    note.skip = UI.Button(note, L["End the tour"], 10, 24, "ghost", function() overlay:Hide() end)
+    note.skip = UI.Button(note, L["End the tour"], 10, 24, "default", function() overlay:Hide() end)
     note.skip:FitText(16)
     note.skip:SetPoint("BOTTOMLEFT", 8, 12)
     -- it follows the window (moved, resized, a page laid out)

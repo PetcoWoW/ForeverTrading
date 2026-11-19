@@ -4,7 +4,7 @@ local L = FT.L
 
 -- The version being released: a copy straight from the repository (not packaged) has no version in its TOC yet
 -- (the packager puts the tag there) and shows this one. Set it with every release.
-local RELEASE = "v1.1.1"
+local RELEASE = "v1.1.2"
 local GetMeta = (C_AddOns and C_AddOns.GetAddOnMetadata) or GetAddOnMetadata
 FT.VERSION = (GetMeta and GetMeta(ADDON, "Version")) or RELEASE
 if FT.VERSION == "" or FT.VERSION:find("@", 1, true) then FT.VERSION = RELEASE end
@@ -155,9 +155,14 @@ function FT.SideKey()
     return FT.ServerOf(realm) .. "-" .. tostring(faction)
 end
 
--- Data of this server and faction (snapshots, order books, scan log)
-function FT.R()
-    local key = FT.sideKey or FT.SideKey()
+-- the data key of an auction house: your faction's is the server and side (as always); Blackwater, the neutral
+-- one, is shared by both factions
+function FT.HouseKey(house)
+    if house == "neutral" then return FT.ServerOf(GetRealmName and GetRealmName() or "?") .. "-Neutral" end
+    return FT.sideKey or FT.SideKey()
+end
+
+local function Realm(key)
     local realms = FT.db.realms
     local r = realms[key]
     if not r then
@@ -171,6 +176,16 @@ function FT.R()
     r.today = r.today or {}
     r.meta = r.meta or {}
     return r
+end
+
+-- Data of the auction house on (snapshots, order books, scan log, sales): your faction's or Blackwater (House.lua)
+function FT.R()
+    return Realm(FT.houseKey or FT.sideKey or FT.SideKey())
+end
+
+-- Data of this server and side whichever the auction house (the deals journal, the craft queue, users met)
+function FT.Side()
+    return Realm(FT.sideKey or FT.SideKey())
 end
 
 local function InitDB()
@@ -427,12 +442,13 @@ function FT.Name(itemID)
     return NameBook()[itemID]
 end
 
--- The auction house's cut of a sale, a fraction: as the last letter of a sale told it (its cut over its price -
--- it isn't the same everywhere now), else 5%
-function FT.Cut()
-    local c = FT.db and FT.db.cutSeen
+-- The auction house's cut of a sale, a fraction: as the last letter of a sale of that house (the one on when not
+-- said) told it (its cut over its price - it isn't the same everywhere now), else 5% (Blackwater: 15%)
+function FT.Cut(house)
+    local neutral = (house or FT.house) == "neutral"
+    local c = FT.db and (neutral and FT.db.cutSeenNeutral or FT.db.cutSeen)
     if type(c) == "table" and type(c.rate) == "number" and c.rate >= 0 and c.rate < 0.5 then return c.rate end
-    return 0.05
+    return neutral and 0.15 or 0.05
 end
 
 -- name -> item, of every item name seen (in this game language; of two items with one name, one of them)
@@ -597,6 +613,9 @@ FT.On("PLAYER_LOGIN", function()
     FT.sideKey = FT.SideKey()
     local c = FT.db.chars[FT.charKey] or {}
     FT.db.chars[FT.charKey] = c
+    -- the auction house whose prices this character looked at last (talking to an auctioneer picks its own)
+    FT.house = (c.house == "neutral") and "neutral" or "faction"
+    FT.houseKey = FT.HouseKey(FT.house)
     c.name = UnitName("player")
     c.realm = GetRealmName()
     c.server = FT.ServerOf(c.realm)
@@ -649,7 +668,13 @@ SlashCmdList.FOREVERTRADING = function(msg)
     elseif cmd == "stop" then
         FT.Scanner.Stop("user")
     elseif cmd == "share" or cmd == "exchange" then
-        if rest == "test" then FT.Share.Test() else FT.Share.Ask(true) end
+        if rest == "test" then
+            FT.Share.Test()
+        elseif rest == "stop" then
+            FT.Share.Stop()
+        else
+            FT.Share.Ask(true)
+        end
     elseif cmd == "news" then
         FT.News.Show()
     elseif cmd == "tour" then

@@ -244,7 +244,8 @@ function T.Build(p)
     local clear = UI.Button(dt, L["Clear history"], 10, 24, "down", function()
         UI.Confirm({
             title = L["Clear history"],
-            text = L["Clear ForeverTrading's price history (day candles, intraday, order books) of this server? Auctionator's and Mastercraft's own data stay."],
+            text = string.format(L["Clear ForeverTrading's price history (day candles, intraday, order books) of this server's auction house: %s? The other auction house's, Auctionator's and Mastercraft's data stay."],
+                FT.House.Name()),
             ok = L["Clear history"],
             okStyle = "down",
             onOK = function()
@@ -296,20 +297,40 @@ function T.Build(p)
         end
         return -y
     end
-    UI.OnSize(content, function(self, w)
+    -- two columns as wide as the page is now. A window changing size passes through sizes on the way (down to
+    -- nothing): those are let go, and it is laid out again once the window has settled. The scroll stays inside
+    -- the page (never sideways, never past the end).
+    local function Layout()
+        local w = scroll:GetWidth()
+        if not w or w < 200 then return end
         local cw = math.floor((w - 10) / 2)
+        content:SetWidth(w)
         left:ClearAllPoints()
-        left:SetPoint("TOPLEFT", 0, 0)
+        left:SetPoint("TOPLEFT", content, "TOPLEFT", 0, 0)
         left:SetWidth(cw)
         right:ClearAllPoints()
-        right:SetPoint("TOPLEFT", cw + 10, 0)
+        right:SetPoint("TOPLEFT", content, "TOPLEFT", cw + 10, 0)
         right:SetWidth(cw)
         local h1 = Stack(left, { g, sc, so, pr, al })
         local h2 = Stack(right, { sg, ex, dt, ab })
         left:SetHeight(h1)
         right:SetHeight(h2)
-        self:SetHeight(math.max(h1, h2))
-    end)
+        content:SetHeight(math.max(h1, h2))
+        if scroll.SetHorizontalScroll then scroll:SetHorizontalScroll(0) end
+        local maxS = math.max(0, content:GetHeight() - scroll:GetHeight())
+        if scroll:GetVerticalScroll() > maxS then scroll:SetVerticalScroll(maxS) end
+        if scroll.UpdateScrollChildRect then scroll:UpdateScrollChildRect() end
+    end
+    local function Settled()
+        Layout()
+        C_Timer.After(0, Layout)
+        C_Timer.After(0.2, Layout)
+    end
+    scroll:HookScript("OnSizeChanged", Settled)
+    p:HookScript("OnShow", Settled)
+    -- the window's size mode changed (compact, standard, full screen)
+    T.OnLayout = Settled
+    Layout()
 end
 
 function T.Refresh()

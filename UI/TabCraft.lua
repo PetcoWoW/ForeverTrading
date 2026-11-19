@@ -596,14 +596,14 @@ local SOURCE_NAMES = { ah = "auction house", vendor = "vendor", ["vendor~"] = "v
 local function CraftsCell(row)
     local f = CreateFrame("Frame", nil, row)
     f:SetSize(104, 22)
-    f.minus = UI.Button(f, "-", 22, 20, "ghost", function()
+    f.minus = UI.Button(f, "-", 22, 20, "default", function()
         if f.x then FT.Queue.Add(f.x.r.key, IsShiftKeyDown() and -5 or -1) end
     end)
     f.minus:SetPoint("LEFT", 0, 0)
     f.text = UI.Text(f, 12, "text", "CENTER")
     f.text:SetPoint("LEFT", f.minus, "RIGHT", 2, 0)
     f.text:SetWidth(52)
-    f.plus = UI.Button(f, "+", 22, 20, "ghost", function()
+    f.plus = UI.Button(f, "+", 22, 20, "default", function()
         if f.x then FT.Queue.Add(f.x.r.key, IsShiftKeyDown() and 5 or 1) end
     end)
     f.plus:SetPoint("LEFT", f.text, "RIGHT", 2, 0)

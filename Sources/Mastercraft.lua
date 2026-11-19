@@ -51,8 +51,9 @@ function MC.EachRecipe(fn)
     end
 end
 
--- Mastercraft's price book for this server and faction
+-- Mastercraft's price book for this server and faction (of your faction's auction house: not Blackwater's)
 function MC.Book()
+    if FT.house == "neutral" then return nil end
     local db = MastercraftDB
     if not (type(db) == "table" and type(db.prices) == "table") then return nil end
     local faction = UnitFactionGroup("player") or ""
@@ -77,6 +78,8 @@ function MC.Price(itemID)
     local book = MC.Book()
     local e = book and type(book.items) == "table" and book.items[itemID]
     if type(e) ~= "table" or type(e.p) ~= "number" or e.p <= 0 or e.gone then return nil end
+    -- seen while you were at Blackwater: of its lots, not of your faction's house
+    if FT.House.WasNeutral(e.t) then return nil end
     local listed = e.n
     if not listed and type(e.tiers) == "table" then
         listed = 0
@@ -111,7 +114,7 @@ function MC.Import()
     local newest, count = last, 0
     for itemID, e in pairs(book.items) do
         if type(itemID) == "number" and type(e) == "table" and type(e.t) == "number" and e.t > last
-            and type(e.p) == "number" and e.p > 0 and not e.gone then
+            and type(e.p) == "number" and e.p > 0 and not e.gone and not FT.House.WasNeutral(e.t) then
             local _, _, listed, tiers = MC.Price(itemID)
             FT.Hist.Observe(itemID, e.p, listed, nil, e.t, "mastercraft")
             local have = FT.Hist.Book(itemID)

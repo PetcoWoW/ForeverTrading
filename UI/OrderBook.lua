@@ -46,21 +46,29 @@ function UI.OrderBook(parent)
     f.updated:SetPoint("BOTTOMLEFT", 12, 89)
     f.updated:SetPoint("RIGHT", f, "RIGHT", -12, 0)
 
+    -- buying: its title, then the field and the button side by side (half the width each), then what it costs -
+    -- each on its own line (the panel is narrow: a title and a field on one line ran into each other)
     f.calcTitle = UI.Text(f, 11, "muted")
-    f.calcTitle:SetPoint("BOTTOMLEFT", 12, 62)
+    f.calcTitle:SetPoint("BOTTOMLEFT", 12, 68)
+    f.calcTitle:SetPoint("RIGHT", -12, 0)
     f.calcTitle:SetText(L["Cost to buy"])
-    f.calc = UI.Input(f, 70, 22, L["qty"], function() f:UpdateCalc() end)
-    f.calc:SetPoint("BOTTOMRIGHT", -12, 56)
+    f.calcRow = CreateFrame("Frame", nil, f)
+    f.calcRow:SetHeight(22)
+    f.calcRow:SetPoint("BOTTOMLEFT", 12, 40)
+    f.calcRow:SetPoint("BOTTOMRIGHT", -12, 40)
+    f.calc = UI.Input(f.calcRow, 70, 22, L["qty"], function() f:UpdateCalc() end)
+    f.calc:SetPoint("LEFT", 0, 0)
+    f.calc:SetPoint("RIGHT", f.calcRow, "CENTER", -4, 0)
     f.calc:SetNumeric(true)
     -- at the auction house: buy what the box says
-    f.buy = UI.Button(f, L["Buy"], 10, 22, "primary", function() f:Buy() end)
-    f.buy:FitText(24)
-    f.buy:SetPoint("BOTTOMRIGHT", -12, 29)
+    f.buy = UI.Button(f.calcRow, L["Buy"], 70, 22, "primary", function() f:Buy() end)
+    f.buy:SetPoint("LEFT", f.calcRow, "CENTER", 4, 0)
+    f.buy:SetPoint("RIGHT", 0, 0)
     f.calcResult = UI.Text(f, 12, "text")
-    f.calcResult:SetPoint("BOTTOMLEFT", 12, 34)
-    f.calcResult:SetPoint("RIGHT", f.buy, "LEFT", -8, 0)
+    f.calcResult:SetPoint("BOTTOMLEFT", 12, 22)
+    f.calcResult:SetPoint("RIGHT", -12, 0)
     f.calcAvg = UI.Text(f, 11, "dim")
-    f.calcAvg:SetPoint("BOTTOMLEFT", 12, 16)
+    f.calcAvg:SetPoint("BOTTOMLEFT", 12, 6)
     f.calcAvg:SetPoint("RIGHT", -12, 0)
 
     f.empty = UI.Text(f, 12, "dim", "CENTER")
@@ -80,7 +88,7 @@ function UI.OrderBook(parent)
         r.price = UI.Text(r, 12, "down", "LEFT")
         r.qty = UI.Text(r, 12, "text", "RIGHT")
         r.cum = UI.Text(r, 12, "muted", "RIGHT")
-        r.hl = UI.Tex(r, "BACKGROUND", "bg2", 1, -1)
+        r.hl = UI.RoundTex(r, "BACKGROUND", "hl", 1, -1)
         r.hl:SetAllPoints()
         r.hl:Hide()
         r:SetScript("OnEnter", function(self)
@@ -189,7 +197,7 @@ function UI.OrderBook(parent)
         local can = id and FT.Buy.Possible() and commodity ~= nil and (gear or (qty and qty > 0))
         self.buy:SetUsable(can and true or false)
         if not FT.Buy.Possible() then
-            self.buy:SetTip(L["Buy"], L["Talk to an auctioneer to buy."])
+            self.buy:SetTip(L["Buy"], FT.House.Why(L["Talk to an auctioneer to buy."]))
         elseif commodity == nil then
             -- the game is loading the item: asked again in a moment
             self.buy:SetTip(L["Buy"], L["The item is still loading: try again in a moment."])
@@ -247,6 +255,11 @@ function UI.OrderBook(parent)
         self.calcAvg:SetText(text)
     end
 
-    f:SetScript("OnSizeChanged", function(self) self:Refresh() end)
+    -- the house its numbers are of: an item window's own (nil: the one on)
+    for _, name in ipairs({ "SetItem", "Refresh", "UpdateBuy", "UpdateCalc", "Buy" }) do
+        local fn = f[name]
+        if fn then f[name] = function(self, ...) return FT.House.With(self.house, fn, self, ...) end end
+    end
+    f:HookScript("OnSizeChanged", function(self) self:Refresh() end)
     return f
 end

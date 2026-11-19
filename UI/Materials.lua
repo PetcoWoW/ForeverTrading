@@ -115,6 +115,9 @@ function UI.Materials(parent, onPick)
         local n = math.min(MAX_ROWS, math.max(1, #(e.parts or {})))
         return true, TOP + n * ROW_H + 6 + BOTTOM
     end
+    -- the house its prices are of: an item window's own (nil: the one on)
+    local setItem = f.SetItem
+    function f:SetItem(id) return FT.House.With(self.house, setItem, self, id) end
 
     -- one of its materials
     function f:Has(id)

@@ -407,7 +407,7 @@ local function NeedAH(quiet)
         return false
     end
     if not FT.ahOpen then
-        if not quiet then FT.Print(L["Open the auction house first."]) end
+        if not quiet then FT.Print(FT.House.Why(L["Open the auction house first."])) end
         return false
     end
     return true
@@ -1104,13 +1104,34 @@ end
 ---------------------------------------------------------------------------
 local liveTicker
 
-FT.On("AUCTION_HOUSE_SHOW", function()
-    FT.ahOpen = true
-    if not Modern() then return end
-    HookSearches()
-    for _, e in ipairs(EVENTS) do pcall(frame.RegisterEvent, frame, e) end
+-- Online: at the auction house, and it is the one whose prices are on (House.lua) - its lists are read, the open
+-- item searched again, scans run, you buy and post. Offline: away, or looking at the other house's prices while
+-- standing at this one (nothing of this one may go into them).
+function S.SetOnline(on)
+    on = on and true or false
+    if on == (FT.ahOpen == true) then return end
+    if on then
+        FT.ahOpen = true
+        if not Modern() then return end
+        HookSearches()
+        for _, e in ipairs(EVENTS) do pcall(frame.RegisterEvent, frame, e) end
+        if not liveTicker then liveTicker = C_Timer.NewTicker(1, LiveStep) end
+    else
+        FT.ahOpen = false
+        if liveTicker then
+            liveTicker:Cancel()
+            liveTicker = nil
+        end
+        live.id, live.head, live.list, live.waiting, live.rest, live.answered = nil, nil, nil, false, {}, {}
+        live.named, live.browseFor = {}, nil
+        if S.mode then S.Stop("closed") end
+        frame:UnregisterAllEvents()
+    end
     FT.Fire("FT_AH_CHANGED")
-    if not liveTicker then liveTicker = C_Timer.NewTicker(1, LiveStep) end
+end
+
+FT.On("AUCTION_HOUSE_SHOW", function()
+    S.SetOnline(not FT.House or FT.House.Online())
     C_Timer.After(2.5, function()
         if not FT.ahOpen or S.mode then return end
         local now = time()
@@ -1120,17 +1141,14 @@ FT.On("AUCTION_HOUSE_SHOW", function()
     end)
 end)
 
+-- the other auction house: its own keys of the listings (read from its data when needed)
+FT.On("FT_HOUSE_CHANGED", function()
+    S.listed, S.listedAt = nil, nil
+    live.answered = {}
+end)
+
 FT.On("AUCTION_HOUSE_CLOSED", function()
-    FT.ahOpen = false
-    if liveTicker then
-        liveTicker:Cancel()
-        liveTicker = nil
-    end
-    live.id, live.head, live.list, live.waiting, live.rest, live.answered = nil, nil, nil, false, {}, {}
-    live.named, live.browseFor = {}, nil
-    if S.mode then S.Stop("closed") end
-    frame:UnregisterAllEvents()
-    FT.Fire("FT_AH_CHANGED")
+    S.SetOnline(false)
 end)
 
 ---------------------------------------------------------------------------

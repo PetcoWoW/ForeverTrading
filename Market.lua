@@ -112,6 +112,7 @@ function M.Rebuild()
         end
     end
     building = true
+    M.errors, M.firstError = 0, nil
     local today = FT.Day()
     local dayKeys = {}
     for i = 0, SPARK_DAYS do dayKeys[i] = tostring(today - SPARK_DAYS + i) end
@@ -122,14 +123,19 @@ function M.Rebuild()
         local last = math.min(i + CHUNK - 1, #jobs)
         for k = i, last do
             local id, src = jobs[k][1], jobs[k][2]
-            local row
-            if src == "own" then
-                row = RowFromOwn(id, today)
-            elseif src == "atr" then
-                local e = db[tostring(id)]
-                if type(e) == "table" then row = RowFromAuctionator(id, e, today, dayKeys) end
-            else
-                row = RowFromMastercraft(id)
+            -- one item that fails must not stop the market (it would stay unbuilt)
+            local ok, row = pcall(function()
+                if src == "own" then return RowFromOwn(id, today) end
+                if src == "atr" then
+                    local e = db[tostring(id)]
+                    return type(e) == "table" and RowFromAuctionator(id, e, today, dayKeys) or nil
+                end
+                return RowFromMastercraft(id)
+            end)
+            if not ok then
+                M.errors = M.errors + 1
+                M.firstError = M.firstError or tostring(row)
+                row = nil
             end
             if row then
                 newRows[#newRows + 1] = row
@@ -181,6 +187,7 @@ end
 FT.On("FT_READY", function() C_Timer.After(3, M.Rebuild) end)
 FT.On("FT_SCAN_DONE", function() FT.Debounce("marketRebuild", 1, M.Rebuild) end)
 FT.On("FT_PRICES_CHANGED", function() FT.Debounce("marketRebuild", 4, M.Rebuild) end)
+FT.On("FT_HOUSE_CHANGED", function() FT.Debounce("marketRebuild", 0.1, M.Rebuild) end)
 
 -- items worth showing in movers: listed on several days, not dirt cheap
 local function Liquid(r)

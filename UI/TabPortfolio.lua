@@ -203,7 +203,7 @@ function T.BuildJournal(p)
             row.cells.sold:SetText(QtyMoney(x.sold, x.income))
             local buy = x.avgBuy and FT.Money(x.avgBuy, "short") or "—"
             local sell = x.avgSell and FT.Money(x.avgSell, "short") or "—"
-            row.cells.avg:SetText((x.avgBuy or x.avgSell) and (buy .. FT.C("dim", " → ") .. sell) or FT.C("dim", "—"))
+            row.cells.avg:SetText((x.avgBuy or x.avgSell) and (buy .. FT.C("dim", " / ") .. sell) or FT.C("dim", "—"))
             local r = x.result
             row.cells.result:SetText(r == 0 and FT.C("dim", "0")
                 or FT.C(r > 0 and "up" or "down", (r > 0 and "+" or "-") .. FT.Money(math.abs(r), "short")))

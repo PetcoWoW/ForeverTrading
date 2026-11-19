@@ -10,7 +10,7 @@ FT.Queue = Q
 local GetCount = (C_Item and C_Item.GetItemCount) or GetItemCount
 
 local function Store()
-    local r = FT.R()
+    local r = FT.Side()
     r.queue = r.queue or {}
     return r.queue
 end

@@ -25,6 +25,10 @@ charts, order books, craft profitability and "sell / craft / buy" signals. It al
   **More** on any chart opens the item in its own window with large charts and its order book.
 - **Price exchange** - ForeverTrading users in a guild or group share their scans: when your prices are more
   than an hour old, the freshest scan around comes to you in the background (or press **Exchange**).
+- **Two auction houses** - your faction's and Blackwater (the neutral one, shared by both factions) each keep
+  their own prices, history, deals and your auctions: talking to an auctioneer picks its house, and the chip in
+  the header switches whose prices you see. **Deals between the houses**: cheaper at one than the other sells it
+  for - buy, carry it over, list it there, both cuts counted.
 - **Trading** - at the auction house: buy from the order book, post from your bags (a suggested price, the
   deposit, the cut, warnings) and watch **My auctions** (who undercut you, cancel) - every action confirmed with
   the exact numbers first; when you are undercut it says whether to wait or post again. Optionally ForeverTrading
@@ -50,6 +54,7 @@ English (Settings > Language).
 | **Что вы смотрите сами** | Любой ваш поиск и открытый товар на аукционе тоже попадает в историю и стаканы. |
 | **Живые цены** (свой) | Пока открыт аукцион, открытый в аддоне предмет запрашивается заново каждые 8 секунд: цена и стакан всегда свежие. Пауза, пока вы сами ищете, покупаете или продаёте. |
 | **Обмен** (с гильдией и группой) | Если вашим ценам рынка больше часа, аддон спрашивает пользователей ForeverTrading в гильдии (затем в группе), у кого свежее, — и самый свежий присылает свой полный скан в фоне, по одному скрытому сообщению в секунду. Кнопка **Обмен** в шапке — спросить сразу, аукцион не нужен. |
+| **Два аукциона** | У аукциона вашей фракции и у Черноводья (нейтрального, общего для обеих фракций) свои цены, история, сделки и ваши лоты. Аукционист сам выбирает свой аукцион; чип в шапке переключает, чьи цены вы смотрите. «Сделки > Между аукционами» — что на одном дешевле, чем продаётся на другом. |
 | **Auctionator** | Его полный скан и поиски пишутся в нашу историю; дни, которые вы сами не сканировали, берутся из его базы. |
 | **Mastercraft** | Его сканы цен пишутся в историю; рецепты и запасы альтов, на которых вы ещё не заходили с ForeverTrading. |
 | **Игра** | Окна профессий (рецепты), сумки, банк, почта, золото каждого персонажа, цены у торговцев. |

@@ -417,8 +417,13 @@ function H.Recent(itemID, n)
     return out
 end
 
--- prune everything once after login, a little each frame
-FT.On("FT_READY", function()
+-- prune everything once after login (and an auction house's data the first time it is switched to), a little
+-- each frame
+local pruned = {}
+local function PruneAll()
+    local key = FT.houseKey
+    if not key or pruned[key] then return end
+    pruned[key] = true
     local r = FT.R()
     local ids = {}
     for itemID in pairs(r.snaps) do ids[#ids + 1] = { "s", itemID } end
@@ -428,7 +433,9 @@ FT.On("FT_READY", function()
     ticker = C_Timer.NewTicker(0.05, function()
         for _ = 1, 60 do
             local job = ids[i]
-            if not job then
+            -- done, or the other house is on now (its own pruning follows)
+            if not job or FT.houseKey ~= key then
+                if job then pruned[key] = nil end
                 ticker:Cancel()
                 return
             end
@@ -443,7 +450,8 @@ FT.On("FT_READY", function()
             i = i + 1
         end
     end)
-end)
+end
+FT.On("FT_READY", PruneAll)
 
 ---------------------------------------------------------------------------
 -- Order books (the listings of an item at each price)
@@ -520,7 +528,32 @@ function H.CostToBuy(itemID, qty)
     return cost, true, cost / qty
 end
 
--- forget all of our history of this server
+-- Each auction house's session caches apart: those of the house on are in use (the other house's prices on, or an
+-- item window looking at the other house for a moment - FT.House.With - switches them there and back)
+local sets, setKey = {}, nil
+local function UseSet()
+    local key = FT.houseKey or "?"
+    if key == setKey then return end
+    if setKey then
+        sets[setKey] = { cache = cache, latest = latest, before = before, books = books, today = todayCache, days = daysCache }
+    end
+    local s = sets[key]
+    if s then
+        cache, latest, before, books, todayCache, daysCache = s.cache, s.latest, s.before, s.books, s.today, s.days
+    else
+        cache, latest, before, books, todayCache, daysCache = {}, {}, {}, {}, {}, {}
+    end
+    setKey = key
+end
+-- what was read before is of the house on at login
+FT.On("FT_LOGIN", function() setKey = FT.houseKey end)
+FT.On("FT_HOUSE_USE", UseSet)
+FT.On("FT_HOUSE_CHANGED", function()
+    UseSet()
+    C_Timer.After(5, PruneAll)
+end)
+
+-- forget all of our history of this server (of the auction house on)
 function H.ClearAll()
     local r = FT.R()
     r.snaps, r.books, r.scans, r.days, r.today, r.listed, r.sales = {}, {}, {}, {}, {}, nil, nil
@@ -618,6 +651,76 @@ function FT.Price(itemID)
         end
     end
     return nil
+end
+
+---------------------------------------------------------------------------
+-- Either auction house (House.lua): the one on as this session saw it, the other as it was saved (nothing of
+-- it is in this session's caches) - for the deals between the two
+---------------------------------------------------------------------------
+local function TailDays(str, n)
+    if type(str) ~= "string" then return {} end
+    local tail = str
+    if #str > n * 44 then
+        tail = str:sub(-n * 44)
+        local cut = tail:find(";", 1, true)
+        tail = cut and tail:sub(cut + 1) or ""
+    end
+    local out = ParseDays(tail)
+    while #out > n do table.remove(out, 1) end
+    return out
+end
+
+-- its data (nil: never scanned there)
+local function RealmIn(house)
+    if house == FT.house then return FT.R() end
+    return FT.db.realms[FT.HouseKey(house)]
+end
+
+-- the lowest price there, when it was seen, how many were listed (nil: not seen there, or none left)
+function H.PriceIn(house, itemID)
+    if house == FT.house then
+        local l = latest[itemID]
+        if l and l.p then
+            if l.gone then return nil end
+            return l.p, l.t, l.q
+        end
+    end
+    local r = RealmIn(house)
+    if not r then return nil end
+    local tr = r.today and ParseToday(r.today[itemID])
+    if tr then return tr.c, tr.m * 60 + EPOCH, tr.q end
+    local last = TailDays(r.days and r.days[itemID], 1)[1]
+    if last then return last.c, FT.DayStart(last.day) + 43200, last.q end
+    return nil
+end
+
+-- the closes of its last `n` days there (today's the last), oldest first
+function H.ClosesIn(house, itemID, n)
+    local r = RealmIn(house)
+    if not r then return {} end
+    local out = {}
+    for _, d in ipairs(TailDays(r.days and r.days[itemID], n)) do out[#out + 1] = d.c end
+    local tr = r.today and ParseToday(r.today[itemID])
+    if tr then out[#out + 1] = tr.c end
+    while #out > n do table.remove(out, 1) end
+    return out
+end
+
+-- its order book there (saved for the items that matter to you; of the house on, this session's too)
+function H.BookIn(house, itemID)
+    if house == FT.house then return H.Book(itemID) end
+    local r = RealmIn(house)
+    local str = r and r.books and r.books[itemID]
+    return str and ParseBook(str) or nil
+end
+
+-- when the whole market there was last seen (a full scan, or one received), nil: never
+function H.MarketTimeIn(house)
+    local r = RealmIn(house)
+    local meta = r and r.meta
+    if not meta then return nil end
+    local t = math.max(meta.lastFull or 0, meta.lastPeer or 0, meta.lastScan or 0)
+    return t > 0 and t or nil
 end
 
 ---------------------------------------------------------------------------

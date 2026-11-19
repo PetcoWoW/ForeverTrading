@@ -56,7 +56,7 @@ function UI.Chart(parent)
     ch.tag = CreateFrame("Frame", nil, ch)
     ch.tag:SetFrameLevel(ch.mouse:GetFrameLevel() + 1)
     ch.tag:SetSize(AXIS_W - 2, 16)
-    ch.tag.bg = UI.Tex(ch.tag, "BACKGROUND", "up", 1)
+    ch.tag.bg = UI.RoundTex(ch.tag, "BACKGROUND", "up", 1)
     ch.tag.bg:SetAllPoints()
     ch.tag.text = UI.Text(ch.tag, 10, "black", "CENTER")
     ch.tag.text:SetPoint("CENTER")
@@ -70,14 +70,14 @@ function UI.Chart(parent)
     ch.cyTag = CreateFrame("Frame", nil, ch)
     ch.cyTag:SetFrameLevel(ch.mouse:GetFrameLevel() + 2)
     ch.cyTag:SetSize(AXIS_W - 2, 16)
-    ch.cyTag.bg = UI.Tex(ch.cyTag, "BACKGROUND", "bg3", 1)
+    ch.cyTag.bg = UI.RoundTex(ch.cyTag, "BACKGROUND", "bg3", 1)
     ch.cyTag.bg:SetAllPoints()
     ch.cyTag.text = UI.Text(ch.cyTag, 10, "text", "CENTER")
     ch.cyTag.text:SetPoint("CENTER")
     ch.cxTag = CreateFrame("Frame", nil, ch)
     ch.cxTag:SetFrameLevel(ch.mouse:GetFrameLevel() + 2)
     ch.cxTag:SetSize(80, TIME_H - 2)
-    ch.cxTag.bg = UI.Tex(ch.cxTag, "BACKGROUND", "bg3", 1)
+    ch.cxTag.bg = UI.RoundTex(ch.cxTag, "BACKGROUND", "bg3", 1)
     ch.cxTag.bg:SetAllPoints()
     ch.cxTag.text = UI.Text(ch.cxTag, 10, "text", "CENTER")
     ch.cxTag.text:SetPoint("CENTER")
@@ -142,6 +142,7 @@ function UI.Chart(parent)
             self.title:SetText(d and d.title or "")
             self.legend:SetText("")
             self.legendMA:SetText("")
+            self:FitHead()
             self.lowerText:SetText("")
             self.tag:Hide()
             self.grid:HideRest(); self.fills:HideRest(); self.rects:HideRest(); self.lines:HideRest()
@@ -488,6 +489,7 @@ function UI.Chart(parent)
             end
         end
         self.legendMA:SetText(table.concat(parts, "   "))
+        self:FitHead()
         if d.lower then
             local v = self.lowerValues and self.lowerValues[i]
             local label = d.lowerLabel or ""
@@ -587,7 +589,29 @@ function UI.Chart(parent)
             self:GetScript("OnLeave")(self)
         end
     end)
-    ch:SetScript("OnSizeChanged", function(self)
+    -- the header line - the title, then the values under the mouse - in the chart's width: what doesn't fit is cut
+    -- ("..."), the averages go first
+    function ch:FitHead()
+        local w = self:GetWidth()
+        if not w or w <= 0 then return end
+        local avail = w - 16
+        self.title:SetWidth(0)
+        local tw = math.min(self.title:GetStringWidth(), avail)
+        if self.title:GetStringWidth() > avail then self.title:SetWidth(avail) end
+        local room = avail - tw - 10
+        self.legend:SetWidth(0)
+        local lw = self.legend:GetStringWidth()
+        local hasMA = (self.legendMA:GetText() or "") ~= ""
+        local mw = hasMA and self.legendMA:GetStringWidth() or 0
+        if lw + (hasMA and (14 + mw) or 0) <= room then
+            self.legendMA:SetShown(hasMA)
+            return
+        end
+        self.legendMA:Hide()
+        if lw > room then self.legend:SetWidth(math.max(1, room)) end
+    end
+
+    ch:HookScript("OnSizeChanged", function(self)
         self:Layout()
         self:Render()
     end)
