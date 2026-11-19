@@ -12,6 +12,10 @@ FT.News = N
 -- start, after the files are read (a table made with them would keep the English)
 local function News()
     return {
+        ["v1.1.3"] = {
+            { L["Hotfix"], L["The ForeverTrading tab on the auction house window works without Auctionator too."],
+                nil },
+        },
         ["v1.1.2"] = {
             { L["Blackwater apart"], L["The neutral auction house keeps its own prices, history, deals and your auctions: a scan there doesn't touch your faction's. Talking to an auctioneer picks its house; the chip next to the auction house status switches whose prices you see, the pencil on it puts a wrong auction house right."],
                 nil },
@@ -43,6 +47,17 @@ local function News()
                 nil },
         },
     }
+end
+
+-- a hotfix: what's new is that of the version it fixes, then its own lines (seen already with that version: not shown
+-- again by itself)
+local HOTFIX_OF = { ["v1.1.3"] = "v1.1.2" }
+local function ListFor(v)
+    local all, list = News(), {}
+    local base = HOTFIX_OF[v]
+    for _, it in ipairs(base and all[base] or {}) do list[#list + 1] = it end
+    for _, it in ipairs(all[v] or {}) do list[#list + 1] = it end
+    return #list > 0 and list or nil
 end
 
 local win
@@ -120,7 +135,7 @@ end
 
 -- the window for this version (nothing new for it: nothing shown)
 function N.Show()
-    local list = News()[FT.VERSION_TEXT]
+    local list = ListFor(FT.VERSION_TEXT)
     if not list then
         FT.Print(string.format(L["Nothing new written for %s."], FT.VERSION_TEXT))
         return
@@ -169,7 +184,7 @@ function N.OnWindow()
         return
     end
     if FT.db.newsSeen ~= FT.VERSION_TEXT then
-        if News()[FT.VERSION_TEXT] then
+        if ListFor(FT.VERSION_TEXT) and FT.db.newsSeen ~= HOTFIX_OF[FT.VERSION_TEXT] then
             N.Show()
         else
             FT.db.newsSeen = FT.VERSION_TEXT

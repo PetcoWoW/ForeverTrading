@@ -161,10 +161,17 @@ local function BuildAHTab(ah)
         if not ok or not made then return nil end
         tab = made
         tab:SetText("ForeverTrading")
-        local last = ah.Tabs and ah.Tabs[#ah.Tabs]
-        if last then
-            tab:SetPoint("TOPLEFT", last, "TOPRIGHT", 3, 0)
-        else
+        -- after the game's last tab (the template may have put ours in that list already: not after itself)
+        local last
+        for i = #(ah.Tabs or {}), 1, -1 do
+            local t = ah.Tabs[i]
+            if t and t ~= tab and t.IsShown and t:IsShown() then
+                last = t
+                break
+            end
+        end
+        tab:ClearAllPoints()
+        if not (last and pcall(tab.SetPoint, tab, "TOPLEFT", last, "TOPRIGHT", 3, 0)) then
             tab:SetPoint("TOPRIGHT", ah, "BOTTOMRIGHT", -4, 2)
         end
     end

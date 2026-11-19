@@ -1,5 +1,13 @@
 # ForeverTrading
 
+## v1.1.3
+
+**Fixes**
+- The ForeverTrading tab on the auction house window without Auctionator: it was placed after itself and threw an error ("Cannot anchor to itself") - now after the game's last tab.
+
+**Исправления**
+- Вкладка ForeverTrading на окне аукциона без Auctionator: она цеплялась сама к себе и давала ошибку («Cannot anchor to itself») — теперь встаёт после последней вкладки игры.
+
 ## v1.1.2
 
 **New**

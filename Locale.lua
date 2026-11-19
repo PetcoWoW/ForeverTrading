@@ -839,6 +839,9 @@ ru["Item windows"] = "Окна предметов"
 ru["More: the item in a window of its own - up to four at once, two items side by side. Each window has its own auction house (its chip) and a compact mode with the charts alone."] =
     "«Подробнее»: товар в отдельном окне — до четырёх сразу, два товара рядом. У каждого окна свой аукцион (свой чип) и компактный режим только с графиками."
 ru["A tidier look"] = "Аккуратнее вид"
+ru["Hotfix"] = "Срочное исправление"
+ru["The ForeverTrading tab on the auction house window works without Auctionator too."] =
+    "Вкладка ForeverTrading на окне аукциона работает и без Auctionator."
 ru["Choices are one framed switch, tinted buttons have an edge, corners are slightly rounded, rows and filters line up; the light style shows hovered and chosen rows."] =
     "Переключатели — единый элемент в рамке, у цветных кнопок контур, углы чуть скруглены, ряды и фильтры выровнены; в светлой теме видно наведённые и выбранные строки."
 ru["The deals journal counts what was sold (Forever's letters say 0) and keeps up with Collect all; no exchange during your own scan; the Settings columns stay; the ticker shows the market's most valuable listings while there are no moves yet."] =
