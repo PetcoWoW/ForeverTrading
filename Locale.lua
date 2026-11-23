@@ -95,6 +95,9 @@ ru["Not enough price history yet"] = "Пока мало истории цен"
 ru["%s above the %d-day average"] = "%s выше средней за %d дн."
 ru["%s below the %d-day average"] = "%s ниже средней за %d дн."
 ru["%s below the %d-day average: wait"] = "%s ниже средней за %d дн. — лучше подождать"
+ru["%s above its price of the last hours"] = "%s выше цены последних часов"
+ru["%s below its price of the last hours"] = "%s ниже цены последних часов"
+ru["%s below its price of the last hours: wait"] = "%s ниже цены последних часов — лучше подождать"
 ru["RSI %d: overbought"] = "RSI %d: перекуплен"
 ru["RSI %d: oversold"] = "RSI %d: перепродан"
 ru["Price near its average"] = "Цена около средней"
@@ -347,6 +350,15 @@ ru["Reload UI"] = "Перезагрузить UI"
 ru["Language and ticker changes need a reload."] = "Смена языка и бегущей строки требует перезагрузки."
 ru["About"] = "О аддоне"
 ru["%d items, about %s KB saved"] = "%d предметов, около %s КБ данных"
+ru["Remove"] = "Убрать"
+ru["Remove items long gone"] = "Убрать давно не виденные"
+ru["Not seen for %d+ days: %s items"] = "Не было на аукционе %d+ дней: %s предм."
+ru["Nothing to remove: every item was seen in the last %d days (or matters to you)."] =
+    "Убирать нечего: все предметы были на аукционе за последние %d дней (или нужны вам)."
+ru["Remove the history of %s items not seen on the auction house for %d days or more (both auction houses, about %s KB)? Those that matter to you stay: your recipes and their materials, watchlist, what you own."] =
+    "Убрать историю %s предметов, которых не было на аукционе %d дней и больше (на обоих аукционах, около %s КБ)? Нужные вам остаются: рецепты и их материалы, избранное, то, что у вас есть."
+ru["Removed the history of %s items not seen for %d days (about %s KB): the saved file is smaller from the next logout or /reload."] =
+    "Убрана история %s предметов, которых не было %d дней (около %s КБ). Файл сохранений уменьшится при следующем выходе или /reload."
 ru["connected"] = "подключён"
 ru["not loaded"] = "не загружен"
 
@@ -732,6 +744,10 @@ ru["the game refused to send it (code %s)"] = "игра отказалась о�
 ru["the game found no player named %s"] = "игра не нашла персонажа «%s»"
 ru["works"] = "работает"
 ru["sent, but it didn't come back: this way seems not to work here"] = "отправлено, но не вернулось — похоже, здесь этот путь не работает"
+ru["works, but some characters come changed: the compact exchange can't go this way"] =
+    "работает, но часть символов приходит изменённой — плотный обмен этим путём не пройдёт"
+ru["The exchange: the compact data came changed on the way. From now on the old format is asked for - press Exchange again."] =
+    "Обмен: плотные данные пришли искажёнными. Дальше будет запрашиваться старый формат — нажмите «Обмен» ещё раз."
 ru["guild"] = "гильдия"
 ru["group"] = "группа"
 ru["whisper"] = "шёпот"
@@ -788,6 +804,16 @@ ru["%s each at %s, %s at %s: +%s each after its cut"] = "купить за %s (%
 ru["sells there"] = "там продаётся"
 ru["here %s, there %s"] = "здесь %s, там %s"
 ru["Buy at %s: %s for %s (price of %s)"] = "Купить (%s): %s за %s, цена %s"
+ru["in your list"] = "в списке"
+ru["in your list since %s"] = "добавлено в список %s"
+ru["Right click: out of your carry list."] = "Правый клик: убрать из списка закупки."
+ru["Right click: into your carry list - at %s the Sell page shows what you brought and what it cost."] =
+    "Правый клик: в список закупки — там, где продавать (%s), вкладка «Продажа» покажет, что вы привезли и почём купили."
+ru["Carry list: %s - buy at %s for up to %s each, list at %s for ~%s."] =
+    "Список закупки: %s — купить (%s) не дороже %s за шт., выставить (%s) около %s."
+ru["Carry list: %s is out of it."] = "Список закупки: %s убран."
+ru["brought"] = "привезено"
+ru["bought at %s for %s each: list at ~%s"] = "куплено (%s) по %s: ставить около %s"
 ru["Carry it to %s and list it at %s each: its cut there is %s (the deposit comes back when it sells; unsold, it is lost)."] =
     "Отвезти (%s) и выставить по %s за шт.: комиссия там %s (залог вернётся при продаже, а если не продастся — сгорит)."
 ru["listed there: %s"] = "там выставлено: %s"
@@ -840,6 +866,26 @@ ru["More: the item in a window of its own - up to four at once, two items side b
     "«Подробнее»: товар в отдельном окне — до четырёх сразу, два товара рядом. У каждого окна свой аукцион (свой чип) и компактный режим только с графиками."
 ru["A tidier look"] = "Аккуратнее вид"
 ru["Hotfix"] = "Срочное исправление"
+ru["Faster"] = "Быстрее"
+ru["Saving a scan is three to four times as fast and far lighter on the game's memory: prices are written into the saved file once, when you log out. After a scan only the items that changed are counted again, a little each frame. /ft perf shows what each part took and the memory it takes."] =
+    "Скан сохраняется в 3–4 раза быстрее и гораздо меньше нагружает память игры: цены пишутся в файл сохранений один раз — при выходе. После скана заново считаются только изменившиеся предметы, понемногу в каждом кадре. /ft perf показывает, сколько заняла каждая часть и сколько памяти у аддона."
+ru["Without Auctionator"] = "Без Auctionator"
+ru["ForeverTrading goes by its own scans: top gainers and losers, the market mood, an item's changes, signals, liquidity and reselling work from the first days of scanning - while an auction house has been scanned on fewer days, fewer days of prices are asked for. Auctionator and Mastercraft only fill in what is missing."] =
+    "ForeverTrading опирается на свои сканы: лидеры роста и падения, настроение рынка, изменения цены, сигналы, ликвидность и перепродажа работают с первых дней сканирования — пока аукцион сканировали меньше дней, и истории требуется меньше. Auctionator и Mastercraft только дополняют то, чего не хватает."
+ru["The carry list"] = "Список закупки"
+ru["Signals > Deals > Between houses: a right click on a deal puts it on your carry list. It stays on the page (even when the deal is gone), and at the other auction house the Sell page marks what you brought and what it cost."] =
+    "«Сигналы > Сделки > Между аукционами»: правый клик по сделке добавляет её в список закупки. Она остаётся на странице (даже когда сделки уже нет), а на другом аукционе вкладка «Продажа» помечает, что вы привезли и почём купили."
+ru["A smaller saved file"] = "Файл сохранений меньше"
+ru["Settings > Data: remove the history of items not seen on either auction house for 30 days - the ones that matter to you stay. Less for the game to load at login."] =
+    "«Настройки > Данные»: убрать историю предметов, которых не было ни на одном аукционе 30 дней, — нужные вам остаются. Игре меньше загружать при входе."
+ru["A lighter exchange"] = "Обмен легче"
+ru["About a third fewer messages between two players with 1.1.4: prices come sooner. /ft share test also checks that every character comes through."] =
+    "Между игроками с 1.1.4 примерно на треть меньше сообщений — цены приходят быстрее. /ft share test заодно проверяет, что все символы доходят."
+ru["Our own font"] = "Свой шрифт"
+ru["Sofia Sans Condensed: narrow, with Cyrillic, no Mastercraft needed for it (the classic style keeps the game's). After updating, restart the game once."] =
+    "Sofia Sans Condensed: узкий, с кириллицей, Mastercraft для него больше не нужен (классическая тема — со шрифтом игры). После обновления один раз перезапустите игру."
+ru["Cheaper at one auction house than the other sells it for. A right click on a deal puts it on your carry list: it stays here, and at the other auction house the Sell page shows what you brought and what it cost."] =
+    "Что на одном аукционе дешевле, чем продаётся на другом. Правый клик по сделке — в список закупки: она остаётся здесь, а на другом аукционе вкладка «Продажа» покажет, что вы привезли и почём купили."
 ru["The ForeverTrading tab on the auction house window works without Auctionator too."] =
     "Вкладка ForeverTrading на окне аукциона работает и без Auctionator."
 ru["Choices are one framed switch, tinted buttons have an edge, corners are slightly rounded, rows and filters line up; the light style shows hovered and chosen rows."] =
@@ -1058,3 +1104,29 @@ ru["Done"] = "Готово"
 ru["End the tour"] = "Закончить"
 ru["The tour is over. Again: Settings > About, or /ft tour."] = "Экскурсия окончена. Повторить: Настройки > Об аддоне или /ft tour."
 ru["After the fight: the tour opens the pages of the window."] = "После боя: экскурсия открывает разделы окна."
+
+-- /ft perf
+ru["how fast it works and the memory it takes"] = "скорость работы и занятая память"
+ru["Performance (this session):"] = "Замеры (эта сессия):"
+ru["%.1f MB"] = "%.1f МБ"
+ru["Memory: ForeverTrading %s, all addons %s"] = "Память: ForeverTrading %s, все аддоны вместе %s"
+ru["Saved prices: %s items, %s characters; %s waiting to be written (at logout or /reload)"] =
+    "Сохранённые цены: %s предметов, %s символов; ждут записи (при выходе или /reload): %s"
+ru["Writing them at the last logout: %s ms (%s records)"] = "Запись при прошлом выходе: %s мс (%s записей)"
+ru["%s: %s - %s ms of work in %s frames (the longest %s ms), %s s in all, %s"] =
+    "%s: %s шт. — %s мс работы за %s кадров (самый долгий %s мс), всего %s с, %s"
+ru["Nothing measured yet this session: make a scan or open the Market."] =
+    "В этой сессии ещё нечего показать: сделайте скан или откройте «Рынок»."
+ru["Reading every auction (deep scan)"] = "Чтение всех лотов (глубокий скан)"
+ru["Reading a scan of Auctionator"] = "Чтение скана Auctionator"
+ru["Saving a scan"] = "Сохранение скана"
+ru["Marking what is no longer listed"] = "Отметка снятого с аукциона"
+ru["Market: every item"] = "«Рынок»: все предметы"
+ru["Market: the changed items"] = "«Рынок»: изменившиеся предметы"
+ru["Deals: every item"] = "«Сделки»: все предметы"
+ru["Deals: the changed items"] = "«Сделки»: изменившиеся предметы"
+ru["Pruning old history"] = "Чистка старой истории"
+ru["Market: %s items, %s with prices on 3+ days of the last two weeks, %s can be top gainers or losers"] =
+    "«Рынок»: %s предметов, из них с ценами за 3+ дня из последних двух недель: %s, могут попасть в лидеры роста и падения: %s"
+ru["(Auctionator is off: only the days ForeverTrading saw itself count)"] =
+    "(Auctionator выключен: считаются только дни, которые ForeverTrading видел сам)"

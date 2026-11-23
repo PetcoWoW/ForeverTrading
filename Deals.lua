@@ -17,7 +17,7 @@ local ADDON, FT = ...
 local D = {}
 FT.Deals = D
 
-local CHUNK = 200
+local FULL_EVERY = 600  -- every item again at least this often (prices age); otherwise only the changed ones
 local BOOK_SLACK = 600 -- an order book this much older than the price is still the price's
 local THERE_AGE = 3 * 86400 -- between the houses: the price where it is sold, not older than this
 local THERE_DAYS = 2        -- buy no more than sells there in this many days
@@ -25,6 +25,10 @@ local THERE_DAYS = 2        -- buy no more than sells there in this many days
 local deals = {}
 local builtAt
 local building, again, dirty = false, false, true
+local fullAt, builtDay, fullNext = nil, nil, false
+-- what each item counted in the last look (the counts below go on item by item): 1 has a price, 2 has days of
+-- history, 4 an error, 8 a deal under the minimum profit (16: two)
+local counted = {}
 -- the last look, for the page to say why it found nothing (and /ft debug): items with a price, the newest
 -- price, items with 3+ days of prices, deals under the minimum profit, errors
 local info
@@ -90,11 +94,19 @@ local function ToVendor(id, p, t, mine)
     return d
 end
 
+-- closes of the days before reselling needs: 2, fewer while the market has been watched fewer days (its first day:
+-- none - the fair price of the hours seen decides, in the whole stats)
+local function NeedCloses()
+    return math.min(2, math.max(0, FT.Hist.WatchedDays(14) - 1))
+end
+
 -- a quick look before the whole stats: is the price far under the closes of the last days?
 local function LooksCheap(id, p, below)
     local row = FT.Market.Row(id)
     local spark = row and row.spark
-    if not (spark and #spark >= 3) then return false end
+    local need = NeedCloses()
+    if not (spark and #spark >= need + 1) then return false end
+    if need == 0 and #spark < 2 then return true end
     local closes = {}
     for i = 1, #spark - 1 do closes[#closes + 1] = spark[i] end -- the last one may be today's: left out
     table.sort(closes)
@@ -213,7 +225,7 @@ local function Judge(id, mine, below, look)
             look.unknown[#look.unknown + 1] = { id, p }
         end
         local row = FT.Market.Row(id)
-        if row and row.spark and #row.spark >= 3 then look.history = look.history + 1 end
+        if row and row.spark and #row.spark >= NeedCloses() + 1 then look.history = look.history + 1 end
     end
     local v = ToVendor(id, p, t, mine[id])
     local r = LooksCheap(id, p, below) and ToResell(id, p, t, mine[id], below) or nil
@@ -245,18 +257,62 @@ local function LoadVendorPrices(list)
         end
         if done or GetTime() - lastLook >= LOAD_REBUILD then
             lastLook = GetTime()
+            -- any item may have its vendor price now: every item again
+            fullNext = true
             D.Changed()
         end
     end)
 end
 
-function D.Build()
-    if building then
-        again = true
-        return
+local function Count(look, code, sign)
+    look.items = look.items + sign * (code % 2)
+    look.history = look.history + sign * (math.floor(code / 2) % 2)
+    look.errors = look.errors + sign * (math.floor(code / 4) % 2)
+    look.small = look.small + sign * math.floor(code / 8)
+end
+
+-- one item looked at: its deals into `out`, what it counts into `look`, vendor prices to ask for into `unknown`
+local one = {} -- what Judge counts for one item (the same table each time)
+local function Look(id, mine, below, minProfit, look, out, unknown)
+    one.items, one.history, one.newest, one.unknown = 0, 0, nil, unknown
+    local fine, d, x = pcall(Judge, id, mine, below, one)
+    local code
+    if not fine then
+        code = 4
+        look.firstError = look.firstError or tostring(d)
+    else
+        code = one.items + 2 * one.history
+        if one.newest and (not look.newest or one.newest > look.newest) then look.newest = one.newest end
+        if d then
+            if d.profit >= minProfit then out[#out + 1] = d else code = code + 8 end
+        end
+        if x then
+            if x.profit >= minProfit then out[#out + 1] = x else code = code + 8 end
+        end
     end
-    if not FT.db then return end
+    local old = counted[id]
+    if old then Count(look, old, -1) end
+    counted[id] = code ~= 0 and code or nil
+    Count(look, code, 1)
+end
+
+local function ByProfit(a, b) return a.profit > b.profit end
+
+local function Finished(out, unknown)
+    table.sort(out, ByProfit)
+    deals, builtAt, building = out, time(), false
+    LoadVendorPrices(unknown)
+    FT.Fire("FT_DEALS_READY")
+    if again then
+        again = false
+        C_Timer.After(1, D.Build)
+    end
+end
+
+-- every item
+local function BuildAll()
     building, dirty = true, false
+    FT.Hist.TakeChanged("deals") -- every item is looked at: what changed so far is in it
     -- an error here must not leave the page "looking" for ever
     local ok, ids, mine = pcall(function()
         local list = {}
@@ -270,43 +326,48 @@ function D.Build()
     end
     local below = (FT.S.dealBelow or 30) / 100
     local minProfit = FT.S.dealMin or 0
-    local look = { items = 0, history = 0, small = 0, errors = 0, unknown = {} }
-    local out = {}
-    local i = 1
-    local ticker
-    ticker = C_Timer.NewTicker(0, function()
-        local last = math.min(i + CHUNK - 1, #ids)
-        for k = i, last do
-            local fine, d, x = pcall(Judge, ids[k], mine, below, look)
-            if not fine then
-                look.errors = look.errors + 1
-                look.firstError = look.firstError or tostring(d)
-            else
-                for _, deal in ipairs({ d or false, x or false }) do
-                    if deal then
-                        if deal.profit >= minProfit then
-                            out[#out + 1] = deal
-                        else
-                            look.small = look.small + 1
-                        end
-                    end
-                end
-            end
-        end
-        i = last + 1
-        if i > #ids then
-            ticker:Cancel()
-            table.sort(out, function(a, b) return a.profit > b.profit end)
-            deals, builtAt, building, info = out, time(), false, look
-            LoadVendorPrices(look.unknown)
-            look.unknown = nil
-            FT.Fire("FT_DEALS_READY")
-            if again then
-                again = false
-                C_Timer.After(1, D.Build)
-            end
-        end
+    local look = { items = 0, history = 0, small = 0, errors = 0 }
+    local out, unknown = {}, {}
+    local today = FT.Day()
+    counted = {}
+    FT.Job("deals", #ids, function(k) Look(ids[k], mine, below, minProfit, look, out, unknown) end, function()
+        info, fullAt, builtDay = look, time(), today
+        Finished(out, unknown)
     end)
+end
+
+-- only the items whose prices changed (or your auctions of them): the rest stay as they were
+local function BuildChanged(set)
+    building, dirty = true, false
+    local ids = {}
+    for id in pairs(set) do ids[#ids + 1] = id end
+    local mine = OwnedMap()
+    local below = (FT.S.dealBelow or 30) / 100
+    local minProfit = FT.S.dealMin or 0
+    local out, unknown = {}, {}
+    for _, d in ipairs(deals) do
+        if not set[d.id] then out[#out + 1] = d end
+    end
+    local look = info -- the counts go on from the last look
+    FT.Job("deals+", #ids, function(k) Look(ids[k], mine, below, minProfit, look, out, unknown) end, function()
+        Finished(out, unknown)
+    end)
+end
+
+function D.Build()
+    if building then
+        again = true
+        return
+    end
+    if not FT.db then return end
+    if fullNext or not (builtAt and info) or builtDay ~= FT.Day() or time() - (fullAt or 0) > FULL_EVERY then
+        fullNext = false
+        return BuildAll()
+    end
+    local set, n, all = FT.Hist.TakeChanged("deals")
+    if all then return BuildAll() end
+    dirty = false
+    if n > 0 then BuildChanged(set) end
 end
 
 -- the deals (best first), when they were looked for, still looking
@@ -364,12 +425,98 @@ end
 
 FT.On("FT_MARKET_READY", D.Changed)
 FT.On("FT_SCAN_DONE", D.Changed)
-FT.On("FT_OWNED_CHANGED", D.Changed)
-FT.On("FT_SETTINGS_CHANGED", D.Changed)
+-- your auctions changed: the items they are of (and were of) again
+local ownedBefore = {}
+FT.On("FT_OWNED_CHANGED", function()
+    local now = OwnedMap()
+    for id in pairs(now) do FT.Hist.MarkChanged("deals", id) end
+    for id in pairs(ownedBefore) do FT.Hist.MarkChanged("deals", id) end
+    ownedBefore = now
+    D.Changed()
+end)
+FT.On("FT_SETTINGS_CHANGED", function()
+    fullNext = true
+    D.Changed()
+end)
 -- the other auction house: its own deals (vendor prices are the same everywhere)
 FT.On("FT_HOUSE_CHANGED", function()
-    deals, builtAt, info = {}, nil, nil
+    deals, builtAt, info, counted = {}, nil, nil, {}
     D.Changed()
     FT.Fire("FT_DEALS_READY")
 end)
 FT.On("FT_LIVE_UPDATED", function(id) D.Update(id) end)
+
+---------------------------------------------------------------------------
+-- The carry list: the deals between the auction houses you take on (a right click on one). At the one house it
+-- says what to buy - it stays when the deal is gone (you bought the cheap lots); at the other the Sell page says
+-- what you brought and what it was bought for. It goes when you have listed what you brought there (out of your
+-- bags at that house), on another right click, or after two weeks.
+---------------------------------------------------------------------------
+local C = {}
+FT.Carry = C
+local CARRY_DAYS = 14
+
+-- itemID -> { buy, sell (houses), unit (bought for), target (to list at), qty, cut (there), at (taken on), had }
+local function Store()
+    local r = FT.Side()
+    r.carry = r.carry or {}
+    return r.carry
+end
+
+function C.Get(id)
+    return id and Store()[id] or nil
+end
+
+function C.Count()
+    local n = 0
+    for _ in pairs(Store()) do n = n + 1 end
+    return n
+end
+
+-- a deal between the houses into the list, or out of it (`d`: a deal, or a row of the list); true: in it now
+function C.Toggle(d)
+    local s = Store()
+    if s[d.id] then
+        s[d.id] = nil
+        FT.Fire("FT_CARRY_CHANGED")
+        return false
+    end
+    s[d.id] = { buy = d.buyHouse, sell = d.sellHouse, unit = d.unit, target = d.target, qty = d.qty or 1, cut = d.cut,
+        at = time() }
+    FT.Fire("FT_CARRY_CHANGED")
+    return true
+end
+
+-- the list as rows of the deals page - those not among the deals found now (`have`: itemID -> true)
+function C.Rows(have)
+    local out = {}
+    for id, e in pairs(Store()) do
+        if not (have and have[id]) and e.unit and e.target then
+            local qty = e.qty or 1
+            local net = e.target * (1 - (e.cut or FT.Cut(e.sell)))
+            out[#out + 1] = { id = id, kind = "HOUSES", carried = true, buyHouse = e.buy, sellHouse = e.sell,
+                unit = e.unit, target = e.target, qty = qty, cut = e.cut, perUnit = net - e.unit,
+                profit = (net - e.unit) * qty, cost = e.unit * qty, t = e.at, sellT = e.at }
+        end
+    end
+    return out
+end
+
+-- what you brought is out of your bags at the house it sells at (listed, or sold to a vendor there), or the
+-- entry is old: out of the list
+local function Tidy()
+    if not FT.db then return end
+    local s, now, changed = Store(), time(), false
+    for id, e in pairs(s) do
+        local count = GetItemCount and GetItemCount(id) or 0
+        if count > 0 then
+            e.had = true
+        elseif e.had and FT.ahHere and FT.atHouse == e.sell then
+            s[id], changed = nil, true
+        end
+        if s[id] and now - (e.at or 0) > CARRY_DAYS * 86400 then s[id], changed = nil, true end
+    end
+    if changed then FT.Fire("FT_CARRY_CHANGED") end
+end
+FT.On("FT_INVENTORY_CHANGED", Tidy)
+FT.On("FT_READY", Tidy)

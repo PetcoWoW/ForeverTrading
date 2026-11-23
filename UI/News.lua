@@ -12,6 +12,20 @@ FT.News = N
 -- start, after the files are read (a table made with them would keep the English)
 local function News()
     return {
+        ["v1.1.4"] = {
+            { L["Faster"], L["Saving a scan is three to four times as fast and far lighter on the game's memory: prices are written into the saved file once, when you log out. After a scan only the items that changed are counted again, a little each frame. /ft perf shows what each part took and the memory it takes."],
+                function() FT.PerfReport() end },
+            { L["Without Auctionator"], L["ForeverTrading goes by its own scans: top gainers and losers, the market mood, an item's changes, signals, liquidity and reselling work from the first days of scanning - while an auction house has been scanned on fewer days, fewer days of prices are asked for. Auctionator and Mastercraft only fill in what is missing."],
+                function() FT.Show("market") end },
+            { L["The carry list"], L["Signals > Deals > Between houses: a right click on a deal puts it on your carry list. It stays on the page (even when the deal is gone), and at the other auction house the Sell page marks what you brought and what it cost."],
+                function() FT.Show("signals"); FT.Tabs.signals.SetView("deals"); FT.Tabs.signals.SetDealKind("HOUSES") end },
+            { L["A smaller saved file"], L["Settings > Data: remove the history of items not seen on either auction house for 30 days - the ones that matter to you stay. Less for the game to load at login."],
+                function() FT.Show("settings") end },
+            { L["A lighter exchange"], L["About a third fewer messages between two players with 1.1.4: prices come sooner. /ft share test also checks that every character comes through."],
+                nil },
+            { L["Our own font"], L["Sofia Sans Condensed: narrow, with Cyrillic, no Mastercraft needed for it (the classic style keeps the game's). After updating, restart the game once."],
+                nil },
+        },
         ["v1.1.3"] = {
             { L["Hotfix"], L["The ForeverTrading tab on the auction house window works without Auctionator too."],
                 nil },

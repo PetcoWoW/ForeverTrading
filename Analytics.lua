@@ -93,11 +93,24 @@ local function UseCache()
     cache = caches[key] or {}
     cacheKey = key
 end
-FT.On("FT_PRICES_CHANGED", function() wipe(cache) end)
-FT.On("FT_HOUSE_CHANGED", UseCache)
+-- new prices: the items they are of are counted again (all of them after a whole market came in)
+local function Forget()
+    local set, _, all = FT.Hist.TakeChanged("stats")
+    if all then
+        wipe(cache)
+        return
+    end
+    for id in pairs(set) do cache[id] = nil end
+end
+local STATS_FRESH = 600 -- seconds: counted again after this anyway (the fair price weighs prices by their age)
+FT.On("FT_PRICES_CHANGED", Forget)
+FT.On("FT_SCAN_DONE", Forget)
+FT.On("FT_HOUSE_CHANGED", function()
+    UseCache()
+    wipe(cache)
+end)
 FT.On("FT_HOUSE_USE", UseCache)
 FT.On("FT_LIVE_UPDATED", function(itemID) if itemID then cache[itemID] = nil end end)
-FT.On("FT_SCAN_DONE", function() wipe(cache) end)
 FT.On("FT_SETTINGS_CHANGED", function() wipe(cache) end)
 
 local function CloseAtOrBefore(daily, day)
@@ -110,6 +123,20 @@ end
 local function Change(now, ref)
     if not now or not ref or ref <= 0 then return nil end
     return now / ref - 1
+end
+
+-- the first close from day `from` to day `to`
+local function FirstCloseIn(daily, from, to)
+    for _, c in ipairs(daily) do
+        if c.day >= from and c.day <= to then return c.c end
+    end
+    return nil
+end
+
+-- How long the market of this auction house has been watched (days with a whole-market scan, of the last `window`):
+-- while it is little (a new auction house, Auctionator off: our own scans only) fewer days of prices are asked for.
+local function Watched(window)
+    return FT.Hist.WatchedDays(window)
 end
 
 ---------------------------------------------------------------------------
@@ -151,6 +178,13 @@ function An.FairNow(itemID)
     end
     if s then
         for i = 1, #s.t do Add(s.p[i], s.q[i], s.t[i], nil, s.n[i], s.sl and s.sl[i]) end
+    else
+        -- not every price of it is kept (it doesn't matter to you): today's count too - its newest price and the one
+        -- before it, once they are an hour old (not only the closes of the days before)
+        local p, t, _, q, gone = FT.Price(itemID)
+        if p and t and not gone and FT.Day(t) == today then Add(p, q, t, nil, nil, nil) end
+        local prev = FT.Hist.Previous(itemID)
+        if prev and prev.t ~= t and FT.Day(prev.t) == today then Add(prev.p, prev.q, prev.t, nil, prev.n, prev.sl) end
     end
     if #obs == 0 then return nil end
     table.sort(obs, function(a, b) return a.t < b.t end)
@@ -211,8 +245,8 @@ end
 --   sinceQ, sinceN, sinceS (listed, auctions, sellers: more (+) or fewer (-) since), flood, crowd, dropped }
 function An.Stats(itemID)
     local s = cache[itemID]
-    if s then return s end
-    s = {}
+    if s and GetTime() - s.countedAt < STATS_FRESH then return s end
+    s = { countedAt = GetTime() }
     s.price, s.t, s.source, s.listed = FT.Price(itemID)
     local daily = FT.Hist.Daily(itemID, 60)
     s.daily = daily
@@ -220,9 +254,13 @@ function An.Stats(itemID)
     local closes = {}
     for _, c in ipairs(daily) do closes[#closes + 1] = c.c end
     s.closes = closes
-    s.ch1 = Change(s.price, CloseAtOrBefore(daily, today - 1))
-    s.ch7 = Change(s.price, CloseAtOrBefore(daily, today - 7))
-    s.ch30 = Change(s.price, CloseAtOrBefore(daily, today - 30))
+    -- No day as old as that known (a new auction house or item, Auctionator off): the change since the first day of
+    -- that span known - or since today's first price, when it moved today at all (seen more than once).
+    local last = daily[#daily]
+    local dayOpen = last and last.day == today and last.o and last.h ~= last.l and last.o or nil
+    s.ch1 = Change(s.price, CloseAtOrBefore(daily, today - 1) or dayOpen)
+    s.ch7 = Change(s.price, CloseAtOrBefore(daily, today - 7) or FirstCloseIn(daily, today - 6, today - 1) or dayOpen)
+    s.ch30 = Change(s.price, CloseAtOrBefore(daily, today - 30) or FirstCloseIn(daily, today - 29, today - 1) or dayOpen)
 
     -- the average of the last N days, today left out (that's what we compare today with)
     local avgDays = FT.S.avgDays
@@ -245,7 +283,6 @@ function An.Stats(itemID)
     end
     s.avgN = n
     s.avg = n > 0 and sum / n or nil
-    s.dev = Change(s.price, s.avg)
     s.hi7, s.lo7, s.hi30, s.lo30 = hi7, lo7, hi30, lo30
     s.days = days14
     -- how many days this item has history at all (liquidity can't be judged on a day or two)
@@ -272,6 +309,9 @@ function An.Stats(itemID)
         s.sellersNow = s.sellersNow or ((book.sellers or 0) > 0 and book.sellers or nil)
     end
     s.fair, s.typicalQ, s.typicalN, s.typicalS = An.FairNow(itemID)
+    -- the first day the market is watched (no day before today): the fair price of the hours seen is the average
+    if not s.avg and s.fair and Watched(avgDays) <= 1 then s.avg, s.avgN, s.avgFair = s.fair, 0, true end
+    s.dev = Change(s.price, s.avg)
     s.spike = Spike(s)
     s.falling = Falling(s)
     s.sale = s.spike and s.fair or s.price
@@ -352,6 +392,8 @@ end
 function An.DevSeries(itemID, days)
     local daily = FT.Hist.Daily(itemID, (days or 30) + FT.S.avgDays)
     local out = {}
+    -- days in an average: 3, fewer while the market has been watched fewer days
+    local need = math.max(1, math.min(3, Watched(FT.S.avgDays) - 1))
     local from = FT.Day() - (days or 30) + 1
     for i, c in ipairs(daily) do
         if c.day >= from then
@@ -361,7 +403,7 @@ function An.DevSeries(itemID, days)
                 if c.day - prev.day > FT.S.avgDays then break end
                 sum, n = sum + prev.c, n + 1
             end
-            if n >= 3 and sum > 0 then
+            if n >= need and sum > 0 then
                 -- in money: what selling one now brings above (or below) the average price
                 local avg = sum / n
                 out[#out + 1] = { t = c.t, value = c.c - avg, pct = c.c / avg - 1 }
@@ -372,21 +414,44 @@ function An.DevSeries(itemID, days)
 end
 
 -- how easy it is to sell: "high" / "medium" / "low" (by how many of the last 14 days it was listed)
--- "unknown" while the item has less than 5 days of history: too early to tell
+-- "unknown" while the item has less than 5 days of history (fewer while the market itself has been watched fewer
+-- days, at least 2): too early to tell. On the market's first day: "medium" when many auctions of it are up now.
 function An.Liquidity(s)
-    if not s or not s.days or not s.span or s.span < 5 then return "unknown" end
-    -- the share of the days we know of on which it was listed
-    local cover = s.days / math.min(14, s.span)
-    if cover >= 0.6 and (s.auctions == nil or s.auctions >= 4) then return "high" end
-    if cover >= 0.3 then return "medium" end
-    return "low"
+    if not s or not s.days or not s.span then return "unknown" end
+    local watched = Watched(14)
+    if s.span >= math.max(2, math.min(5, watched)) then
+        -- the share of the days we know of on which it was listed
+        local cover = s.days / math.min(14, s.span)
+        if cover >= 0.6 and (s.auctions == nil or s.auctions >= 4) then return "high" end
+        if cover >= 0.3 then return "medium" end
+        return "low"
+    end
+    if watched <= 1 then
+        local auctions = s.auctionsNow or s.auctions
+        if (auctions and auctions >= 4) or (not auctions and (s.listed or 0) >= 10) then return "medium" end
+    end
+    return "unknown"
 end
 
 ---------------------------------------------------------------------------
 -- Signals: kind, strength (1-3), reason
 ---------------------------------------------------------------------------
+-- an average of 3 days or more (fewer while the market has been watched fewer days; its first day: the fair price
+-- of the hours seen)
 local function Enough(s)
-    return s and s.price and s.avg and (s.avgN or 0) >= 3
+    if not (s and s.price and s.avg) then return false end
+    return (s.avgN or 0) >= math.min(3, math.max(0, Watched(FT.S.avgDays) - 1))
+end
+
+-- what the average is of, in the reasons: "the 14-day average" (as many days as the setting while there are 3 or
+-- more of them, otherwise as many as there are), or the price of the last hours
+local function AboveText(s, dev)
+    if s.avgFair then return string.format(L["%s above its price of the last hours"], FT.Pct(dev, true)) end
+    return string.format(L["%s above the %d-day average"], FT.Pct(dev, true), (s.avgN or 0) >= 3 and FT.S.avgDays or s.avgN)
+end
+local function BelowText(s, dev)
+    if s.avgFair then return string.format(L["%s below its price of the last hours"], FT.Pct(dev, true)) end
+    return string.format(L["%s below the %d-day average"], FT.Pct(dev, true), (s.avgN or 0) >= 3 and FT.S.avgDays or s.avgN)
 end
 
 -- for something you have or make: sell now?
@@ -404,14 +469,18 @@ function An.SellSignal(s)
         local strength = (dev >= th and hot) and 3 or ((dev >= th * 2) and 3 or 2)
         local reason
         if dev >= th then
-            reason = string.format(L["%s above the %d-day average"], FT.Pct(dev, true), FT.S.avgDays)
+            reason = AboveText(s, dev)
         else
             reason = string.format(L["RSI %d: overbought"], math.floor(s.rsi + 0.5))
         end
         return "SELL", strength, reason
     end
     if dev <= -th then
-        return "HOLD", 2, string.format(L["%s below the %d-day average: wait"], FT.Pct(dev, true), FT.S.avgDays)
+        if s.avgFair then
+            return "HOLD", 2, string.format(L["%s below its price of the last hours: wait"], FT.Pct(dev, true))
+        end
+        return "HOLD", 2, string.format(L["%s below the %d-day average: wait"], FT.Pct(dev, true),
+            (s.avgN or 0) >= 3 and FT.S.avgDays or s.avgN)
     end
     return "FAIR", 1, L["Price near its average"]
 end
@@ -426,14 +495,14 @@ function An.BuySignal(s)
         local strength = (dev <= -th and cold) and 3 or 2
         local reason
         if dev <= -th then
-            reason = string.format(L["%s below the %d-day average"], FT.Pct(dev, true), FT.S.avgDays)
+            reason = BelowText(s, dev)
         else
             reason = string.format(L["RSI %d: oversold"], math.floor(s.rsi + 0.5))
         end
         return "BUY", strength, reason
     end
     if dev >= th then
-        return "EXPENSIVE", 2, string.format(L["%s above the %d-day average"], FT.Pct(dev, true), FT.S.avgDays)
+        return "EXPENSIVE", 2, AboveText(s, dev)
     end
     return "FAIR", 1, L["Price near its average"]
 end

@@ -1,5 +1,29 @@
 # ForeverTrading
 
+## v1.1.4
+
+**New**
+- **Faster**: saving a scan takes three to four times less work and far less of the game's memory - prices are written into the saved file once, when you log out (or `/reload`), not with every price. After "My items" or prices from another player, the Market, the deals and the item stats count again only the items that changed; everything again after a full scan, another auction house, a new day, and every 10 minutes. Long jobs take a share of each frame (less in a fight) instead of a fixed number of items: smooth on a slow computer, quicker on a fast one. `/ft perf` shows what each part took, the addon's memory, the saved data and how much of it waits to be written.
+- **Without Auctionator**: ForeverTrading goes by its own scans. The fewer days an auction house has been scanned, the fewer days of prices are asked for - its first day the price of the last hours stands in for the average: top gainers and losers, the market mood, an item's change in a day, a week and a month, buy and sell signals, liquidity and reselling work from the first days. A market watched longer behaves as before. Auctionator and Mastercraft only fill in what is missing.
+- **The carry list**: Signals > Deals > Between houses - a right click on a deal puts it on your list (and takes it off). It stays on the page, first, even when the deal is gone; at the other auction house the Sell page marks what you brought and shows what it cost and the price the deal counted on. It goes once you have listed it there, or after two weeks.
+- **A smaller saved file**: Settings > Data - remove the history of items not seen on either auction house for 30 days (it says how many first). The ones that matter to you stay: your recipes and their materials, watchlist, what you own.
+- **A lighter exchange**: between two players with 1.1.4 prices go compact - about a third fewer messages (7,000 prices in some 1 minute on three lanes instead of almost 2). With older versions as before. `/ft share test` also checks that every character comes through; should they come changed, the old format is asked for.
+- **Our own font**: Sofia Sans Condensed Medium (SIL Open Font License) - narrow, with Cyrillic; no Mastercraft needed for it. The classic style keeps the game's font. A new file: restart the game once after updating.
+
+**Changes**
+- Top gainers and losers show only items that rose, or fell - no rows of 0%; before today's scan, the moves of the last day the market was seen.
+
+**Новое**
+- **Быстрее**: сохранение скана в 3–4 раза легче и гораздо меньше нагружает память игры — цены пишутся в файл сохранений один раз, при выходе (или `/reload`), а не с каждой ценой. После «Моих товаров» или цен от другого игрока «Рынок», сделки и статистика предметов пересчитывают только изменившиеся предметы; всё целиком — после полного скана, смены аукциона, в новый день и раз в 10 минут. Долгая работа занимает долю каждого кадра (в бою меньше), а не фиксированное число предметов: плавно на слабом компьютере, быстрее на сильном. `/ft perf` показывает, сколько заняла каждая часть, память аддона, размер данных и сколько ждёт записи.
+- **Без Auctionator**: ForeverTrading опирается на свои сканы. Чем меньше дней аукцион сканировали, тем меньше дней истории требуется — в первый день вместо средней берётся цена последних часов: лидеры роста и падения, настроение рынка, изменение цены за день, неделю и месяц, сигналы «купить/продать», ликвидность и перепродажа работают с первых дней. На рынке, который смотрят дольше, — как раньше. Auctionator и Mastercraft только дополняют недостающее.
+- **Список закупки**: «Сигналы > Сделки > Между аукционами» — правый клик по сделке добавляет её в список (и убирает). Она остаётся на странице первой, даже когда сделки уже нет; на другом аукционе вкладка «Продажа» помечает, что вы привезли, и показывает, почём купили и по какой цене ставить. Убирается сама, когда вы выставили привезённое там, или через две недели.
+- **Файл сохранений меньше**: «Настройки > Данные» — убрать историю предметов, которых не было ни на одном аукционе 30 дней (сначала скажет, сколько). Нужные вам остаются: рецепты и их материалы, избранное, то, что у вас есть.
+- **Обмен легче**: между игроками с 1.1.4 цены идут в плотном виде — примерно на треть меньше сообщений (7 000 цен примерно за минуту по трём каналам вместо почти двух). Со старыми версиями — как раньше. `/ft share test` заодно проверяет, что все символы доходят; если они приходят искажёнными, запрашивается старый формат.
+- **Свой шрифт**: Sofia Sans Condensed Medium (свободная лицензия SIL OFL) — узкий, с кириллицей, Mastercraft для него не нужен. В классической теме — шрифт игры. Это новый файл: после обновления один раз перезапустите игру.
+
+**Изменения**
+- В лидерах роста и падения только выросшие или упавшие предметы, без строк с 0%; до сегодняшнего скана — движения за последний день, когда рынок видели целиком.
+
 ## v1.1.3
 
 **Fixes**

@@ -193,22 +193,38 @@ local function BuildTicker(parent)
         return e
     end
 
+    -- the entries hang on one strip that moves: one anchor a frame (an entry is placed again only when it goes
+    -- round from the left edge to the end)
+    t.strip = CreateFrame("Frame", nil, t)
+    t.strip:SetSize(1, 26)
+    t.offset = 0
+    local function PlaceStrip(self)
+        self.strip:ClearAllPoints()
+        self.strip:SetPoint("LEFT", self, "LEFT", self.offset, 0)
+    end
+    local function PlaceEntry(self, e)
+        e:ClearAllPoints()
+        e:SetPoint("LEFT", self.strip, "LEFT", e.x, 0)
+    end
+
     function t:SetEntries(list)
         self.list = list
+        self.offset = 0
+        PlaceStrip(self)
         local x = 12
         for i, item in ipairs(list) do
             local e = Entry(i)
             e.itemID = item.id
             e.text:SetText(item.text)
             e:SetWidth(math.ceil(e.text:GetStringWidth()) + 4)
-            e.x = x
-            x = x + e:GetWidth() + 34
-            e:ClearAllPoints()
-            e:SetPoint("LEFT", self, "LEFT", e.x, 0)
+            e.x, e.w = x, e:GetWidth()
+            x = x + e.w + 34
+            PlaceEntry(self, e)
             e:Show()
         end
         for i = #list + 1, #self.entries do self.entries[i]:Hide() end
         self.total = x
+        self.right = x - 34 -- the right edge of the last entry, on the strip
     end
 
     t:SetScript("OnUpdate", function(self, elapsed)
@@ -218,23 +234,31 @@ local function BuildTicker(parent)
             -- everything fits: no need to move
             return
         end
-        local dx = self.speed * math.min(elapsed, 0.1)
-        local maxRight = 0
-        for i = 1, #self.list do
-            local e = self.entries[i]
-            local right = e.x + e:GetWidth()
-            if right > maxRight then maxRight = right end
-        end
-        for i = 1, #self.list do
-            local e = self.entries[i]
-            e.x = e.x - dx
-            if e.x + e:GetWidth() < 0 then
-                e.x = math.max(maxRight + 34, W)
-                maxRight = e.x + e:GetWidth()
+        local n = #self.list
+        self.offset = self.offset - self.speed * math.min(elapsed, 0.1)
+        if self.offset < -10000 then
+            -- far along: the strip back to the start, the entries with it
+            for i = 1, n do
+                local e = self.entries[i]
+                e.x = e.x + self.offset
+                PlaceEntry(self, e)
             end
-            e:ClearAllPoints()
-            e:SetPoint("LEFT", self, "LEFT", e.x, 0)
-            if not self.clips then e:SetShown(e.x >= 0 and e.x + e:GetWidth() <= W) end
+            self.right = self.right + self.offset
+            self.offset = 0
+        end
+        PlaceStrip(self)
+        for i = 1, n do
+            local e = self.entries[i]
+            if e.x + e.w + self.offset < 0 then
+                -- gone past the left edge: after the last one
+                e.x = math.max(self.right + 34, W - self.offset)
+                self.right = e.x + e.w
+                PlaceEntry(self, e)
+            end
+            if not self.clips then
+                local sx = e.x + self.offset
+                e:SetShown(sx >= 0 and sx + e.w <= W)
+            end
         end
     end)
     t.clips = t.SetClipsChildren ~= nil
@@ -366,8 +390,12 @@ local function BuildScanBox(header, anchor, closeButton)
     f.elapsed = 0
     f:SetScript("OnUpdate", function(self, elapsed)
         self.elapsed = self.elapsed + elapsed
-        if self.elapsed >= 0.2 then
-            self.elapsed = 0
+        if self.elapsed < 0.2 then return end
+        self.elapsed = 0
+        -- only while a scan or the exchange runs (and once when it ends): the rest comes with the events
+        local busy = FT.Scanner.mode ~= nil or FT.Share.Status() ~= nil
+        if busy or self.busy then
+            self.busy = busy
             FT.UpdateScanBox()
         end
     end)
@@ -620,6 +648,7 @@ local function Build()
 
     win:SetScript("OnShow", function()
         FT.UpdateStatus()
+        FT.UpdateScanBox()
         FT.UpdateTicker()
         FT.Market.EnsureFresh()
     end)

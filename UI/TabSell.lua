@@ -49,10 +49,16 @@ local function Rows()
         local name = FT.Name(e.id)
         if not search or (name and FT.Fold(name):find(search, 1, true)) then out[#out + 1] = e end
     end
-    -- taken off to post again and back from the mail: first
-    for _, e in ipairs(out) do e.repost = FT.Owned.Waiting(e.id) ~= nil end
+    -- taken off to post again and back from the mail: first; then what you brought from the other auction house
+    -- (the carry list) to sell here
+    for _, e in ipairs(out) do
+        e.repost = FT.Owned.Waiting(e.id) ~= nil
+        local c = FT.Carry.Get(e.id)
+        e.carry = (c and c.sell == FT.house) and c or nil
+    end
     table.sort(out, function(a, b)
         if a.repost ~= b.repost then return a.repost end
+        if (a.carry ~= nil) ~= (b.carry ~= nil) then return a.carry ~= nil end
         local va, vb = a.value or -1, b.value or -1
         if va ~= vb then return va > vb end
         return a.id < b.id
@@ -113,7 +119,8 @@ local function BuildList(p)
         update = function(row, e)
             local c = row.cells.name
             c.icon:SetItem(e.id)
-            c.text:SetText(FT.ItemText(e.id) .. (e.repost and FT.C("accent", " " .. L["post again"]) or ""))
+            c.text:SetText(FT.ItemText(e.id) .. (e.repost and FT.C("accent", " " .. L["post again"]) or "")
+                .. (e.carry and FT.C("accent", " " .. L["brought"]) or ""))
             row.cells.count:SetText(FT.Num(e.count))
             row.cells.price:SetText(e.price and FT.Money(e.price, "short") or FT.C("dim", "—"))
             row.cells.signal:Set(e.signal, nil, e.strength)
@@ -441,6 +448,12 @@ function T.ShowForm(keep)
     else
         parts[#parts + 1] = L["all your stacks in one posting"]
     end
+    -- brought from the other auction house (the carry list): what it cost there, what the deal counted on here
+    local carry = FT.Carry.Get(e.id)
+    if carry and carry.sell == FT.house and carry.unit and carry.target then
+        parts[#parts + 1] = FT.C("accent", string.format(L["bought at %s for %s each: list at ~%s"], FT.House.Name(carry.buy),
+            FT.Money(math.floor(carry.unit + 0.5), "short"), FT.Money(math.floor(carry.target + 0.5), "short")))
+    end
     f.sub:SetText(table.concat(parts, FT.C("dim", "  ||  ")))
     Facts(e)
     local max = T.MaxQty(e)
@@ -545,6 +558,13 @@ end
 
 -- a posting started, done or cancelled: the Post button follows
 FT.On("FT_SELL_STATE", function() if form and form:IsVisible() then T.UpdateSummary() end end)
+-- the carry list changed: what you brought shows
+FT.On("FT_CARRY_CHANGED", function()
+    if page and page:IsVisible() and state.view ~= "owned" then
+        T.RefreshList()
+        T.ShowForm(true)
+    end
+end)
 
 ---------------------------------------------------------------------------
 -- Page

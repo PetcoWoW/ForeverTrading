@@ -1,1 +1,4 @@
 * text=auto eol=lf
+# fonts and images as they are (no line-end changes)
+*.ttf binary
+*.tga binary

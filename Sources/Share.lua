@@ -17,8 +17,11 @@
 --              it can tell who is there and why nothing came ("old", "same", "off", "busy")
 --   P  pick:   "P", proto, the name picked, its time, the lanes the asker takes
 --   B  begin:  "B", proto, side, time, items, lanes   D  data: "D", n, "item,price,listed,age;..." (on any lane)
+--   C  begin, compact: as B, its data in   Z  data: "Z", n, numbers in printable characters (on any lane)
+--              when the asker's pick says it reads them (format "2", since 1.1.4: about half the messages)
 --   E  end:    "E", messages, items                K  still here (the sender is in a fight)
---   T  test:   "T", proto, a token: /ft share test sends it to itself every way it can and sees which come back
+--   T  test:   "T", proto, a token, the compact characters: /ft share test sends it to itself every way it can and
+--              sees which come back (and whether every character comes back as it was)
 -- A channel here is "GUILD", "PARTY", "RAID" or "W:<name>": a hidden whisper to that player.
 -- Times go over the wire as server time: players' clocks differ.
 local ADDON, FT = ...
@@ -65,6 +68,79 @@ local test            -- /ft share test running: { token, sent = { keys }, heard
 
 local function Enc(n) return FT.Hist.Enc(n) end
 local function Dec(s) return FT.Hist.Dec(s) end
+
+---------------------------------------------------------------------------
+-- The compact data (format "2"): numbers in printable characters with no separators. Of the 92 printable ones
+-- (no tab - it parts the fields - no "|" nor "\") half end a number and the other half come before its last digit:
+-- under 46 a number takes one character, under 2116 two, under 97 336 three, under 4.5 million four.
+-- An item: its id (in a message the items go by id: after the first only the step up from the one before), its
+-- price, listed x 2 (+1: an age follows), the age (minutes before the scan).
+---------------------------------------------------------------------------
+local FORMAT = "2"
+local Z_BASE = 46
+local Z_MORE, Z_LAST = {}, {}   -- digit -> character
+local MORE_OF, LAST_OF = {}, {} -- byte -> digit
+local Z_ALL                     -- every character, in order (the test sends them)
+do
+    local chars = {}
+    for b = 33, 126 do
+        if b ~= 124 and b ~= 92 then chars[#chars + 1] = string.char(b) end
+    end
+    for i = 0, Z_BASE - 1 do
+        Z_MORE[i], Z_LAST[i] = chars[i + 1], chars[Z_BASE + i + 1]
+        MORE_OF[chars[i + 1]:byte()] = i
+        LAST_OF[chars[Z_BASE + i + 1]:byte()] = i
+    end
+    Z_ALL = table.concat(chars)
+end
+
+local function ZPut(parts, v)
+    v = math.max(0, math.floor(v))
+    local low = v % Z_BASE
+    v = math.floor(v / Z_BASE)
+    local digits = {}
+    while v > 0 do
+        digits[#digits + 1] = v % Z_BASE
+        v = math.floor(v / Z_BASE)
+    end
+    for i = #digits, 1, -1 do parts[#parts + 1] = Z_MORE[digits[i]] end
+    parts[#parts + 1] = Z_LAST[low]
+end
+
+-- items list[from .. from + k - 1] ({ id, price, listed, age }) as one message's data
+local function ZText(list, from, k)
+    local items = {}
+    for i = from, from + k - 1 do items[#items + 1] = list[i] end
+    table.sort(items, function(a, b) return a[1] < b[1] end)
+    local parts, prev = {}, 0
+    for _, e in ipairs(items) do
+        ZPut(parts, e[1] - prev)
+        prev = e[1]
+        ZPut(parts, e[2])
+        local age = e[4] or 0
+        ZPut(parts, (e[3] or 0) * 2 + (age > 0 and 1 or 0))
+        if age > 0 then ZPut(parts, age) end
+    end
+    return table.concat(parts)
+end
+
+-- the numbers of a message's data (nil: a character that isn't ours - not this format)
+local function ZNumbers(text)
+    local out_, acc = {}, 0
+    for i = 1, #text do
+        local b = text:byte(i)
+        local d = MORE_OF[b]
+        if d then
+            acc = acc * Z_BASE + d
+        else
+            d = LAST_OF[b]
+            if not d then return nil end
+            out_[#out_ + 1] = acc * Z_BASE + d
+            acc = 0
+        end
+    end
+    return out_
+end
 
 -- our clock vs the server's
 local function Skew()
@@ -316,7 +392,8 @@ local function Pick(r)
     FT.Debug("share: offers on", ask.channel, "-", Count(ask.offers), best and ("picked " .. best.name) or "none")
     if not best then return NextChannel() end
     ask.picked = best.name
-    Send(best.channel, "P", PROTO, best.name, Enc(best.wire), tostring(LANES))
+    -- the lanes we take and the data format we read (1.1.3 and older send the old one: they don't know it)
+    Send(best.channel, "P", PROTO, best.name, Enc(best.wire), tostring(LANES), FT.db.shareOldFormat and "1" or FORMAT)
     -- they don't begin: the next channel
     C_Timer.After(PICK_WAIT, function()
         if ask and ask.round == r and ask.picked then
@@ -476,6 +553,35 @@ local function StopSending()
     out = nil
 end
 
+-- the next message's data, from item o.i on: its text, and the item after its last
+local function NextData(o)
+    local head = 2 + #Enc(o.seq + 1) + 1
+    if o.dense then
+        -- as many items as fit (one more never makes the text shorter)
+        local lo, hi, best, text = 1, math.min(#o.list - o.i + 1, 120), 0, nil
+        while lo <= hi do
+            local mid = math.floor((lo + hi) / 2)
+            local t = ZText(o.list, o.i, mid)
+            if head + #t <= MSG_MAX then
+                best, text, lo = mid, t, mid + 1
+            else
+                hi = mid - 1
+            end
+        end
+        if best == 0 then best, text = 1, ZText(o.list, o.i, 1) end
+        return text, o.i + best
+    end
+    local parts, len, k = {}, head, o.i
+    while k <= #o.list do
+        local s = ItemText(o.list[k])
+        if len + #s + 1 > MSG_MAX then break end
+        parts[#parts + 1] = s
+        len = len + #s + 1
+        k = k + 1
+    end
+    return table.concat(parts, ";"), k
+end
+
 local function SendStep()
     local o = out
     if not o then return end
@@ -494,16 +600,8 @@ local function SendStep()
     end
     for lane = 1, o.lanes or 1 do
         if o.i > #o.list then break end
-        local head = 2 + #Enc(o.seq + 1) + 1
-        local parts, len, k = {}, head, o.i
-        while k <= #o.list do
-            local s = ItemText(o.list[k])
-            if len + #s + 1 > MSG_MAX then break end
-            parts[#parts + 1] = s
-            len = len + #s + 1
-            k = k + 1
-        end
-        if SendOn(lane, o.channel, "D", Enc(o.seq + 1), table.concat(parts, ";")) then
+        local text, k = NextData(o)
+        if SendOn(lane, o.channel, o.dense and "Z" or "D", Enc(o.seq + 1), text) then
             o.seq, o.i, o.fails = o.seq + 1, k, 0
         else
             -- left the guild or the group, or the game holds messages back: try again, give up after a while
@@ -514,7 +612,8 @@ local function SendStep()
     end
 end
 
-local function StartSending(channel, lanes)
+-- dense: the compact data (the asker reads it)
+local function StartSending(channel, lanes, dense)
     lanes = math.max(1, math.min(LANES, lanes or 1))
     local mine = FT.Hist.MarketTime()
     if not Fresh(mine) then return end
@@ -529,22 +628,23 @@ local function StartSending(channel, lanes)
     table.sort(list, function(a, b) return a[2] * math.max(1, a[3]) > b[2] * math.max(1, b[3]) end)
     while #list > MAX_ITEMS do table.remove(list) end
     lastStream[channel] = time()
-    local ok, code = Send(channel, "B", PROTO, FT.houseKey, Enc(Wire(mine)), Enc(#list), tostring(lanes))
-    FT.Debug("share: sending", #list, "prices on", channel, "-", lanes, "lanes", ok and "" or ("- not sent: " .. tostring(code)))
+    local ok, code = Send(channel, dense and "C" or "B", PROTO, FT.houseKey, Enc(Wire(mine)), Enc(#list), tostring(lanes))
+    FT.Debug("share: sending", #list, "prices on", channel, "-", lanes, "lanes", dense and "compact" or "",
+        ok and "" or ("- not sent: " .. tostring(code)))
     if not ok then return end
-    out = { channel = channel, t = mine, list = list, i = 1, seq = 0, fails = 0, lanes = lanes }
+    out = { channel = channel, t = mine, list = list, i = 1, seq = 0, fails = 0, lanes = lanes, dense = dense }
     out.ticker = C_Timer.NewTicker(SEND_EVERY, SendStep)
 end
 
--- picked: as many lanes as the asker takes (none said: 1.1.1, one)
-local function OnPick(channel, target, lanesText)
+-- picked: as many lanes as the asker takes (none said: 1.1.1, one), compact when it reads that (since 1.1.4)
+local function OnPick(channel, target, lanesText, formatText)
     if not IsMe(target) then return end
     if out or not FT.S.shareSend then return end
     if lastStream[channel] and time() - lastStream[channel] < STREAM_GAP then
         FT.Debug("share: picked on", channel, "- sent there less than 5 minutes ago")
         return
     end
-    StartSending(channel, tonumber(lanesText) or 1)
+    StartSending(channel, tonumber(lanesText) or 1, formatText == FORMAT)
 end
 
 ---------------------------------------------------------------------------
@@ -562,7 +662,8 @@ local function Scanning()
     return FT.scanning or FT.atrScanning or (FT.Scanner and FT.Scanner.mode ~= nil)
 end
 
-local function OnBegin(channel, sender, side, tWire, countText)
+-- dense: its data comes compact ("C" began it)
+local function OnBegin(channel, sender, side, tWire, countText, dense)
     if side ~= FT.houseKey or streams[sender] then return end
     if Scanning() then
         FT.Debug("share:", Short(sender), "begins - not taken: our own scan runs")
@@ -585,35 +686,69 @@ local function OnBegin(channel, sender, side, tWire, countText)
     end
     FT.Debug("share: receiving", count, "prices from", Short(sender), "-", FT.Ago(t))
     streams[sender] = { t = t, count = count, got = 0, taken = 0, value = 0, lastAt = GetTime(), shownAt = GetTime(),
-        from = Short(sender) }
+        from = Short(sender), dense = dense }
     if manual then FT.Print(string.format(L["Receiving prices from %s (their scan: %s)..."], Short(sender), FT.Ago(t))) end
 end
 
-local function OnData(sender, payload)
-    local st = streams[sender]
-    if not st or type(payload) ~= "string" then return end
-    st.lastAt = GetTime()
-    for rec in payload:gmatch("[^;]+") do
-        if st.got >= st.count then break end
-        local a, b, c, d = rec:match("^(%w+),(%w+),(%w*),?(%w*)$")
-        local id, p = Dec(a), Dec(b)
-        if id and p and id < 10000000 and p > 0 and p < MAX_PRICE then
-            st.got = st.got + 1
-            local q = Dec(c)
-            if q and q > 1000000 then q = nil end
-            local t = st.t - math.min(Dec(d) or 0, WINDOW / 60) * 60
-            if Plausible(id, p) then
-                FT.Hist.Observe(id, p, q, nil, t, "peer")
-                st.taken = st.taken + 1
-                st.value = st.value + p * (q or 0)
-            end
-        end
+-- one price of a transfer: item, price, listed (nil: not known), age (minutes before their scan)
+local function Take(st, id, p, q, age)
+    if not (id and p and id > 0 and id < 10000000 and p > 0 and p < MAX_PRICE) then return end
+    st.got = st.got + 1
+    if q and (q <= 0 or q > 1000000) then q = nil end
+    local t = st.t - math.min(age or 0, WINDOW / 60) * 60
+    if Plausible(id, p) then
+        FT.Hist.Observe(id, p, q, nil, t, "peer")
+        st.taken = st.taken + 1
+        st.value = st.value + p * (q or 0)
     end
-    -- a long transfer: the pages catch up once a minute (not on every message)
+end
+
+-- a long transfer: the pages catch up once a minute (not on every message)
+local function Shown(st)
     if GetTime() - st.shownAt > 60 then
         st.shownAt = GetTime()
         FT.Fire("FT_PRICES_CHANGED", "peer")
     end
+end
+
+local function OnData(sender, payload)
+    local st = streams[sender]
+    if not st or st.dense or type(payload) ~= "string" then return end
+    st.lastAt = GetTime()
+    for rec in payload:gmatch("[^;]+") do
+        if st.got >= st.count then break end
+        local a, b, c, d = rec:match("^(%w+),(%w+),(%w*),?(%w*)$")
+        Take(st, Dec(a), Dec(b), Dec(c), Dec(d))
+    end
+    Shown(st)
+end
+
+-- the compact data: item (the step up from the one before), price, listed x 2 (+1: an age follows), age
+local function OnDense(sender, payload)
+    local st = streams[sender]
+    if not (st and st.dense) or type(payload) ~= "string" then return end
+    st.lastAt = GetTime()
+    local v = ZNumbers(payload)
+    if not v then
+        -- the way changes characters: this transfer brings nothing - from now on the old data is asked for
+        streams[sender] = nil
+        FT.db.shareOldFormat = true
+        FT.Print(L["The exchange: the compact data came changed on the way. From now on the old format is asked for - press Exchange again."])
+        return
+    end
+    local k, prev = 1, 0
+    while v[k + 2] and st.got < st.count do
+        local id, p, x = prev + v[k], v[k + 1], v[k + 2]
+        k = k + 3
+        local age = 0
+        if x % 2 == 1 then
+            age = v[k] or 0
+            k = k + 1
+        end
+        prev = id
+        Take(st, id, p, math.floor(x / 2), age)
+    end
+    Shown(st)
 end
 
 local function Finish(sender, complete)
@@ -670,18 +805,24 @@ FT.On("CHAT_MSG_ADDON", function(prefix, text, channel, sender)
     local lane = LANE_OF[prefix]
     if not lane or type(text) ~= "string" or not sender then return end
     local kind, a, b, c, d, e = strsplit("\t", text)
-    if lane > 1 and kind ~= "D" then return end
+    if lane > 1 and kind ~= "D" and kind ~= "Z" then return end
     if IsMe(sender) then
-        -- our own test message came back: that way works
-        if kind == "T" and test and b == test.token then test.heard[channel == "WHISPER" and "W" or channel] = true end
+        -- our own test message came back: that way works (and the compact characters came as they went, or not)
+        if kind == "T" and test and b == test.token then
+            local key = channel == "WHISPER" and "W" or channel
+            test.heard[key] = true
+            test.chars[key] = (c == Z_ALL)
+        end
         return
     end
     if kind == "T" then return end
     X.Met(sender)
     if channel == "WHISPER" then channel = "W:" .. Short(sender) end
-    if kind ~= "D" and kind ~= "K" then FT.Debug("share: heard", kind, "from", Short(sender), "on", channel) end
+    if kind ~= "D" and kind ~= "Z" and kind ~= "K" then FT.Debug("share: heard", kind, "from", Short(sender), "on", channel) end
     if kind == "D" then
         OnData(sender, b)
+    elseif kind == "Z" then
+        OnDense(sender, b)
     elseif kind == "K" then
         if streams[sender] then streams[sender].lastAt = GetTime() end
     elseif kind == "E" then
@@ -695,9 +836,9 @@ FT.On("CHAT_MSG_ADDON", function(prefix, text, channel, sender)
     elseif kind == "N" then
         OnNo(channel, sender, b, c, d, e)
     elseif kind == "P" then
-        OnPick(channel, b, d)
-    elseif kind == "B" then
-        OnBegin(channel, sender, b, c, d)
+        OnPick(channel, b, d, e)
+    elseif kind == "B" or kind == "C" then
+        OnBegin(channel, sender, b, c, d, kind == "C")
     end
 end)
 
@@ -728,13 +869,13 @@ function X.Test()
     end
     FT.Print(string.format(L["Exchange test: which ways the game carries ForeverTrading's hidden messages (the realm restricts addon messages: %s)..."], restricted))
     FindMe()
-    local t = { token = tostring(math.random(100000, 999999)), sent = {}, heard = {}, self = MyName() }
+    local t = { token = tostring(math.random(100000, 999999)), sent = {}, heard = {}, chars = {}, self = MyName() }
     test = t
     local ways = Channels()
     ways[#ways + 1] = "W:" .. t.self
     for _, ch in ipairs(ways) do
         local key = IsWhisper(ch) and "W" or ch
-        local ok, code = Send(ch, "T", PROTO, t.token)
+        local ok, code = Send(ch, "T", PROTO, t.token, Z_ALL)
         if ok then
             t.sent[#t.sent + 1] = key
         else
@@ -746,8 +887,13 @@ function X.Test()
         test = nil
         for _, key in ipairs(t.sent) do
             local text
-            if t.heard[key] then
+            if t.heard[key] and t.chars[key] then
                 text = L["works"]
+                -- the compact data comes through: asked for again (should it have been given up)
+                FT.db.shareOldFormat = nil
+            elseif t.heard[key] then
+                -- the compact data wouldn't come through this way as it went: an exchange with 1.1.4 would bring nothing
+                text = L["works, but some characters come changed: the compact exchange can't go this way"]
             elseif key == "W" and t.notFound then
                 text = string.format(L["the game found no player named %s"], t.self)
             else

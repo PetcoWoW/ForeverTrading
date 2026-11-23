@@ -132,6 +132,8 @@ function MC.Import()
     meta.mcImport = newest
     if count > 0 then
         FT.Debug("Mastercraft prices imported:", count)
+        -- its prices are read where ours are missing: every page looks at everything again
+        FT.Hist.MarkAll()
         FT.Fire("FT_PRICES_CHANGED", "mastercraft")
     end
     return count

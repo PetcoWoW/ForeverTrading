@@ -176,6 +176,10 @@ local function DealText(d)
         text = string.format(L["%s each at %s, %s at %s: +%s each after its cut"], Money(d.unit), H.Name(d.buyHouse),
             Money(d.target), H.Name(d.sellHouse), Money(d.perUnit))
         local qty = d.noBook and L["the cheapest lot"] or string.format(L["%s pcs"], FT.Num(d.qty))
+        -- only in your list now (the deal itself is gone): when you took it on
+        if d.carried then
+            return text .. FT.C("dim", "  ||  " .. qty .. "  ||  " .. string.format(L["in your list since %s"], FT.Ago(d.t)))
+        end
         local sells = d.sales and ("  ||  " .. L["sells there"] .. " " .. FT.Sales.PerDayText(d.sales)) or ""
         local ages = string.format(L["here %s, there %s"], FT.Ago(d.buyHouse == FT.house and d.t or d.sellT),
             FT.Ago(d.buyHouse == FT.house and d.sellT or d.t))
@@ -220,6 +224,12 @@ local function DealTip(row, d)
             GameTooltip:AddLine(L["Only the cheapest lot is sure: open the item (or Check order books) for its whole order book."], 0.6, 0.62, 0.66, true)
         end
         GameTooltip:AddLine(L["Click: the item with its order book - buy there."], 0.6, 0.62, 0.66, true)
+        if FT.Carry.Get(d.id) then
+            GameTooltip:AddLine(L["Right click: out of your carry list."], 0.6, 0.62, 0.66, true)
+        else
+            GameTooltip:AddLine(string.format(L["Right click: into your carry list - at %s the Sell page shows what you brought and what it cost."],
+                H.Name(d.sellHouse)), 0.6, 0.62, 0.66, true)
+        end
         GameTooltip:Show()
         return
     end
@@ -250,6 +260,7 @@ local function BuildDeals(p)
     end, 22)
     f.kind:SetPoint("TOPLEFT", 0, -1)
     f.kind:SetValue(dstate.kind)
+    T.dealsKind = f.kind -- the tour points at it
     f.ageLabel = UI.Text(f, 11, "dim")
     f.ageLabel:SetPoint("LEFT", f.kind, "RIGHT", 18, 0)
     f.ageLabel:SetText(L["Prices not older than"])
@@ -279,12 +290,26 @@ local function BuildDeals(p)
         setup = RowSetup,
         update = function(row, d)
             row.icon:SetItem(d.id)
-            row.name:SetText(FT.ItemText(d.id, 40))
+            local listed = d.kind == "HOUSES" and FT.Carry.Get(d.id)
+            row.name:SetText(FT.ItemText(d.id, 40) .. (listed and FT.C("accent", "  [" .. L["in your list"] .. "]") or ""))
             row.reason:SetText(DealText(d))
             row.value:SetText(FT.C("up", "+" .. Money(d.profit)))
             row.badge:Set(d.kind, nil, d.noBook and 1 or 3)
         end,
-        onClick = function(d)
+        onClick = function(d, button)
+            -- between the houses: a right click takes it on (or lets it go)
+            if button == "RightButton" and d.kind == "HOUSES" then
+                local on = FT.Carry.Toggle(d)
+                local H = FT.House
+                if on then
+                    FT.Print(string.format(L["Carry list: %s - buy at %s for up to %s each, list at %s for ~%s."],
+                        FT.ItemText(d.id), H.Name(d.buyHouse), Money(d.unit), H.Name(d.sellHouse), Money(d.target)))
+                else
+                    FT.Print(string.format(L["Carry list: %s is out of it."], FT.ItemText(d.id)))
+                end
+                T.RefreshDeals()
+                return
+            end
             if UI.ItemClick(d.id) then return end
             FT.ShowDetail(d.id)
         end,
@@ -302,17 +327,33 @@ local function ShownDeals()
     local matches = FT.NameMatcher(T.search)
     local since = time() - dstate.age
     local out, noBook, total, older = {}, {}, 0, 0
+    local have = {}
     for _, d in ipairs(list) do
         if (dstate.kind == "all" or d.kind == dstate.kind) and (not matches or matches(d.id)) then
-            if d.t >= since then
+            if d.t >= since or (d.kind == "HOUSES" and FT.Carry.Get(d.id)) then
                 out[#out + 1] = d
                 total = total + d.profit
+                if d.kind == "HOUSES" then have[d.id] = true end
                 -- only the house open here can be searched (between the houses: the one it is bought at)
                 if d.noBook and (d.kind ~= "HOUSES" or d.buyHouse == FT.house) then noBook[#noBook + 1] = d.id end
             else
                 older = older + 1
             end
         end
+    end
+    -- the carry list: what you took on stays on the page (whatever the prices' age), first
+    if dstate.kind == "all" or dstate.kind == "HOUSES" then
+        for _, d in ipairs(FT.Carry.Rows(have)) do
+            if not matches or matches(d.id) then out[#out + 1] = d end
+        end
+        local function Listed(d) return d.kind == "HOUSES" and FT.Carry.Get(d.id) ~= nil end
+        local keyed = {}
+        for i, d in ipairs(out) do keyed[d] = i end
+        table.sort(out, function(a, b)
+            local la, lb = Listed(a), Listed(b)
+            if la ~= lb then return la end
+            return keyed[a] < keyed[b]
+        end)
     end
     return out, total, noBook, building, older
 end
@@ -521,6 +562,7 @@ end
 
 -- the deals were looked for again; the auction house opened or closed (Check order books needs it)
 FT.On("FT_DEALS_READY", function() T.RefreshDeals() end)
+FT.On("FT_CARRY_CHANGED", function() T.RefreshDeals() end)
 FT.On("AUCTION_HOUSE_SHOW", function() C_Timer.After(0.5, T.RefreshDeals) end)
 FT.On("AUCTION_HOUSE_CLOSED", function() C_Timer.After(0.5, T.RefreshDeals) end)
 FT.On("FT_AH_CHANGED", function() C_Timer.After(0.1, T.RefreshDeals) end)

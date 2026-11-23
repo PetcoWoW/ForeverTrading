@@ -4,7 +4,7 @@ local L = FT.L
 
 -- The version being released: a copy straight from the repository (not packaged) has no version in its TOC yet
 -- (the packager puts the tag there) and shows this one. Set it with every release.
-local RELEASE = "v1.1.3"
+local RELEASE = "v1.1.4"
 local GetMeta = (C_AddOns and C_AddOns.GetAddOnMetadata) or GetAddOnMetadata
 FT.VERSION = (GetMeta and GetMeta(ADDON, "Version")) or RELEASE
 if FT.VERSION == "" or FT.VERSION:find("@", 1, true) then FT.VERSION = RELEASE end
@@ -66,6 +66,52 @@ function FT.Debounce(key, delay, fn)
         if not ok then geterrorhandler()(err) end
     end
     C_Timer.After(delay, Check)
+end
+
+---------------------------------------------------------------------------
+-- Long jobs, a little each frame - and what they cost (/ft perf)
+---------------------------------------------------------------------------
+-- a job works this many milliseconds of a frame (fewer in a fight): smooth on a slow computer, quick on a fast one
+local FRAME_MS, FIGHT_MS = 8, 3
+local clock = debugprofilestop
+FT.Clock = clock
+FT.perf = {} -- name -> its last run: { n, ms (work), frames, worst (the longest frame), wall (seconds), at, runs }
+
+function FT.PerfNote(name, n, ms, frames, worst, wall)
+    local p = FT.perf[name] or { runs = 0 }
+    FT.perf[name] = p
+    p.n, p.ms, p.frames, p.worst, p.wall, p.at = n, ms, frames or 1, worst or ms, wall or ms / 1000, time()
+    p.runs = p.runs + 1
+end
+
+-- step(i) for i = 1..n, as many as fit in each frame's share; done() at the end. A step returning false stops the
+-- job (done isn't called). The job: job:Cancel().
+function FT.Job(name, n, step, done)
+    local job = {}
+    local i, spent, frames, worst, began = 1, 0, 0, 0, GetTime()
+    local ticker
+    ticker = C_Timer.NewTicker(0, function()
+        local t0 = clock()
+        local stop = t0 + ((InCombatLockdown and InCombatLockdown()) and FIGHT_MS or FRAME_MS)
+        while i <= n do
+            if step(i) == false then
+                ticker:Cancel()
+                return
+            end
+            i = i + 1
+            if clock() >= stop then break end
+        end
+        local d = clock() - t0
+        spent, frames = spent + d, frames + 1
+        if d > worst then worst = d end
+        if i > n then
+            ticker:Cancel()
+            FT.PerfNote(name, n, spent, frames, worst, GetTime() - began)
+            if done then done() end
+        end
+    end)
+    function job.Cancel() ticker:Cancel() end
+    return job
 end
 
 ---------------------------------------------------------------------------
@@ -628,6 +674,65 @@ FT.On("PLAYER_LOGIN", function()
 end)
 
 ---------------------------------------------------------------------------
+-- /ft perf: what the long jobs cost the last time, the memory, the saved prices
+---------------------------------------------------------------------------
+local PERF_JOBS = {
+    { "scan:read", "Reading every auction (deep scan)" },
+    { "scan:list", "Reading a scan of Auctionator" },
+    { "scan:save", "Saving a scan" },
+    { "scan:gone", "Marking what is no longer listed" },
+    { "market", "Market: every item" },
+    { "market+", "Market: the changed items" },
+    { "deals", "Deals: every item" },
+    { "deals+", "Deals: the changed items" },
+    { "prune", "Pruning old history" },
+}
+
+local function Ms(v)
+    return string.format("%.1f", v or 0)
+end
+
+local function MB(kb)
+    return string.format(L["%.1f MB"], (kb or 0) / 1024)
+end
+
+function FT.PerfReport()
+    FT.Print(L["Performance (this session):"])
+    local mine
+    local update = UpdateAddOnMemoryUsage or (C_AddOns and C_AddOns.UpdateAddOnMemoryUsage)
+    local usage = GetAddOnMemoryUsage or (C_AddOns and C_AddOns.GetAddOnMemoryUsage)
+    if update and usage then
+        pcall(update)
+        local ok, kb = pcall(usage, ADDON)
+        if ok and type(kb) == "number" then mine = kb end
+    end
+    FT.Print("  " .. string.format(L["Memory: ForeverTrading %s, all addons %s"], mine and MB(mine) or "?",
+        MB(collectgarbage("count"))))
+    local items, size = FT.Hist.Footprint()
+    FT.Print("  " .. string.format(L["Saved prices: %s items, %s characters; %s waiting to be written (at logout or /reload)"],
+        FT.Num(items), FT.Num(size), FT.Num(FT.Hist.Unwritten())))
+    local rowsN, deep, movers = FT.Market.Depth()
+    FT.Print("  " .. string.format(L["Market: %s items, %s with prices on 3+ days of the last two weeks, %s can be top gainers or losers"],
+        FT.Num(rowsN), FT.Num(deep), FT.Num(movers)) .. (FT.Atr.On() and "" or
+        (" " .. L["(Auctionator is off: only the days ForeverTrading saw itself count)"])))
+    local lo = FT.db.perfLogout
+    if type(lo) == "table" and lo.ms then
+        FT.Print("  " .. string.format(L["Writing them at the last logout: %s ms (%s records)"], Ms(lo.ms), FT.Num(lo.n or 0)))
+    end
+    local any = false
+    for _, job in ipairs(PERF_JOBS) do
+        local p = FT.perf[job[1]]
+        if p then
+            any = true
+            FT.Print("  " .. string.format(L["%s: %s - %s ms of work in %s frames (the longest %s ms), %s s in all, %s"],
+                L[job[2]], FT.Num(p.n), Ms(p.ms), FT.Num(p.frames), Ms(p.worst), string.format("%.1f", p.wall or 0),
+                FT.Ago(p.at)))
+        end
+    end
+    if not any then FT.Print("  " .. L["Nothing measured yet this session: make a scan or open the Market."]) end
+end
+
+---------------------------------------------------------------------------
 -- Slash commands
 ---------------------------------------------------------------------------
 SLASH_FOREVERTRADING1 = "/ft"
@@ -675,6 +780,8 @@ SlashCmdList.FOREVERTRADING = function(msg)
         else
             FT.Share.Ask(true)
         end
+    elseif cmd == "perf" then
+        FT.PerfReport()
     elseif cmd == "news" then
         FT.News.Show()
     elseif cmd == "tour" then
@@ -685,6 +792,7 @@ SlashCmdList.FOREVERTRADING = function(msg)
         FT.Print("/ft scan — " .. L["full scan"] .. ",  /ft scan mine — " .. L["My items"] .. ",  /ft stop")
         FT.Print("/ft share — " .. L["ask guild and group for fresh prices"] .. ",  /ft share test — " .. L["check which ways the exchange can use"])
         FT.Print("/ft news — " .. L["what's new"] .. ",  /ft tour — " .. L["the tour of ForeverTrading"])
+        FT.Print("/ft perf — " .. L["how fast it works and the memory it takes"])
         FT.Print("/ft lang ru | en | auto,  /ft reset,  /ft github,  /ft support")
     end
 end

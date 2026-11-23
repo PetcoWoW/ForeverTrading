@@ -266,6 +266,12 @@ FT.On("FT_DATA_CLEARED", function()
     wipe(last)
     wipe(cache)
 end)
+-- items long gone from the auction house left the history (FT.Hist.DropUnseen)
+FT.On("FT_ITEMS_DROPPED", function(ids)
+    for id in pairs(ids or {}) do
+        last[id], cache[id] = nil, nil
+    end
+end)
 -- per auction house (an item window may look at the other one for a moment)
 local saved, savedKey = {}, nil
 local function UseHouse()

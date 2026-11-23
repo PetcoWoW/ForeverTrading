@@ -4,7 +4,8 @@
 
 An exchange-style trading terminal for the **WoW Forever** auction house, with its own scanner: price and profit
 charts, order books, craft profitability and "sell / craft / buy" signals. It also reads **Auctionator** and
-**Mastercraft** when they are installed (each source can be turned off in Settings) - neither is required.
+**Mastercraft** when they are installed (each source can be turned off in Settings) - neither is required: it goes by
+its own scans, and the signals and deals work from the first days of scanning.
 
 - **Market** - every item seen on the auction house: price, 24h change, 7-day sparkline, filters, a price line
   and a profitability line (zero in the middle) per item, RSI and other indicators, price alerts, and the
@@ -28,7 +29,8 @@ charts, order books, craft profitability and "sell / craft / buy" signals. It al
 - **Two auction houses** - your faction's and Blackwater (the neutral one, shared by both factions) each keep
   their own prices, history, deals and your auctions: talking to an auctioneer picks its house, and the chip in
   the header switches whose prices you see. **Deals between the houses**: cheaper at one than the other sells it
-  for - buy, carry it over, list it there, both cuts counted.
+  for - buy, carry it over, list it there, both cuts counted. A right click puts a deal on your **carry list**: at
+  the other house the Sell page shows what you brought and what it cost.
 - **Trading** - at the auction house: buy from the order book, post from your bags (a suggested price, the
   deposit, the cut, warnings) and watch **My auctions** (who undercut you, cancel) - every action confirmed with
   the exact numbers first; when you are undercut it says whether to wait or post again. Optionally ForeverTrading
@@ -43,7 +45,7 @@ English (Settings > Language).
 
 ## Русский
 
-Биржевой терминал для аукциона **WoW Forever** со **своим сканером**: графики цены и прибыльности, стаканы, прибыльность крафта и сигналы «продавать / крафтить / закупать». В связке с **Auctionator** и **Mastercraft** — их данные тоже попадают в историю (каждый источник отключается в настройках), но ни один из них не обязателен.
+Биржевой терминал для аукциона **WoW Forever** со **своим сканером**: графики цены и прибыльности, стаканы, прибыльность крафта и сигналы «продавать / крафтить / закупать». В связке с **Auctionator** и **Mastercraft** — их данные тоже попадают в историю (каждый источник отключается в настройках), но ни один из них не обязателен: аддон опирается на свои сканы, а они лишь дополняют недостающее.
 
 ## Откуда данные
 
@@ -54,7 +56,7 @@ English (Settings > Language).
 | **Что вы смотрите сами** | Любой ваш поиск и открытый товар на аукционе тоже попадает в историю и стаканы. |
 | **Живые цены** (свой) | Пока открыт аукцион, открытый в аддоне предмет запрашивается заново каждые 8 секунд: цена и стакан всегда свежие. Пауза, пока вы сами ищете, покупаете или продаёте. |
 | **Обмен** (с гильдией и группой) | Если вашим ценам рынка больше часа, аддон спрашивает пользователей ForeverTrading в гильдии (затем в группе), у кого свежее, — и самый свежий присылает свой полный скан в фоне, по одному скрытому сообщению в секунду. Кнопка **Обмен** в шапке — спросить сразу, аукцион не нужен. |
-| **Два аукциона** | У аукциона вашей фракции и у Черноводья (нейтрального, общего для обеих фракций) свои цены, история, сделки и ваши лоты. Аукционист сам выбирает свой аукцион; чип в шапке переключает, чьи цены вы смотрите. «Сделки > Между аукционами» — что на одном дешевле, чем продаётся на другом. |
+| **Два аукциона** | У аукциона вашей фракции и у Черноводья (нейтрального, общего для обеих фракций) свои цены, история, сделки и ваши лоты. Аукционист сам выбирает свой аукцион; чип в шапке переключает, чьи цены вы смотрите. «Сделки > Между аукционами» — что на одном дешевле, чем продаётся на другом; правый клик по сделке — в **список закупки**, и на другом аукционе вкладка «Продажа» покажет, что вы привезли и почём купили. |
 | **Auctionator** | Его полный скан и поиски пишутся в нашу историю; дни, которые вы сами не сканировали, берутся из его базы. |
 | **Mastercraft** | Его сканы цен пишутся в историю; рецепты и запасы альтов, на которых вы ещё не заходили с ForeverTrading. |
 | **Игра** | Окна профессий (рецепты), сумки, банк, почта, золото каждого персонажа, цены у торговцев. |
@@ -65,7 +67,7 @@ English (Settings > Language).
 2. Откройте окно каждой профессии хотя бы раз на каждом персонаже (или пусть Mastercraft их знает).
 3. Кнопка **Мои товары** — стаканы всех ваших предметов (по одному поиску на каждый, несколько минут); перед началом аддон спросит подтверждение.
 
-Изменение за 24ч появится со второго дня, RSI и сигналы — через 3+ дня цен. Если включён Auctionator, его прошлая история сразу заполняет графики.
+Изменения цены, лидеры роста и падения, сигналы и сделки появляются уже в первый день, со второго скана: пока аукцион сканировали мало дней, аддон требует меньше истории (в первый день вместо средней — цена последних часов). RSI — через 3+ дня цен. Если включён Auctionator, его прошлая история сразу заполняет графики.
 
 ## Вкладки
 
@@ -74,7 +76,7 @@ English (Settings > Language).
 - **Сигналы** — продавать сейчас / выгодно крафтить / выгодно закупать / держать и не крафтить, перебитые лоты и рискованные рецепты. **Сделки** — что выгодно купить прямо сейчас: дешевле, чем даст торговец, или сильно ниже справедливой цены на спокойном рынке.
 - **Портфель** — запасы всех персонажей сервера по рыночным ценам и их стоимость по дням. **Журнал сделок** — что вы реально купили, продали и заработали, по письмам аукциона.
 - **Продажа** — что у вас в сумках можно выставить: цена рынка и сигнал; форма выставления с подсказанной ценой (на 1 медь дешевле самой низкой), сроком, залогом, комиссией, итогом и предупреждениями; выставление — только после подтверждения, у аукциониста. Переключатель «Мои лоты» — ваши лоты: где вас перебили и стоит ли перевыставлять, сколько осталось, снять с аукциона.
-- **Настройки** — сканирование, живые цены, источники, обмен, пороги сигналов, хранение данных.
+- **Настройки** — сканирование, живые цены, источники, обмен, пороги сигналов, хранение данных; «Убрать» — история предметов, которых не было на аукционе 30+ дней.
 
 Три размера окна в шапке: компактное (только графики — без стакана и карточек), стандартное и на весь экран.
 
@@ -98,6 +100,11 @@ English (Settings > Language).
 
 ## Команды
 
-`/ft` — окно · `/ft scan` — полный скан · `/ft scan mine` — мои товары · `/ft stop` — остановить скан · `/ft share` — запросить цены у гильдии и группы · `/ft market | craft | signals | portfolio | settings` · `/ft lang ru | en | auto` · `/ft reset` · `/ft debug`.
+`/ft` — окно · `/ft scan` — полный скан · `/ft scan mine` — мои товары · `/ft stop` — остановить скан · `/ft share` — запросить цены у гильдии и группы · `/ft market | craft | signals | portfolio | settings` · `/ft lang ru | en | auto` · `/ft reset` · `/ft debug` · `/ft perf` — скорость и память.
 
 Shift-клик по предмету в любом списке — ссылка в чат; ПКМ по строке рынка — в избранное.
+
+## Шрифт
+
+Sofia Sans Condensed Medium (Lettersoup, https://github.com/lettersoup/Sofia-Sans) — лежит в `media/`, лицензия SIL Open Font License 1.1 (`media/SofiaSansCondensed-OFL.txt`).
+

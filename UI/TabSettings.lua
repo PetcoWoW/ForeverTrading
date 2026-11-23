@@ -8,6 +8,7 @@ FT.Tabs.settings = T
 
 local controls = {}
 local ROW = 30
+local UNSEEN_DAYS = 30 -- Data > Remove: items not seen on the auction house this long
 
 local function Changed()
     FT.Fire("FT_SETTINGS_CHANGED")
@@ -232,7 +233,7 @@ function T.Build(p)
     Next(ex)
 
     -- data
-    local dt = Section(right, L["Data"], 5)
+    local dt = Section(right, L["Data"], 6)
     Choice(dt, "keepDaily", L["Keep day candles for"], { { 30, L["30 days"] }, { 60, L["60 days"] }, { 90, L["90 days"] }, { 180, L["180 days"] } },
         L["Every item seen on the auction house keeps one candle a day."])
     Check(dt, "trackAll", L["Intraday history for every item"],
@@ -257,6 +258,34 @@ function T.Build(p)
     end)
     clear:FitText(24)
     clear:SetPoint("TOPRIGHT", -14, dt.y)
+    Next(dt)
+    -- items long gone from the auction house: their history out (a smaller saved file, a quicker login)
+    T.unseen = UI.Text(dt, 11, "dim")
+    T.unseen:SetPoint("TOPLEFT", 14, dt.y - 6)
+    local drop = UI.Button(dt, L["Remove"], 10, 24, "default", function()
+        local items, chars = FT.Hist.DropUnseen(UNSEEN_DAYS, false)
+        if items == 0 then
+            FT.Print(string.format(L["Nothing to remove: every item was seen in the last %d days (or matters to you)."], UNSEEN_DAYS))
+            return
+        end
+        UI.Confirm({
+            title = L["Remove items long gone"],
+            text = string.format(L["Remove the history of %s items not seen on the auction house for %d days or more (both auction houses, about %s KB)? Those that matter to you stay: your recipes and their materials, watchlist, what you own."],
+                FT.Num(items), UNSEEN_DAYS, FT.Num(math.ceil(chars / 1024))),
+            ok = L["Remove"],
+            okStyle = "down",
+            onOK = function()
+                local n, c = FT.Hist.DropUnseen(UNSEEN_DAYS, true)
+                FT.Print(string.format(L["Removed the history of %s items not seen for %d days (about %s KB): the saved file is smaller from the next logout or /reload."],
+                    FT.Num(n), UNSEEN_DAYS, FT.Num(math.ceil(c / 1024))))
+                T.unseenAt = nil
+                T.Refresh()
+            end,
+        })
+    end)
+    drop:FitText(24)
+    drop:SetPoint("TOPRIGHT", -14, dt.y)
+    T.unseen:SetPoint("RIGHT", drop, "LEFT", -10, 0)
     Next(dt)
     local reload = UI.Button(dt, L["Reload UI"], 10, 24, "default", function() ReloadUI() end)
     reload:FitText(24)
@@ -337,6 +366,12 @@ function T.Refresh()
     for _, fn in ipairs(controls) do fn() end
     local items, size = FT.Hist.Footprint()
     T.footprint:SetText(string.format(L["%d items, about %s KB saved"], items, FT.Num(math.ceil(size / 1024))))
+    -- counted at most once a minute (it reads both auction houses' data)
+    if not T.unseenAt or GetTime() - T.unseenAt > 60 then
+        T.unseenAt = GetTime()
+        local n = FT.Hist.DropUnseen(UNSEEN_DAYS, false)
+        T.unseen:SetText(string.format(L["Not seen for %d+ days: %s items"], UNSEEN_DAYS, FT.Num(n)))
+    end
     local meta = FT.R().meta
     if meta.lastPeer then
         T.shareText:SetText(string.format(L["Last received: %s from %s"], FT.Ago(meta.lastPeer), meta.lastPeerFrom or "?"))

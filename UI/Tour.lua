@@ -53,6 +53,14 @@ local function MakeSteps() return {
     { title = L["Signals and deals"], tab = "signals", prep = function() Tab("signals").SetView("signals") end,
       text = L["What to sell, craft and buy now, your auctions undercut, risky recipes. Deals: what to buy right now for a profit - under what a vendor pays, far under the fair price, or cheaper than the other auction house sells it for."],
       target = function() return Tab("signals").viewSeg end },
+    { title = L["The carry list"], tab = "signals",
+      prep = function()
+          local S = Tab("signals")
+          S.SetView("deals")
+          S.SetDealKind("HOUSES")
+      end,
+      text = L["Cheaper at one auction house than the other sells it for. A right click on a deal puts it on your carry list: it stays here, and at the other auction house the Sell page shows what you brought and what it cost."],
+      target = function() return Tab("signals").dealsKind end },
     { title = L["Selling"], tab = "sell", prep = function() Tab("sell").SetView("bags") end,
       text = L["Your bags at market prices: a copper under the lowest, the deposit, the cut, and warnings. My auctions: who undercut you, and whether to wait or post again."],
       target = function() return Tab("sell").viewSeg end },

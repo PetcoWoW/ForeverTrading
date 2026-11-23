@@ -88,9 +88,12 @@ function UI.RGB(name)
 end
 
 ---------------------------------------------------------------------------
--- Font: Noto Sans when Mastercraft brings it (it has Cyrillic and looks modern), else the game's own
+-- Font: our own Sofia Sans Condensed Medium (media/, SIL Open Font License: SofiaSansCondensed-OFL.txt) - narrow,
+-- with Cyrillic. Should it not load (new files show only after the game is restarted): Mastercraft's Noto Sans,
+-- then the game's own.
 ---------------------------------------------------------------------------
 UI.FONT = STANDARD_TEXT_FONT or "Fonts\\FRIZQT__.TTF"
+local OWN_FONT = "Interface\\AddOns\\" .. ADDON .. "\\media\\SofiaSansCondensed-Medium.ttf"
 
 local function AddonLoaded(name)
     if C_AddOns and C_AddOns.IsAddOnLoaded then return C_AddOns.IsAddOnLoaded(name) end
@@ -105,19 +108,22 @@ function UI.ResolveFont()
     if UI.theme == "classic" and (FT.Lang() ~= "ru" or GetLocale() == "ruRU") and STANDARD_TEXT_FONT then
         candidates[#candidates + 1] = STANDARD_TEXT_FONT
     end
+    candidates[#candidates + 1] = OWN_FONT
     if AddonLoaded("Mastercraft") then
         candidates[#candidates + 1] = "Interface\\AddOns\\Mastercraft\\media\\NotoSans-Regular.ttf"
     end
     candidates[#candidates + 1] = "Fonts\\ARIALN.TTF"
-    local probe = UIParent:CreateFontString(nil, "OVERLAY")
     for _, path in ipairs(candidates) do
+        -- a new font string each time: one that didn't take its font has none (one that did tells it)
+        local probe = UIParent:CreateFontString(nil, "OVERLAY")
         local ok, res = pcall(probe.SetFont, probe, path, 12, "")
-        if ok and res ~= false then
+        local got = ok and probe:GetFont()
+        probe:Hide()
+        if ok and res ~= false and got then
             UI.FONT = path
             break
         end
     end
-    probe:Hide()
 end
 
 ---------------------------------------------------------------------------

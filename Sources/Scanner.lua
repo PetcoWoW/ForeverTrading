@@ -14,8 +14,6 @@ local S = {}
 FT.Scanner = S
 
 local AH = C_AuctionHouse
-local READ_CHUNK = 1500
-local SAVE_CHUNK = 300
 local ANSWER_TIMEOUT = 3
 local LISTED_FRESH = 2 * 3600 -- what a full scan found stays good enough for "my items" this long
 local REPLICATE_COOLDOWN = 15 * 60
@@ -103,51 +101,37 @@ end
 function S.Ingest(acc, t, source, done)
     local ids = {}
     for itemID in pairs(acc.items) do ids[#ids + 1] = itemID end
-    local i = 1
-    local ticker
-    ticker = C_Timer.NewTicker(0, function()
-        local last = math.min(i + SAVE_CHUNK - 1, #ids)
-        for k = i, last do
-            local itemID = ids[k]
-            local it = acc.items[itemID]
-            local ladder = Ladder(it)
-            FT.Hist.SetBook(itemID, { t = t, levels = ladder, auctions = it.auctions, qty = it.qty,
-                sellers = it.sellerCount, source = source, partial = it.partial })
-            FT.Hist.Observe(itemID, ladder[1][1], it.qty, it.auctions, t, source,
-                (not it.partial and it.sellerCount > 0) and it.sellerCount or nil)
-            if it.rows then FT.Sales.Observe(itemID, it.rows, t, it.partial, "full") end
-        end
-        i = last + 1
-        if i > #ids then
-            ticker:Cancel()
-            if done then done(#ids) end
-        end
+    FT.Job("scan:save", #ids, function(k)
+        local itemID = ids[k]
+        local it = acc.items[itemID]
+        local ladder = Ladder(it)
+        FT.Hist.SetBook(itemID, { t = t, levels = ladder, auctions = it.auctions, qty = it.qty,
+            sellers = it.sellerCount, source = source, partial = it.partial })
+        FT.Hist.Observe(itemID, ladder[1][1], it.qty, it.auctions, t, source,
+            (not it.partial and it.sellerCount > 0) and it.sellerCount or nil)
+        if it.rows then FT.Sales.Observe(itemID, it.rows, t, it.partial, "full") end
+    end, function()
+        if done then done(#ids) end
     end)
 end
 
--- a full scan: everything we know that wasn't listed is gone for now
-local function MarkGone(seen, t)
+-- a full scan: everything we know that wasn't listed is gone for now; then()
+local function MarkGone(seen, t, after)
+    local gone = {}
     FT.Hist.EachItem(function(itemID)
-        if not seen[itemID] then FT.Hist.Gone(itemID, t) end
+        if not seen[itemID] then gone[#gone + 1] = itemID end
     end)
+    FT.Job("scan:gone", #gone, function(k) FT.Hist.Gone(gone[k], t) end, after)
 end
 
 -- read a list another addon handed over (`info(entry)` -> count, buyout, owner, itemID)
 function S.ReadList(list, info, done)
     local acc = S.NewAcc()
-    local i, n = 1, #list
-    local ticker
-    ticker = C_Timer.NewTicker(0, function()
-        local last = math.min(i + READ_CHUNK - 1, n)
-        for k = i, last do
-            local count, buyout, owner, itemID = info(list[k])
-            S.Add(acc, itemID, count, buyout, owner)
-        end
-        i = last + 1
-        if i > n then
-            ticker:Cancel()
-            done(acc)
-        end
+    FT.Job("scan:list", #list, function(k)
+        local count, buyout, owner, itemID = info(list[k])
+        S.Add(acc, itemID, count, buyout, owner)
+    end, function()
+        done(acc)
     end)
 end
 
@@ -155,10 +139,11 @@ end
 function S.SaveFull(acc, t, source, done)
     if S.mode == "full" then S.phase = "save" end
     S.Ingest(acc, t, source, function(items)
-        MarkGone(acc.items, t)
-        FT.Hist.LogScan({ t = t, items = items, auctions = acc.auctions, value = acc.value, source = source })
-        FT.Hist.MarkScan("full", t)
-        if done then done(items) end
+        MarkGone(acc.items, t, function()
+            FT.Hist.LogScan({ t = t, items = items, auctions = acc.auctions, value = acc.value, source = source })
+            FT.Hist.MarkScan("full", t)
+            if done then done(items) end
+        end)
     end)
 end
 
@@ -226,27 +211,21 @@ function S.SaveSummary(sum, t, source, done)
     if S.mode == "full" then S.phase = "save" end
     local ids = {}
     for id in pairs(sum.items) do ids[#ids + 1] = id end
-    local i, value = 1, 0
-    local ticker
-    ticker = C_Timer.NewTicker(0, function()
-        local last = math.min(i + SAVE_CHUNK - 1, #ids)
-        for k = i, last do
-            local id = ids[k]
-            local e = sum.items[id]
-            FT.Hist.Observe(id, e.p, e.q, nil, t, source)
-            value = value + e.p * e.q
-        end
-        i = last + 1
-        if i > #ids then
-            ticker:Cancel()
-            MarkGone(sum.items, t)
+    local value = 0
+    FT.Job("scan:save", #ids, function(k)
+        local id = ids[k]
+        local e = sum.items[id]
+        FT.Hist.Observe(id, e.p, e.q, nil, t, source)
+        value = value + e.p * e.q
+    end, function()
+        MarkGone(sum.items, t, function()
             S.listed, S.listedAt = {}, t
             for id, e in pairs(sum.items) do S.listed[id] = e.key or true end
             S.SaveListed(t)
             FT.Hist.LogScan({ t = t, items = #ids, value = value, source = source, summary = true })
             FT.Hist.MarkScan("full", t)
             if done then done(#ids) end
-        end
+        end)
     end)
 end
 
@@ -528,23 +507,17 @@ local function ReadDeep()
     S.total, S.done = n, 0
     local acc = S.NewAcc()
     local t = time()
-    local i = 0
-    S.ticker = C_Timer.NewTicker(0, function()
-        if S.mode ~= "full" then return end
-        local last = math.min(i + READ_CHUNK - 1, n - 1)
-        for k = i, last do
-            local _, _, count, _, _, _, _, _, _, buyout, _, _, _, owner, _, _, itemID = AH.GetReplicateItemInfo(k)
-            S.Add(acc, itemID, count, buyout, owner)
-        end
-        i = last + 1
-        S.done = math.min(n, i)
-        if i >= n then
-            S.ticker:Cancel()
-            S.ticker = nil
-            S.SaveFull(acc, t, "full", function(items)
-                Finish("full", string.format(L["Full scan done: %s items, %s auctions."], FT.Num(items), FT.Num(acc.auctions)))
-            end)
-        end
+    -- the game counts its auctions from 0
+    S.ticker = FT.Job("scan:read", n, function(k)
+        if S.mode ~= "full" then return false end
+        local _, _, count, _, _, _, _, _, _, buyout, _, _, _, owner, _, _, itemID = AH.GetReplicateItemInfo(k - 1)
+        S.Add(acc, itemID, count, buyout, owner)
+        S.done = k
+    end, function()
+        S.ticker = nil
+        S.SaveFull(acc, t, "full", function(items)
+            Finish("full", string.format(L["Full scan done: %s items, %s auctions."], FT.Num(items), FT.Num(acc.auctions)))
+        end)
     end)
 end
 
