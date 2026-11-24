@@ -10,6 +10,7 @@
 //
 // Options (environment):
 //   FEED_REGIONS  comma list of us,eu,kr,tw (default: us)
+//   FEED_HOUSES   comma list of house ids to build (default: all twelve; see HOUSES below)
 //   FEED_CACHE    folder for the last download and the history (default: tools/feed/cache)
 //   FEED_OUT      the Lua file to write (default: Data/Feed.lua)
 //   FEED_FIXTURE  a folder of saved API answers to build from instead of the network (tests)
@@ -34,7 +35,11 @@ const HOUSES = {
   123: "Roleplay PvP Alliance", 124: "Roleplay PvP Horde", 125: "Roleplay PvP Neutral",
 };
 const REGION_IDS = { us: 1, kr: 2, eu: 3, tw: 4 };
-const KEEP_DAYS = 7;          // daily lows and sales kept and shipped
+const ONLY = process.env.FEED_HOUSES
+  ? new Set(process.env.FEED_HOUSES.split(",").map((s) => Number(s.trim())).filter(Boolean))
+  : null;
+const KEEP_DAYS = 14;         // daily lows kept and shipped
+const SALES_DAYS = 7;         // what sold: over the last week
 const MAX_GAP = 3 * 3600;     // two downloads further apart than this: no sales are counted between them
 // A listing gone by the next download: with more than 2 hours left it was bought (or taken off by its seller,
 // which looks the same from outside); with under 30 minutes left it ran out. 30 min - 2 h: can't tell, not counted.
@@ -197,20 +202,20 @@ function processHouse(region, houseId, got, hist) {
 // ---------------------------------------------------------------------------------------------------------------
 const b36 = (n) => (n === undefined || n === null ? "" : Math.round(n).toString(36));
 
-// one house: "item=p,q,n,sold,value,watchedHours,expired,low0..low6;" in base 36; low0 is the oldest of the 7 days
+// one house: "item=p,q,n,sold,value,watchedHours,expired,low0..low13;" in base 36; low0 is the oldest day
 function encodeHouse(res) {
   const { now, h, day } = res;
   const days = [];
   for (let d = day - KEEP_DAYS + 1; d <= day; d++) days.push(d);
   let watchedSec = 0;
-  for (const d of days) watchedSec += h.watched[d] || 0;
+  for (const d of days.slice(-SALES_DAYS)) watchedSec += h.watched[d] || 0;
   const parts = [];
   const ids = Object.keys(h.items).map(Number).sort((x, y) => x - y);
   for (const item of ids) {
     const r = h.items[item];
     const e = now.get(item);
     let sold = 0, value = 0, expired = 0;
-    for (const d of days) {
+    for (const d of days.slice(-SALES_DAYS)) {
       const s = r.s[d];
       if (s) { sold += s[0]; value += s[1]; expired += s[2]; }
     }
@@ -263,7 +268,7 @@ async function main() {
     const histFile = path.join(CACHE, `history-${region}.json`);
     const hist = readJSON(histFile, {});
     results[region] = {};
-    for (const houseId of Object.keys(HOUSES).map(Number)) {
+    for (const houseId of Object.keys(HOUSES).map(Number).filter((id) => !ONLY || ONLY.has(id))) {
       const got = await fetchHouse(region, houseId, auth);
       if (!got || got.listings.length === 0) continue;
       const res = processHouse(region, houseId, got, hist);

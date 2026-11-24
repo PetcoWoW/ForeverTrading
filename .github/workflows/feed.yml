@@ -1,7 +1,8 @@
 # The price feed: every hour, download every WoW Forever auction house from Blizzard's Game Data API, build
 # Data/Feed.lua (tools/feed/build.mjs) and publish the addon with it as a new release, which addon managers
 # (WowUp) pick up. Needs the repository secrets BLIZZARD_CLIENT_ID and BLIZZARD_CLIENT_SECRET
-# (https://develop.battle.net/access/clients). Optional repository variable FEED_REGIONS (default: us).
+# (https://develop.battle.net/access/clients). Optional repository variables FEED_REGIONS (default: us) and
+# FEED_HOUSES (default: 110,116 - PvP Alliance and PvP Blackwater).
 name: Price feed
 
 on:
@@ -57,6 +58,8 @@ jobs:
           BLIZZARD_CLIENT_ID: ${{ secrets.BLIZZARD_CLIENT_ID }}
           BLIZZARD_CLIENT_SECRET: ${{ secrets.BLIZZARD_CLIENT_SECRET }}
           FEED_REGIONS: ${{ vars.FEED_REGIONS || 'us' }}
+          # PvP Alliance (110) and PvP Blackwater (116); all twelve: set the repository variable FEED_HOUSES empty
+          FEED_HOUSES: ${{ vars.FEED_HOUSES || '110,116' }}
         run: node tools/feed/build.mjs
 
       - name: Save the download and the history

@@ -9,7 +9,7 @@ GitHub release.
 
 - the lowest price now, how many are listed, in how many auctions;
 - what sold over the last 7 days, what it sold for, and how many expired;
-- the lowest price of each of the last 7 days (UTC days).
+- the lowest price of each of the last 14 days (UTC days).
 
 ## How sales are counted
 
@@ -40,7 +40,8 @@ for documenting them.
 
 1. Create a client at <https://develop.battle.net/access/clients>.
 2. In the GitHub repository: Settings > Secrets and variables > Actions, add `BLIZZARD_CLIENT_ID` and
-   `BLIZZARD_CLIENT_SECRET`. Optional variable `FEED_REGIONS` (e.g. `us,eu`; default `us`).
+   `BLIZZARD_CLIENT_SECRET`. Optional variables: `FEED_REGIONS` (e.g. `us,eu`; default `us`) and
+   `FEED_HOUSES` (default `110,116`, PvP Alliance and PvP Blackwater; the house ids are below).
 3. Actions > Price feed > Run workflow, once. After that it runs hourly.
 
 The first run has prices and no sales yet; sales and daily lows fill in over the next days.

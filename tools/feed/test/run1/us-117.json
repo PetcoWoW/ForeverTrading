@@ -1,0 +1,7 @@
+{"modified": 1795500000,
+ "auctions":[{"id":1,"item":{"id":7911},"buyout":5000,"quantity":1,"time_left":"VERY_LONG"},
+             {"id":2,"item":{"id":7911},"buyout":12000,"quantity":2,"time_left":"LONG"},
+             {"id":3,"item":{"id":13444},"bid":100,"quantity":1,"time_left":"LONG"}],
+ "commodities":[{"id":10,"item":{"id":12359},"unit_price":142,"quantity":20,"time_left":"LONG"},
+                {"id":11,"item":{"id":12359},"unit_price":150,"quantity":40,"time_left":"SHORT"},
+                {"id":12,"item":{"id":12359},"unit_price":160,"quantity":10,"time_left":"MEDIUM"}]}
