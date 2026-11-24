@@ -80,6 +80,14 @@ end
 function S.Add(acc, itemID, count, buyout, owner)
     if not (count and count > 0 and buyout and buyout > 0) then return end
     S.AddLevel(acc, itemID, buyout / count, count, 1, owner)
+    -- how many each seller has up (whales and Market Makers, FT.Whales: only a deep scan names every seller)
+    if type(owner) == "string" and owner ~= "" then
+        local it = acc.items[itemID]
+        if it then
+            it.byOwner = it.byOwner or {}
+            it.byOwner[owner] = (it.byOwner[owner] or 0) + count
+        end
+    end
     -- auction by auction, for the items that matter to you: what sells (FT.Sales)
     if FT.Hist.Tracked(itemID) then
         local it = acc.items[itemID]
@@ -142,6 +150,7 @@ function S.SaveFull(acc, t, source, done)
         MarkGone(acc.items, t, function()
             FT.Hist.LogScan({ t = t, items = items, auctions = acc.auctions, value = acc.value, source = source })
             FT.Hist.MarkScan("full", t)
+            if FT.Whales then pcall(FT.Whales.FromScan, acc, t) end
             if done then done(items) end
         end)
     end)

@@ -386,3 +386,144 @@ end
 FT.On("FT_SCAN_DONE", function() FT.Debounce("alerts", 2, M.CheckAlerts) end)
 FT.On("FT_PRICES_CHANGED", function() FT.Debounce("alerts", 2, M.CheckAlerts) end)
 FT.On("FT_LIVE_UPDATED", function() FT.Debounce("alerts", 2, M.CheckAlerts) end)
+
+---------------------------------------------------------------------------
+-- The meme layer: TO THE MOON / RUG PULL banners, whales and Market Makers
+---------------------------------------------------------------------------
+local MOON, RUG = 0.30, -0.30      -- a day's move this big gets a banner
+local WHALE_SHARE = 0.5            -- one seller with this share of what's listed is a whale
+local WHALE_MIN_VALUE = 500000     -- ... and at least 50g of it up
+local MAX_BANNERS = 3              -- per market build
+
+-- 0.42 -> "42%" (no sign: a size, not a move)
+local function Whole(v) return string.format("%d%%", math.floor(math.abs(v) * 100 + 0.5)) end
+
+-- what you own or watch: banners are about your stuff (and the market's single biggest move of the day)
+local function Cares(id)
+    return FT.db.watch[id] ~= nil or (FT.Port and FT.Port.Count(id) > 0)
+end
+
+local function Banner(id, text, title, color)
+    if FT.Toast then FT.Toast(id, text, title, color) end
+    if FT.S.alertChat then
+        local _, _, _, _, link = FT.Item(id)
+        FT.Print(FT.C(color, title) .. " " .. (link or FT.ItemText(id)) .. " " .. text)
+    end
+    if FT.S.alertSound then pcall(PlaySound, (SOUNDKIT and SOUNDKIT.RAID_WARNING) or 8959) end
+end
+
+-- once a day per item and kind
+local function Seen(id, kind)
+    local day = FT.Day()
+    local s = FT.db.memeSeen
+    if not s or s.day ~= day then
+        s = { day = day }
+        FT.db.memeSeen = s
+    end
+    local key = kind .. id
+    if s[key] then return true end
+    s[key] = true
+    return false
+end
+
+function M.CheckBanners()
+    if FT.S.meme == false or not rows then return end
+    local shown = 0
+    local topUp, topDown
+    for _, r in ipairs(rows) do
+        local ch = r.ch1
+        if ch and Liquid(r) and Plausible(ch) then
+            if ch >= MOON and (not topUp or ch > topUp.ch1) then topUp = r end
+            if ch <= RUG and (not topDown or ch < topDown.ch1) then topDown = r end
+            if shown < MAX_BANNERS and Cares(r.id) then
+                if ch >= MOON and not Seen(r.id, "moon") then
+                    Banner(r.id, string.format(L["up %s today"], Whole(ch)), L["TO THE MOON"], "up")
+                    shown = shown + 1
+                elseif ch <= RUG and not Seen(r.id, "rug") then
+                    Banner(r.id, string.format(L["down %s today"], Whole(ch)), L["RUG PULL"], "down")
+                    shown = shown + 1
+                end
+            end
+        end
+    end
+    -- the market's biggest of the day, owned or not
+    if shown < MAX_BANNERS and topUp and not Seen(0, "moon") and not Seen(topUp.id, "moon") then
+        Banner(topUp.id, string.format(L["up %s today: the market's biggest"], Whole(topUp.ch1)), L["TO THE MOON"], "up")
+        shown = shown + 1
+    end
+    if shown < MAX_BANNERS and topDown and not Seen(0, "rug") and not Seen(topDown.id, "rug") then
+        Banner(topDown.id, string.format(L["down %s today: the market's biggest"], Whole(topDown.ch1)), L["RUG PULL"], "down")
+    end
+end
+
+FT.On("FT_MARKET_READY", function() FT.Debounce("meme", 3, M.CheckBanners) end)
+
+-- Whales and Market Makers, from your own deep scans (Full scan): the Blizzard feed has no seller names.
+-- R().whales = { t, items = { [itemID] = { n = seller, s = share, q = how many } } }
+-- R().makers = { t, list = { { n, value, items, top = itemID } } }, the 20 with the most gold listed
+local W = {}
+FT.Whales = W
+W.Whole = Whole
+
+function W.FromScan(acc, t)
+    local mine = {}
+    for _, c in pairs(FT.db.chars) do if c.name then mine[c.name] = true end end
+    local whales, byOwner = {}, {}
+    for itemID, it in pairs(acc.items) do
+        if it.byOwner and (it.qty or 0) > 0 then
+            local price = FT.Price(itemID)
+            if price and price > 0 then
+                local topName, topQ = nil, 0
+                for name, q in pairs(it.byOwner) do
+                    if q > topQ then topName, topQ = name, q end
+                    local o = byOwner[name]
+                    if not o then
+                        o = { n = name, value = 0, items = 0, topV = 0 }
+                        byOwner[name] = o
+                    end
+                    local v = price * q
+                    o.value, o.items = o.value + v, o.items + 1
+                    if v > o.topV then o.top, o.topV = itemID, v end
+                end
+                local share = topQ / it.qty
+                if topName and share >= WHALE_SHARE and price * topQ >= WHALE_MIN_VALUE and it.qty >= 5 then
+                    whales[itemID] = { n = topName, s = math.floor(share * 100 + 0.5) / 100, q = topQ }
+                end
+            end
+        end
+    end
+    local list = {}
+    for _, o in pairs(byOwner) do
+        list[#list + 1] = { n = o.n, value = math.floor(o.value), items = o.items, top = o.top, you = mine[o.n] or nil }
+    end
+    if #list == 0 then return end -- the scan gave no seller names: keep what we had
+    table.sort(list, function(a, b) return a.value > b.value end)
+    for i = #list, 21, -1 do list[i] = nil end
+    local r = FT.R()
+    local before = r.whales and r.whales.items or {}
+    r.whales = { t = t, items = whales }
+    r.makers = { t = t, list = list }
+    -- WHALE ALERT: a new whale in something you own or watch
+    if FT.S.meme ~= false then
+        local shown = 0
+        for itemID, w in pairs(whales) do
+            local old = before[itemID]
+            if shown < MAX_BANNERS and Cares(itemID) and not mine[w.n] and not (old and old.n == w.n) then
+                Banner(itemID, string.format(L["%s holds %s of what's listed"], w.n, Whole(w.s)), L["WHALE ALERT"], "accent")
+                shown = shown + 1
+            end
+        end
+    end
+    FT.Fire("FT_WHALES_READY")
+end
+
+-- the whale of one item from the last deep scan, or nil
+function W.Of(itemID)
+    local w = FT.R().whales
+    return w and w.items and w.items[itemID], w and w.t
+end
+
+function W.Makers()
+    local m = FT.R().makers
+    return m and m.list or {}, m and m.t
+end

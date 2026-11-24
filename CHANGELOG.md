@@ -1,5 +1,15 @@
 # The Wolf of Booty Bay
 
+## v0.5 - batch 4: the meme layer
+
+- TO THE MOON / RUG PULL banners: something you own or watch up or down 30%+ in a day, plus the market's single
+  biggest move each way; once a day per item.
+- Market Makers on the Terminal: the 20 sellers with the most gold listed, from your last Full scan (the Blizzard
+  feed has no seller names). Click one to open their biggest item.
+- WHALE ALERT: one seller holding half or more of an item you own or watch (50g+ of it); the item's glance line
+  names the whale.
+- APE IN on the strongest buys. Settings > Alerts > Meme mode turns it all off.
+
 ## v0.4 - batch 3: money and portfolio
 
 - The Money tab: Carry it (between your faction's auction house and Blackwater, the other house's prices from the

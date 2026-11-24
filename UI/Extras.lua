@@ -324,6 +324,7 @@ local function NewToast()
     UI.Fill(t, "bg1")
     UI.Border(t, "line")
     local bar = UI.RoundTex(t, "ARTWORK", "accent", 1, nil, "left", UI.RADIUS - 1)
+    t.bar = bar
     bar:SetWidth(3)
     bar:SetPoint("TOPLEFT", 1, -1)
     bar:SetPoint("BOTTOMLEFT", 1, 1)
@@ -358,7 +359,8 @@ local function NewToast()
     return t
 end
 
-function FT.Toast(itemID, text)
+-- title and color: a banner of its own (the meme layer); nil = a price alert
+function FT.Toast(itemID, text, title, color)
     UI.ResolveFont()
     local t
     for _, x in ipairs(toasts) do
@@ -377,6 +379,10 @@ function FT.Toast(itemID, text)
         toasts[#toasts + 1] = t
     end
     t.itemID = itemID
+    color = color or "accent"
+    t.title:SetText(title or L["Price alert"])
+    UI.SetTextColor(t.title, color)
+    UI.SetTexColor(t.bar, color, 1)
     t.icon:SetItem(itemID)
     t.text:SetText(FT.ItemText(itemID, 30) .. " " .. text)
     t.age = 0

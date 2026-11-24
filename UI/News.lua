@@ -12,6 +12,14 @@ FT.News = N
 -- start, after the files are read (a table made with them would keep the English)
 local function News()
     return {
+        ["v0.5"] = {
+            { L["TO THE MOON / RUG PULL"], L["A banner when something you own or watch jumps or crashes 30% in a day, and one for the market's biggest move."],
+                function() FT.Show("market") end },
+            { L["Whales and Market Makers"], L["After a Full scan: the sellers with the most gold listed (Terminal), WHALE ALERT when one seller holds most of an item you care about."],
+                function() FT.Show("market") end },
+            { L["APE IN"], L["The strongest buy signals now say APE IN. Turn the whole meme layer off in Settings > Alerts > Meme mode."],
+                function() FT.Show("settings") end },
+        },
         ["v0.4"] = {
             { L["The Money tab"], L["Carry it, Flip it, Vendor it, Sell yours, the Farm Board: one list for each way to make gold, the best move right now on top."],
                 function() FT.Show("signals") end },
