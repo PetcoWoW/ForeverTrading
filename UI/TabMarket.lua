@@ -780,7 +780,7 @@ local function BuildItemView(parent)
         r:SetPoint("TOPRIGHT", -10, y)
         return r
     end
-    v.rsi = IndLine(-28, "RSI (14)")
+    v.rsi = IndLine(-28, L["RSI (14)"])
     v.rsiBar = CreateFrame("Frame", nil, v.ind)
     v.rsiBar:SetHeight(3)
     v.rsiBar:SetPoint("TOPLEFT", 10, -44)
@@ -958,7 +958,7 @@ function T.ShowItem(id, keepView)
     v.dev:SetText(FT.Pct(s.dev))
     v.vol:SetText(s.vol and string.format("%.1f%%", s.vol * 100) or FT.C("dim", "—"))
     local liq = FT.An.Liquidity(s)
-    local liqNames = { high = L["high"], medium = L["medium"], low = L["low"], unknown = L["no data"] }
+    local liqNames = { high = L["liq:high"], medium = L["liq:medium"], low = L["liq:low"], unknown = L["no data"] }
     local liqColors = { high = "up", medium = "accent", low = "down", unknown = "dim" }
     -- and how much really sells, when seen (FT.Sales)
     v.liq:SetText(FT.C(liqColors[liq], liqNames[liq])

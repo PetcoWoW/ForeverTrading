@@ -266,7 +266,7 @@ local function AddLines(tt, itemID)
         tt:AddDoubleLine("|cfff0b90bWolf of Booty Bay|r", right)
         local parts = {}
         if s.ch7 then parts[#parts + 1] = L["7d"] .. " " .. FT.Pct(s.ch7) end
-        if s.rsi then parts[#parts + 1] = "RSI " .. string.format("%.0f", s.rsi) end
+        if s.rsi then parts[#parts + 1] = L["RSI"] .. " " .. string.format("%.0f", s.rsi) end
         local sig = FT.An.SellSignal(s)
         if sig ~= "NODATA" then
             parts[#parts + 1] = FT.C(FT.SIGNAL_COLORS[sig] or "muted", FT.SignalText(sig))

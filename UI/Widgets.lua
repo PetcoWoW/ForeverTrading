@@ -986,6 +986,7 @@ end
 function UI.Badge(parent, w, h)
     local f = CreateFrame("Frame", nil, parent)
     f:SetSize(w or 64, h or 18)
+    f.baseW = w or 64
     f.bg = UI.RoundTex(f, "BACKGROUND", "muted", 0.15)
     f.bg:SetAllPoints()
     f.text = UI.Text(f, 10, "muted", "CENTER")
@@ -995,6 +996,9 @@ function UI.Badge(parent, w, h)
         UI.SetTexColor(self.bg, color, (strength and strength >= 3) and 0.30 or 0.15)
         UI.SetTextColor(self.text, color)
         self.text:SetText(label or FT.SignalText(kind))
+        -- a longer word (Plain English) widens the badge rather than spilling out of it
+        local need = math.ceil(self.text:GetStringWidth()) + 10
+        if need > (self.baseW or 0) then self:SetWidth(need) else self:SetWidth(self.baseW) end
     end
     return f
 end

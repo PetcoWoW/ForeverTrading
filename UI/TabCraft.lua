@@ -542,7 +542,7 @@ function T.ShowDetail(keepView)
     local on = FT.Scanner.LiveOn(r.output)
     for _, id in ipairs(LiveMaterials(r)) do on = on or FT.Scanner.LiveOn(id) end
     d.liveText:SetText(on and (FT.C("up", L["live"]) .. FT.C("dim", " || " .. L["the item and its materials"])) or "")
-    local liqNames = { high = L["high"], medium = L["medium"], low = L["low"], unknown = L["no data"] }
+    local liqNames = { high = L["liq:high"], medium = L["liq:medium"], low = L["liq:low"], unknown = L["no data"] }
     -- how much really sells (seen from the listings) when known, else how often it is listed
     local sales = e.stats.sales and FT.Sales.PerDayText(e.stats.sales)
     d.cells.sell:SetText(FT.C(FT.SIGNAL_COLORS[e.sell] or "muted", FT.SignalText(e.sell)) .. FT.C("dim", "  ||  ")
