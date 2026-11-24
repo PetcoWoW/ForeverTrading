@@ -223,7 +223,7 @@ function S.SaveSummary(sum, t, source, done)
             for id, e in pairs(sum.items) do S.listed[id] = e.key or true end
             S.SaveListed(t)
             FT.Hist.LogScan({ t = t, items = #ids, value = value, source = source, summary = true })
-            FT.Hist.MarkScan("full", t)
+            FT.Hist.MarkScan(source == "feed" and "feed" or "full", t)
             if done then done(#ids) end
         end)
     end)

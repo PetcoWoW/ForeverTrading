@@ -1,5 +1,12 @@
 # The Wolf of Booty Bay
 
+## v0.1 - the price feed
+
+- Every release now carries the prices of every WoW Forever auction house, built hourly from Blizzard's own
+  auction data: lowest price, listed, sold over the last 7 days, daily lows. Prices before your first scan,
+  charts for the days you didn't scan, and "sells ~N a day" from a whole week of watching. Settings > Sources.
+- Releases are published hourly (version 0.1.<date and time>), so WowUp keeps the prices fresh.
+
 ## v0.1.0
 
 First version, built on ForeverTrading 1.1.4 by thewoolfi.

@@ -399,6 +399,8 @@ function FT.DebugReport()
     FT.Print("side " .. tostring(FT.sideKey) .. ", house " .. tostring(FT.house) .. " (" .. tostring(FT.houseKey)
         .. "), cut " .. string.format("%.1f%%", FT.Cut() * 100) .. ", char " .. tostring(FT.charKey))
     FT.Print("Auctionator " .. tostring(FT.Atr.Loaded()) .. ", days " .. tostring(FT.Atr.HistoryDays()))
+    FT.Print("feed: " .. FT.Feed.Describe() .. " (ruleset " .. tostring(FT.Feed.Ruleset()) .. ", house "
+        .. tostring(FT.Feed.HouseID(FT.house)) .. ")")
     FT.Print("recipes " .. #FT.Craft.List() .. ", tracked " .. FT.Hist.UniverseSize())
     -- recipes by profession: how many the Craft page has, how many ForeverTrading read itself (Mastercraft: the rest)
     local all, own = {}, {}

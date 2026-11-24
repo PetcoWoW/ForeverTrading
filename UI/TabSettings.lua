@@ -180,7 +180,10 @@ function T.Build(p)
         L["Auctions read per item, cheapest first (50 a page). More pages: a deeper order book, a slower scan."])
 
     -- sources
-    local so = Section(left, L["Sources"], 1)
+    local so = Section(left, L["Sources"], 2)
+    Check(so, "useFeed", L["Price feed"],
+        L["Prices of every auction house, built hourly from Blizzard's own auction data and shipped with each update: prices before your first scan, and charts for the days you didn't scan. Update the addon (WowUp) and /reload for fresh ones."],
+        function() FT.Fire("FT_SOURCES_CHANGED"); if FT.Feed then FT.Feed.Take() end end)
     Check(so, "useAuctionator", "Auctionator",
         L["Its full scans and searches go into Wolf of Booty Bay's history, and the days you haven't scanned yourself come from its price database."],
         function() FT.Fire("FT_SOURCES_CHANGED") end)

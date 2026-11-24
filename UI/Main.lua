@@ -342,6 +342,7 @@ function FT.UpdateStatus()
     local function Source(name, on)
         return on and (FT.C("up", name) .. " " .. FT.C("up", L["on"])) or FT.C("dim", name .. " " .. L["off"])
     end
+    parts[#parts + 1] = Source(L["Feed"], FT.Feed.On() and FT.Feed.Time() ~= nil)
     parts[#parts + 1] = Source("Auctionator", FT.Atr.On())
     parts[#parts + 1] = string.format(L["Recipes: %d"], #FT.Craft.List())
     parts[#parts + 1] = string.format(L["Tracked: %d"], FT.S.trackAll and #(FT.Market.Rows() or {}) or FT.Hist.UniverseSize())

@@ -119,6 +119,7 @@ end
 ---------------------------------------------------------------------------
 FT.DEFAULTS = {
     words = "plain",        -- plain (Plain English) / trader (the trader terms), after a reload
+    useFeed = true,         -- the price feed shipped with the addon (Sources/Feed.lua)
     useAuctionator = true,  -- its scans and searches go into our history; days we don't have come from it
     liveRefresh = true,     -- the item you have open is searched again every few seconds at the auction house
     shareAuto = true,       -- prices older than an hour: ask guild and group for fresher ones
@@ -292,7 +293,7 @@ local C_SUFFIX = FT.COIN.copper
 
 -- where a price came from, for people
 function FT.SourceName(source)
-    local names = { full = L["full scan"], mine = L["My items"], auctionator = "Auctionator",
+    local names = { full = L["full scan"], mine = L["My items"], auctionator = "Auctionator", feed = L["price feed"],
         history = L["history"], live = L["live search"], peer = L["exchange"] }
     return names[source] or L["scan"]
 end

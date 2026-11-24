@@ -1,0 +1,5 @@
+{"modified": 1795503600,
+ "auctions":[{"id":2,"item":{"id":7911},"buyout":12000,"quantity":2,"time_left":"LONG"},
+             {"id":4,"item":{"id":7911},"buyout":5500,"quantity":1,"time_left":"VERY_LONG"}],
+ "commodities":[{"id":10,"item":{"id":12359},"unit_price":142,"quantity":5,"time_left":"LONG"},
+                {"id":13,"item":{"id":12359},"unit_price":139,"quantity":30,"time_left":"VERY_LONG"}]}

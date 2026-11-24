@@ -12,11 +12,13 @@ FT.News = N
 -- start, after the files are read (a table made with them would keep the English)
 local function News()
     return {
-        ["v0.1.0"] = {
+        ["v0.1"] = {
             { L["Welcome to the Wolf of Booty Bay"], L["The auction house as a stock market. Built on ForeverTrading by thewoolfi - his scanner, history and price exchange, with our own look on top."],
                 nil },
             { L["Easier to read"], L["The game's own wide font, bigger text and window sizes up to 150%: Settings > General."],
                 function() FT.Show("settings") end },
+            { L["The price feed"], L["Prices of every auction house come with each update, built hourly from Blizzard's own auction data: prices before your first scan, charts for the days you didn't scan, and what really sells over a whole week."],
+                function() FT.Show("market") end },
             { L["Plain English"], L["Trader terms like RSI and liquidity are swapped for plain words. Prefer the trader terms? Settings > General > Words."],
                 function() FT.Show("settings") end },
         },
@@ -26,6 +28,11 @@ end
 -- a hotfix: what's new is that of the version it fixes, then its own lines (seen already with that version: not shown
 -- again by itself)
 local HOTFIX_OF = {}
+
+-- what's new is written per minor version ("v0.1"): the hourly price-feed releases only change the last number
+local function NewsKey()
+    return (FT.VERSION_TEXT or ""):match("^(v%d+%.%d+)") or FT.VERSION_TEXT
+end
 local function ListFor(v)
     local all, list = News(), {}
     local base = HOTFIX_OF[v]
@@ -56,7 +63,7 @@ local function Build()
     win:SetScript("OnDragStop", function(self) self:StopMovingOrSizing() end)
     -- seen: not again for this version
     win:SetScript("OnHide", function()
-        if FT.db then FT.db.newsSeen = FT.VERSION_TEXT end
+        if FT.db then FT.db.newsSeen = NewsKey() end
     end)
 
     win.title = UI.Text(win, 16, "text")
@@ -109,7 +116,7 @@ end
 
 -- the window for this version (nothing new for it: nothing shown)
 function N.Show()
-    local list = ListFor(FT.VERSION_TEXT)
+    local list = ListFor(NewsKey())
     if not list then
         FT.Print(string.format(L["Nothing new written for %s."], FT.VERSION_TEXT))
         return
@@ -146,7 +153,7 @@ function N.OnWindow()
     N.checked = true
     if FT.freshInstall and not FT.db.tourOffered then
         FT.db.tourOffered = true
-        FT.db.newsSeen = FT.VERSION_TEXT
+        FT.db.newsSeen = NewsKey()
         UI.Confirm({
             owner = "tourOffer",
             title = L["Welcome to Wolf of Booty Bay"],
@@ -157,11 +164,11 @@ function N.OnWindow()
         })
         return
     end
-    if FT.db.newsSeen ~= FT.VERSION_TEXT then
-        if ListFor(FT.VERSION_TEXT) and FT.db.newsSeen ~= HOTFIX_OF[FT.VERSION_TEXT] then
+    if FT.db.newsSeen ~= NewsKey() then
+        if ListFor(NewsKey()) and FT.db.newsSeen ~= HOTFIX_OF[NewsKey()] then
             N.Show()
         else
-            FT.db.newsSeen = FT.VERSION_TEXT
+            FT.db.newsSeen = NewsKey()
         end
     end
 end

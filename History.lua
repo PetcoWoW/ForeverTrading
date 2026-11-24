@@ -514,6 +514,19 @@ function H.Recent(itemID, n)
             if added then table.sort(out, function(a, b) return a.day < b.day end) end
         end
     end
+    -- the days only the price feed has
+    local feed = FT.Feed and FT.Feed.Daily(itemID, FT.Day() - n + 1)
+    if feed then
+        local have, added = {}, false
+        for _, r in ipairs(out) do have[r.day] = true end
+        for d, row in pairs(feed) do
+            if not have[d] then
+                out[#out + 1] = { day = d, o = row.low, h = row.low, l = row.low, c = row.low }
+                added = true
+            end
+        end
+        if added then table.sort(out, function(a, b) return a.day < b.day end) end
+    end
     return out
 end
 
@@ -841,7 +854,8 @@ function H.HasScan(t)
     return false
 end
 
--- kind: "full", "mine" or "peer" (a whole-market scan received from another ForeverTrading user)
+-- kind: "full", "mine", "peer" (a whole-market scan received from another ForeverTrading user) or "feed" (the
+-- price feed shipped with the addon, Sources/Feed.lua)
 function H.MarkScan(kind, t)
     local meta = FT.R().meta
     t = t or time()
@@ -849,6 +863,7 @@ function H.MarkScan(kind, t)
     if kind == "full" then meta.lastFull = t end
     if kind == "mine" then meta.lastMine = t end
     if kind == "peer" then meta.lastPeer = math.max(meta.lastPeer or 0, t) end
+    if kind == "feed" then meta.lastFeed = math.max(meta.lastFeed or 0, t) end
 end
 
 function H.LastScan(kind)
@@ -856,6 +871,7 @@ function H.LastScan(kind)
     if kind == "full" then return meta.lastFull end
     if kind == "mine" then return meta.lastMine end
     if kind == "peer" then return meta.lastPeer end
+    if kind == "feed" then return meta.lastFeed end
     return meta.lastScan
 end
 
@@ -877,6 +893,13 @@ function H.WatchedDays(window)
             n = n + 1
         end
     end
+    -- the days the price feed saw the whole market
+    for _, d in ipairs(FT.Feed and FT.Feed.Days() or {}) do
+        if d > today - window and d <= today and not seen[d] then
+            seen[d] = true
+            n = n + 1
+        end
+    end
     watched[window] = { house = FT.houseKey, day = today, count = count, last = last, n = n }
     return n
 end
@@ -884,7 +907,7 @@ end
 -- the time of the newest prices of the whole market we have: our full scan or one received
 function H.MarketTime()
     local meta = FT.R().meta
-    return math.max(meta.lastFull or 0, meta.lastPeer or 0)
+    return math.max(meta.lastFull or 0, meta.lastPeer or 0, meta.lastFeed or 0)
 end
 
 ---------------------------------------------------------------------------
@@ -1036,6 +1059,12 @@ function H.Daily(itemID, days)
             for d, row in pairs(atr) do
                 if not map[d] then map[d] = { day = d, h = row.high, l = row.low, v = row.qty } end
             end
+        end
+    end
+    local feed = FT.Feed and FT.Feed.Daily(itemID, from)
+    if feed then
+        for d, row in pairs(feed) do
+            if not map[d] then map[d] = { day = d, h = row.low, l = row.low } end
         end
     end
     local keys = {}

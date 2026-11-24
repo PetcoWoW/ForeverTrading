@@ -239,19 +239,27 @@ local function RateOf(d, days)
     }
 end
 
+-- the feed's sales (Sources/Feed.lua) when they cover more hours than ours
+local function Better(own, feed)
+    if not feed then return own end
+    if not own or (feed.hours or 0) > (own.hours or 0) then return feed end
+    return own
+end
+
 function Sa.Rate(itemID, days)
     if not (itemID and FT.db) then return nil end
-    return RateOf(Days(itemID), days)
+    return Better(RateOf(Days(itemID), days), FT.Feed and FT.Feed.Rate(itemID))
 end
 
 -- what sells at either auction house (House.lua): the other one's as it was saved
 function Sa.RateIn(house, itemID, days)
     if house == FT.house then return Sa.Rate(itemID, days) end
     if not (itemID and FT.db) then return nil end
+    local feed = FT.Feed and FT.Feed.Rate(itemID, house)
     local r = FT.db.realms[FT.HouseKey(house)]
     local str = r and r.sales and r.sales[itemID]
-    if not str then return nil end
-    return RateOf(Parse(str), days)
+    if not str then return feed end
+    return Better(RateOf(Parse(str), days), feed)
 end
 
 -- "~12 a day" (with a decimal under 10), for the pages
