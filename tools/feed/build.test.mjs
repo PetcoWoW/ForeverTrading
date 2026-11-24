@@ -8,9 +8,10 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
-const run = (fixture, out, cache, now) =>
+const run = (fixture, out, cache, now, houses) =>
   execFileSync("node", [path.join(here, "build.mjs")], {
-    env: { ...process.env, FEED_FIXTURE: path.join(here, "test", fixture), FEED_OUT: out, FEED_CACHE: cache, FEED_NOW: String(now) },
+    env: { ...process.env, FEED_FIXTURE: path.join(here, "test", fixture), FEED_OUT: out, FEED_CACHE: cache,
+      FEED_NOW: String(now), FEED_HOUSES: houses || "" },
   });
 
 test("counts what sold between two downloads", () => {
@@ -28,9 +29,18 @@ test("counts what sold between two downloads", () => {
   }));
   // item 7911: lowest now 5500, 3 listed in 2 auctions, 1 bought for 5000, today's low 5000
   assert.deepEqual(items["7911"].slice(0, 7), [5500, 3, 2, 1, 5000, 1, 0]);
-  assert.equal(items["7911"][13], 5000);
+  assert.equal(items["7911"][20], 5000); // today: the last of 14 daily lows
   // goods 12359: 15 of a stack bought at 142, 40 ran out, the 30-min-to-2-h listing not counted
   assert.deepEqual(items["12359"].slice(0, 7), [139, 35, 2, 15, 15 * 142, 1, 40]);
   // the bid-only listing has no price: not shipped
   assert.equal(items["13444"], undefined);
+});
+
+test("builds only the houses asked for", () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "feed-"));
+  const out = path.join(dir, "Feed.lua");
+  run("run1", out, path.join(dir, "cache"), 1795500100, "114,116");
+  const lua = fs.readFileSync(out, "utf8");
+  assert.match(lua, /\[114\] = \{/);
+  assert.doesNotMatch(lua, /\[117\] = \{/);
 });
