@@ -21,9 +21,17 @@ local GetSubClassInfo = (C_Item and C_Item.GetItemSubClassInfo) or GetItemSubCla
 local function MoneyAxis(v) return FT.Money(v, "short") end
 
 -- the price line of an item: tf "1H" / "4H" / "1D" / "1W", moving averages when ma is on
+-- the price chart's style (Settings and the chart's "Pro chart" box): "simple", one line green when it went up
+-- over the period and red when down, nothing else; "pro", candles and the averages
+function UI.ProChart()
+    return FT.S.chartStyle == "pro"
+end
+
 function UI.PriceChartData(id, tf, ma)
     local candles = FT.Hist.Series(id, tf)
     local overlays = {}
+    local pro = UI.ProChart()
+    ma = ma and pro
     -- the averages show from 3 points on (until there are 7 / 25, of the points there are); MA25 once there
     -- are more than 7, else it would be the same line
     if ma and #candles >= 3 then
@@ -42,7 +50,7 @@ function UI.PriceChartData(id, tf, ma)
         emptyBody = L["No prices for it yet: scan My items or run a full scan at the auction house."]
     end
     return {
-        candles = candles, mode = "line", lineColor = "accent", tagColor = "accent", fmt = MoneyAxis,
+        candles = candles, mode = pro and "candles" or "line", fmt = MoneyAxis,
         title = L["Price"], overlays = overlays, hourly = intraday, defaultCount = intraday and 72 or 60,
         emptyTitle = L["No price history"], emptyBody = emptyBody,
     }
@@ -612,6 +620,7 @@ local function RefreshIn(w, keepView)
 
     w.tf:SetValue(FT.S.chartTF)
     w.ma:SetChecked(FT.S.showMA)
+    w.ma:SetShown(UI.ProChart()) -- the averages are part of the Pro chart
     DrawIn(w, keepView)
     if not w.compact then
         w.book:SetItem(id)

@@ -65,7 +65,7 @@ local function PassFilters(id)
 end
 local page, list, countText, overview, itemView, book, center, mats
 local LEFT_W, RIGHT_W = 372, 232
-local CARDS_H = 118 -- the indicator, signal and alert cards under the charts
+local CARDS_H = 132 -- the indicator, signal and alert cards under the charts (124 high, 8 above them)
 
 local GetClassInfo = (C_Item and C_Item.GetItemClassInfo) or GetItemClassInfo
 local GetSubClassInfo = (C_Item and C_Item.GetItemSubClassInfo) or GetItemSubClassInfo
@@ -699,6 +699,12 @@ local function BuildItemView(parent)
         { "hi7", L["7d high"] }, { "lo7", L["7d low"] }, { "avg", L["Average"] }, { "hi30", L["30d high"] },
         { "lo30", L["30d low"] }, { "listed", L["Listed"] }, { "auctions", L["Auctions"] }, { "sellers", L["Sellers"] },
     }
+    -- Simple view: the four numbers that matter at a glance
+    if FT.S.simple ~= false then
+        pairsDef = {
+            { "fair", L["Normal price"] }, { "lo7", L["7d low"] }, { "listed", L["Listed"] }, { "sells", L["Sells a day"] },
+        }
+    end
     v.pairs = {}
     for i, d in ipairs(pairsDef) do
         local p = StatPair(v.strip, d[2])
@@ -720,11 +726,18 @@ local function BuildItemView(parent)
         T.DrawChart()
     end)
     v.tf:SetPoint("TOPLEFT", 0, -100)
+    v.pro = UI.Check(v, L["Pro chart"], function(on)
+        FT.S.chartStyle = on and "pro" or "simple"
+        T.ApplyChartStyle()
+        T.DrawChart()
+    end)
+    v.pro:SetPoint("LEFT", v.tf, "RIGHT", 16, 0)
+    v.pro:SetTip(L["Pro chart"], L["Candles (each period's open, high, low and close), the averages and a second chart of the price against its average. Off: one clean line, green when it went up, red when down."])
     v.ma = UI.Check(v, L["Averages"], function(on)
         FT.S.showMA = on
         T.DrawChart(true)
     end)
-    v.ma:SetPoint("LEFT", v.tf, "RIGHT", 16, 0)
+    v.ma:SetPoint("LEFT", v.pro, "RIGHT", 16, 0)
     v.ma:SetTip(L["Moving averages"], L["Two smoothed lines on the price chart: MA7 and MA25, the average price of the last 7 and 25 points (days on 1D). Until there are that many, of the points there are; MA25 shows once there are more than 7."])
 
     v.search = UI.Button(v, L["Search on AH"], 10, 22, "default", function()
@@ -754,19 +767,27 @@ local function BuildItemView(parent)
     v.ind = Card(v, L["Indicators"])
     v.sig = Card(v, L["Signal"])
     v.alert = Card(v, L["Price alert"])
-    for _, c in ipairs({ v.ind, v.sig, v.alert }) do c:SetHeight(110) end
+    for _, c in ipairs({ v.ind, v.sig, v.alert }) do c:SetHeight(124) end
     UI.OnSize(v, function(self, w, h)
         T.FitHeader()
         local cards = self.compact and 0 or CARDS_H
-        self.chart:SetHeight(math.max(80, math.floor((h - 128 - cards - 6) * 0.56)))
+        -- the simple chart has the room of both charts
+        local share = UI.ProChart() and 0.56 or 1
+        self.chart:SetHeight(math.max(80, math.floor((h - 128 - cards - 6) * share)))
         local cw = (w - 16) / 3
         self.ind:ClearAllPoints()
         self.ind:SetPoint("BOTTOMLEFT", 0, 0)
         self.ind:SetWidth(cw)
         self.sig:ClearAllPoints()
-        self.sig:SetPoint("BOTTOMLEFT", cw + 8, 0)
-        self.sig:SetWidth(cw)
         self.alert:ClearAllPoints()
+        if FT.S.simple ~= false then
+            -- Simple view: no indicators card; what to do gets two thirds
+            self.sig:SetPoint("BOTTOMLEFT", 0, 0)
+            self.sig:SetWidth(2 * cw + 8)
+        else
+            self.sig:SetPoint("BOTTOMLEFT", cw + 8, 0)
+            self.sig:SetWidth(cw)
+        end
         self.alert:SetPoint("BOTTOMLEFT", 2 * (cw + 8), 0)
         self.alert:SetWidth(cw)
     end)
@@ -812,6 +833,9 @@ local function BuildItemView(parent)
     end
     v.sellBadge, v.sellText = SigRow(-28, L["If you sell"])
     v.buyBadge, v.buyText = SigRow(-64, L["If you buy"])
+    v.glance = UI.Text(v.sig, 11, "muted")
+    v.glance:SetPoint("TOPLEFT", 10, -104)
+    v.glance:SetPoint("RIGHT", v.sig, "RIGHT", -10, 0)
     v.craft = UI.Button(v.sig, L["Recipe"], 10, 18, "default", function()
         local rs = FT.Craft.ByOutput(state.selected)
         if rs and rs[1] then FT.OpenRecipe(rs[1].key) end
@@ -888,6 +912,20 @@ function T.UpdateAlert()
     v.alertText:SetText(#parts > 0 and (L["Alert when"] .. ": " .. table.concat(parts, ", ")) or FT.C("dim", L["No alert set"]))
 end
 
+-- Simple chart: one chart (the price) with the room of two, no averages box; Pro: both charts
+function T.ApplyChartStyle()
+    local v = itemView
+    if not v then return end
+    local pro = UI.ProChart()
+    v.pchart:SetShown(pro)
+    v.ma:SetShown(pro)
+    local w, h = v:GetSize()
+    if w and w > 0 then
+        local cards = v.compact and 0 or CARDS_H
+        v.chart:SetHeight(math.max(80, math.floor((h - 128 - cards - 6) * (pro and 0.56 or 1))))
+    end
+end
+
 -- draw the charts of the chosen item (price; profit in money, zero in the middle); keepView: same zoom
 function T.DrawChart(keepView)
     local v = itemView
@@ -912,9 +950,10 @@ function T.ShowItem(id, keepView)
         local subName = GetSubClassInfo and sub and GetSubClassInfo(cls, sub)
         if subName and subName ~= "" and subName ~= parts[1] then parts[#parts + 1] = subName end
     end
-    if FT.Hist.Tracked(id) then parts[#parts + 1] = FT.C("accent", L["tracked intraday"]) end
+    local simple = FT.S.simple ~= false
+    if FT.Hist.Tracked(id) and not simple then parts[#parts + 1] = FT.C("accent", L["tracked intraday"]) end
     local rs = FT.Craft.ByOutput(id)
-    if rs and rs[1] then parts[#parts + 1] = FT.C("up", L["you can craft it"]) end
+    if rs and rs[1] and (FT.S.showCraft or not simple) then parts[#parts + 1] = FT.C("up", L["you can craft it"]) end
     local own = FT.Port.Count(id)
     if own > 0 then parts[#parts + 1] = FT.C("text", string.format(L["you have %s"], FT.Num(own))) end
     local s = FT.An.Stats(id)
@@ -932,6 +971,8 @@ function T.ShowItem(id, keepView)
         if p.key == "listed" or p.key == "auctions" or p.key == "sellers" then
             p.value:SetText(UI.CountText(s, p.key))
             if p.key == "auctions" then p.label:SetText(UI.AuctionsLabel(id)) end
+        elseif p.key == "sells" then
+            p.value:SetText(s.sales and FT.Sales.PerDayText(s.sales) or FT.C("dim", "—"))
         else
             p.value:SetText(val and FT.Money(val, "short") or "—")
         end
@@ -939,6 +980,8 @@ function T.ShowItem(id, keepView)
 
     v.tf:SetValue(FT.S.chartTF)
     v.ma:SetChecked(FT.S.showMA)
+    v.pro:SetChecked(UI.ProChart())
+    T.ApplyChartStyle()
     T.DrawChart(keepView)
 
     -- indicators
@@ -971,6 +1014,16 @@ function T.ShowItem(id, keepView)
     local buy, buyStrength, buyReason = FT.An.BuySignal(s)
     v.buyBadge:Set(buy, nil, buyStrength)
     v.buyText:SetText(buyReason or "")
+    -- Simple view: the indicators in one line under what to do
+    if FT.S.simple ~= false then
+        local bits = {}
+        if s.rsi then bits[#bits + 1] = L["RSI"] .. " " .. string.format("%.0f", s.rsi) end
+        bits[#bits + 1] = L["Liquidity"] .. ": " .. FT.C(liqColors[liq], liqNames[liq])
+        if s.dev then bits[#bits + 1] = L["vs average"] .. " " .. FT.Pct(s.dev) end
+        v.glance:SetText(table.concat(bits, FT.C("dim", "   ·   ")))
+    else
+        v.glance:SetText("")
+    end
 
     -- alert: the boxes are filled when another item is opened (and after Save), never while you type in them
     if v.alertFor ~= id and not (v.below:HasFocus() or v.above:HasFocus()) then
@@ -1039,12 +1092,13 @@ function T.OnLayout()
     local v = itemView
     v.compact = compact
     for _, c in ipairs({ v.ind, v.sig, v.alert }) do c:SetShown(not compact) end
+    if FT.S.simple ~= false then v.ind:Hide() end
     v.pchart:ClearAllPoints()
     v.pchart:SetPoint("TOPLEFT", v.chart, "BOTTOMLEFT", 0, -6)
     v.pchart:SetPoint("BOTTOMRIGHT", 0, compact and 0 or CARDS_H)
     local h = v:GetHeight()
     if h and h > 0 then
-        v.chart:SetHeight(math.max(80, math.floor((h - 128 - (compact and 0 or CARDS_H) - 6) * 0.56)))
+        v.chart:SetHeight(math.max(80, math.floor((h - 128 - (compact and 0 or CARDS_H) - 6) * (UI.ProChart() and 0.56 or 1))))
     end
     T.LayoutRight()
 end

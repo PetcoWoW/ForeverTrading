@@ -6,7 +6,7 @@ local L = FT.L
 FT.Tabs = {}
 
 local TAB_ORDER = { "market", "craft", "signals", "portfolio", "sell", "settings" }
-local TAB_LABELS = { market = "Market", craft = "Craft", signals = "Signals", portfolio = "Portfolio", sell = "Selling",
+local TAB_LABELS = { market = "Terminal", craft = "Craft", signals = "Money", portfolio = "Portfolio", sell = "Sell",
     settings = "Settings" }
 
 local win, nav, content, ticker, statusLeft, statusRight, scanDot, scanText, sizeBox, gearBtn, brand
@@ -541,15 +541,16 @@ local function Build()
     logo:SetPoint("LEFT", 14, 0)
     local brand1 = UI.Text(header, 15, "accent")
     brand1:SetPoint("LEFT", logo, "RIGHT", 10, 0)
-    brand1:SetText("FOREVER")
+    brand1:SetText("WOLF OF")
     local brand2 = UI.Text(header, 15, "text")
     brand2:SetPoint("LEFT", brand1, "RIGHT", 1, 0)
-    brand2:SetText("TRADING")
+    brand2:SetText(" BOOTY BAY")
 
     -- the pages; Settings is the gear on the right
     local items = {}
     for _, key in ipairs(TAB_ORDER) do
-        if key ~= "settings" then items[#items + 1] = { key, L[TAB_LABELS[key]] } end
+        -- the Craft tab only when it's on (Settings > General)
+        if key ~= "settings" and (key ~= "craft" or FT.S.showCraft) then items[#items + 1] = { key, L[TAB_LABELS[key]] } end
     end
     local pill = FT.BuildAHPill(header)
     brand = { logo = logo, words = { brand1, brand2 }, pill = pill }

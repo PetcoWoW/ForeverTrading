@@ -41,7 +41,7 @@ plain["RSI %d: oversold"] = "Beaten down (%d/100): could bounce back"
 plain["Price change, RSI, the signal and the craft profit of the item."] =
     "Price change, hype, what to do and the craft profit of the item."
 plain["Sell: %d%% above the %d-day average or RSI 70+.  Buy: %d%% below or RSI 30-.  Craft: profit from %s and margin from %d%%."] =
-    "Cash out: %d%% above its normal %d-day price, or overhyped.  Buy the dip: %d%% below, or beaten down.  Craft: profit from %s and %d%%+ profit."
+    "Cash out: %d%% over normal (%d days) or overhyped  ·  Buy the dip: %d%% under or beaten down  ·  Craft: %s+ and %d%%+ profit"
 
 -- the other numbers
 plain["Indicators"] = "The numbers"
@@ -94,3 +94,8 @@ plain["To a vendor: a sure profit. Resell: the cheap lots of a steady market, li
     "To a vendor: a sure profit. Flip: the cheap ones of a steady item, listed again near the normal price. Between houses: cheaper at one auction house than the other sells it for."
 plain["Under the lowest would be %s: far under its fair price (or the vendor's). Rather wait for the cheap lots to go, or let yours run out."] =
     "Under the lowest would be %s: far under its normal price (or the vendor's). Better to wait for the cheap ones to go, or let yours run out."
+
+-- shorter where it shows all the time
+plain["From the auction house's letters, read when you open your mailbox; deposits of what you post here. The cut is taken off what sold."] =
+    "From your auction house mail. The cut is already taken off."
+plain["Average"] = "Average price"

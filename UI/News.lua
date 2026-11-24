@@ -12,6 +12,12 @@ FT.News = N
 -- start, after the files are read (a table made with them would keep the English)
 local function News()
     return {
+        ["v0.3"] = {
+            { L["Four tabs"], L["Terminal, Money, Portfolio, Sell. Craft is off until you turn it on: Settings > General."],
+                nil },
+            { L["Simple view"], L["Each item shows the four numbers that matter, what to do, and one clean chart: green when it went up, red when down. Pro chart: candles and averages."],
+                function() FT.Show("market") end },
+        },
         ["v0.2"] = {
             { L["Where your prices come from"], L["The status bar shows Blizzard's time and your scan's: the newer one in green. Yellow means newer prices are likely out: /reload."],
                 nil },

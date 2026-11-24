@@ -140,7 +140,7 @@ function T.Build(p)
     local right = CreateFrame("Frame", nil, content)
 
     -- general
-    local g = Section(left, L["General"], 10)
+    local g = Section(left, L["General"], 12)
     Choice(g, "words", L["Words"], { { "plain", L["Plain English"] }, { "trader", L["Trader terms"] } },
         L["Plain English swaps the trader terms (RSI, liquidity, volatility...) for plain words. Takes effect after a reload."],
         function() FT.AskReload(L["The new words show after the interface reloads. Reload now?"]) end)
@@ -159,6 +159,12 @@ function T.Build(p)
             end
             FT.Detail.Rescale(v)
         end)
+    Check(g, "simple", L["Simple view"],
+        L["The numbers that matter at a glance: four key numbers per item, what to do in one card, one clean chart. Off: every number and indicator. Takes effect after a reload."],
+        function() FT.AskReload() end)
+    Check(g, "showCraft", L["Craft tab"],
+        L["Recipes your characters know, with their profit. Takes effect after a reload."],
+        function() FT.AskReload() end)
     Check(g, "ticker", L["Ticker tape under the header"], L["Your watchlist and the day's biggest movers, scrolling. Takes effect after /reload."],
         function() FT.AskReload() end)
     Check(g, "minimap", L["Minimap button"], nil, function() if FT.UpdateMinimap then FT.UpdateMinimap() end end)
