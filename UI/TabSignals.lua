@@ -605,10 +605,11 @@ local function BuildFarmView(p)
     local f = ListView(p, function(x, button)
         if button == "RightButton" then WowheadLink(x.id) return end
         if UI.ItemClick(x.id) then return end
-        FT.OpenItem(x.id)
+        if FT.Craft.UsedIn(x.id) then FT.ShowBestUse(x.id) else FT.OpenItem(x.id) end
     end, function(row, x)
         UI.TipItem(row, x.id)
         GameTooltip:AddLine(" ")
+        if FT.Craft.UsedIn(x.id) then GameTooltip:AddLine(L["Click: its best use, every recipe it goes into."], 0.6, 0.64, 0.7) end
         GameTooltip:AddLine(L["Right-click: a Wowhead link for where to get it."], 0.6, 0.64, 0.7)
         GameTooltip:Show()
     end)
@@ -620,7 +621,7 @@ local function BuildFarmView(p)
     end, 22)
     f.kind:SetPoint("TOPLEFT", 0, -1)
     f.kind:SetValue(farmKind)
-    f.hint:SetText(L["What the market pays for each a day: price x how many sell a day. Farm the top of the list; right-click for where to get it."])
+    f.hint:SetText(L["What the market pays for each a day: price x how many sell a day. Click for its best use; right-click for where to get it."])
     f.list:SetEmptyText(L["No sales seen yet: the price feed fills this over a few hours."])
     return f
 end

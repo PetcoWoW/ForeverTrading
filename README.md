@@ -24,6 +24,13 @@ feed: update the addon (WowUp does it by itself) and `/reload`. Settings > Sourc
 
 Don't run ForeverTrading at the same time: two scanners do the same work twice.
 
+## Recipes (Best use)
+
+`Data/Recipes.lua` holds every crafting recipe of WoW Forever (about 2,300), read from the Blizzard API by
+`tools/recipes/build.mjs`. The `recipes` workflow refreshes it every Monday and commits it when something changed.
+It's what **Best use** ranks: every recipe a material goes into, and what one of it brings in each. You'll find it
+on the Farm Board (click), the item's Best use button on the Terminal, and a line in the material's tooltip.
+
 ## Settings that matter (Settings > General)
 
 - **Words**: Plain English (default) swaps trader terms for plain ones - "Hype meter" instead of RSI,

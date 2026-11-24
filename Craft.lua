@@ -332,3 +332,92 @@ function C.History(r, days)
     end
     return out
 end
+
+---------------------------------------------------------------------------
+-- Best use of a material: every recipe it goes into (all of WoW Forever's, Data/Recipes.lua from the Blizzard
+-- API, and the ones your characters know), and what one of it brings made into each
+---------------------------------------------------------------------------
+local PROF_NAMES = {
+    [129] = "First Aid", [164] = "Blacksmithing", [165] = "Leatherworking", [171] = "Alchemy", [185] = "Cooking",
+    [186] = "Mining", [197] = "Tailoring", [202] = "Engineering", [333] = "Enchanting",
+}
+C.PROF_NAMES = PROF_NAMES
+
+local byReagent -- [materialID] = { recipe, ... } (recipes shaped like C.List()'s)
+
+local function BuildUses()
+    byReagent = {}
+    local outputs = {} -- output:name of the known ones, so a recipe in both lists counts once (the known one)
+    local function Index(r)
+        local seen = {}
+        for _, rg in ipairs(r.reagents) do
+            if rg.itemID and not seen[rg.itemID] then
+                seen[rg.itemID] = true
+                byReagent[rg.itemID] = byReagent[rg.itemID] or {}
+                table.insert(byReagent[rg.itemID], r)
+            end
+        end
+    end
+    for _, r in ipairs(C.List()) do
+        outputs[r.output .. ":" .. tostring(r.name)] = true
+        Index(r)
+    end
+    for id, d in pairs(FT.RECIPE_DB or {}) do
+        local prof, output, qty, name = d[1], d[2], d[3], d[4]
+        if not outputs[output .. ":" .. tostring(name)] then
+            local reagents = {}
+            for k = 5, #d - 1, 2 do reagents[#reagents + 1] = { itemID = d[k], qty = d[k + 1] } end
+            Index({ key = "db:" .. id, id = id, name = name, prof = PROF_NAMES[prof] or "?", output = output,
+                outputQty = qty > 0 and qty or 1, reagents = reagents, knownBy = {} })
+        end
+    end
+end
+FT.On("FT_RECIPES_CHANGED", function() byReagent = nil end)
+
+-- the recipes a material goes into (nil: none)
+function C.UsedIn(itemID)
+    if not byReagent then BuildUses() end
+    return byReagent[itemID]
+end
+
+-- what one of it brings sold as it is: the auction house after the cut, or a merchant
+function C.RawValue(itemID)
+    local s = FT.An.Stats(itemID)
+    local ah = (s.sale or s.price) and (s.sale or s.price) * Cut() or nil
+    local vendor = FT.VendorSell(itemID)
+    if ah and (not vendor or ah >= vendor) then return ah, "ah" end
+    return vendor, vendor and "vendor" or nil
+end
+
+-- { { recipe, eval, need = how many of it, each = what one of it brings that way (the product's price minus
+--   the other materials, per one), known = someone of yours knows it }, ... }, the best first; raw, rawVia
+function C.BestUse(itemID)
+    local out = {}
+    for _, r in ipairs(C.UsedIn(itemID) or {}) do
+        local e = C.Eval(r)
+        local need, mine = 0, 0
+        for _, part in ipairs(e.parts or {}) do
+            if part.itemID == itemID then
+                need = need + part.qty
+                mine = mine + (part.total or 0)
+            end
+        end
+        local x = { recipe = r, eval = e, need = need, known = next(r.knownBy or {}) ~= nil }
+        -- the other materials must have a price: else what's left for this one isn't known
+        local othersPriced = true
+        for _, part in ipairs(e.parts or {}) do
+            if part.itemID ~= itemID and not part.unit then othersPriced = false end
+        end
+        if need > 0 and e.revenue and othersPriced then
+            x.each = (e.revenue - (e.cost - mine)) / need
+        end
+        out[#out + 1] = x
+    end
+    table.sort(out, function(a, b)
+        if (a.each ~= nil) ~= (b.each ~= nil) then return a.each ~= nil end
+        if a.each and a.each ~= b.each then return a.each > b.each end
+        return (a.recipe.name or "") < (b.recipe.name or "")
+    end)
+    local raw, via = C.RawValue(itemID)
+    return out, raw, via
+end

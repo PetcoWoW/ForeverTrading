@@ -12,6 +12,11 @@ FT.News = N
 -- start, after the files are read (a table made with them would keep the English)
 local function News()
     return {
+        ["v0.6"] = {
+            { L["Best use"], L["Every recipe a material goes into, all 2,300 of WoW Forever's, ranked by what one of it brings. Click a Farm Board row, or Best use on an item's chart."],
+                function() FT.Show("signals"); FT.Tabs.signals.SetView("farm") end },
+            { L["In the tooltip too"], L["A material's tooltip names its best use and how it compares to selling it as it is."] },
+        },
         ["v0.5"] = {
             { L["TO THE MOON / RUG PULL"], L["A banner when something you own or watch jumps or crashes 30% in a day, and one for the market's biggest move."],
                 function() FT.Show("market") end },

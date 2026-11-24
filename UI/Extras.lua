@@ -256,12 +256,31 @@ end)
 ---------------------------------------------------------------------------
 -- Item tooltips
 ---------------------------------------------------------------------------
+-- "Best use: Thorium Bar, 1.2g each (+40%)" - kept a minute per item (a tooltip shows many times a second)
+local bestLines = {}
+local function BestUseLine(itemID)
+    local c = bestLines[itemID]
+    if c and GetTime() - c.t < 60 then return c.text end
+    local list, raw = FT.Craft.BestUse(itemID)
+    local x = list[1]
+    local text
+    if x and x.each and x.each > 0 then
+        text = string.format(L["Best use: %s, %s each"], FT.ItemText(x.recipe.output, 26), FT.Money(math.floor(x.each), "short"))
+        if raw and raw > 0 then text = text .. " " .. FT.Pct(x.each / raw - 1) end
+        if #list > 1 then text = text .. FT.C("dim", string.format(L["  (%d recipes)"], #list)) end
+    end
+    bestLines[itemID] = { t = GetTime(), text = text }
+    return text
+end
+FT.On("FT_PRICES_CHANGED", function() wipe(bestLines) end)
+
 local function AddLines(tt, itemID)
     if not (FT.S and FT.S.tooltip and itemID) then return end
     local ok, err = pcall(function()
         local s = FT.An.Stats(itemID)
         local rs = FT.Craft.ByOutput(itemID)
-        if not s.price and not rs then return end
+        local uses = FT.S.tooltipBestUse ~= false and FT.Craft.UsedIn(itemID)
+        if not s.price and not rs and not uses then return end
         local right = s.price and (FT.Money(s.price, "short") .. "  " .. FT.Pct(s.ch1)) or ""
         tt:AddDoubleLine("|cfff0b90bWolf of Booty Bay|r", right)
         local parts = {}
@@ -279,6 +298,10 @@ local function AddLines(tt, itemID)
                     FT.C(e.profit >= 0 and "up" or "down", FT.Money(e.profit, "short")),
                     math.floor((e.margin or 0) * 100 + 0.5)), 0.8, 0.82, 0.86)
             end
+        end
+        if uses then
+            local best = BestUseLine(itemID)
+            if best then tt:AddLine(best, 0.8, 0.82, 0.86) end
         end
     end)
     if not ok then FT.Debug(err) end
@@ -505,6 +528,137 @@ function FT.ShowLink(title, body, url)
     d:Raise()
     d.input:SetFocus()
     d.input:HighlightText()
+end
+
+---------------------------------------------------------------------------
+-- Best use: every recipe a material goes into, ranked by what one of it brings (FT.Craft.BestUse)
+---------------------------------------------------------------------------
+local bestUse
+
+local function BestUseWindow()
+    if bestUse then return bestUse end
+    UI.ResolveFont()
+    local d = CreateFrame("Frame", "WolfOfBootyBayBestUse", UIParent)
+    d:SetSize(640, 440)
+    d:SetPoint("CENTER", 0, 60)
+    d:SetFrameStrata("DIALOG")
+    d:SetToplevel(true)
+    d:EnableMouse(true)
+    d:SetMovable(true)
+    d:SetClampedToScreen(true)
+    d:RegisterForDrag("LeftButton")
+    d:SetScript("OnDragStart", d.StartMoving)
+    d:SetScript("OnDragStop", d.StopMovingOrSizing)
+    UI.Fill(d, "bg1")
+    UI.Border(d, "line")
+    local bar = UI.RoundTex(d, "ARTWORK", "accent", 1, nil, "top", UI.RADIUS - 1)
+    bar:SetHeight(2)
+    bar:SetPoint("TOPLEFT", 1, -1)
+    bar:SetPoint("TOPRIGHT", -1, -1)
+    d.icon = UI.Icon(d, 30)
+    d.icon:SetPoint("TOPLEFT", 16, -14)
+    d.title = UI.Text(d, 14, "text")
+    d.title:SetPoint("TOPLEFT", d.icon, "TOPRIGHT", 10, -1)
+    d.title:SetPoint("RIGHT", d, "RIGHT", -110, 0)
+    d.raw = UI.Text(d, 11, "muted")
+    d.raw:SetPoint("TOPLEFT", d.title, "BOTTOMLEFT", 0, -4)
+    d.raw:SetPoint("RIGHT", d, "RIGHT", -16, 0)
+    d.close = UI.Button(d, L["Close"], 10, 22, "default", function() d:Hide() end)
+    d.close:FitText(24)
+    d.close:SetPoint("TOPRIGHT", -14, -14)
+    d.chart = UI.Button(d, L["Chart"], 10, 22, "default", function()
+        if d.itemID then FT.OpenItem(d.itemID) end
+    end)
+    d.chart:FitText(24)
+    d.chart:SetPoint("RIGHT", d.close, "LEFT", -6, 0)
+    local panel = UI.Panel(d, "bg0", "line")
+    panel:SetPoint("TOPLEFT", 12, -60)
+    panel:SetPoint("BOTTOMRIGHT", -12, 30)
+    local cols = {
+        { key = "name", title = L["Makes"], width = "fill" },
+        { key = "prof", title = L["Profession"], width = 110 },
+        { key = "need", title = L["Uses"], width = 44, justify = "RIGHT" },
+        { key = "each", title = L["Worth each"], width = 96, justify = "RIGHT" },
+        { key = "vs", title = L["vs selling it"], width = 90, justify = "RIGHT" },
+    }
+    d.header = UI.Header(panel, cols, function() end)
+    d.header:SetPoint("TOPLEFT", 1, -1)
+    d.header:SetPoint("TOPRIGHT", -1, -1)
+    d.list = UI.List(panel, {
+        rowHeight = 24, cols = cols,
+        update = function(row, x)
+            local r = x.recipe
+            row.cells.name:SetText(FT.ItemText(r.output, 34) .. (x.known and FT.C("up", "  " .. L["known"]) or ""))
+            row.cells.prof:SetText(FT.C("dim", L[r.prof or "?"]))
+            row.cells.need:SetText(FT.Num(x.need))
+            if x.each then
+                row.cells.each:SetText(FT.C(x.each > 0 and "text" or "down", FT.Money(math.floor(x.each), "short")))
+                row.cells.vs:SetText(d.raw_ and d.raw_ > 0 and FT.Pct(x.each / d.raw_ - 1) or "")
+            else
+                row.cells.each:SetText(FT.C("dim", L["no price"]))
+                row.cells.vs:SetText("")
+            end
+        end,
+        onClick = function(x) if not UI.ItemClick(x.recipe.output) then FT.OpenItem(x.recipe.output) end end,
+        onEnter = function(row, x)
+            local r, e = x.recipe, x.eval
+            GameTooltip:SetOwner(row, "ANCHOR_RIGHT")
+            GameTooltip:AddLine(r.name or FT.ItemText(r.output), 1, 1, 1)
+            for _, part in ipairs(e.parts or {}) do
+                GameTooltip:AddDoubleLine(part.qty .. " x " .. FT.ItemText(part.itemID),
+                    part.total and FT.Money(part.total, "short") or L["no price"], 0.8, 0.82, 0.86, 0.8, 0.82, 0.86)
+            end
+            if e.revenue then
+                GameTooltip:AddDoubleLine(L["Sells for"] .. (e.via == "vendor" and (" (" .. L["vendor"] .. ")") or ""),
+                    FT.Money(math.floor(e.revenue), "short"), 0.6, 0.64, 0.7, 1, 1, 1)
+            end
+            if x.known then
+                local who = {}
+                for name in pairs(r.knownBy) do who[#who + 1] = name end
+                GameTooltip:AddLine(L["Known by"] .. " " .. table.concat(who, ", "), 0.3, 0.8, 0.4, true)
+            end
+            GameTooltip:AddLine(L["Click: its chart"], 0.6, 0.64, 0.7)
+            GameTooltip:Show()
+        end,
+    })
+    d.list:SetPoint("TOPLEFT", d.header, "BOTTOMLEFT", 0, -2)
+    d.list:SetPoint("BOTTOMRIGHT", -1, 2)
+    d.list:SetEmptyText(L["Not a material of any recipe."])
+    d.foot = UI.Text(d, 10, "dim")
+    d.foot:SetPoint("BOTTOMLEFT", 16, 10)
+    d.foot:SetPoint("RIGHT", d, "RIGHT", -16, 0)
+    d.foot:SetText(L["Worth each: what the product sells for, minus the other materials, per one of this. Before your time and the recipe."])
+    tinsert(UISpecialFrames, "WolfOfBootyBayBestUse")
+    d:Hide()
+    bestUse = d
+    return d
+end
+
+function FT.ShowBestUse(itemID)
+    if not itemID then return end
+    local d = BestUseWindow()
+    d.itemID = itemID
+    d.icon:SetItem(itemID)
+    d.title:SetText(L["Best use of"] .. " " .. FT.ItemText(itemID, 40))
+    local list, raw, via = FT.Craft.BestUse(itemID)
+    d.raw_ = raw
+    local best = list[1] and list[1].each
+    local line
+    if raw then
+        line = string.format(L["Sold as it is: %s each%s."], FT.Money(math.floor(raw), "short"),
+            via == "vendor" and (" (" .. L["vendor"] .. ")") or "")
+    else
+        line = L["No price for it as it is yet."]
+    end
+    if best and raw and best > raw then
+        line = line .. "  " .. FT.C("up", string.format(L["Best: make %s, %s more each."], FT.ItemText(list[1].recipe.output, 24), FT.Pct(best / raw - 1, true)))
+    elseif best and raw then
+        line = line .. "  " .. FT.C("accent", L["Selling it as it is beats every recipe."])
+    end
+    d.raw:SetText(line .. "  " .. FT.C("dim", string.format(L["%d recipes"], #list)))
+    d.list:SetItems(list)
+    d:Show()
+    d:Raise()
 end
 
 function FT.ShowSupport()

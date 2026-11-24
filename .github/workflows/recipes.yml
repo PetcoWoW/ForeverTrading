@@ -5,7 +5,8 @@ on:
     - cron: "41 9 * * 1"
   workflow_dispatch:
   push:
-    branches: [probe-recipes]
+    branches: [main]
+    paths: [tools/recipes/**]
 permissions:
   contents: write
 jobs:

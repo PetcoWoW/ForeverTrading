@@ -171,7 +171,7 @@ function T.Build(p)
     Check(g, "ahButton", L["Button on the auction house"], L["Opens Wolf of Booty Bay next to the auction house window."])
     Check(g, "replaceAH", L["Open Wolf of Booty Bay instead of the auction house window"],
         L["Talking to an auctioneer opens Wolf of Booty Bay; the game's window stays open behind it, unseen. The \"AH: online\" pill in the header brings it back for buying and selling (and Auctionator). Walking away: the terminal goes offline with the last known prices."])
-    Check(g, "tooltip", L["Lines in item tooltips"], L["Price change, RSI, the signal and the craft profit of the item."])
+    Check(g, "tooltip", L["Lines in item tooltips"], L["Price change, RSI, the signal and the craft profit of the item, and a material's best use."])
     Check(g, "versionCheck", L["Tell me about new versions"],
         L["Wolf of Booty Bay users in your guild and group tell each other which version they have (a hidden addon message): a newer one shows in chat and in the status bar."])
 
