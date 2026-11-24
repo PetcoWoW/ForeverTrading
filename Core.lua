@@ -4,7 +4,7 @@ local L = FT.L
 
 -- The version being released: a copy straight from the repository (not packaged) has no version in its TOC yet
 -- (the packager puts the tag there) and shows this one. Set it with every release.
-local RELEASE = "v0.6.0"
+local RELEASE = "v0.7.0"
 local GetMeta = (C_AddOns and C_AddOns.GetAddOnMetadata) or GetAddOnMetadata
 FT.VERSION = (GetMeta and GetMeta(ADDON, "Version")) or RELEASE
 if FT.VERSION == "" or FT.VERSION:find("@", 1, true) then FT.VERSION = RELEASE end
@@ -123,6 +123,7 @@ FT.DEFAULTS = {
     reloadReminder = true,  -- a chat line, at most hourly, when newer feed prices are likely out
     scanWithAuctionator = true, -- Full scan runs Auctionator's scan when it's installed (one scan feeds both)
     tooltipBestUse = true,  -- a material's tooltip: its best use (Data/Recipes.lua)
+    holdTrends = true,      -- a steady climb is held (HODL / sell half) rather than sold the day it's above average
     meme = true,            -- the meme layer: TO THE MOON / RUG PULL banners, whale alerts, APE IN
     simple = true,          -- Simple view: the key numbers only, one clean chart (after a reload)
     showCraft = false,      -- the Craft tab (after a reload)

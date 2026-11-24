@@ -1,5 +1,13 @@
 # The Wolf of Booty Bay
 
+## v0.7 - hold what's climbing
+
+- The sell signal tells a jump from a climb. Climbing for weeks (this week's average 5%+ over the two weeks
+  before, up 15%+ in 30 days, higher lows) and still selling: HODL (DIAMOND HANDS in meme mode). Stretched far
+  above its average (3x the sell threshold, or RSI 80+): SELL HALF. The climb cracking (fell since the last
+  check, under its fair price, flooded, more sellers, hardly selling): CASH OUT.
+- Settings > Signals > Hold what's climbing turns it off (back to selling anything above average).
+
 ## v0.6 - Best use of a material
 
 - Every crafting recipe of WoW Forever (2,302, from the Blizzard API's `static-forever-us` professions) ships in

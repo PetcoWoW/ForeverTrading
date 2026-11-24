@@ -93,8 +93,8 @@ local function Collect()
     for _, h in ipairs(rows) do
         judged = judged + 1
         if h.signal == "NODATA" then early = early + 1 end
-        if h.signal == "SELL" then
-            sell[#sell + 1] = { id = h.id, signal = "SELL", strength = h.strength, reason = h.reason,
+        if h.signal == "SELL" or h.signal == "TRIM" then
+            sell[#sell + 1] = { id = h.id, signal = h.signal, strength = h.strength, reason = h.reason,
                 value = FT.Num(h.qty) .. FT.C("dim", " x ") .. FT.Money(h.price, "short"), sortV = h.value * h.strength,
                 tip = string.format(L["You have %s: worth %s"], FT.Num(h.qty), FT.Money(h.value)) }
         elseif h.signal == "HOLD" then
@@ -522,8 +522,9 @@ local function SellYours()
                 FT.Money(h.price, "short"))
         else
             unit, house = netHere, here
-            x.signal = (h.signal == "SELL" or h.signal == "HOLD") and h.signal or "SELL"
-            x.label = (h.signal ~= "SELL" and h.signal ~= "HOLD") and L["SELL"] or nil
+            local own = h.signal == "SELL" or h.signal == "HOLD" or h.signal == "TRIM"
+            x.signal = own and h.signal or "SELL"
+            x.label = (not own) and L["SELL"] or nil
             x.reason = h.reason or string.format(L["%s each here"], FT.Money(h.price, "short"))
         end
         -- how many at once: what sells there in two days
