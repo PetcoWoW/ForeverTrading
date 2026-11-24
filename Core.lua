@@ -1,17 +1,17 @@
--- ForeverTrading: core (saved data, events, formatting helpers, slash commands)
+-- Wolf of Booty Bay (built on ForeverTrading): core (saved data, events, formatting helpers, slash commands)
 local ADDON, FT = ...
 local L = FT.L
 
 -- The version being released: a copy straight from the repository (not packaged) has no version in its TOC yet
 -- (the packager puts the tag there) and shows this one. Set it with every release.
-local RELEASE = "v1.1.4"
+local RELEASE = "v0.1.0"
 local GetMeta = (C_AddOns and C_AddOns.GetAddOnMetadata) or GetAddOnMetadata
 FT.VERSION = (GetMeta and GetMeta(ADDON, "Version")) or RELEASE
 if FT.VERSION == "" or FT.VERSION:find("@", 1, true) then FT.VERSION = RELEASE end
 FT.VERSION_TEXT = FT.VERSION:match("^%d") and ("v" .. FT.VERSION) or FT.VERSION
 FT.MEDIA = "Interface\\AddOns\\" .. ADDON .. "\\media\\"
-FT.URL_SUPPORT = "https://boosty.to/andrewwoolfi"
-FT.URL_GITHUB = "https://github.com/thewoolfi/ForeverTrading"
+FT.URL_SUPPORT = "https://github.com/thewoolfi/ForeverTrading"
+FT.URL_GITHUB = "https://github.com/sain221b-sketch/forevertrading"
 
 ---------------------------------------------------------------------------
 -- Events: game events and our own ("FT_*") share one dispatcher
@@ -69,7 +69,7 @@ function FT.Debounce(key, delay, fn)
 end
 
 ---------------------------------------------------------------------------
--- Long jobs, a little each frame - and what they cost (/ft perf)
+-- Long jobs, a little each frame - and what they cost (/wolf perf)
 ---------------------------------------------------------------------------
 -- a job works this many milliseconds of a frame (fewer in a fight): smooth on a slow computer, quick on a fast one
 local FRAME_MS, FIGHT_MS = 8, 3
@@ -118,10 +118,9 @@ end
 -- Saved data
 ---------------------------------------------------------------------------
 FT.DEFAULTS = {
-    lang = "auto",          -- auto / ru / en
-    theme = "dark",         -- dark / light / classic (after a reload)
+    words = "plain",        -- plain (Plain English) / trader (the trader terms), after a reload
+    useFeed = true,         -- the price feed shipped with the addon (Sources/Feed.lua)
     useAuctionator = true,  -- its scans and searches go into our history; days we don't have come from it
-    useMastercraft = true,  -- recipes and holdings of alts ForeverTrading hasn't seen yet
     liveRefresh = true,     -- the item you have open is searched again every few seconds at the auction house
     shareAuto = true,       -- prices older than an hour: ask guild and group for fresher ones
     shareSend = true,       -- give our fresh scan to guild and group members who ask
@@ -152,7 +151,9 @@ FT.DEFAULTS = {
     trackAll = false,       -- intraday history for every item (more memory)
     keepDays = 45,
     maxSnaps = 240,
-    scale = 1.0,
+    scale = 1.1,
+    font = "game",          -- game (Friz Quadrata, wide) / condensed (Sofia Sans Condensed), after a reload
+    textSize = 1,           -- added to every text's size: 0 normal, 1 large, 2 larger (after a reload)
     ticker = true,
     ahButton = true,
     replaceAH = false,      -- talking to an auctioneer opens ForeverTrading in place of the game's window
@@ -235,9 +236,9 @@ function FT.Side()
 end
 
 local function InitDB()
-    FT.freshInstall = ForeverTradingDB == nil
-    ForeverTradingDB = ForeverTradingDB or {}
-    local db = ForeverTradingDB
+    FT.freshInstall = WolfOfBootyBayDB == nil
+    WolfOfBootyBayDB = WolfOfBootyBayDB or {}
+    local db = WolfOfBootyBayDB
     db.settings = db.settings or {}
     Fill(db.settings, FT.DEFAULTS)
     db.realms = db.realms or {}
@@ -264,12 +265,9 @@ local function InitDB()
     FT.S = db.settings
 end
 
-function FT.Lang()
-    local lang = FT.S and FT.S.lang or "auto"
-    if lang == "auto" then
-        return (GetLocale() == "ruRU") and "ru" or "en"
-    end
-    return lang
+-- the words the window uses: "plain" (Plain English, the default) or "trader" (the trader terms)
+function FT.Words()
+    return FT.S and FT.S.words or "plain"
 end
 
 ---------------------------------------------------------------------------
@@ -295,7 +293,7 @@ local C_SUFFIX = FT.COIN.copper
 
 -- where a price came from, for people
 function FT.SourceName(source)
-    local names = { full = L["full scan"], mine = L["My items"], auctionator = "Auctionator", mastercraft = "Mastercraft",
+    local names = { full = L["full scan"], mine = L["My items"], auctionator = "Auctionator", feed = L["price feed"],
         history = L["history"], live = L["live search"], peer = L["exchange"] }
     return names[source] or L["scan"]
 end
@@ -624,7 +622,7 @@ end
 -- Messages
 ---------------------------------------------------------------------------
 function FT.Print(msg)
-    DEFAULT_CHAT_FRAME:AddMessage("|cfff0b90bForever|r|cffeaecefTrading|r: " .. tostring(msg))
+    DEFAULT_CHAT_FRAME:AddMessage("|cfff0b90bWolf of Booty Bay|r: " .. tostring(msg))
 end
 
 function FT.Debug(...)
@@ -641,7 +639,7 @@ end
 FT.On("ADDON_LOADED", function(name)
     if name ~= ADDON then return end
     InitDB()
-    FT.ApplyLocale(FT.Lang())
+    FT.ApplyLocale(FT.Words())
     FT.Fire("FT_DB_READY")
 end)
 
@@ -674,7 +672,7 @@ FT.On("PLAYER_LOGIN", function()
 end)
 
 ---------------------------------------------------------------------------
--- /ft perf: what the long jobs cost the last time, the memory, the saved prices
+-- /wolf perf: what the long jobs cost the last time, the memory, the saved prices
 ---------------------------------------------------------------------------
 local PERF_JOBS = {
     { "scan:read", "Reading every auction (deep scan)" },
@@ -706,7 +704,7 @@ function FT.PerfReport()
         local ok, kb = pcall(usage, ADDON)
         if ok and type(kb) == "number" then mine = kb end
     end
-    FT.Print("  " .. string.format(L["Memory: ForeverTrading %s, all addons %s"], mine and MB(mine) or "?",
+    FT.Print("  " .. string.format(L["Memory: Wolf of Booty Bay %s, all addons %s"], mine and MB(mine) or "?",
         MB(collectgarbage("count"))))
     local items, size = FT.Hist.Footprint()
     FT.Print("  " .. string.format(L["Saved prices: %s items, %s characters; %s waiting to be written (at logout or /reload)"],
@@ -714,7 +712,7 @@ function FT.PerfReport()
     local rowsN, deep, movers = FT.Market.Depth()
     FT.Print("  " .. string.format(L["Market: %s items, %s with prices on 3+ days of the last two weeks, %s can be top gainers or losers"],
         FT.Num(rowsN), FT.Num(deep), FT.Num(movers)) .. (FT.Atr.On() and "" or
-        (" " .. L["(Auctionator is off: only the days ForeverTrading saw itself count)"])))
+        (" " .. L["(Auctionator is off: only the days Wolf of Booty Bay saw itself count)"])))
     local lo = FT.db.perfLogout
     if type(lo) == "table" and lo.ms then
         FT.Print("  " .. string.format(L["Writing them at the last logout: %s ms (%s records)"], Ms(lo.ms), FT.Num(lo.n or 0)))
@@ -735,22 +733,22 @@ end
 ---------------------------------------------------------------------------
 -- Slash commands
 ---------------------------------------------------------------------------
-SLASH_FOREVERTRADING1 = "/ft"
-SLASH_FOREVERTRADING2 = "/forevertrading"
-SLASH_FOREVERTRADING3 = "/ftrade"
-SlashCmdList.FOREVERTRADING = function(msg)
+SLASH_WOLFOFBOOTYBAY1 = "/wolf"
+SLASH_WOLFOFBOOTYBAY2 = "/wolfbb"
+SLASH_WOLFOFBOOTYBAY3 = "/booty"
+SlashCmdList.WOLFOFBOOTYBAY = function(msg)
     msg = (msg or ""):lower():gsub("^%s+", ""):gsub("%s+$", "")
     local cmd, rest = msg:match("^(%S*)%s*(.-)$")
     if cmd == "" then
         FT.Toggle()
     elseif cmd == "market" or cmd == "craft" or cmd == "signals" or cmd == "portfolio" or cmd == "sell" or cmd == "settings" then
         FT.Show(cmd)
-    elseif cmd == "lang" and (rest == "ru" or rest == "en" or rest == "auto") then
-        FT.S.lang = rest
+    elseif cmd == "words" and (rest == "plain" or rest == "trader") then
+        FT.S.words = rest
         if FT.AskReload then
-            FT.AskReload(L["The new language shows after the interface reloads. Reload now?"])
+            FT.AskReload(L["The new words show after the interface reloads. Reload now?"])
         else
-            FT.Print(L["Language changed. Type /reload to apply."])
+            FT.Print(L["Words changed. Type /reload to apply."])
         end
     elseif cmd == "reset" then
         FT.db.frame = {}
@@ -766,7 +764,7 @@ SlashCmdList.FOREVERTRADING = function(msg)
         else
             FT.Scanner.StartFull()
         end
-    elseif cmd == "support" or cmd == "donate" then
+    elseif cmd == "credits" or cmd == "support" then
         FT.ShowSupport()
     elseif cmd == "github" or cmd == "git" then
         FT.ShowGitHub()
@@ -787,12 +785,12 @@ SlashCmdList.FOREVERTRADING = function(msg)
     elseif cmd == "tour" then
         FT.Tour.Start()
     else
-        FT.Print("/ft — " .. L["open / close"])
-        FT.Print("/ft market | craft | signals | portfolio | sell | settings")
-        FT.Print("/ft scan — " .. L["full scan"] .. ",  /ft scan mine — " .. L["My items"] .. ",  /ft stop")
-        FT.Print("/ft share — " .. L["ask guild and group for fresh prices"] .. ",  /ft share test — " .. L["check which ways the exchange can use"])
-        FT.Print("/ft news — " .. L["what's new"] .. ",  /ft tour — " .. L["the tour of ForeverTrading"])
-        FT.Print("/ft perf — " .. L["how fast it works and the memory it takes"])
-        FT.Print("/ft lang ru | en | auto,  /ft reset,  /ft github,  /ft support")
+        FT.Print("/wolf — " .. L["open / close"])
+        FT.Print("/wolf market | craft | signals | portfolio | sell | settings")
+        FT.Print("/wolf scan — " .. L["full scan"] .. ",  /wolf scan mine — " .. L["My items"] .. ",  /wolf stop")
+        FT.Print("/wolf share — " .. L["ask guild and group for fresh prices"] .. ",  /wolf share test — " .. L["check which ways the exchange can use"])
+        FT.Print("/wolf news — " .. L["what's new"] .. ",  /wolf tour — " .. L["the tour of Wolf of Booty Bay"])
+        FT.Print("/wolf perf — " .. L["how fast it works and the memory it takes"])
+        FT.Print("/wolf words plain | trader,  /wolf reset,  /wolf github,  /wolf credits")
     end
 end

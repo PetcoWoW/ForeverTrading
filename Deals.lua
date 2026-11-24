@@ -1,4 +1,4 @@
--- ForeverTrading: good deals - what to buy at the auction house right now for a profit.
+-- Wolf of Booty Bay (built on ForeverTrading): good deals - what to buy at the auction house right now for a profit.
 --  * to a vendor: listed under what a vendor pays for it - buy it and sell it to the vendor: a sure profit
 --    (no cut, no waiting);
 --  * to resell: listed far under its fair price on a steady market (listed most days, not flooded, no crowd
@@ -29,7 +29,7 @@ local fullAt, builtDay, fullNext = nil, nil, false
 -- what each item counted in the last look (the counts below go on item by item): 1 has a price, 2 has days of
 -- history, 4 an error, 8 a deal under the minimum profit (16: two)
 local counted = {}
--- the last look, for the page to say why it found nothing (and /ft debug): items with a price, the newest
+-- the last look, for the page to say why it found nothing (and /wolf debug): items with a price, the newest
 -- price, items with 3+ days of prices, deals under the minimum profit, errors
 local info
 

@@ -1,6 +1,6 @@
--- ForeverTrading: "What's new" - once a version, the first time the window opens after an update: a few lines on
+-- Wolf of Booty Bay (built on ForeverTrading): "What's new" - once a version, the first time the window opens after an update: a few lines on
 -- what came, each with a button to where it is. On a first install the tour is offered instead (UI/Tour.lua).
--- Again any time: Settings > About, /ft news.
+-- Again any time: Settings > About, /wolf news.
 local ADDON, FT = ...
 local UI = FT.UI
 local L = FT.L
@@ -12,60 +12,27 @@ FT.News = N
 -- start, after the files are read (a table made with them would keep the English)
 local function News()
     return {
-        ["v1.1.4"] = {
-            { L["Faster"], L["Saving a scan is three to four times as fast and far lighter on the game's memory: prices are written into the saved file once, when you log out. After a scan only the items that changed are counted again, a little each frame. /ft perf shows what each part took and the memory it takes."],
-                function() FT.PerfReport() end },
-            { L["Without Auctionator"], L["ForeverTrading goes by its own scans: top gainers and losers, the market mood, an item's changes, signals, liquidity and reselling work from the first days of scanning - while an auction house has been scanned on fewer days, fewer days of prices are asked for. Auctionator and Mastercraft only fill in what is missing."],
-                function() FT.Show("market") end },
-            { L["The carry list"], L["Signals > Deals > Between houses: a right click on a deal puts it on your carry list. It stays on the page (even when the deal is gone), and at the other auction house the Sell page marks what you brought and what it cost."],
-                function() FT.Show("signals"); FT.Tabs.signals.SetView("deals"); FT.Tabs.signals.SetDealKind("HOUSES") end },
-            { L["A smaller saved file"], L["Settings > Data: remove the history of items not seen on either auction house for 30 days - the ones that matter to you stay. Less for the game to load at login."],
+        ["v0.1"] = {
+            { L["Welcome to the Wolf of Booty Bay"], L["The auction house as a stock market. Built on ForeverTrading by thewoolfi - his scanner, history and price exchange, with our own look on top."],
+                nil },
+            { L["Easier to read"], L["The game's own wide font, bigger text and window sizes up to 150%: Settings > General."],
                 function() FT.Show("settings") end },
-            { L["A lighter exchange"], L["About a third fewer messages between two players with 1.1.4: prices come sooner. /ft share test also checks that every character comes through."],
-                nil },
-            { L["Our own font"], L["Sofia Sans Condensed: narrow, with Cyrillic, no Mastercraft needed for it (the classic style keeps the game's). After updating, restart the game once."],
-                nil },
-        },
-        ["v1.1.3"] = {
-            { L["Hotfix"], L["The ForeverTrading tab on the auction house window works without Auctionator too."],
-                nil },
-        },
-        ["v1.1.2"] = {
-            { L["Blackwater apart"], L["The neutral auction house keeps its own prices, history, deals and your auctions: a scan there doesn't touch your faction's. Talking to an auctioneer picks its house; the chip next to the auction house status switches whose prices you see, the pencil on it puts a wrong auction house right."],
-                nil },
-            { L["Between the auction houses"], L["Signals > Deals > Between houses: cheaper at one auction house than the other sells it for - buy, carry it over, list it there; each house's cut counted, no more than sells there in two days."],
-                function() FT.Show("signals"); FT.Tabs.signals.SetView("deals"); FT.Tabs.signals.SetDealKind("HOUSES") end },
-            { L["Item windows"], L["More opens up to four item windows at once - two items side by side. Each has a compact mode (the charts alone) and its own auction house."],
-                nil },
-            { L["A faster exchange"], L["Prices go three times as fast between two players with 1.1.2 (three lanes at once). Exchange pressed again stops it; what has come stays."],
-                nil },
-            { L["Deals on any computer"], L["Signals > Deals asks the game for what vendors pay (a new computer or game knows hardly any), and says why there are none: old prices, too little history, the minimum profit."],
-                function() FT.Show("signals"); FT.Tabs.signals.SetView("deals") end },
-            { L["A tidier look"], L["Choices are one framed switch, tinted buttons have an edge, corners are slightly rounded, rows and filters line up; the light style shows hovered and chosen rows."],
-                nil },
-            { L["Fixes"], L["The deals journal counts what was sold (Forever's letters say 0) and keeps up with Collect all; no exchange during your own scan; the Settings columns stay; the ticker shows the market's most valuable listings while there are no moves yet."],
-                nil },
-        },
-        ["v1.1.1"] = {
-            { L["Good deals"], L["Signals > Deals: what to buy right now for a profit - under what a vendor pays, or far under the fair price on a steady market."],
-                function() FT.Show("signals"); FT.Tabs.signals.SetView("deals") end },
-            { L["What really sells"], L["How much really sells a day, on the Craft page, the Market and the item window (told from the listings); and risks: a flooded market, more sellers, hardly bought."],
+            { L["The price feed"], L["Prices of every auction house come with each update, built hourly from Blizzard's own auction data: prices before your first scan, charts for the days you didn't scan, and what really sells over a whole week."],
                 function() FT.Show("market") end },
-            { L["Undercut"], L["A line in chat when an auction of yours is undercut; Sell > My auctions tells whether to wait or post it again."],
-                function() FT.Show("sell"); FT.Tabs.sell.SetView("owned") end },
-            { L["Deals journal"], L["Portfolio > Deals journal: what you really earned - from the auction house's letters."],
-                function() FT.Show("portfolio"); FT.Tabs.portfolio.SetView("journal") end },
-            { L["The craft queue"], L["Craft > Queue: the materials to buy for several crafts at once, at their cheapest, and how long it all takes to sell."],
-                function() FT.Show("craft"); FT.Tabs.craft.SetView("queue") end },
-            { L["Fixes"], L["The price exchange works (it didn't know your name), poisons are back on the Craft page, vendor prices of materials count, searching finds Russian names in any case."],
-                nil },
+            { L["Plain English"], L["Trader terms like RSI and liquidity are swapped for plain words. Prefer the trader terms? Settings > General > Words."],
+                function() FT.Show("settings") end },
         },
     }
 end
 
 -- a hotfix: what's new is that of the version it fixes, then its own lines (seen already with that version: not shown
 -- again by itself)
-local HOTFIX_OF = { ["v1.1.3"] = "v1.1.2" }
+local HOTFIX_OF = {}
+
+-- what's new is written per minor version ("v0.1"): the hourly price-feed releases only change the last number
+local function NewsKey()
+    return (FT.VERSION_TEXT or ""):match("^(v%d+%.%d+)") or FT.VERSION_TEXT
+end
 local function ListFor(v)
     local all, list = News(), {}
     local base = HOTFIX_OF[v]
@@ -77,7 +44,7 @@ end
 local win
 
 local function Build()
-    win = CreateFrame("Frame", "ForeverTradingNews", UIParent, UI.EdgeTemplate())
+    win = CreateFrame("Frame", "WolfOfBootyBayNews", UIParent, UI.EdgeTemplate())
     win:SetFrameStrata("DIALOG")
     win:SetToplevel(true)
     win:SetClampedToScreen(true)
@@ -90,19 +57,19 @@ local function Build()
         insets = { left = 4, right = 4, top = 4, bottom = 4 } }) then
         UI.Border(win, "line")
     end
-    table.insert(UISpecialFrames, "ForeverTradingNews")
+    table.insert(UISpecialFrames, "WolfOfBootyBayNews")
     win:RegisterForDrag("LeftButton")
     win:SetScript("OnDragStart", function(self) self:StartMoving() end)
     win:SetScript("OnDragStop", function(self) self:StopMovingOrSizing() end)
     -- seen: not again for this version
     win:SetScript("OnHide", function()
-        if FT.db then FT.db.newsSeen = FT.VERSION_TEXT end
+        if FT.db then FT.db.newsSeen = NewsKey() end
     end)
 
     win.title = UI.Text(win, 16, "text")
     win.title:SetPoint("TOPLEFT", 20, -18)
     local close = UI.Button(win, "×", 26, 26, "ghost", function() win:Hide() end)
-    close.label:SetFont(UI.FONT, 18, "")
+    close.label:SetFont(UI.FONT, UI.Size(18), "")
     close:SetPoint("TOPRIGHT", -10, -10)
     win.sub = UI.Text(win, 11, "dim")
     win.sub:SetPoint("TOPLEFT", win.title, "BOTTOMLEFT", 0, -4)
@@ -149,7 +116,7 @@ end
 
 -- the window for this version (nothing new for it: nothing shown)
 function N.Show()
-    local list = ListFor(FT.VERSION_TEXT)
+    local list = ListFor(NewsKey())
     if not list then
         FT.Print(string.format(L["Nothing new written for %s."], FT.VERSION_TEXT))
         return
@@ -157,7 +124,7 @@ function N.Show()
     if not win then Build() end
     local width = 560
     win:SetWidth(width)
-    win.title:SetText(string.format(L["What's new in ForeverTrading %s"], FT.VERSION_TEXT))
+    win.title:SetText(string.format(L["What's new in Wolf of Booty Bay %s"], FT.VERSION_TEXT))
     local y = -64
     for i, item in ipairs(list) do
         local r = Row(i)
@@ -186,22 +153,22 @@ function N.OnWindow()
     N.checked = true
     if FT.freshInstall and not FT.db.tourOffered then
         FT.db.tourOffered = true
-        FT.db.newsSeen = FT.VERSION_TEXT
+        FT.db.newsSeen = NewsKey()
         UI.Confirm({
             owner = "tourOffer",
-            title = L["Welcome to ForeverTrading"],
-            text = L["A short tour: where everything is and how to use it (a couple of minutes). It can be taken again any time: Settings > About, /ft tour."],
+            title = L["Welcome to Wolf of Booty Bay"],
+            text = L["A short tour: where everything is and how to use it (a couple of minutes). It can be taken again any time: Settings > About, /wolf tour."],
             ok = L["Take the tour"],
             cancel = L["Later"],
             onOK = function() FT.Tour.Start() end,
         })
         return
     end
-    if FT.db.newsSeen ~= FT.VERSION_TEXT then
-        if ListFor(FT.VERSION_TEXT) and FT.db.newsSeen ~= HOTFIX_OF[FT.VERSION_TEXT] then
+    if FT.db.newsSeen ~= NewsKey() then
+        if ListFor(NewsKey()) and FT.db.newsSeen ~= HOTFIX_OF[NewsKey()] then
             N.Show()
         else
-            FT.db.newsSeen = FT.VERSION_TEXT
+            FT.db.newsSeen = NewsKey()
         end
     end
 end

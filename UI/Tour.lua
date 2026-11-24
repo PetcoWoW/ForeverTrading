@@ -1,7 +1,7 @@
--- ForeverTrading: the tour - step by step over the real window: everything but the part a step is about is
+-- Wolf of Booty Bay (built on ForeverTrading): the tour - step by step over the real window: everything but the part a step is about is
 -- dimmed, the part is ringed, and a note beside it says what it is and does (Back, Next, Esc to end). A step
 -- whose part isn't on the screen (the compact window has no order book) is passed over. Offered on a first
--- install; again any time: Settings > About, /ft tour.
+-- install; again any time: Settings > About, /wolf tour.
 local ADDON, FT = ...
 local UI = FT.UI
 local L = FT.L
@@ -28,7 +28,7 @@ local function MakeSteps() return {
       text = L["Your faction's or Blackwater, the neutral one: each keeps its own prices. Talking to an auctioneer picks its house; a click shows the other one's prices (at an auctioneer: offline there). The pencil: this auctioneer is of the other house."],
       target = function() return FT.MainRefs and FT.MainRefs.house end },
     { title = L["Scan and exchange"],
-      text = L["Full scan: the prices of the whole market in a couple of minutes (at an auctioneer). Exchange: fresh prices from ForeverTrading users in your guild and group, anywhere."],
+      text = L["Full scan: the prices of the whole market in a couple of minutes (at an auctioneer). Exchange: fresh prices from Wolf of Booty Bay users in your guild and group, anywhere."],
       target = function() return FT.MainRefs and FT.MainRefs.scan end },
     { title = L["Market"], tab = "market",
       text = L["Search by name (in quotes: that name exactly), categories, filters as at the auction house. Click an item: its chart, signals and order book; right-click: watchlist."],
@@ -68,7 +68,7 @@ local function MakeSteps() return {
       text = L["What everything your characters own is worth. Deals journal: what you really earned, from the auction house's letters."],
       target = function() return Tab("portfolio").viewSeg end },
     { title = L["Settings"],
-      text = L["Signal thresholds, the exchange, alerts, your data. In About: What's new, and this tour again (/ft tour)."],
+      text = L["Signal thresholds, the exchange, alerts, your data. In About: What's new, and this tour again (/wolf tour)."],
       target = function() return FT.MainRefs and FT.MainRefs.gear end },
 } end
 
@@ -121,12 +121,12 @@ local function Place()
 end
 
 local function Build()
-    overlay = CreateFrame("Frame", "ForeverTradingTour", UIParent)
+    overlay = CreateFrame("Frame", "WolfOfBootyBayTour", UIParent)
     overlay:SetFrameStrata("FULLSCREEN_DIALOG")
     overlay:SetAllPoints(UIParent)
     overlay:EnableMouse(true) -- the window under it waits while the tour runs
     overlay:Hide()
-    table.insert(UISpecialFrames, "ForeverTradingTour")
+    table.insert(UISpecialFrames, "WolfOfBootyBayTour")
     shades = {}
     for i = 1, 4 do
         local t = overlay:CreateTexture(nil, "BACKGROUND")
@@ -169,7 +169,7 @@ local function Build()
         if FT.db then FT.db.tourDone = true end
         if step > 0 then
             step = 0
-            FT.Print(L["The tour is over. Again: Settings > About, or /ft tour."])
+            FT.Print(L["The tour is over. Again: Settings > About, or /wolf tour."])
         end
     end)
 end

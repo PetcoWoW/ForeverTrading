@@ -1,4 +1,4 @@
--- ForeverTrading: posting auctions from your bags, at the auction house. The Selling page works out the price,
+-- Wolf of Booty Bay (built on ForeverTrading): posting auctions from your bags, at the auction house. The Selling page works out the price,
 -- the deposit and the cut; here the posting itself: one question with everything (and the warnings), then the
 -- post - stackable goods by quantity (all your stacks together), anything else one item at a time. When the
 -- server warns about the price it asks once more. Nothing is posted without your click; the item must still be

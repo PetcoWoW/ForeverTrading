@@ -1,4 +1,4 @@
--- ForeverTrading: the deals journal - what you really bought and sold at the auction house, and what it brought.
+-- Wolf of Booty Bay (built on ForeverTrading): the deals journal - what you really bought and sold at the auction house, and what it brought.
 -- The auction house's mail says it exactly (its invoice: the price, the cut, the deposit back, how many, who),
 -- read when you open your mailbox; the deposits of what you post here are written when you post. Kept per server
 -- and side (all your characters, both auction houses), 90 days. The cut is learned per house (by the letter's

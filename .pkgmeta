@@ -1,4 +1,4 @@
-package-as: ForeverTrading
+package-as: WolfOfBootyBay
 
 enable-nolib-creation: no
 
@@ -14,5 +14,4 @@ ignore:
   - .gitignore
   - .pkgmeta
   - README.md
-  - LICENSE
   - CHANGELOG.md

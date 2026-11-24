@@ -1,4 +1,4 @@
--- ForeverTrading: what crafting materials cost at a vendor.
+-- Wolf of Booty Bay (built on ForeverTrading): what crafting materials cost at a vendor.
 -- 1. what a merchant really charged you (recorded when you visit one: Sources/Game.lua)
 -- 2. what Mastercraft recorded the same way
 -- 3. for the common vendor-sold reagents below: an estimate from the item's sell price (vendors sell
@@ -30,8 +30,6 @@ function FT.VendorBuy(itemID)
     if not itemID then return nil end
     local own = FT.db and FT.db.vendor[itemID]
     if own then return own, "seen" end
-    local mc = FT.MC.Loaded() and type(MastercraftDB.vendorPrices) == "table" and MastercraftDB.vendorPrices[itemID]
-    if type(mc) == "number" and mc > 0 then return mc, "seen" end
     if VENDOR_REAGENTS[itemID] then
         local _, _, _, sellPrice = FT.Item(itemID)
         if sellPrice and sellPrice > 0 then return sellPrice * 4, "estimate" end

@@ -1,4 +1,4 @@
--- ForeverTrading: what your characters own (bags, bank, mail) and what it is worth at market prices.
+-- Wolf of Booty Bay (built on ForeverTrading): what your characters own (bags, bank, mail) and what it is worth at market prices.
 local ADDON, FT = ...
 
 local P = {}
@@ -41,19 +41,6 @@ function P.Holdings()
             end
         end
     end
-    -- Mastercraft's: the alts we haven't seen with ForeverTrading yet, and mailboxes we haven't opened
-    if FT.MC.Loaded() then
-        FT.MC.EachInventory(function(guid, c, inv)
-            local name = c.name or "?"
-            if not seen[guid] then
-                for id, n in pairs(type(inv.bags) == "table" and inv.bags or {}) do Add(name, id, n, "bags") end
-                for id, n in pairs(type(inv.bank) == "table" and inv.bank or {}) do Add(name, id, n, "bank") end
-            end
-            if not mailSeen[guid] then
-                for id, n in pairs(type(inv.mail) == "table" and inv.mail or {}) do Add(name, id, n, "mail") end
-            end
-        end)
-    end
     holdings = out
     return out
 end
@@ -78,14 +65,6 @@ function P.Gold()
         if not seen[guid] and c.side == FT.sideKey and type(c.money) == "number" then
             total = total + c.money
             seen[guid] = true
-        end
-    end
-    if FT.MC.Loaded() then
-        for guid, c in pairs(FT.MC.Chars()) do
-            if not seen[guid] and type(c.money) == "number" then
-                total = total + c.money
-                seen[guid] = true
-            end
         end
     end
     return total

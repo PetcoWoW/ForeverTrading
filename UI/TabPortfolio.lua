@@ -1,4 +1,4 @@
--- ForeverTrading: Portfolio page - what your characters on this server own, valued at market prices.
+-- Wolf of Booty Bay (built on ForeverTrading): Portfolio page - what your characters on this server own, valued at market prices.
 local ADDON, FT = ...
 local UI = FT.UI
 local L = FT.L
@@ -117,7 +117,7 @@ function T.Build(p)
     })
     list:SetPoint("TOPLEFT", T.header, "BOTTOMLEFT", 0, -2)
     list:SetPoint("BOTTOMRIGHT", -1, 4)
-    list:SetEmptyText(L["Nothing priced yet. Open your bags and bank once per character; Mastercraft's records of your alts are used too."])
+    list:SetEmptyText(L["Nothing priced yet. Open your bags and bank once per character."])
     for _, c in ipairs(cards) do portfolioParts[#portfolioParts + 1] = c end
     for _, x in ipairs({ chartTitle, rangeSeg, chart, panel }) do portfolioParts[#portfolioParts + 1] = x end
     T.BuildJournal(p)

@@ -1,4 +1,4 @@
--- ForeverTrading: Settings page.
+-- Wolf of Booty Bay (built on ForeverTrading): Settings page.
 local ADDON, FT = ...
 local UI = FT.UI
 local L = FT.L
@@ -140,15 +140,17 @@ function T.Build(p)
     local right = CreateFrame("Frame", nil, content)
 
     -- general
-    local g = Section(left, L["General"], 9)
-    Choice(g, "lang", L["Language"], { { "auto", L["Game language"] }, { "ru", "Русский" }, { "en", "English" } },
-        L["Takes effect after /reload."], function()
-            FT.AskReload(L["The new language shows after the interface reloads. Reload now?"])
-        end)
-    Choice(g, "theme", L["Style"], { { "dark", L["Dark"] }, { "light", L["Light"] }, { "classic", L["Classic"] } },
-        L["Dark: an exchange terminal at night. Light: the same by day. Classic: the game's own look. Takes effect after a reload."],
-        function() FT.AskReload(L["The new style shows after the interface reloads. Reload now?"]) end)
-    Choice(g, "scale", L["Window scale"], { { 0.8, "80%" }, { 0.9, "90%" }, { 1.0, "100%" }, { 1.1, "110%" }, { 1.2, "120%" } },
+    local g = Section(left, L["General"], 10)
+    Choice(g, "words", L["Words"], { { "plain", L["Plain English"] }, { "trader", L["Trader terms"] } },
+        L["Plain English swaps the trader terms (RSI, liquidity, volatility...) for plain words. Takes effect after a reload."],
+        function() FT.AskReload(L["The new words show after the interface reloads. Reload now?"]) end)
+    Choice(g, "font", L["Font"], { { "game", L["Game font (wide)"] }, { "condensed", L["Condensed (narrow)"] } },
+        L["The game's own font reads easiest; the condensed one fits more in a row. Takes effect after a reload."],
+        function() FT.AskReload(L["The new font shows after the interface reloads. Reload now?"]) end)
+    Choice(g, "textSize", L["Text size"], { { 0, L["Normal"] }, { 1, L["Large"] }, { 2, L["Larger"] } },
+        L["Makes every text bigger without making the window bigger. Takes effect after a reload."],
+        function() FT.AskReload(L["The new text size shows after the interface reloads. Reload now?"]) end)
+    Choice(g, "scale", L["Window scale"], { { 0.9, "90%" }, { 1.0, "100%" }, { 1.1, "110%" }, { 1.2, "120%" }, { 1.3, "130%" }, { 1.4, "140%" }, { 1.5, "150%" } },
         nil, function(v)
             local w = FT.Window()
             if w then
@@ -160,12 +162,12 @@ function T.Build(p)
     Check(g, "ticker", L["Ticker tape under the header"], L["Your watchlist and the day's biggest movers, scrolling. Takes effect after /reload."],
         function() FT.AskReload() end)
     Check(g, "minimap", L["Minimap button"], nil, function() if FT.UpdateMinimap then FT.UpdateMinimap() end end)
-    Check(g, "ahButton", L["Button on the auction house"], L["Opens ForeverTrading next to the auction house window."])
-    Check(g, "replaceAH", L["Open ForeverTrading instead of the auction house window"],
-        L["Talking to an auctioneer opens ForeverTrading; the game's window stays open behind it, unseen. The \"AH: online\" pill in the header brings it back for buying and selling (and Auctionator). Walking away: the terminal goes offline with the last known prices."])
+    Check(g, "ahButton", L["Button on the auction house"], L["Opens Wolf of Booty Bay next to the auction house window."])
+    Check(g, "replaceAH", L["Open Wolf of Booty Bay instead of the auction house window"],
+        L["Talking to an auctioneer opens Wolf of Booty Bay; the game's window stays open behind it, unseen. The \"AH: online\" pill in the header brings it back for buying and selling (and Auctionator). Walking away: the terminal goes offline with the last known prices."])
     Check(g, "tooltip", L["Lines in item tooltips"], L["Price change, RSI, the signal and the craft profit of the item."])
     Check(g, "versionCheck", L["Tell me about new versions"],
-        L["ForeverTrading users in your guild and group tell each other which version they have (a hidden addon message): a newer one shows in chat and in the status bar."])
+        L["Wolf of Booty Bay users in your guild and group tell each other which version they have (a hidden addon message): a newer one shows in chat and in the status bar."])
 
     -- scanning
     local sc = Section(left, L["Scanning"], 4)
@@ -179,12 +181,12 @@ function T.Build(p)
 
     -- sources
     local so = Section(left, L["Sources"], 2)
+    Check(so, "useFeed", L["Price feed"],
+        L["Prices of every auction house, built hourly from Blizzard's own auction data and shipped with each update: prices before your first scan, and charts for the days you didn't scan. Update the addon (WowUp) and /reload for fresh ones."],
+        function() FT.Fire("FT_SOURCES_CHANGED"); if FT.Feed then FT.Feed.Take() end end)
     Check(so, "useAuctionator", "Auctionator",
-        L["Its full scans and searches go into ForeverTrading's history, and the days you haven't scanned yourself come from its price database."],
+        L["Its full scans and searches go into Wolf of Booty Bay's history, and the days you haven't scanned yourself come from its price database."],
         function() FT.Fire("FT_SOURCES_CHANGED") end)
-    Check(so, "useMastercraft", "Mastercraft",
-        L["Its price scans go into ForeverTrading's history; the recipes and holdings of alts you haven't logged in with ForeverTrading come from it."],
-        function() FT.Fire("FT_SOURCES_CHANGED"); FT.Fire("FT_RECIPES_CHANGED"); FT.Fire("FT_INVENTORY_CHANGED") end)
 
     -- prices
     local pr = Section(left, L["Prices"], 2)
@@ -221,7 +223,7 @@ function T.Build(p)
     -- exchange
     local ex = Section(right, L["Exchange"], 3)
     Check(ex, "shareAuto", L["Ask guild and group for fresh prices"],
-        L["When your prices of the whole market are more than an hour old, ForeverTrading asks its users in your guild (then your group) who has fresher ones; the freshest sends its last full scan in the background. At most once an hour."])
+        L["When your prices of the whole market are more than an hour old, Wolf of Booty Bay asks its users in your guild (then your group) who has fresher ones; the freshest sends its last full scan in the background. At most once an hour."])
     Check(ex, "shareSend", L["Share my scans"],
         L["When someone in your guild or group asks, your full scan (less than 3 days old and fresher than theirs) goes to them in the background: hidden addon messages, one a second, paused in a fight."])
     T.shareText = UI.Text(ex, 11, "dim")
@@ -245,7 +247,7 @@ function T.Build(p)
     local clear = UI.Button(dt, L["Clear history"], 10, 24, "down", function()
         UI.Confirm({
             title = L["Clear history"],
-            text = string.format(L["Clear ForeverTrading's price history (day candles, intraday, order books) of this server's auction house: %s? The other auction house's, Auctionator's and Mastercraft's data stay."],
+            text = string.format(L["Clear Wolf of Booty Bay's price history (day candles, intraday, order books) of this server's auction house: %s? The other auction house's, Auctionator's and Mastercraft's data stay."],
                 FT.House.Name()),
             ok = L["Clear history"],
             okStyle = "down",
@@ -303,7 +305,7 @@ function T.Build(p)
     if T.about.SetWordWrap then T.about:SetWordWrap(true) end
     T.about:SetJustifyV("TOP")
     T.about:SetHeight(4 * ROW)
-    local support = UI.Button(ab, L["Support on Boosty"], 10, 24, "primary", function() FT.ShowSupport() end)
+    local support = UI.Button(ab, L["Credits: ForeverTrading"], 10, 24, "primary", function() FT.ShowSupport() end)
     support:FitText(28)
     support:SetPoint("BOTTOMLEFT", 14, 12)
     local gh = UI.Button(ab, "GitHub", 10, 24, "default", function() FT.ShowGitHub() end)
@@ -379,11 +381,10 @@ function T.Refresh()
         T.shareText:SetText(L["Nothing received yet"])
     end
     local lines = {
-        "ForeverTrading  ||  " .. string.format(L["version %s"], FT.C("text", FT.VERSION_TEXT)),
-        "Auctionator: " .. (FT.Atr.Loaded() and FT.C("up", L["connected"]) or FT.C("down", L["not loaded"])) ..
-            "    Mastercraft: " .. (FT.MC.Loaded() and FT.C("up", L["connected"]) or FT.C("down", L["not loaded"])),
-        L["Prices come from ForeverTrading's own scans (and Auctionator's and Mastercraft's when they are on); recipes from your profession windows and Mastercraft."],
-        "/ft  ||  /ft scan  ||  /ft scan mine  ||  /ft stop  ||  /ft reset",
+        "Wolf of Booty Bay  ||  " .. string.format(L["version %s"], FT.C("text", FT.VERSION_TEXT)),
+        "Auctionator: " .. (FT.Atr.Loaded() and FT.C("up", L["connected"]) or FT.C("down", L["not loaded"])),
+        L["Prices come from Wolf of Booty Bay's own scans (and Auctionator's when it is on); recipes from your profession windows."],
+        "/wolf  ||  /wolf scan  ||  /wolf scan mine  ||  /wolf stop  ||  /wolf reset",
     }
     T.about:SetText(table.concat(lines, "\n"))
 end

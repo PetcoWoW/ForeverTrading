@@ -1,0 +1,52 @@
+## Interface: 16001
+## Title: |cfff0b90bThe Wolf of Booty Bay|r
+## Notes: The auction house as a stock market for WoW Forever: tickers, gainers and losers, plain-English picks, your net worth. Built on ForeverTrading by thewoolfi. Reads Auctionator's data too.
+## Version: 0.1.0
+## Author: sain221b-sketch (built on ForeverTrading by thewoolfi)
+## X-Website: https://github.com/sain221b-sketch/forevertrading
+## X-License: Apache-2.0
+## SavedVariables: WolfOfBootyBayDB
+## OptionalDeps: Auctionator
+## IconTexture: Interface\Icons\INV_Misc_Coin_02
+## Category: Auction/Economy
+## X-Category: Auction/Economy
+
+Locale.lua
+Core.lua
+Version.lua
+House.lua
+Data\Vendor.lua
+Data\Feed.lua
+Sources\Scanner.lua
+Sources\Auctionator.lua
+Sources\Feed.lua
+Sources\Game.lua
+History.lua
+Analytics.lua
+Sales.lua
+Craft.lua
+Market.lua
+Portfolio.lua
+Deals.lua
+Journal.lua
+Queue.lua
+Sources\Share.lua
+Sources\Buy.lua
+Sources\Sell.lua
+Sources\Owned.lua
+UI\Theme.lua
+UI\Widgets.lua
+UI\Chart.lua
+UI\OrderBook.lua
+UI\Materials.lua
+UI\Detail.lua
+UI\Main.lua
+UI\TabMarket.lua
+UI\TabCraft.lua
+UI\TabSignals.lua
+UI\TabPortfolio.lua
+UI\TabSell.lua
+UI\TabSettings.lua
+UI\Extras.lua
+UI\News.lua
+UI\Tour.lua

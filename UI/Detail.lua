@@ -1,4 +1,4 @@
--- ForeverTrading: an item in a window of its own ("More" on the charts) - several at once, to look at two items
+-- Wolf of Booty Bay (built on ForeverTrading): an item in a window of its own ("More" on the charts) - several at once, to look at two items
 -- side by side: large price and profit charts, the numbers that matter, its order book and what buying costs
 -- (compact: the charts alone, half as wide). With the auction house open its price and order book stay live
 -- (searched again every few seconds).
@@ -29,9 +29,9 @@ function UI.PriceChartData(id, tf, ma)
     if ma and #candles >= 3 then
         local closes = {}
         for i, c in ipairs(candles) do closes[i] = c.c end
-        overlays[#overlays + 1] = { values = FT.An.SMA(closes, 7, true), color = "blue", label = "MA7" }
+        overlays[#overlays + 1] = { values = FT.An.SMA(closes, 7, true), color = "blue", label = L["MA7"] }
         if #candles > 7 then
-            overlays[#overlays + 1] = { values = FT.An.SMA(closes, 25, true), color = "purple", label = "MA25" }
+            overlays[#overlays + 1] = { values = FT.An.SMA(closes, 25, true), color = "purple", label = L["MA25"] }
         end
     end
     local intraday = (tf == "1H" or tf == "4H")
@@ -134,7 +134,7 @@ function UI.MoreButton(chart, getID)
         local id = getID()
         if id then FT.ShowDetail(id) end
     end)
-    b.label:SetFont(UI.FONT, 11, "")
+    b.label:SetFont(UI.FONT, UI.Size(11), "")
     b:FitText(14)
     b:SetPoint("TOPRIGHT", -3, -2)
     b:SetFrameLevel(chart:GetFrameLevel() + 14)
@@ -248,7 +248,7 @@ local function SizeButtons(w, header)
 end
 
 local function New(index)
-    local w = CreateFrame("Frame", "ForeverTradingDetail" .. index, UIParent, UI.EdgeTemplate())
+    local w = CreateFrame("Frame", "WolfOfBootyBayDetail" .. index, UIParent, UI.EdgeTemplate())
     w.index = index
     w:SetFrameStrata("HIGH")
     w:SetToplevel(true)
@@ -325,7 +325,7 @@ local function New(index)
     w.sub:SetPoint("TOPLEFT", w.name, "BOTTOMLEFT", 0, -6)
 
     local close = UI.Button(header, "×", 30, 30, "ghost", function() w:Hide() end)
-    close.label:SetFont(UI.FONT, 18, "")
+    close.label:SetFont(UI.FONT, UI.Size(18), "")
     w.close = close
     w.sizes = SizeButtons(w, header)
     w.sizes:SetPoint("RIGHT", close, "LEFT", -6, 0)
@@ -561,7 +561,7 @@ Draw = function(w, keepView)
     FT.House.With(w.house, DrawIn, w, keepView)
 end
 
-local LIQ_NAMES = { high = "high", medium = "medium", low = "low", unknown = "no data" }
+local LIQ_NAMES = { high = "liq:high", medium = "liq:medium", low = "liq:low", unknown = "no data" }
 local LIQ_COLORS = { high = "up", medium = "accent", low = "down", unknown = "dim" }
 
 local function RefreshIn(w, keepView)
@@ -601,7 +601,7 @@ local function RefreshIn(w, keepView)
     local ind = {}
     if s.rsi then
         local color = (s.rsi >= 70 and "down") or (s.rsi <= 30 and "up") or "text"
-        ind[#ind + 1] = "RSI " .. FT.C(color, string.format("%.0f", s.rsi))
+        ind[#ind + 1] = L["RSI"] .. " " .. FT.C(color, string.format("%.0f", s.rsi))
     end
     if s.dev then ind[#ind + 1] = L["vs average"] .. " " .. FT.Pct(s.dev) end
     if s.vol then ind[#ind + 1] = L["Daily volatility"] .. " " .. FT.C("text", string.format("%.1f%%", s.vol * 100)) end

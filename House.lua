@@ -1,4 +1,4 @@
--- ForeverTrading: which auction house. Your faction's (Alliance or Horde) and Blackwater - the neutral one, shared by
+-- Wolf of Booty Bay (built on ForeverTrading): which auction house. Your faction's (Alliance or Horde) and Blackwater - the neutral one, shared by
 -- both factions - have lots and prices of their own: each keeps its own history, order books, sales, deals, your
 -- auctions there and its cut. Two things are told apart:
 --  * the house you stand at (FT.atHouse, while FT.ahHere): talking to an auctioneer tells it (an auctioneer of
@@ -211,7 +211,7 @@ function Ho.Fix()
     FT.UI.Confirm({
         owner = "houseFix",
         title = string.format(L["This is %s?"], Ho.Name(to)),
-        text = string.format(L["The prices seen at this auctioneer go to %s from now on, and ForeverTrading remembers it for the auctioneers here."], Ho.Name(to)),
+        text = string.format(L["The prices seen at this auctioneer go to %s from now on, and Wolf of Booty Bay remembers it for the auctioneers here."], Ho.Name(to)),
         ok = Ho.Name(to),
         cancel = L["Cancel"],
         onOK = function()

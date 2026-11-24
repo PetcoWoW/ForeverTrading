@@ -1,4 +1,4 @@
--- ForeverTrading: Selling page. On the left what you carry that the auction house takes, at market prices with
+-- Wolf of Booty Bay (built on ForeverTrading): Selling page. On the left what you carry that the auction house takes, at market prices with
 -- a signal; in the middle one item to post: the market (the cheapest listing, the fair price, the vendor's, the
 -- signal), the quantity, the price per unit (a copper under the cheapest to begin with), how long, and what it
 -- comes to - deposit, the auction house's cut, what you get - with warnings (under the vendor price, far under the fair one,
@@ -295,7 +295,7 @@ local function BuildForm(p)
     f.warn:SetJustifyV("TOP")
 
     f.post = UI.Button(f, L["Post"], 10, 30, "primary", function() T.Post() end)
-    f.post.label:SetFont(UI.FONT, 13, "")
+    f.post.label:SetFont(UI.FONT, UI.Size(13), "")
     f.post:FitText(40)
     f.post:SetPoint("BOTTOMRIGHT", -16, 16)
     f.hint = UI.Text(f, 10, "dim")
@@ -861,7 +861,7 @@ function T.BuildOwnedForm(p)
         local a = T.CurrentOwned()
         if a then FT.Owned.Cancel(a) end
     end)
-    f.cancel.label:SetFont(UI.FONT, 13, "")
+    f.cancel.label:SetFont(UI.FONT, UI.Size(13), "")
     f.cancel:FitText(36)
     f.cancel:SetPoint("BOTTOMRIGHT", -16, 16)
     -- undercut: take it off to post it again under the lowest (back from the mail, the Sell page has it first)
@@ -869,7 +869,7 @@ function T.BuildOwnedForm(p)
         local a = T.CurrentOwned()
         if a then FT.Owned.CancelToRepost(a) end
     end)
-    f.repost.label:SetFont(UI.FONT, 13, "")
+    f.repost.label:SetFont(UI.FONT, UI.Size(13), "")
     f.repost:FitText(36)
     f.repost:SetPoint("BOTTOMRIGHT", f.cancel, "TOPRIGHT", 0, 8)
     f.repost:SetTip(L["Take off to post cheaper"], L["The auction is taken off (the deposit is lost) and the item comes back by mail; back in your bags, the Sell page has it first, at a copper under the lowest. Posting again needs your click there."])

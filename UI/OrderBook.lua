@@ -1,4 +1,4 @@
--- ForeverTrading: order book - what is listed at each price, with the depth behind it, and what
+-- Wolf of Booty Bay (built on ForeverTrading): order book - what is listed at each price, with the depth behind it, and what
 -- buying a quantity really costs.
 local ADDON, FT = ...
 local UI = FT.UI

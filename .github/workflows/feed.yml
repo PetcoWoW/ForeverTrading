@@ -1,0 +1,77 @@
+# The price feed: every hour, download every WoW Forever auction house from Blizzard's Game Data API, build
+# Data/Feed.lua (tools/feed/build.mjs) and publish the addon with it as a new release, which addon managers
+# (WowUp) pick up. Needs the repository secrets BLIZZARD_CLIENT_ID and BLIZZARD_CLIENT_SECRET
+# (https://develop.battle.net/access/clients). Optional repository variable FEED_REGIONS (default: us).
+name: Price feed
+
+on:
+  schedule:
+    - cron: "17 * * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: price-feed
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  feed:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Restore the last download and the history
+        uses: actions/cache/restore@v4
+        with:
+          path: tools/feed/cache
+          key: feed-cache-${{ github.run_id }}
+          restore-keys: feed-cache-
+
+      - name: Build the price feed
+        env:
+          BLIZZARD_CLIENT_ID: ${{ secrets.BLIZZARD_CLIENT_ID }}
+          BLIZZARD_CLIENT_SECRET: ${{ secrets.BLIZZARD_CLIENT_SECRET }}
+          FEED_REGIONS: ${{ vars.FEED_REGIONS || 'us' }}
+        run: node tools/feed/build.mjs
+
+      - name: Save the download and the history
+        uses: actions/cache/save@v4
+        with:
+          path: tools/feed/cache
+          key: feed-cache-${{ github.run_id }}
+
+      - name: Package the addon with the feed
+        run: |
+          BASE=$(grep -m1 '^## Version:' WolfOfBootyBay.toc | sed 's/^## Version: *//; s/\r//')
+          MAJMIN=$(echo "$BASE" | cut -d. -f1,2)
+          VERSION="$MAJMIN.$(date -u +%Y%m%d%H%M)"
+          mkdir -p dist/WolfOfBootyBay
+          git archive HEAD | tar -x -C dist/WolfOfBootyBay
+          cp Data/Feed.lua dist/WolfOfBootyBay/Data/Feed.lua
+          ( cd dist/WolfOfBootyBay \
+            && rm -rf .github tools .gitattributes .gitignore .pkgmeta \
+            && sed -i "s/^## Version: .*/## Version: $VERSION/" WolfOfBootyBay.toc )
+          ( cd dist && zip -qr "WolfOfBootyBay-$VERSION.zip" WolfOfBootyBay )
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "v$VERSION" "dist/WolfOfBootyBay-$VERSION.zip" \
+            --title "v$VERSION" \
+            --notes "The Wolf of Booty Bay with prices as of $(date -u '+%Y-%m-%d %H:%M') UTC." \
+            --latest
+          # keep the newest 12 releases
+          gh release list --limit 100 --json tagName,createdAt \
+            --jq 'sort_by(.createdAt) | reverse | .[12:] | .[].tagName' |
+          while read -r tag; do gh release delete "$tag" --yes --cleanup-tag; done

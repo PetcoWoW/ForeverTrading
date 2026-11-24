@@ -1,4 +1,4 @@
--- ForeverTrading: Market page - every item with its price and moves, the chart of one item, its order
+-- Wolf of Booty Bay (built on ForeverTrading): Market page - every item with its price and moves, the chart of one item, its order
 -- book, indicators, signals and price alerts. With no item chosen: the market overview.
 local ADDON, FT = ...
 local UI = FT.UI
@@ -677,7 +677,7 @@ local function BuildItemView(parent)
     v.sub = UI.Text(v, 11, "dim")
     v.sub:SetPoint("TOPLEFT", v.name, "BOTTOMLEFT", 0, -5)
     v.back = UI.Button(v, "×", 24, 24, "ghost", function() T.ClearSelection() end)
-    v.back.label:SetFont(UI.FONT, 16, "")
+    v.back.label:SetFont(UI.FONT, UI.Size(16), "")
     v.back:SetPoint("TOPRIGHT", 0, -2)
     v.back:SetTip(L["Back to the market overview"])
     v.change = UI.Text(v, 14, "text", "RIGHT")
@@ -780,7 +780,7 @@ local function BuildItemView(parent)
         r:SetPoint("TOPRIGHT", -10, y)
         return r
     end
-    v.rsi = IndLine(-28, "RSI (14)")
+    v.rsi = IndLine(-28, L["RSI (14)"])
     v.rsiBar = CreateFrame("Frame", nil, v.ind)
     v.rsiBar:SetHeight(3)
     v.rsiBar:SetPoint("TOPLEFT", 10, -44)
@@ -816,7 +816,7 @@ local function BuildItemView(parent)
         local rs = FT.Craft.ByOutput(state.selected)
         if rs and rs[1] then FT.OpenRecipe(rs[1].key) end
     end)
-    v.craft.label:SetFont(UI.FONT, 11, "")
+    v.craft.label:SetFont(UI.FONT, UI.Size(11), "")
     v.craft:FitText(16)
     v.craft:SetPoint("TOPRIGHT", -6, -4)
 
@@ -958,7 +958,7 @@ function T.ShowItem(id, keepView)
     v.dev:SetText(FT.Pct(s.dev))
     v.vol:SetText(s.vol and string.format("%.1f%%", s.vol * 100) or FT.C("dim", "—"))
     local liq = FT.An.Liquidity(s)
-    local liqNames = { high = L["high"], medium = L["medium"], low = L["low"], unknown = L["no data"] }
+    local liqNames = { high = L["liq:high"], medium = L["liq:medium"], low = L["liq:low"], unknown = L["no data"] }
     local liqColors = { high = "up", medium = "accent", low = "down", unknown = "dim" }
     -- and how much really sells, when seen (FT.Sales)
     v.liq:SetText(FT.C(liqColors[liq], liqNames[liq])
