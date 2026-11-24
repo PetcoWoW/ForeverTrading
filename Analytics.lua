@@ -266,11 +266,15 @@ function An.Stats(itemID)
     local avgDays = FT.S.avgDays
     local sum, n, days14 = 0, 0, 0
     local hi7, lo7, hi30, lo30
+    local wSum, wN, pSum, pN, loOld = 0, 0, 0, 0, nil -- this week, the two weeks before it, the low before this week
     for _, c in ipairs(daily) do
         local age = today - c.day
         if age >= 1 and age <= avgDays then
             sum, n = sum + c.c, n + 1
         end
+        if age >= 1 and age <= 7 then wSum, wN = wSum + c.c, wN + 1 end
+        if age >= 8 and age <= 21 then pSum, pN = pSum + c.c, pN + 1 end
+        if age >= 8 and age <= 29 then loOld = math.min(loOld or c.l, c.l) end
         if age <= 13 then days14 = days14 + 1 end
         if age <= 6 then
             hi7 = math.max(hi7 or c.h, c.h)
@@ -283,6 +287,12 @@ function An.Stats(itemID)
     end
     s.avgN = n
     s.avg = n > 0 and sum / n or nil
+    -- Climbing for weeks, not a jump: this week's average 5%+ over the two weeks before, up 15%+ in 30 days,
+    -- and this week's low above the lows before it (higher lows: buyers keep paying more). Needs 3 weeks.
+    s.avgWeek = wN > 0 and wSum / wN or nil
+    s.avgBefore = pN > 0 and pSum / pN or nil
+    s.rising = (wN >= 4 and pN >= 7 and s.avgWeek >= s.avgBefore * 1.05 and (s.ch30 or 0) >= 0.15
+        and lo7 ~= nil and loOld ~= nil and lo7 > loOld) and true or false
     s.hi7, s.lo7, s.hi30, s.lo30 = hi7, lo7, hi30, lo30
     s.days = days14
     -- how many days this item has history at all (liquidity can't be judged on a day or two)
@@ -465,6 +475,26 @@ function An.SellSignal(s)
     local th = FT.S.sellAbove / 100
     local dev = s.dev or 0
     local hot = s.rsi and s.rsi >= 70
+    if (dev >= th or hot) and s.rising and FT.S.holdTrends ~= false then
+        local up30 = FT.Pct(s.ch30, true)
+        -- the climb cracking: fell since the last check, under its fair price, more listed or sellers than usual,
+        -- or not selling - take the gains while they're there
+        local why
+        if s.dropped then why = L["fell since the last check"]
+        elseif s.falling then why = L["under its price of the last hours"]
+        elseif s.flood then why = L["far more listed than usual"]
+        elseif s.crowd then why = L["more sellers than usual"]
+        elseif s.slow then why = L["hardly selling"] end
+        if why then
+            return "SELL", 3, string.format(L["%s in 30 days, but the climb is cracking (%s): cash out"], up30, why)
+        end
+        -- climbing, but stretched far above its average: bank half, let the rest ride
+        if dev >= th * 3 or (s.rsi and s.rsi >= 80) then
+            return "TRIM", 2, string.format(L["%s in 30 days and stretched (%s over average): sell half, hold half"],
+                up30, FT.Pct(dev, true))
+        end
+        return "HOLD", 3, string.format(L["Climbing for weeks (%s in 30 days, higher lows, still selling): let it ride"], up30)
+    end
     if dev >= th or hot then
         local strength = (dev >= th and hot) and 3 or ((dev >= th * 2) and 3 or 2)
         local reason
@@ -516,7 +546,7 @@ function An.Trend(s)
 end
 
 FT.SIGNAL_COLORS = {
-    SELL = "up", BUY = "up", CRAFT = "up",
+    SELL = "up", BUY = "up", CRAFT = "up", TRIM = "up",
     HOLD = "accent", WATCH = "accent", EXPENSIVE = "accent", RISKY = "accent",
     AVOID = "down", LOSS = "down",
     FAIR = "muted", NODATA = "dim",
@@ -525,7 +555,7 @@ FT.SIGNAL_COLORS = {
 
 function FT.SignalText(kind)
     local names = {
-        SELL = L["SELL"], BUY = L["BUY"], CRAFT = L["CRAFT"], HOLD = L["HOLD"], WATCH = L["WATCH"],
+        SELL = L["SELL"], TRIM = L["TRIM"], BUY = L["BUY"], CRAFT = L["CRAFT"], HOLD = L["HOLD"], WATCH = L["WATCH"],
         EXPENSIVE = L["PRICEY"], RISKY = L["RISKY"], AVOID = L["AVOID"], LOSS = L["LOSS"], FAIR = L["FAIR"],
         NODATA = L["NO DATA"], VENDOR = L["TO VENDOR"], RESELL = L["RESELL"], UNDERCUT = L["UNDERCUT"],
         HOUSES = L["CARRY OVER"],

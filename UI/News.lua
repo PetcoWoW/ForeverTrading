@@ -12,6 +12,10 @@ FT.News = N
 -- start, after the files are read (a table made with them would keep the English)
 local function News()
     return {
+        ["v0.7"] = {
+            { L["HODL what's climbing"], L["A price that's high because it's climbed for weeks now says HODL, or SELL HALF when it's stretched. A sudden jump, or a climb that cracks, still says CASH OUT."],
+                function() FT.Show("signals") end },
+        },
         ["v0.6"] = {
             { L["Best use"], L["Every recipe a material goes into, all 2,300 of WoW Forever's, ranked by what one of it brings. Click a Farm Board row, or Best use on an item's chart."],
                 function() FT.Show("signals"); FT.Tabs.signals.SetView("farm") end },

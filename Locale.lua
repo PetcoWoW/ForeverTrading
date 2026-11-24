@@ -24,6 +24,7 @@ end
 plain["SELL"] = "CASH OUT"
 plain["BUY"] = "BUY DIP"
 plain["HOLD"] = "HODL"
+plain["TRIM"] = "SELL HALF"
 plain["PRICEY"] = "OVERPRICED"
 plain["AVOID"] = "STAY AWAY"
 plain["LOSS"] = "LOSES GOLD"

@@ -402,7 +402,7 @@ function T.Refresh()
     cards[3]:Set(FT.Money(gold, "short"), L["all characters on this server"])
     local toSell = 0
     for _, x in ipairs(rows) do
-        if x.signal == "SELL" then toSell = toSell + 1 end
+        if x.signal == "SELL" or x.signal == "TRIM" then toSell = toSell + 1 end
     end
     cards[4]:Set(FT.Num(#rows), toSell > 0 and FT.C("up", string.format(L["%d worth selling now"], toSell)) or L["priced items"])
     T.DrawChart()
