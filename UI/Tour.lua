@@ -50,8 +50,8 @@ local function MakeSteps() return {
     { title = L["Craft"], tab = "craft", craft = true, prep = function() Tab("craft").SetView("recipes") end,
       text = L["What each recipe costs with its cheapest materials (auction house, vendor or crafting it yourself), what it brings, its risks. Queue: the materials to buy for several crafts at once."],
       target = function() return Tab("craft").viewSeg end },
-    { title = L["Money"], tab = "signals", prep = function() Tab("signals").SetView("signals") end,
-      text = L["What to sell and buy now, and deals: under what a vendor pays, far under the normal price, or cheaper than the other auction house sells it for."],
+    { title = L["Money"], tab = "signals", prep = function() Tab("signals").SetView("HOUSES") end,
+      text = L["Ways to make gold now: carry it to the other auction house, flip it, vendor it, sell what you own, and what's worth farming."],
       target = function() return Tab("signals").viewSeg end },
     { title = L["The carry list"], tab = "signals",
       prep = function()
@@ -60,7 +60,7 @@ local function MakeSteps() return {
           S.SetDealKind("HOUSES")
       end,
       text = L["Cheaper at one auction house than the other sells it for. A right click on a deal puts it on your carry list: it stays here, and at the other auction house the Sell page shows what you brought and what it cost."],
-      target = function() return Tab("signals").dealsKind end },
+      target = function() return Tab("signals").viewSeg end },
     { title = L["Sell"], tab = "sell", prep = function() Tab("sell").SetView("bags") end,
       text = L["Your bags at market prices, a copper under the lowest. My auctions: who undercut you."],
       target = function() return Tab("sell").viewSeg end },

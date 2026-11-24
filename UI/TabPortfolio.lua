@@ -10,6 +10,8 @@ local state = { sort = "value", desc = true, days = 30, view = "portfolio", peri
 local cards, chart, list, rangeSeg
 local portfolioParts = {} -- what the Portfolio view shows (hidden in the Journal view)
 local journal             -- the Journal view
+local charsView           -- the Characters view
+local STALE_DAYS = 7      -- a character's bank or mailbox not seen for this long: its numbers are old
 
 local function NameCell(row)
     local f = CreateFrame("Frame", nil, row)
@@ -39,7 +41,7 @@ function T.Build(p)
     sub:SetText(L["Bags, banks and mailboxes of your characters on this server, at auction house prices"])
 
     -- what you own, or what your trading brought (the deals journal)
-    T.viewSeg = UI.Segmented(p, { { "portfolio", L["Portfolio"] }, { "journal", L["Deals journal"] } }, function(v) T.SetView(v) end, 22)
+    T.viewSeg = UI.Segmented(p, { { "portfolio", L["Portfolio"] }, { "chars", L["Characters"] }, { "journal", L["Deals journal"] } }, function(v) T.SetView(v) end, 22)
     T.viewSeg:SetPoint("TOPRIGHT", -8, -8)
     T.viewSeg:SetValue(state.view)
     T.head, T.sub = head, sub
@@ -121,6 +123,7 @@ function T.Build(p)
     for _, c in ipairs(cards) do portfolioParts[#portfolioParts + 1] = c end
     for _, x in ipairs({ chartTitle, rangeSeg, chart, panel }) do portfolioParts[#portfolioParts + 1] = x end
     T.BuildJournal(p)
+    T.BuildChars(p)
 
     UI.OnSize(p, function(self, w, h)
         local cw = (w - 16 - 3 * 8) / 4
@@ -278,13 +281,82 @@ end
 function T.SetView(view)
     state.view = view
     if T.viewSeg then T.viewSeg:SetValue(view) end
-    local j = view == "journal"
-    for _, x in ipairs(portfolioParts) do x:SetShown(not j) end
+    local j, ch = view == "journal", view == "chars"
+    for _, x in ipairs(portfolioParts) do x:SetShown(not j and not ch) end
     if journal then journal:SetShown(j) end
-    T.head:SetText(j and L["Deals journal"] or L["Portfolio"])
-    T.sub:SetText(j and L["What you bought and sold at the auction house, and what it brought"]
+    if charsView then charsView:SetShown(ch) end
+    T.head:SetText((j and L["Deals journal"]) or (ch and L["Characters"]) or L["Portfolio"])
+    T.sub:SetText((j and L["What you bought and sold at the auction house, and what it brought"])
+        or (ch and L["Every character on this server: gold, what it holds, when it was last seen"])
         or L["Bags, banks and mailboxes of your characters on this server, at auction house prices"])
     T.Refresh()
+end
+
+---------------------------------------------------------------------------
+-- Characters (FT.Port.Characters): your bank alt and every other character, with how fresh its numbers are
+---------------------------------------------------------------------------
+local function AgeText(t)
+    if not t then return FT.C("down", L["never"]) end
+    local days = (time() - t) / 86400
+    local text = FT.Ago(t)
+    return days >= STALE_DAYS and FT.C("accent", text) or text
+end
+
+function T.BuildChars(p)
+    local f = CreateFrame("Frame", nil, p)
+    f:SetPoint("TOPLEFT", 0, -30)
+    f:SetPoint("BOTTOMRIGHT", 0, 0)
+    f:Hide()
+    charsView = f
+    f.note = UI.Text(f, 11, "dim")
+    f.note:SetPoint("TOPLEFT", 12, -12)
+    f.note:SetPoint("RIGHT", -12, 0)
+    if f.note.SetWordWrap then f.note:SetWordWrap(false) end
+    local panel = UI.Panel(f, "bg1", "line")
+    panel:SetPoint("TOPLEFT", 8, -34)
+    panel:SetPoint("BOTTOMRIGHT", -8, 8)
+    local cols = {
+        { key = "name", title = L["Character"], width = "fill" },
+        { key = "gold", title = L["Gold"], width = 110, justify = "RIGHT" },
+        { key = "worth", title = L["Items"], width = 110, justify = "RIGHT" },
+        { key = "total", title = L["Total"], width = 110, justify = "RIGHT" },
+        { key = "bank", title = L["Bank seen"], width = 110, justify = "RIGHT" },
+        { key = "mail", title = L["Mail seen"], width = 110, justify = "RIGHT" },
+    }
+    f.header = UI.Header(panel, cols, function() end)
+    f.header:SetPoint("TOPLEFT", 1, -1)
+    f.header:SetPoint("TOPRIGHT", -1, -1)
+    f.list = UI.List(panel, {
+        rowHeight = 28, cols = cols,
+        update = function(row, x)
+            local color = x.classFile and RAID_CLASS_COLORS and RAID_CLASS_COLORS[x.classFile]
+            local name = color and ("|c" .. color.colorStr .. x.name .. "|r") or x.name
+            row.cells.name:SetText(name .. (x.current and FT.C("dim", "  " .. L["(this one)"]) or ""))
+            row.cells.gold:SetText(FT.Money(x.gold, "short"))
+            row.cells.worth:SetText(FT.Money(math.floor(x.worth), "short"))
+            row.cells.total:SetText(FT.Money(math.floor(x.total), "short"))
+            row.cells.bank:SetText(AgeText(x.bankT))
+            row.cells.mail:SetText(AgeText(x.mailT))
+        end,
+    })
+    f.list:SetPoint("TOPLEFT", f.header, "BOTTOMLEFT", 0, -2)
+    f.list:SetPoint("BOTTOMRIGHT", -1, 4)
+    f.list:SetEmptyText(L["No characters yet."])
+end
+
+function T.RefreshChars()
+    if not charsView then return end
+    local list = FT.Port.Characters()
+    local old = {}
+    for _, x in ipairs(list) do
+        if not x.current and (not x.bankT or time() - x.bankT >= STALE_DAYS * 86400) then old[#old + 1] = x.name end
+    end
+    if #old > 0 then
+        charsView.note:SetText(FT.C("accent", string.format(L["Out of date: %s. Log in and open the bank and mailbox to count what they hold."], table.concat(old, ", "))))
+    else
+        charsView.note:SetText(L["A character counts from its own logins: open its bank and mailbox now and then."])
+    end
+    charsView.list:SetItems(list, true)
 end
 
 FT.On("FT_JOURNAL_CHANGED", function() T.RefreshJournal() end)
@@ -320,6 +392,7 @@ end
 
 function T.Refresh()
     if state.view == "journal" then return T.RefreshJournal() end
+    if state.view == "chars" then return T.RefreshChars() end
     local rows, total, total7 = FT.Port.Rows()
     T.rows, T.total = rows, total
     local gold = FT.Port.Gold()

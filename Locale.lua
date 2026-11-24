@@ -99,3 +99,5 @@ plain["Under the lowest would be %s: far under its fair price (or the vendor's).
 plain["From the auction house's letters, read when you open your mailbox; deposits of what you post here. The cut is taken off what sold."] =
     "From your auction house mail. The cut is already taken off."
 plain["Average"] = "Average price"
+plain["TO VENDOR"] = "VENDOR IT"
+plain["CARRY OVER"] = "CARRY IT"

@@ -113,3 +113,41 @@ function P.History(days)
     end
     return out
 end
+
+-- Every character of this side (your bank alt too): gold, what its bags, bank and mail are worth, and when each
+-- was last seen - a character counts only from its own logins, so an old "last seen" means old numbers.
+-- { guid, name, classFile, current, gold, worth, seenT, bankT, mailT, moneyT }, the richest first
+function P.Characters()
+    local worth = {}
+    for _, h in ipairs((P.Rows())) do
+        for name, c in pairs(h.chars or {}) do
+            worth[name] = (worth[name] or 0) + h.price * (c.bags + c.bank + c.mail)
+        end
+    end
+    local out = {}
+    for guid, c in pairs(FT.db.chars) do
+        if c.side == FT.sideKey then
+            local inv = FT.db.inv[guid] or {}
+            local current = guid == FT.charKey
+            local gold = current and GetMoney() or (type(c.money) == "number" and c.money or 0)
+            out[#out + 1] = {
+                guid = guid, name = c.name or "?", classFile = c.classFile, current = current,
+                gold = gold, worth = worth[c.name or "?"] or 0, seenT = current and time() or c.seenT,
+                bankT = inv.bankT, mailT = inv.mailT, moneyT = c.moneyT,
+            }
+        end
+    end
+    for _, x in ipairs(out) do x.total = x.gold + x.worth end
+    table.sort(out, function(a, b) return a.total > b.total end)
+    return out
+end
+
+-- when each character was here last: at login and at logout
+FT.On("FT_LOGIN", function()
+    local c = FT.charKey and FT.db.chars[FT.charKey]
+    if c then c.seenT = time() end
+end)
+FT.On("PLAYER_LOGOUT", function()
+    local c = FT.charKey and FT.db.chars[FT.charKey]
+    if c then c.seenT = time() end
+end)

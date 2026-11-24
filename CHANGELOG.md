@@ -1,5 +1,15 @@
 # The Wolf of Booty Bay
 
+## v0.4 - batch 3: money and portfolio
+
+- The Money tab: Carry it (between your faction's auction house and Blackwater, the other house's prices from the
+  price feed when you haven't been there), Flip it, Vendor it, Sell yours (each thing you own: vendor, this house or
+  the other, how many at a time), the Farm Board, and Signals. The best move right now sits under the title.
+- Farm Board: ore, herbs, leather, cloth, elemental and gems ranked by price x how many sell a day, with the week's
+  move; right-click for a Wowhead link.
+- Portfolio > Characters: gold, items, total and when the bank and mailbox were last seen, for every character;
+  out-of-date ones named at the top.
+
 ## v0.3 - batch 2: slim and readable
 
 - Four tabs: Terminal, Money, Portfolio, Sell. The Craft tab is off by default (Settings > General > Craft tab).
