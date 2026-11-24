@@ -537,6 +537,41 @@ local function MoverList(parent, title)
     return box
 end
 
+-- Market Makers: the sellers with the most gold listed, from your last Full scan
+function T.MakersList(parent)
+    local box = UI.Panel(parent, "bg1", "line")
+    box.title = UI.Text(box, 12, "text")
+    box.title:SetPoint("TOPLEFT", 12, -10)
+    box.title:SetText(L["Market Makers"])
+    box.when = UI.Text(box, 10, "dim", "RIGHT")
+    box.when:SetPoint("TOPRIGHT", -12, -11)
+    local cols = {
+        { key = "name", title = "", width = "fill" },
+        { key = "value", title = "", width = 74, justify = "RIGHT" },
+        { key = "items", title = "", width = 50, justify = "RIGHT" },
+    }
+    box.list = UI.List(box, {
+        rowHeight = 24, cols = cols,
+        update = function(row, x)
+            row.cells.name:SetText(x.n .. (x.you and FT.C("dim", " " .. L["(you)"]) or ""))
+            row.cells.value:SetText(FT.Money(x.value, "short"))
+            row.cells.items:SetText(FT.C("dim", string.format(L["%d items"], x.items)))
+        end,
+        onClick = function(x) if x.top then T.Select(x.top) end end,
+        onEnter = function(row, x)
+            GameTooltip:SetOwner(row, "ANCHOR_RIGHT")
+            GameTooltip:AddLine(x.n, 1, 1, 1)
+            GameTooltip:AddLine(string.format(L["%s listed across %d items"], FT.Money(x.value), x.items), nil, nil, nil, true)
+            if x.top then GameTooltip:AddLine(L["Biggest: "] .. FT.ItemText(x.top) .. "  " .. FT.C("dim", L["(click to open)"]), nil, nil, nil, true) end
+            GameTooltip:Show()
+        end,
+    })
+    box.list:SetPoint("TOPLEFT", 1, -32)
+    box.list:SetPoint("BOTTOMRIGHT", -1, 4)
+    box.list:SetEmptyText(L["Run a Full scan at the auction house: it names the sellers."])
+    return box
+end
+
 local function BuildOverview(parent)
     local v = CreateFrame("Frame", nil, parent)
     v:SetAllPoints()
@@ -566,8 +601,10 @@ local function BuildOverview(parent)
     v.chartTitle = UI.Text(v, 12, "text")
     v.chartTitle:SetText(L["Value listed on the auction house, by scan"])
     v.chart = UI.Chart(v)
-    v.gainers = MoverList(v, L["Top gainers 24h"])
-    v.losers = MoverList(v, L["Top losers 24h"])
+    local meme = FT.S.meme ~= false
+    v.gainers = MoverList(v, meme and L["TO THE MOON (24h)"] or L["Top gainers 24h"])
+    v.losers = MoverList(v, meme and L["RUG PULLS (24h)"] or L["Top losers 24h"])
+    v.makers = T.MakersList(v)
 
     UI.OnSize(v, function(self, w, h)
         local cw = (w - 3 * 8) / 4
@@ -583,13 +620,16 @@ local function BuildOverview(parent)
         self.chart:SetPoint("TOPRIGHT", 0, -134)
         local listsH = math.max(180, math.floor(h * 0.36))
         self.chart:SetPoint("BOTTOM", 0, listsH + 8)
-        local half = (w - 8) / 2
+        local third = (w - 16) / 3
         self.gainers:ClearAllPoints()
         self.gainers:SetPoint("BOTTOMLEFT", 0, 0)
-        self.gainers:SetSize(half, listsH)
+        self.gainers:SetSize(third, listsH)
         self.losers:ClearAllPoints()
-        self.losers:SetPoint("BOTTOMRIGHT", 0, 0)
-        self.losers:SetSize(half, listsH)
+        self.losers:SetPoint("BOTTOMLEFT", third + 8, 0)
+        self.losers:SetSize(third, listsH)
+        self.makers:ClearAllPoints()
+        self.makers:SetPoint("BOTTOMRIGHT", 0, 0)
+        self.makers:SetSize(third, listsH)
     end)
     return v
 end
@@ -638,6 +678,9 @@ function T.ShowOverview()
     })
     overview.gainers.list:SetItems(FT.Market.Movers(20, "ch1", true))
     overview.losers.list:SetItems(FT.Market.Movers(20, "ch1", false))
+    local makers, t = FT.Whales.Makers()
+    overview.makers.list:SetItems(makers)
+    overview.makers.when:SetText(t and FT.Ago(t) or "")
 end
 
 ---------------------------------------------------------------------------
@@ -1020,6 +1063,8 @@ function T.ShowItem(id, keepView)
         if s.rsi then bits[#bits + 1] = L["RSI"] .. " " .. string.format("%.0f", s.rsi) end
         bits[#bits + 1] = L["Liquidity"] .. ": " .. FT.C(liqColors[liq], liqNames[liq])
         if s.dev then bits[#bits + 1] = L["vs average"] .. " " .. FT.Pct(s.dev) end
+        local whale = FT.Whales.Of(id)
+        if whale then bits[#bits + 1] = FT.C("accent", string.format(L["Whale: %s has %s"], whale.n, FT.Whales.Whole(whale.s))) end
         v.glance:SetText(table.concat(bits, FT.C("dim", "   ·   ")))
     else
         v.glance:SetText("")

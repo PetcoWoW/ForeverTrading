@@ -995,6 +995,7 @@ function UI.Badge(parent, w, h)
         local color = FT.SIGNAL_COLORS[kind] or "muted"
         UI.SetTexColor(self.bg, color, (strength and strength >= 3) and 0.30 or 0.15)
         UI.SetTextColor(self.text, color)
+        if not label and kind == "BUY" and strength and strength >= 3 and FT.S.meme ~= false then label = L["APE IN"] end
         self.text:SetText(label or FT.SignalText(kind))
         -- a longer word (Plain English) widens the badge rather than spilling out of it
         local need = math.ceil(self.text:GetStringWidth()) + 10
