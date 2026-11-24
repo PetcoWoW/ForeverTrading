@@ -170,7 +170,9 @@ function A.OnSummaryScan(results)
     local sum = FT.Scanner.NewSummary()
     FT.Scanner.AddBrowse(sum, results)
     FT.Scanner.SaveSummary(sum, time(), "auctionator", function()
-        FT.Print(string.format(L["Took Auctionator's scan: %s items, no need to scan again."], FT.Num(sum.count)))
+        -- Auctionator counts every version of an item (each item level, each "of the Bear"); we count items
+        FT.Print(string.format(L["Took Auctionator's scan: %s items (%s with every gear version), no need to scan again."],
+            FT.Num(sum.count), FT.Num(#results)))
         FT.Fire("FT_SCAN_DONE", "auctionator")
     end)
 end
