@@ -1,4 +1,4 @@
--- ForeverTrading: Signals page - what to do now, in four columns: sell, craft, buy, hold / avoid.
+-- Wolf of Booty Bay (built on ForeverTrading): Signals page - what to do now, in four columns: sell, craft, buy, hold / avoid.
 local ADDON, FT = ...
 local UI = FT.UI
 local L = FT.L

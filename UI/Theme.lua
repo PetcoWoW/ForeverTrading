@@ -1,4 +1,4 @@
--- ForeverTrading: the look and the basic pieces every window uses. Three styles (Settings > General):
+-- Wolf of Booty Bay (built on ForeverTrading): the look and the basic pieces every window uses. Three styles (Settings > General):
 -- dark (an exchange terminal at night, the default), light (the same by day) and classic (the game's own look).
 local ADDON, FT = ...
 
@@ -27,24 +27,6 @@ UI.C = {
 local C = UI.C
 UI.SEL_A = 0.07
 
--- the other styles: the same names, other colours
-local THEMES = {
-    light = {
-        bg0 = { 0.925, 0.933, 0.945 }, bg1 = { 1, 1, 1 }, bg2 = { 0.906, 0.918, 0.933 }, bg3 = { 0.827, 0.843, 0.867 },
-        line = { 0.765, 0.784, 0.816 }, text = { 0.098, 0.114, 0.137 }, muted = { 0.337, 0.373, 0.427 },
-        dim = { 0.494, 0.529, 0.584 }, up = { 0.012, 0.580, 0.380 }, down = { 0.780, 0.165, 0.267 },
-        hl = { 0.800, 0.820, 0.855 }, sel = { 0.984, 0.851, 0.490 },
-        accent = { 0.780, 0.565, 0.0 }, blue = { 0.145, 0.388, 0.922 }, purple = { 0.486, 0.227, 0.929 },
-    },
-    classic = {
-        hl = { 0.135, 0.118, 0.095 }, sel = { 1.0, 0.820, 0.0 },
-        bg0 = { 0.035, 0.032, 0.030 }, bg1 = { 0.075, 0.068, 0.060 }, bg2 = { 0.135, 0.118, 0.095 },
-        bg3 = { 0.200, 0.170, 0.125 }, line = { 0.420, 0.345, 0.205 }, text = { 1.0, 0.953, 0.855 },
-        muted = { 0.800, 0.725, 0.560 }, dim = { 0.560, 0.505, 0.400 }, up = { 0.118, 1.0, 0.118 },
-        down = { 1.0, 0.200, 0.200 }, accent = { 1.0, 0.820, 0.0 }, blue = { 0.400, 0.620, 1.0 },
-        purple = { 0.640, 0.210, 0.930 },
-    },
-}
 UI.theme = "dark"
 UI.INSET = 1 -- how far the window's content keeps from its edge
 
@@ -67,14 +49,10 @@ end
 
 -- once, when the saved settings are known, before any window is built
 function UI.ApplyTheme()
-    local name = FT.S and FT.S.theme or "dark"
-    local palette = THEMES[name]
-    if not palette then name = "dark" end
-    for k, v in pairs(palette or {}) do C[k] = v end
-    UI.theme = name
-    UI.INSET = (name == "classic") and 4 or 1
-    -- the chosen row: a faint gold on dark, a solid light gold on white
-    UI.SEL_A = (name == "light") and 1 or 0.07
+    -- one style: the dark terminal (ForeverTrading's light and classic styles are gone)
+    UI.theme = "dark"
+    UI.INSET = 1
+    UI.SEL_A = 0.07
     -- the colours of coloured text follow
     for k in pairs(FT.HEX) do
         if C[k] then FT.HEX[k] = Hex(C[k]) end
@@ -88,29 +66,22 @@ function UI.RGB(name)
 end
 
 ---------------------------------------------------------------------------
--- Font: our own Sofia Sans Condensed Medium (media/, SIL Open Font License: SofiaSansCondensed-OFL.txt) - narrow,
--- with Cyrillic. Should it not load (new files show only after the game is restarted): Mastercraft's Noto Sans,
--- then the game's own.
+-- Font (Settings > General): the game's own Friz Quadrata (the default: wide and easy to read) or Sofia Sans
+-- Condensed Medium (media/, SIL Open Font License: SofiaSansCondensed-OFL.txt), narrow - more fits in a row.
+-- Should the chosen one not load (new files show only after the game is restarted): the other, then Arial Narrow.
 ---------------------------------------------------------------------------
 UI.FONT = STANDARD_TEXT_FONT or "Fonts\\FRIZQT__.TTF"
 local OWN_FONT = "Interface\\AddOns\\" .. ADDON .. "\\media\\SofiaSansCondensed-Medium.ttf"
-
-local function AddonLoaded(name)
-    if C_AddOns and C_AddOns.IsAddOnLoaded then return C_AddOns.IsAddOnLoaded(name) end
-    return IsAddOnLoaded and IsAddOnLoaded(name)
-end
+local GAME_FONT = STANDARD_TEXT_FONT or "Fonts\\FRIZQT__.TTF"
 
 function UI.ResolveFont()
     if UI.fontResolved then return end
     UI.fontResolved = true
     local candidates = {}
-    -- classic: the game's own Friz Quadrata - when it has the letters of the language we show
-    if UI.theme == "classic" and (FT.Lang() ~= "ru" or GetLocale() == "ruRU") and STANDARD_TEXT_FONT then
-        candidates[#candidates + 1] = STANDARD_TEXT_FONT
-    end
-    candidates[#candidates + 1] = OWN_FONT
-    if AddonLoaded("Mastercraft") then
-        candidates[#candidates + 1] = "Interface\\AddOns\\Mastercraft\\media\\NotoSans-Regular.ttf"
+    if FT.S and FT.S.font == "condensed" then
+        candidates = { OWN_FONT, GAME_FONT }
+    else
+        candidates = { GAME_FONT, OWN_FONT }
     end
     candidates[#candidates + 1] = "Fonts\\ARIALN.TTF"
     for _, path in ipairs(candidates) do
@@ -456,9 +427,15 @@ function UI.VLine(parent, color, alpha)
     return t
 end
 
+-- a text's size with the Text size setting added (Settings > General)
+function UI.Size(size)
+    local bump = FT.S and tonumber(FT.S.textSize) or 0
+    return (size or 12) + bump
+end
+
 function UI.Text(parent, size, color, justify, layer)
     local fs = parent:CreateFontString(nil, layer or "OVERLAY")
-    fs:SetFont(UI.FONT, size or 12, "")
+    fs:SetFont(UI.FONT, UI.Size(size), "")
     local c = type(color) == "table" and color or C[color or "text"]
     fs:SetTextColor(c[1], c[2], c[3], 1)
     fs:SetJustifyH(justify or "LEFT")

@@ -1,4 +1,4 @@
--- ForeverTrading: minimap button, the button on the auction house, item tooltip lines, alert toasts.
+-- Wolf of Booty Bay (built on ForeverTrading): minimap button, the button on the auction house, item tooltip lines, alert toasts.
 local ADDON, FT = ...
 local UI = FT.UI
 local L = FT.L
@@ -19,7 +19,7 @@ end
 
 local function MinimapTooltip(self)
     GameTooltip:SetOwner(self, "ANCHOR_LEFT")
-    GameTooltip:AddLine("|cfff0b90bForever|r|cffeaecefTrading|r")
+    GameTooltip:AddLine("|cfff0b90bWolf of Booty Bay|r")
     local last = FT.Hist.LastScan()
     GameTooltip:AddLine(L["Scan"] .. ": " .. (last and FT.Ago(last) or L["never"]), 0.6, 0.64, 0.7)
     GameTooltip:AddLine(" ")
@@ -30,7 +30,7 @@ local function MinimapTooltip(self)
 end
 
 local function BuildMinimap()
-    mb = CreateFrame("Button", "ForeverTradingMinimapButton", Minimap)
+    mb = CreateFrame("Button", "WolfOfBootyBayMinimapButton", Minimap)
     mb:SetSize(31, 31)
     mb:SetFrameStrata("MEDIUM")
     mb:SetFrameLevel(8)
@@ -80,14 +80,14 @@ end
 local function MakeBroker()
     local ldb = LibStub and LibStub("LibDataBroker-1.1", true)
     if not (ldb and ldb.NewDataObject) then return end
-    ldb:NewDataObject("ForeverTrading", {
-        type = "launcher", label = "ForeverTrading", text = "ForeverTrading", icon = ICON,
+    ldb:NewDataObject("Wolf of Booty Bay", {
+        type = "launcher", label = "Wolf of Booty Bay", text = "Wolf of Booty Bay", icon = ICON,
         OnClick = function(_, button)
             if button == "RightButton" then FT.Show("signals") else FT.Toggle() end
         end,
         OnTooltipShow = function(tt)
             if not (tt and tt.AddLine) then return end
-            tt:AddLine("ForeverTrading")
+            tt:AddLine("Wolf of Booty Bay")
             local last = FT.Hist.LastScan()
             tt:AddLine(L["Scan"] .. ": " .. (last and FT.Ago(last) or L["never"]), 0.6, 0.64, 0.7)
         end,
@@ -130,7 +130,7 @@ end
 
 local function TipAH(self)
     GameTooltip:SetOwner(self, "ANCHOR_TOP")
-    GameTooltip:AddLine("|cfff0b90bForever|r|cffeaecefTrading|r")
+    GameTooltip:AddLine("|cfff0b90bWolf of Booty Bay|r")
     GameTooltip:AddLine(L["Charts, order books, craft profit and signals"], 0.8, 0.8, 0.8, true)
     GameTooltip:Show()
 end
@@ -138,7 +138,7 @@ end
 -- the text of the button (with how far a scan got)
 local function AHLabel()
     local frac = FT.Scanner.Running() and FT.Scanner.Progress()
-    return frac and string.format("ForeverTrading  %d%%", math.floor(frac * 100)) or "ForeverTrading"
+    return frac and string.format("Wolf of Booty Bay  %d%%", math.floor(frac * 100)) or "Wolf of Booty Bay"
 end
 
 -- The modern auction house: a tab in the row of its tabs, the game's own look. With Auctionator its tab
@@ -148,19 +148,19 @@ local function BuildAHTab(ah)
     local lib = LibStub and LibStub("LibAHTab-1-0", true)
     if lib and lib.CreateTab then
         local ok = pcall(function()
-            if not lib:DoesIDExist("ForeverTrading") then
+            if not lib:DoesIDExist("Wolf of Booty Bay") then
                 local holder = CreateFrame("Frame", nil, ah)
-                lib:CreateTab("ForeverTrading", holder, "ForeverTrading")
+                lib:CreateTab("Wolf of Booty Bay", holder, "Wolf of Booty Bay")
             end
-            tab = lib:GetButton("ForeverTrading")
+            tab = lib:GetButton("Wolf of Booty Bay")
         end)
         if not ok then tab = nil end
     end
     if not tab then
-        local ok, made = pcall(CreateFrame, "Button", "ForeverTradingAHTab", ah, "AuctionHouseFrameDisplayModeTabTemplate")
+        local ok, made = pcall(CreateFrame, "Button", "WolfOfBootyBayAHTab", ah, "AuctionHouseFrameDisplayModeTabTemplate")
         if not ok or not made then return nil end
         tab = made
-        tab:SetText("ForeverTrading")
+        tab:SetText("Wolf of Booty Bay")
         -- after the game's last tab (the template may have put ours in that list already: not after itself)
         local last
         for i = #(ah.Tabs or {}), 1, -1 do
@@ -194,7 +194,7 @@ end
 
 -- The classic auction house (or no tab template): our own button
 local function BuildAHPlainButton(ah)
-    local b = UI.Button(ah, "ForeverTrading", 10, 22, "default", ToggleFromAH)
+    local b = UI.Button(ah, "Wolf of Booty Bay", 10, 22, "default", ToggleFromAH)
     b.style = { bg = "bg0", bgA = 0.92, hover = "bg2", hoverA = 1, text = "accent", border = "line" }
     b:SetActive(false)
     b:FitText(24)
@@ -204,7 +204,7 @@ local function BuildAHPlainButton(ah)
     else
         b:SetPoint("TOPRIGHT", ah, "BOTTOMRIGHT", -4, -2)
     end
-    b:SetTip("ForeverTrading", L["Charts, order books, craft profit and signals"])
+    b:SetTip("Wolf of Booty Bay", L["Charts, order books, craft profit and signals"])
     local set = b.SetLabel
     b.SetLabel = function(self, text)
         set(self, text)
@@ -263,7 +263,7 @@ local function AddLines(tt, itemID)
         local rs = FT.Craft.ByOutput(itemID)
         if not s.price and not rs then return end
         local right = s.price and (FT.Money(s.price, "short") .. "  " .. FT.Pct(s.ch1)) or ""
-        tt:AddDoubleLine("|cfff0b90bForever|r|cffeaecefTrading|r", right)
+        tt:AddDoubleLine("|cfff0b90bWolf of Booty Bay|r", right)
         local parts = {}
         if s.ch7 then parts[#parts + 1] = L["7d"] .. " " .. FT.Pct(s.ch7) end
         if s.rsi then parts[#parts + 1] = "RSI " .. string.format("%.0f", s.rsi) end
@@ -386,7 +386,7 @@ function FT.Toast(itemID, text)
 end
 
 ---------------------------------------------------------------------------
--- Start and /ft debug
+-- Start and /wolf debug
 ---------------------------------------------------------------------------
 FT.On("FT_READY", function()
     UI.ResolveFont()
@@ -399,7 +399,6 @@ function FT.DebugReport()
     FT.Print("side " .. tostring(FT.sideKey) .. ", house " .. tostring(FT.house) .. " (" .. tostring(FT.houseKey)
         .. "), cut " .. string.format("%.1f%%", FT.Cut() * 100) .. ", char " .. tostring(FT.charKey))
     FT.Print("Auctionator " .. tostring(FT.Atr.Loaded()) .. ", days " .. tostring(FT.Atr.HistoryDays()))
-    FT.Print("Mastercraft " .. tostring(FT.MC.Loaded()) .. ", last scan " .. tostring(FT.MC.LastScan()))
     FT.Print("recipes " .. #FT.Craft.List() .. ", tracked " .. FT.Hist.UniverseSize())
     -- recipes by profession: how many the Craft page has, how many ForeverTrading read itself (Mastercraft: the rest)
     local all, own = {}, {}
@@ -443,7 +442,7 @@ local linkDialog
 local function LinkDialog()
     if linkDialog then return linkDialog end
     UI.ResolveFont()
-    local d = CreateFrame("Frame", "ForeverTradingLinkDialog", UIParent)
+    local d = CreateFrame("Frame", "WolfOfBootyBayLinkDialog", UIParent)
     d:SetSize(440, 150)
     d:SetPoint("CENTER", 0, 120)
     d:SetFrameStrata("FULLSCREEN_DIALOG")
@@ -482,7 +481,7 @@ local function LinkDialog()
     d.close = UI.Button(d, L["Close"], 10, 24, "default", function() d:Hide() end)
     d.close:FitText(28)
     d.close:SetPoint("BOTTOMRIGHT", -16, 14)
-    tinsert(UISpecialFrames, "ForeverTradingLinkDialog")
+    tinsert(UISpecialFrames, "WolfOfBootyBayLinkDialog")
     d:Hide()
     linkDialog = d
     return d
@@ -501,11 +500,11 @@ function FT.ShowLink(title, body, url)
 end
 
 function FT.ShowSupport()
-    FT.ShowLink(L["Support ForeverTrading"], L["If the addon is useful to you - thank you for your support! Copy the link and open it in your browser:"],
+    FT.ShowLink(L["Built on ForeverTrading"], L["Wolf of Booty Bay is built on ForeverTrading by thewoolfi (Apache License 2.0). Copy the link to see the original:"],
         FT.URL_SUPPORT)
 end
 
 function FT.ShowGitHub()
-    FT.ShowLink(L["ForeverTrading on GitHub"], L["Source code, releases and bug reports. Copy the link and open it in your browser:"],
+    FT.ShowLink(L["Wolf of Booty Bay on GitHub"], L["Source code, releases and bug reports. Copy the link and open it in your browser:"],
         FT.URL_GITHUB)
 end

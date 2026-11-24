@@ -1,4 +1,4 @@
--- ForeverTrading: the materials of one craft of an item (its most profitable recipe) - each at its cheapest
+-- Wolf of Booty Bay (built on ForeverTrading): the materials of one craft of an item (its most profitable recipe) - each at its cheapest
 -- (auction house, vendor or your own craft) with its 24h move - and what one craft costs, brings in and leaves.
 -- Under the order book on the Market page and in the item window.
 local ADDON, FT = ...
@@ -19,7 +19,7 @@ function UI.Materials(parent, onPick)
     f.recipe = UI.Button(f, L["Recipe"], 10, 18, "default", function()
         if f.r then FT.OpenRecipe(f.r.key) end
     end)
-    f.recipe.label:SetFont(UI.FONT, 11, "")
+    f.recipe.label:SetFont(UI.FONT, UI.Size(11), "")
     f.recipe:FitText(16)
     f.recipe:SetPoint("TOPRIGHT", -6, -7)
     f.recipe:SetTip(L["Recipe"], L["Open it on the Craft page"])

@@ -1,4 +1,4 @@
--- ForeverTrading: an item in a window of its own ("More" on the charts) - several at once, to look at two items
+-- Wolf of Booty Bay (built on ForeverTrading): an item in a window of its own ("More" on the charts) - several at once, to look at two items
 -- side by side: large price and profit charts, the numbers that matter, its order book and what buying costs
 -- (compact: the charts alone, half as wide). With the auction house open its price and order book stay live
 -- (searched again every few seconds).
@@ -134,7 +134,7 @@ function UI.MoreButton(chart, getID)
         local id = getID()
         if id then FT.ShowDetail(id) end
     end)
-    b.label:SetFont(UI.FONT, 11, "")
+    b.label:SetFont(UI.FONT, UI.Size(11), "")
     b:FitText(14)
     b:SetPoint("TOPRIGHT", -3, -2)
     b:SetFrameLevel(chart:GetFrameLevel() + 14)
@@ -248,7 +248,7 @@ local function SizeButtons(w, header)
 end
 
 local function New(index)
-    local w = CreateFrame("Frame", "ForeverTradingDetail" .. index, UIParent, UI.EdgeTemplate())
+    local w = CreateFrame("Frame", "WolfOfBootyBayDetail" .. index, UIParent, UI.EdgeTemplate())
     w.index = index
     w:SetFrameStrata("HIGH")
     w:SetToplevel(true)
@@ -325,7 +325,7 @@ local function New(index)
     w.sub:SetPoint("TOPLEFT", w.name, "BOTTOMLEFT", 0, -6)
 
     local close = UI.Button(header, "×", 30, 30, "ghost", function() w:Hide() end)
-    close.label:SetFont(UI.FONT, 18, "")
+    close.label:SetFont(UI.FONT, UI.Size(18), "")
     w.close = close
     w.sizes = SizeButtons(w, header)
     w.sizes:SetPoint("RIGHT", close, "LEFT", -6, 0)

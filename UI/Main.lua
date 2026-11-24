@@ -1,4 +1,4 @@
--- ForeverTrading: the main window - header with navigation, the ticker tape, pages, status bar.
+-- Wolf of Booty Bay (built on ForeverTrading): the main window - header with navigation, the ticker tape, pages, status bar.
 local ADDON, FT = ...
 local UI = FT.UI
 local L = FT.L
@@ -343,7 +343,6 @@ function FT.UpdateStatus()
         return on and (FT.C("up", name) .. " " .. FT.C("up", L["on"])) or FT.C("dim", name .. " " .. L["off"])
     end
     parts[#parts + 1] = Source("Auctionator", FT.Atr.On())
-    parts[#parts + 1] = Source("Mastercraft", FT.MC.Loaded())
     parts[#parts + 1] = string.format(L["Recipes: %d"], #FT.Craft.List())
     parts[#parts + 1] = string.format(L["Tracked: %d"], FT.S.trackAll and #(FT.Market.Rows() or {}) or FT.Hist.UniverseSize())
     local rows = FT.Market.Rows()
@@ -373,7 +372,7 @@ local function BuildScanBox(header, anchor, closeButton)
     end)
     f.share:FitText(24)
     f.share.text = L["Exchange"]
-    f.share:SetTip(L["Price exchange"], L["Ask ForeverTrading users in your guild and group for fresher prices of the whole market. Works anywhere, no auction house needed. (Settings > Exchange: by itself when your prices are more than an hour old.)"])
+    f.share:SetTip(L["Price exchange"], L["Ask Wolf of Booty Bay users in your guild and group for fresher prices of the whole market. Works anywhere, no auction house needed. (Settings > Exchange: by itself when your prices are more than an hour old.)"])
     f.stop = UI.Button(f, L["Stop"], 10, 22, "down", function() FT.Scanner.Stop("user") end)
     f.stop:FitText(20)
     f.stop:SetPoint("RIGHT", 0, 0)
@@ -457,7 +456,7 @@ function FT.UpdateScanBox()
         if kind then
             f.share:SetTip(L["Price exchange"], L["Click: stop the exchange. What has come stays."])
         else
-            f.share:SetTip(L["Price exchange"], L["Ask ForeverTrading users in your guild and group for fresher prices of the whole market. Works anywhere, no auction house needed. (Settings > Exchange: by itself when your prices are more than an hour old.)"])
+            f.share:SetTip(L["Price exchange"], L["Ask Wolf of Booty Bay users in your guild and group for fresher prices of the whole market. Works anywhere, no auction house needed. (Settings > Exchange: by itself when your prices are more than an hour old.)"])
         end
         -- the tooltip on screen follows
         if GameTooltip:IsOwned(f.share) and f.share:GetScript("OnEnter") then f.share:GetScript("OnEnter")(f.share) end
@@ -487,7 +486,7 @@ end
 ---------------------------------------------------------------------------
 local function Build()
     UI.ResolveFont()
-    win = CreateFrame("Frame", "ForeverTradingFrame", UIParent, UI.EdgeTemplate())
+    win = CreateFrame("Frame", "WolfOfBootyBayFrame", UIParent, UI.EdgeTemplate())
     win:SetFrameStrata("HIGH")
     win:SetToplevel(true)
     win:SetClampedToScreen(true)
@@ -500,7 +499,7 @@ local function Build()
         insets = { left = 4, right = 4, top = 4, bottom = 4 } }) then
         UI.Border(win, "line")
     end
-    table.insert(UISpecialFrames, "ForeverTradingFrame")
+    table.insert(UISpecialFrames, "WolfOfBootyBayFrame")
 
     -- header
     local header = CreateFrame("Frame", nil, win)
@@ -546,7 +545,7 @@ local function Build()
     nav:SetPoint("LEFT", houseChip, "RIGHT", 14, 0)
 
     local close = UI.Button(header, "×", 30, 30, "ghost", function() win:Hide() end)
-    close.label:SetFont(UI.FONT, 18, "")
+    close.label:SetFont(UI.FONT, UI.Size(18), "")
     close:SetPoint("RIGHT", -8, 0)
 
     local sizes = BuildSizeButtons(header, close)
@@ -609,7 +608,7 @@ local function Build()
     statusLeft:SetPoint("LEFT", 12, 0)
     statusRight = UI.Text(status, 10, "dim", "RIGHT")
     statusRight:SetPoint("RIGHT", -12, 0)
-    statusRight:SetText(FT.VERSION_TEXT .. "   /ft")
+    statusRight:SetText(FT.VERSION_TEXT .. "   /wolf")
     -- links: support the author, the project on GitHub
     local function StatusLink(text, color, onClick)
         local b = CreateFrame("Button", nil, status)
@@ -624,7 +623,7 @@ local function Build()
     end
     local gh = StatusLink("GitHub", "muted", function() FT.ShowGitHub() end)
     gh:SetPoint("RIGHT", statusRight, "LEFT", -12, 0)
-    local support = StatusLink(L["Support the author"], "accent", function() FT.ShowSupport() end)
+    local support = StatusLink(L["Credits"], "accent", function() FT.ShowSupport() end)
     support:SetPoint("RIGHT", gh, "LEFT", -4, 0)
     -- a newer version was heard of: where to get it
     local newer = StatusLink("", "up", function() FT.ShowGitHub() end)
@@ -875,9 +874,9 @@ function FT.BuildAHPill(header)
         elseif not FT.ahOpen then
             UI.TipText(self, L["Auction house: offline"], L["Talk to an auctioneer. Until then: the last known prices."])
         elseif ahHidden then
-            UI.TipText(self, L["Auction house: online"], L["The game's auction house window is hidden behind ForeverTrading. Click: show it (buying, selling, Auctionator)."])
+            UI.TipText(self, L["Auction house: online"], L["The game's auction house window is hidden behind Wolf of Booty Bay. Click: show it (buying, selling, Auctionator)."])
         else
-            UI.TipText(self, L["Auction house: online"], L["Click: hide the game's auction house window behind ForeverTrading (Settings: open ForeverTrading in its place)."])
+            UI.TipText(self, L["Auction house: online"], L["Click: hide the game's auction house window behind Wolf of Booty Bay (Settings: open Wolf of Booty Bay in its place)."])
         end
     end)
     pill:SetScript("OnLeave", function(self)
@@ -975,7 +974,7 @@ function UI.HouseChip(parent, opts)
         self.icon:SetColor("text")
         local H = FT.House
         local here = FT.atHouse or "faction"
-        UI.TipText(self, L["Wrong auction house?"], string.format(L["Click if this auctioneer is of %s, not %s: ForeverTrading puts it right and remembers it for the auctioneers here."],
+        UI.TipText(self, L["Wrong auction house?"], string.format(L["Click if this auctioneer is of %s, not %s: Wolf of Booty Bay puts it right and remembers it for the auctioneers here."],
             H.Name(here == "neutral" and "faction" or "neutral"), H.Name(here)))
     end)
     c.fix:SetScript("OnLeave", function(self)

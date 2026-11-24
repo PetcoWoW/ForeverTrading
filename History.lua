@@ -1,4 +1,4 @@
--- ForeverTrading: price history, kept by ForeverTrading itself.
+-- Wolf of Booty Bay (built on ForeverTrading): price history, kept by ForeverTrading itself.
 --  * every item seen on the auction house gets a day candle (open, high, low, close of its lowest price,
 --    the most listed and the most auctions that day) - for as long as Settings > Data says;
 --  * the items that matter to you (your recipes and their materials, your watchlist, what you own, what you
@@ -596,15 +596,6 @@ function H.Book(itemID)
         if b then
             books[itemID] = b
             return b
-        end
-    end
-    -- Mastercraft's scan knows the price steps of the items on its shopping lists
-    if FT.MC and FT.MC.Loaded() then
-        local p, t, listed, tiers = FT.MC.Price(itemID)
-        if p and type(tiers) == "table" and #tiers > 0 then
-            local levels = {}
-            for _, tier in ipairs(tiers) do levels[#levels + 1] = { tier[1], tier[2], 0 } end
-            return { t = t, levels = levels, qty = listed, source = "mastercraft" }
         end
     end
     return nil

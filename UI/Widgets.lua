@@ -1,4 +1,4 @@
--- ForeverTrading: widgets (buttons, inputs, lists, badges, sparklines...)
+-- Wolf of Booty Bay (built on ForeverTrading): widgets (buttons, inputs, lists, badges, sparklines...)
 local ADDON, FT = ...
 local UI = FT.UI
 local C = UI.C
@@ -206,7 +206,7 @@ function UI.Input(parent, w, h, placeholder, onChange, onEnter)
     local e = CreateFrame("EditBox", nil, parent)
     e:SetSize(w or 160, UI.ControlH(h))
     e:SetAutoFocus(false)
-    e:SetFont(UI.FONT, 12, "")
+    e:SetFont(UI.FONT, UI.Size(12), "")
     e:SetTextColor(UI.RGB("text"))
     e:SetTextInsets(8, 8, 0, 0)
     UI.Fill(e, "bg2")
@@ -250,7 +250,7 @@ function UI.Confirm(opts)
     local d = confirm
     if not d then
         UI.ResolveFont()
-        d = CreateFrame("Frame", "ForeverTradingConfirm", UIParent, UI.EdgeTemplate())
+        d = CreateFrame("Frame", "WolfOfBootyBayConfirm", UIParent, UI.EdgeTemplate())
         -- above every window (the full-screen ForeverTrading included)
         d:SetFrameStrata("FULLSCREEN_DIALOG")
         d:SetFrameLevel(100)
@@ -302,7 +302,7 @@ function UI.Confirm(opts)
             if cancel then cancel() end
         end)
         d.ok:SetPoint("RIGHT", d.cancel, "LEFT", -8, 0)
-        table.insert(UISpecialFrames, "ForeverTradingConfirm")
+        table.insert(UISpecialFrames, "WolfOfBootyBayConfirm")
         d:Hide()
         confirm = d
     end
@@ -316,7 +316,7 @@ function UI.Confirm(opts)
     d.owner = owner
     d.onOK, d.onCancel, d.accepted = opts.onOK, opts.onCancel, false
     d:SetScale(FT.S.scale or 1)
-    d.title:SetText(opts.title or "ForeverTrading")
+    d.title:SetText(opts.title or "Wolf of Booty Bay")
     d.text:SetText(opts.text or "")
     d.ok.style = UI.ButtonStyle(opts.okStyle or "primary")
     d.ok:SetLabel(opts.ok or L["Continue"])
@@ -349,7 +349,7 @@ function UI.ClearButton(e, onClear)
         e:ClearFocus()
         if onClear then onClear() end
     end)
-    b.label:SetFont(UI.FONT, 15, "")
+    b.label:SetFont(UI.FONT, UI.Size(15), "")
     b:SetPoint("RIGHT", -2, 0)
     b:SetFrameLevel(e:GetFrameLevel() + 3)
     b:SetTip(L["Clear"])

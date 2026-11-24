@@ -1,4 +1,4 @@
--- ForeverTrading: our own auction house scanner (WoW Forever has the modern auction house, C_AuctionHouse).
+-- Wolf of Booty Bay (built on ForeverTrading): our own auction house scanner (WoW Forever has the modern auction house, C_AuctionHouse).
 --  * Full scan: the whole auction house as the game's browse list - the lowest price and how many are listed
 --    of every item, in a few seconds, any time. Optionally "deep" (Settings): every single auction
 --    (ReplicateItems) - order books of everything - once every 15 minutes.
@@ -382,7 +382,7 @@ end
 
 local function NeedAH(quiet)
     if not Modern() then
-        if not quiet then FT.Print(L["This client's auction house can't be scanned by ForeverTrading."]) end
+        if not quiet then FT.Print(L["This client's auction house can't be scanned by Wolf of Booty Bay."]) end
         return false
     end
     if not FT.ahOpen then
@@ -895,7 +895,7 @@ function S.LiveNow(id)
     LiveStep()
 end
 
--- for /ft debug
+-- for /wolf debug
 function S.LiveState()
     local ids = {}
     for _, id in ipairs(live.list or {}) do ids[#ids + 1] = tostring(id) end

@@ -1,4 +1,4 @@
--- ForeverTrading: the whole market at a glance - every item seen on the auction house (by our scans, and
+-- Wolf of Booty Bay (built on ForeverTrading): the whole market at a glance - every item seen on the auction house (by our scans, and
 -- by Auctionator and Mastercraft when they are on), its price, how it moved in a day and a week, top movers,
 -- the market mood, the watchlist and its price alerts.
 local ADDON, FT = ...
@@ -88,21 +88,13 @@ local function RowFromAuctionator(id, e, today, dayKeys)
     }
 end
 
--- an item only Mastercraft's scan has
-local function RowFromMastercraft(id)
-    local p, t, listed = FT.MC.Price(id)
-    if not p then return nil end
-    local cls, sub = FT.ItemClass(id)
-    return { id = id, price = p, qty = listed, spark = {}, days = 0, lastDay = t and FT.Day(t), cls = cls, sub = sub }
-end
-
 local function BuildRow(id, src, today, dayKeys, db)
     if src == "own" then return RowFromOwn(id, today) end
     if src == "atr" then
         local e = db[tostring(id)]
         return type(e) == "table" and RowFromAuctionator(id, e, today, dayKeys) or nil
     end
-    return RowFromMastercraft(id)
+    return nil
 end
 
 local function SetNeedDays()
@@ -127,7 +119,7 @@ function M.Rebuild()
     end
     -- every item is read again: what changed so far is in it
     FT.Hist.TakeChanged("market")
-    -- which source each item is read from: ours first, then Auctionator's, then Mastercraft's
+    -- which source each item is read from: ours first, then Auctionator's
     local ids, srcs, seen = {}, {}, {}
     local function Add(id, src)
         seen[id] = true
@@ -141,12 +133,6 @@ function M.Rebuild()
         for k, e in pairs(db) do
             local id = tonumber(k)
             if id and not seen[id] and type(e) == "table" then Add(id, "atr") end
-        end
-    end
-    if FT.MC.Loaded() then
-        local book = FT.MC.Book()
-        for id in pairs(book and type(book.items) == "table" and book.items or {}) do
-            if type(id) == "number" and not seen[id] then Add(id, "mc") end
         end
     end
     building = true

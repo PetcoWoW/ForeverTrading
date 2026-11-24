@@ -1,4 +1,4 @@
--- ForeverTrading: Craft page - every recipe your characters know: what it costs, what it brings in,
+-- Wolf of Booty Bay (built on ForeverTrading): Craft page - every recipe your characters know: what it costs, what it brings in,
 -- the profit and a signal; one recipe in detail with its margin over time and its materials.
 local ADDON, FT = ...
 local UI = FT.UI
@@ -290,7 +290,7 @@ function T.RefreshList(keepOffset)
     if not list then return end
     local rows = Rows()
     if #FT.Craft.List() == 0 then
-        list:SetEmptyText(L["No recipes yet. Open each profession window once (or let Mastercraft learn them) and they show up here."])
+        list:SetEmptyText(L["No recipes yet. Open each profession window once and they show up here."])
     else
         list:SetEmptyText(L["Nothing matches"])
     end
@@ -452,7 +452,7 @@ local function BuildDetail(p)
     end)
     d.btnSearch:FitText(24)
     d.btnSearch:SetPoint("BOTTOMLEFT", 12, 10)
-    d.btnSearch:SetTip(L["Search on AH"], L["Searches the item and all its materials: in Auctionator's Shopping tab when it is installed, otherwise with ForeverTrading's scanner. The auction house must be open; fresh prices and order books follow."])
+    d.btnSearch:SetTip(L["Search on AH"], L["Searches the item and all its materials: in Auctionator's Shopping tab when it is installed, otherwise with Wolf of Booty Bay's scanner. The auction house must be open; fresh prices and order books follow."])
     d.btnChart = UI.Button(d, L["Price chart"], 10, 24, "default", function()
         if d.r then FT.OpenItem(d.r.output) end
     end)

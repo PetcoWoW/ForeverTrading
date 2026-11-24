@@ -1,4 +1,4 @@
--- ForeverTrading: is there a newer version? An addon can't go online, so guild and group members who use
+-- Wolf of Booty Bay (built on ForeverTrading): is there a newer version? An addon can't go online, so guild and group members who use
 -- ForeverTrading tell each other which version they have (a hidden addon message): at login and when you join
 -- a group - at most once a minute per channel, never in a fight. A newer one than yours: one line in chat a
 -- session and a link in the status bar. Someone with an older version hears yours back, so the news gets round.
@@ -8,7 +8,7 @@ local L = FT.L
 local V = {}
 FT.Ver = V
 
-local PREFIX = "FTRADE"
+local PREFIX = "WOLFBBV"
 local lastSaid = {}   -- channel -> time we last told it
 local answered = {}   -- player -> true: told our version back this session
 
@@ -81,7 +81,7 @@ FT.On("CHAT_MSG_ADDON", function(prefix, text, channel, sender)
     if V.Newer(theirs, FT.VERSION) then
         if not V.newest or V.Newer(theirs, V.newest) then
             V.newest = theirs
-            FT.Print(string.format(L["A newer ForeverTrading is out: %s (you have %s). Get it on CurseForge or GitHub (/ft github)."],
+            FT.Print(string.format(L["A newer Wolf of Booty Bay is out: %s (you have %s). Get it on CurseForge or GitHub (/wolf github)."],
                 theirs, FT.VERSION))
             FT.Fire("FT_NEWER_VERSION", theirs)
         end

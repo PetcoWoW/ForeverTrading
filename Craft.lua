@@ -1,4 +1,4 @@
--- ForeverTrading: what your recipes cost and bring in.
+-- Wolf of Booty Bay (built on ForeverTrading): what your recipes cost and bring in.
 -- Recipes come from Mastercraft (every character it knows) and from your own profession windows.
 local ADDON, FT = ...
 local L = FT.L
@@ -66,9 +66,6 @@ local function Build()
         local id = r.id or r.recipeID or r.spellID
         if type(id) == "number" and not e.id then e.id = id end
         if charName then e.knownBy[charName] = true end
-    end
-    if FT.MC.Loaded() then
-        FT.MC.EachRecipe(function(_, prof, r, c) Add(prof, r, c.name) end)
     end
     for guid, profs in pairs(FT.db.recipes) do
         local c = FT.db.chars[guid]

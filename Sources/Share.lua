@@ -1,4 +1,4 @@
--- ForeverTrading: price exchange between ForeverTrading users of a guild or a group.
+-- Wolf of Booty Bay (built on ForeverTrading): price exchange between ForeverTrading users of a guild or a group.
 -- When your prices of the whole market are more than an hour old (or you press Exchange), the guild (then the
 -- group) is asked who has fresher ones. Those who have offer them; the freshest is picked and sends its last
 -- full scan in the background: hidden addon messages, paused in a fight. The game lets each prefix send about
@@ -20,7 +20,7 @@
 --   C  begin, compact: as B, its data in   Z  data: "Z", n, numbers in printable characters (on any lane)
 --              when the asker's pick says it reads them (format "2", since 1.1.4: about half the messages)
 --   E  end:    "E", messages, items                K  still here (the sender is in a fight)
---   T  test:   "T", proto, a token, the compact characters: /ft share test sends it to itself every way it can and
+--   T  test:   "T", proto, a token, the compact characters: /wolf share test sends it to itself every way it can and
 --              sees which come back (and whether every character comes back as it was)
 -- A channel here is "GUILD", "PARTY", "RAID" or "W:<name>": a hidden whisper to that player.
 -- Times go over the wire as server time: players' clocks differ.
@@ -64,7 +64,7 @@ local streams = {} -- sender -> { t, count, got, taken, value, lastAt, from, man
 local lastAuto = 0
 local round = 0       -- each ask of a channel gets its own number: old timers can't touch a newer ask
 local lastStream = {} -- channel -> time we last sent our scan to it
-local test            -- /ft share test running: { token, sent = { keys }, heard = { key = true } }
+local test            -- /wolf share test running: { token, sent = { keys }, heard = { key = true } }
 
 local function Enc(n) return FT.Hist.Enc(n) end
 local function Dec(s) return FT.Hist.Dec(s) end
@@ -356,7 +356,7 @@ local function Report(a)
         if not a.sentAny then
             FT.Print(L["The game didn't let the question out (it holds addon messages back for a while): try again in a minute."])
         else
-            FT.Print(L["No ForeverTrading user in your guild or group answered: they have to be in the game right now, in your guild or group, on your server and side. (An older ForeverTrading stays silent when it has nothing to give: ask them to update it.)"])
+            FT.Print(L["No Wolf of Booty Bay user in your guild or group answered: they have to be in the game right now, in your guild or group, on your server and side. (An older Wolf of Booty Bay stays silent when it has nothing to give: ask them to update it.)"])
         end
         return
     end
@@ -464,11 +464,11 @@ function X.Ask(manual)
     end
     local channels = Channels()
     if #channels == 0 then
-        if manual then FT.Print(L["The price exchange needs a guild or a group with other ForeverTrading users."]) end
+        if manual then FT.Print(L["The price exchange needs a guild or a group with other Wolf of Booty Bay users."]) end
         return false
     end
     AskRoster()
-    if manual then FT.Print(L["Asking ForeverTrading users in your guild and group for fresher prices..."]) end
+    if manual then FT.Print(L["Asking Wolf of Booty Bay users in your guild and group for fresher prices..."]) end
     channels[#channels + 1] = "W"
     ask = { channels = channels, i = 0, manual = manual, replies = {} }
     NextChannel()
@@ -843,7 +843,7 @@ FT.On("CHAT_MSG_ADDON", function(prefix, text, channel, sender)
 end)
 
 ---------------------------------------------------------------------------
--- /ft share test: which ways the game carries our hidden messages here
+-- /wolf share test: which ways the game carries our hidden messages here
 ---------------------------------------------------------------------------
 local function WayName(key)
     if key == "GUILD" then return L["guild"] end
@@ -867,7 +867,7 @@ function X.Test()
             restricted = L["no"]
         end
     end
-    FT.Print(string.format(L["Exchange test: which ways the game carries ForeverTrading's hidden messages (the realm restricts addon messages: %s)..."], restricted))
+    FT.Print(string.format(L["Exchange test: which ways the game carries Wolf of Booty Bay's hidden messages (the realm restricts addon messages: %s)..."], restricted))
     FindMe()
     local t = { token = tostring(math.random(100000, 999999)), sent = {}, heard = {}, chars = {}, self = MyName() }
     test = t
