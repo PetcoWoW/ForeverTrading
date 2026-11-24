@@ -48,7 +48,8 @@ const log = (...a) => console.log("[feed]", ...a);
 // ---------------------------------------------------------------------------------------------------------------
 async function token() {
   const id = process.env.BLIZZARD_CLIENT_ID, secret = process.env.BLIZZARD_CLIENT_SECRET;
-  if (!id || !secret) throw new Error("BLIZZARD_CLIENT_ID and BLIZZARD_CLIENT_SECRET must be set");
+  const missing = [!id && "BLIZZARD_CLIENT_ID", !secret && "BLIZZARD_CLIENT_SECRET"].filter(Boolean);
+  if (missing.length) throw new Error(`missing: ${missing.join(" and ")} (repository secrets, Settings > Secrets and variables > Actions)`);
   const res = await fetch("https://oauth.battle.net/token", {
     method: "POST",
     headers: {
@@ -57,6 +58,7 @@ async function token() {
     },
     body: "grant_type=client_credentials",
   });
+  if (res.status === 401 || res.status === 400) throw new Error(`Battle.net refused the key (HTTP ${res.status}): check the client ID and secret were pasted whole, with no spaces`);
   if (!res.ok) throw new Error(`token: HTTP ${res.status}`);
   return (await res.json()).access_token;
 }
