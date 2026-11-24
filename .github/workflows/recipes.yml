@@ -1,0 +1,31 @@
+# Every crafting recipe of WoW Forever from the Blizzard API, into Data/Recipes.lua (weekly, or by hand).
+name: recipes
+on:
+  schedule:
+    - cron: "41 9 * * 1"
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: [tools/recipes/**]
+permissions:
+  contents: write
+jobs:
+  recipes:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with: { node-version: 22 }
+      - name: Build the recipe list
+        run: node tools/recipes/build.mjs
+        env:
+          BLIZZARD_CLIENT_ID: ${{ secrets.BLIZZARD_CLIENT_ID }}
+          BLIZZARD_CLIENT_SECRET: ${{ secrets.BLIZZARD_CLIENT_SECRET }}
+      - name: Commit it when it changed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add Data/Recipes.lua
+          if git diff --cached --quiet; then echo "no change"; exit 0; fi
+          git commit -m "Recipes from the Blizzard API"
+          git push

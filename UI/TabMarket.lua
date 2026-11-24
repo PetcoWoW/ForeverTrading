@@ -793,6 +793,12 @@ local function BuildItemView(parent)
         T.UpdateWatchButton()
     end)
     v.watch:SetPoint("RIGHT", v.search, "LEFT", -6, 0)
+    v.bestUse = UI.Button(v, L["Best use"], 10, 22, "default", function()
+        if state.selected then FT.ShowBestUse(state.selected) end
+    end)
+    v.bestUse:FitText(20)
+    v.bestUse:SetPoint("RIGHT", v.watch, "LEFT", -6, 0)
+    v.bestUse:SetTip(L["Best use"], L["Every recipe this goes into, ranked by what one of it brings made into each."])
 
     -- charts: the price on top, the profitability under it (zero in the middle)
     v.chart = UI.Chart(v)
@@ -940,6 +946,7 @@ end
 function T.UpdateWatchButton()
     local v = itemView
     if not (v and state.selected) then return end
+    if v.bestUse then v.bestUse:SetShown(FT.Craft.UsedIn(state.selected) ~= nil) end
     local on = FT.Market.IsWatched(state.selected)
     v.watch:SetLabel(on and L["In watchlist"] or L["Watch"])
     v.watch:SetActive(on)

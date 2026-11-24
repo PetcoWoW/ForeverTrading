@@ -1,5 +1,13 @@
 # The Wolf of Booty Bay
 
+## v0.6 - Best use of a material
+
+- Every crafting recipe of WoW Forever (2,302, from the Blizzard API's `static-forever-us` professions) ships in
+  `Data/Recipes.lua`; a weekly workflow keeps it current.
+- Best use: every recipe a material goes into, ranked by what one of it brings (the product's price minus the
+  other materials, per one), against selling it as it is; recipes your characters know are marked.
+- Opens from a Farm Board row (click), the Best use button on an item's chart, and a line in a material's tooltip.
+
 ## v0.5 - batch 4: the meme layer
 
 - TO THE MOON / RUG PULL banners: something you own or watch up or down 30%+ in a day, plus the market's single
