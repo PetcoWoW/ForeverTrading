@@ -993,7 +993,7 @@ local function DaysIn(house, itemID, n)
 end
 
 -- the lowest price there, when it was seen, how many were listed (nil: not seen there, or none left)
-function H.PriceIn(house, itemID)
+local function OwnPriceIn(house, itemID)
     if house == FT.house then
         local l = latest[itemID]
         if l and l.p then
@@ -1008,12 +1008,47 @@ function H.PriceIn(house, itemID)
     return nil
 end
 
+-- the price at either house; the other house's from the price feed when that is newer (the feed is taken into
+-- the history of the house you look at only)
+function H.PriceIn(house, itemID)
+    local p, t, q = OwnPriceIn(house, itemID)
+    if house ~= FT.house and FT.Feed then
+        local fh = FT.Feed.House(house)
+        local e = fh and fh.items[itemID]
+        if e and e.p and e.q and e.q > 0 and (not t or fh.t > t) then return e.p, fh.t, e.q end
+        -- in the feed's market but not listed now: gone there
+        if fh and not e and (not t or fh.t > t) then return nil end
+    end
+    return p, t, q
+end
+
 -- the closes of its last `n` days there (today's the last), oldest first
 function H.ClosesIn(house, itemID, n)
     local out = {}
-    for _, d in ipairs(DaysIn(house, itemID, n)) do out[#out + 1] = d.c end
+    local days = DaysIn(house, itemID, n)
+    for _, d in ipairs(days) do out[#out + 1] = d.c end
     local tr = TodayIn(house, itemID)
     if tr then out[#out + 1] = tr.c end
+    -- the other house: the feed's daily lows for the days we have nothing of our own
+    if #out < n and house ~= FT.house and FT.Feed then
+        local feed = FT.Feed.Daily(itemID, FT.Day() - n + 1, house)
+        if feed then
+            local have = {}
+            for _, d in ipairs(days) do have[d.day] = true end
+            local extra = {}
+            for d, row in pairs(feed) do
+                if not have[d] then extra[#extra + 1] = { day = d, c = row.low } end
+            end
+            table.sort(extra, function(a, b) return a.day < b.day end)
+            local merged = {}
+            for _, d in ipairs(days) do merged[#merged + 1] = { day = d.day, c = d.c } end
+            for _, e in ipairs(extra) do merged[#merged + 1] = e end
+            table.sort(merged, function(a, b) return a.day < b.day end)
+            out = {}
+            for _, m in ipairs(merged) do out[#out + 1] = m.c end
+            if tr then out[#out + 1] = tr.c end
+        end
+    end
     while #out > n do table.remove(out, 1) end
     return out
 end

@@ -12,6 +12,14 @@ FT.News = N
 -- start, after the files are read (a table made with them would keep the English)
 local function News()
     return {
+        ["v0.4"] = {
+            { L["The Money tab"], L["Carry it, Flip it, Vendor it, Sell yours, the Farm Board: one list for each way to make gold, the best move right now on top."],
+                function() FT.Show("signals") end },
+            { L["Farm Board"], L["Raw materials by the gold the market pays for them a day. Right-click one for a Wowhead link."],
+                function() FT.Show("signals"); FT.Tabs.signals.SetView("farm") end },
+            { L["Characters"], L["Portfolio > Characters: every character's gold and holdings, and when its bank was last seen. Log your bank alt in once to count it."],
+                function() FT.Show("portfolio"); FT.Tabs.portfolio.SetView("chars") end },
+        },
         ["v0.3"] = {
             { L["Four tabs"], L["Terminal, Money, Portfolio, Sell. Craft is off until you turn it on: Settings > General."],
                 nil },

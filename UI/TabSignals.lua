@@ -1,4 +1,7 @@
--- Wolf of Booty Bay (built on ForeverTrading): Signals page - what to do now, in four columns: sell, craft, buy, hold / avoid.
+-- Wolf of Booty Bay (built on ForeverTrading): the Money page - ways to make gold right now, one list each:
+--  Carry it (cheaper at one auction house than the other pays), Flip it (far under its normal price, sells every day),
+--  Vendor it (under what a vendor pays), Sell yours (each thing you own: where and how to sell it), the Farm Board
+--  (raw materials by the gold the market pays for them a day) and Signals (ForeverTrading's four columns).
 local ADDON, FT = ...
 local UI = FT.UI
 local L = FT.L
@@ -432,18 +435,236 @@ end
 
 -- one kind of deals on the page (What's new opens it)
 function T.SetDealKind(kind)
-    dstate.kind = kind
-    if dealsView then dealsView.kind:SetValue(kind) end
-    T.RefreshDeals()
+    if kind == "all" then kind = "HOUSES" end
+    T.SetView(kind)
 end
 
+local DEAL_VIEWS = { HOUSES = true, RESELL = true, VENDOR = true }
+
 function T.SetView(view)
+    -- the old names (the tour, other pages): the deals are now one view each
+    if view == "deals" then view = (dstate.kind ~= "all" and dstate.kind) or "HOUSES" end
     T.view = view
     if T.viewSeg then T.viewSeg:SetValue(view) end
-    local deals = view == "deals"
-    for _, c in ipairs(cols) do c:SetShown(not deals) end
-    if dealsView then dealsView:SetShown(deals) end
+    local deals = DEAL_VIEWS[view]
+    if deals then dstate.kind = view end
+    for _, c in ipairs(cols) do c:SetShown(view == "signals") end
+    if dealsView then
+        dealsView:SetShown(deals or false)
+        dealsView.kind:Hide()
+        dealsView.ageLabel:ClearAllPoints()
+        dealsView.ageLabel:SetPoint("TOPLEFT", 0, -6)
+    end
+    if sellView then sellView:SetShown(view == "sell") end
+    if farmView then farmView:SetShown(view == "farm") end
     T.Refresh()
+end
+
+---------------------------------------------------------------------------
+-- A plain list view (Sell yours, the Farm Board): a bar on top, one list
+---------------------------------------------------------------------------
+local function ListView(p, onClick, onEnter)
+    local f = CreateFrame("Frame", nil, p)
+    f:SetPoint("TOPLEFT", 8, -56)
+    f:SetPoint("BOTTOMRIGHT", -8, 8)
+    f:Hide()
+    f.hint = UI.Text(f, 11, "dim")
+    f.hint:SetPoint("TOPLEFT", 0, -32)
+    f.hint:SetPoint("RIGHT", 0, 0)
+    if f.hint.SetWordWrap then f.hint:SetWordWrap(false) end
+    f.count = UI.Text(f, 11, "dim", "RIGHT")
+    f.count:SetPoint("TOPRIGHT", 0, -6)
+    local box = UI.Panel(f, "bg1", "line")
+    box:SetPoint("TOPLEFT", 0, -50)
+    box:SetPoint("BOTTOMRIGHT", 0, 0)
+    f.list = UI.List(box, {
+        rowHeight = 42,
+        setup = RowSetup,
+        update = function(row, x)
+            row.icon:SetItem(x.id)
+            row.name:SetText(FT.ItemText(x.id, 40) .. (x.qty and FT.C("dim", "  x" .. FT.Num(x.qty)) or ""))
+            row.reason:SetText(x.reason or "")
+            row.value:SetText(x.value or "")
+            row.badge:Set(x.signal, x.label, x.strength or 2)
+        end,
+        onClick = onClick,
+        onEnter = onEnter,
+    })
+    f.list:SetPoint("TOPLEFT", 1, -2)
+    f.list:SetPoint("BOTTOMRIGHT", -1, 2)
+    if f.list.empty then f.list.empty:SetWidth(460) end
+    return f
+end
+
+local sellView, farmView
+
+-- Sell yours: each thing you own (every character) and the best way to turn it into gold - the vendor, this
+-- auction house, or the other one when it pays clearly more after its cut; how many to list at once
+local function SellYours()
+    local out = {}
+    local here = FT.house
+    local other = (here == "neutral") and "faction" or "neutral"
+    local H = FT.House
+    for _, h in ipairs((FT.Port.Rows())) do
+        local id = h.id
+        local netHere = h.price * (1 - FT.Cut(here))
+        local vendor = FT.SellPriceKnown(id) or 0
+        local pOther = FT.Hist.PriceIn(other, id)
+        local netOther = pOther and pOther * (1 - FT.Cut(other)) or 0
+        local x = { id = id, qty = h.qty }
+        local unit, house
+        if vendor > 0 and vendor >= netHere and vendor >= netOther then
+            x.signal, unit = "VENDOR", vendor
+            x.reason = L["A vendor pays more than the auction house"]
+        elseif netOther > netHere * 1.1 then
+            x.signal, x.label, unit, house = "HOUSES", L["CARRY IT"], netOther, other
+            x.reason = string.format(L["%s pays %s (here %s)"], H.Name(other), FT.Money(pOther, "short"),
+                FT.Money(h.price, "short"))
+        else
+            unit, house = netHere, here
+            x.signal = (h.signal == "SELL" or h.signal == "HOLD") and h.signal or "SELL"
+            x.label = (h.signal ~= "SELL" and h.signal ~= "HOLD") and L["SELL"] or nil
+            x.reason = h.reason or string.format(L["%s each here"], FT.Money(h.price, "short"))
+        end
+        -- how many at once: what sells there in two days
+        local rate = house and FT.Sales.RateIn(house, id)
+        if rate and rate.perDay and rate.perDay > 0 then
+            local cap = math.max(1, math.floor(rate.perDay * 2 + 0.5))
+            if cap < h.qty then x.reason = x.reason .. FT.C("dim", "  ·  ") .. string.format(L["list %s at a time"], FT.Num(cap)) end
+        elseif house and rate and rate.hours and rate.hours >= 12 then
+            x.reason = x.reason .. FT.C("dim", "  ·  ") .. FT.C("down", L["hardly sells"])
+        end
+        x.sortV = unit * h.qty
+        x.value = FT.C("up", FT.Money(math.floor(x.sortV), "short"))
+        out[#out + 1] = x
+    end
+    table.sort(out, function(a, b) return a.sortV > b.sortV end)
+    return out
+end
+
+-- The Farm Board: raw materials ranked by the gold the market pays for them a day (price x how many sell a
+-- day), with the week's move. Where to farm them is up to you: right-click gives a Wowhead link.
+local FARM_KINDS = {
+    { "all", "All" }, { "ore", "Ore & stone" }, { "herb", "Herbs" }, { "leather", "Leather" }, { "cloth", "Cloth" },
+    { "elemental", "Elemental" }, { "gem", "Gems" },
+}
+-- the item classes and subclasses of each (Trade Goods: 5 cloth, 6 leather, 7 metal & stone, 9 herb, 10 elemental)
+local FARM_CLASS = {
+    ore = { 7, 7 }, herb = { 7, 9 }, leather = { 7, 6 }, cloth = { 7, 5 }, elemental = { 7, 10 }, gem = { 3 },
+}
+local farmKind = "all"
+
+local function FarmKindOf(r)
+    for k, c in pairs(FARM_CLASS) do
+        if r.cls == c[1] and (c[2] == nil or r.sub == c[2]) then return k end
+    end
+    return nil
+end
+
+local function FarmRows()
+    local out = {}
+    for _, r in ipairs(FT.Market.Rows() or {}) do
+        local kind = r.price and FarmKindOf(r)
+        if kind and (farmKind == "all" or farmKind == kind) and not r.gone then
+            local rate = FT.Sales.Rate(r.id)
+            local perDay = rate and rate.perDay or 0
+            local flow = r.price * perDay
+            local bits = {}
+            bits[#bits + 1] = string.format(L["%s each"], FT.Money(r.price, "short"))
+            if rate then bits[#bits + 1] = FT.Sales.PerDayText(rate) end
+            if r.ch7 then bits[#bits + 1] = FT.Pct(r.ch7) .. " " .. L["this week"] end
+            out[#out + 1] = {
+                id = r.id, reason = table.concat(bits, FT.C("dim", "  ·  ")), sortV = flow,
+                value = flow > 0 and (FT.C("up", FT.Money(math.floor(flow), "short")) .. FT.C("dim", L["/day"])) or FT.C("dim", "—"),
+                signal = (r.ch7 or 0) >= 0.1 and "SELL" or ((r.ch7 or 0) <= -0.1 and "BUY" or "HOLD"),
+                label = ((r.ch7 or 0) >= 0.1 and L["HOT"]) or ((r.ch7 or 0) <= -0.1 and L["COOLING"]) or L["STEADY"],
+            }
+        end
+    end
+    table.sort(out, function(a, b) return a.sortV > b.sortV end)
+    while #out > 80 do table.remove(out) end
+    return out
+end
+
+local function WowheadLink(id)
+    FT.ShowLink(FT.ItemText(id), L["Where to get it: copy the link and open it in your browser."],
+        "https://www.wowhead.com/classic/item=" .. id)
+end
+
+local function BuildSellView(p)
+    local f = ListView(p, function(x)
+        if UI.ItemClick(x.id) then return end
+        FT.OpenItem(x.id)
+    end, function(row, x) UI.TipItem(row, x.id) end)
+    f.hint:SetText(L["Everything your characters own, and the best way to turn each into gold. Characters count once they log in and open their bank and mailbox."])
+    f.list:SetEmptyText(L["Nothing priced yet. Open your bags and bank once per character."])
+    return f
+end
+
+local function BuildFarmView(p)
+    local f = ListView(p, function(x, button)
+        if button == "RightButton" then WowheadLink(x.id) return end
+        if UI.ItemClick(x.id) then return end
+        FT.OpenItem(x.id)
+    end, function(row, x)
+        UI.TipItem(row, x.id)
+        GameTooltip:AddLine(" ")
+        GameTooltip:AddLine(L["Right-click: a Wowhead link for where to get it."], 0.6, 0.64, 0.7)
+        GameTooltip:Show()
+    end)
+    local items = {}
+    for _, k in ipairs(FARM_KINDS) do items[#items + 1] = { k[1], L[k[2]] } end
+    f.kind = UI.Segmented(f, items, function(v)
+        farmKind = v
+        T.RefreshFarm()
+    end, 22)
+    f.kind:SetPoint("TOPLEFT", 0, -1)
+    f.kind:SetValue(farmKind)
+    f.hint:SetText(L["What the market pays for each a day: price x how many sell a day. Farm the top of the list; right-click for where to get it."])
+    f.list:SetEmptyText(L["No sales seen yet: the price feed fills this over a few hours."])
+    return f
+end
+
+function T.RefreshSell()
+    if not (sellView and sellView:IsShown()) then return end
+    local list = SellYours()
+    local matches = FT.NameMatcher(T.search)
+    if matches then
+        local kept = {}
+        for _, x in ipairs(list) do if matches(x.id) then kept[#kept + 1] = x end end
+        list = kept
+    end
+    local total = 0
+    for _, x in ipairs(list) do total = total + x.sortV end
+    sellView.count:SetText(#list > 0 and string.format(L["%d items, worth %s"], #list, FT.Money(math.floor(total), "short")) or "")
+    sellView.list:SetItems(list, true)
+end
+
+function T.RefreshFarm()
+    if not (farmView and farmView:IsShown()) then return end
+    local list = FarmRows()
+    local matches = FT.NameMatcher(T.search)
+    if matches then
+        local kept = {}
+        for _, x in ipairs(list) do if matches(x.id) then kept[#kept + 1] = x end end
+        list = kept
+    end
+    farmView.list:SetItems(list, true)
+end
+
+-- the best deal there is right now, for the line under the title
+local function BestMove()
+    local list = FT.Deals.List()
+    local best
+    for _, d in ipairs(list or {}) do
+        if not best or (d.perUnit or 0) * math.min(d.qty or 1, 20) > (best.perUnit or 0) * math.min(best.qty or 1, 20) then best = d end
+    end
+    if not best then return nil end
+    local H = FT.House
+    local what = (best.kind == "HOUSES" and string.format(L["carry %s to %s"], FT.ItemText(best.id), H.Name(best.sellHouse)))
+        or (best.kind == "VENDOR" and string.format(L["vendor %s"], FT.ItemText(best.id)))
+        or string.format(L["flip %s"], FT.ItemText(best.id))
+    return L["Best move right now"] .. ": " .. what .. "  " .. FT.C("up", "+" .. Money(best.perUnit or 0) .. " " .. L["each"])
 end
 
 ---------------------------------------------------------------------------
@@ -474,14 +695,18 @@ function T.Build(p)
         T.search = ""
         T.Refresh()
     end)
-    -- the four columns of signals, or the good deals
-    T.view = T.view or "signals"
-    T.viewSeg = UI.Segmented(head, { { "signals", L["Signals"] }, { "deals", L["Good deals"] } }, function(v) T.SetView(v) end, 22)
+    -- one way to make gold per view; Signals: ForeverTrading's four columns
+    T.view = T.view or "HOUSES"
+    T.viewSeg = UI.Segmented(head, { { "HOUSES", L["Carry it"] }, { "RESELL", L["Flip it"] }, { "VENDOR", L["Vendor it"] },
+        { "sell", L["Sell yours"] }, { "farm", L["Farm Board"] }, { "signals", L["Signals"] } }, function(v) T.SetView(v) end, 22)
     T.viewSeg:SetPoint("LEFT", T.searchBox, "RIGHT", 12, 0)
     T.viewSeg:SetValue(T.view)
     dealsView = BuildDeals(p)
-    -- the deals are looked for again on new prices only while they are on the screen
-    FT.Deals.watching = function() return dealsView:IsVisible() end
+    sellView = BuildSellView(p)
+    farmView = BuildFarmView(p)
+    -- the deals are looked for again on new prices only while they are on the screen (Sell yours and the
+    -- line under the title use them too)
+    FT.Deals.watching = function() return dealsView:IsVisible() or (T.title and T.title:IsVisible()) end
 
     cols[1] = Column(p, L["Sell now"], L["What you own, priced above its average; your auctions undercut"])
     cols[2] = Column(p, L["Worth crafting"], L["Your recipes with a good profit"])
@@ -508,11 +733,13 @@ function T.Build(p)
 end
 
 function T.Refresh()
-    if T.view == "deals" then
-        T.rules:SetText(string.format(L["Deals: resale %d%% or more under the fair price, from %s profit (Settings > Signals)."],
-            FT.S.dealBelow or 30, FT.Money(FT.S.dealMin or 0, "short")))
-        FT.Deals.Ensure()
-        T.RefreshDeals()
+    FT.Deals.Ensure()
+    local best = BestMove()
+    if DEAL_VIEWS[T.view] or T.view == "sell" or T.view == "farm" then
+        T.rules:SetText(best or FT.C("dim", L["No deal right now: the list fills as prices come in."]))
+        if DEAL_VIEWS[T.view] then T.RefreshDeals() end
+        if T.view == "sell" then T.RefreshSell() end
+        if T.view == "farm" then T.RefreshFarm() end
         return
     end
     T.rules:SetText(string.format(L["Sell: %d%% above the %d-day average or RSI 70+.  Buy: %d%% below or RSI 30-.  Craft: profit from %s and margin from %d%%."],
@@ -561,7 +788,13 @@ function T.OnItems()
 end
 
 -- the deals were looked for again; the auction house opened or closed (Check order books needs it)
-FT.On("FT_DEALS_READY", function() T.RefreshDeals() end)
+FT.On("FT_DEALS_READY", function()
+    T.RefreshDeals()
+    if T.title and T.title:IsVisible() and T.view ~= "signals" then
+        local best = BestMove()
+        if best then T.rules:SetText(best) end
+    end
+end)
 FT.On("FT_CARRY_CHANGED", function() T.RefreshDeals() end)
 FT.On("AUCTION_HOUSE_SHOW", function() C_Timer.After(0.5, T.RefreshDeals) end)
 FT.On("AUCTION_HOUSE_CLOSED", function() C_Timer.After(0.5, T.RefreshDeals) end)
