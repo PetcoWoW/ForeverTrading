@@ -30,8 +30,8 @@ local function MakeSteps() return {
     { title = L["Scan and exchange"],
       text = L["Full scan: the prices of the whole market in a couple of minutes (at an auctioneer). Exchange: fresh prices from Wolf of Booty Bay users in your guild and group, anywhere."],
       target = function() return FT.MainRefs and FT.MainRefs.scan end },
-    { title = L["Market"], tab = "market",
-      text = L["Search by name (in quotes: that name exactly), categories, filters as at the auction house. Click an item: its chart, signals and order book; right-click: watchlist."],
+    { title = L["Terminal"], tab = "market",
+      text = L["Search any item. Click one: its price, chart and what to do. Right-click: watchlist."],
       target = function() return Tab("market").listPanel end },
     { title = L["Item windows"], tab = "market",
       -- an item open on the Market (the first of the list when none is): its More button
@@ -47,11 +47,11 @@ local function MakeSteps() return {
     { title = L["The order book"], tab = "market",
       text = L["Every listing by price, how many, by how many sellers. Click a price: how many to buy; Buy: at an auctioneer, at the server's exact price."],
       target = function() return Tab("market").book end },
-    { title = L["Craft"], tab = "craft", prep = function() Tab("craft").SetView("recipes") end,
+    { title = L["Craft"], tab = "craft", craft = true, prep = function() Tab("craft").SetView("recipes") end,
       text = L["What each recipe costs with its cheapest materials (auction house, vendor or crafting it yourself), what it brings, its risks. Queue: the materials to buy for several crafts at once."],
       target = function() return Tab("craft").viewSeg end },
-    { title = L["Signals and deals"], tab = "signals", prep = function() Tab("signals").SetView("signals") end,
-      text = L["What to sell, craft and buy now, your auctions undercut, risky recipes. Deals: what to buy right now for a profit - under what a vendor pays, far under the fair price, or cheaper than the other auction house sells it for."],
+    { title = L["Money"], tab = "signals", prep = function() Tab("signals").SetView("signals") end,
+      text = L["What to sell and buy now, and deals: under what a vendor pays, far under the normal price, or cheaper than the other auction house sells it for."],
       target = function() return Tab("signals").viewSeg end },
     { title = L["The carry list"], tab = "signals",
       prep = function()
@@ -61,8 +61,8 @@ local function MakeSteps() return {
       end,
       text = L["Cheaper at one auction house than the other sells it for. A right click on a deal puts it on your carry list: it stays here, and at the other auction house the Sell page shows what you brought and what it cost."],
       target = function() return Tab("signals").dealsKind end },
-    { title = L["Selling"], tab = "sell", prep = function() Tab("sell").SetView("bags") end,
-      text = L["Your bags at market prices: a copper under the lowest, the deposit, the cut, and warnings. My auctions: who undercut you, and whether to wait or post again."],
+    { title = L["Sell"], tab = "sell", prep = function() Tab("sell").SetView("bags") end,
+      text = L["Your bags at market prices, a copper under the lowest. My auctions: who undercut you."],
       target = function() return Tab("sell").viewSeg end },
     { title = L["Portfolio and journal"], tab = "portfolio", prep = function() Tab("portfolio").SetView("portfolio") end,
       text = L["What everything your characters own is worth. Deals journal: what you really earned, from the auction house's letters."],
@@ -213,7 +213,13 @@ function TR.Start()
         return
     end
     if not overlay then Build() end
-    STEPS = STEPS or MakeSteps()
+    if not STEPS then
+        -- the Craft step only when the Craft tab is on
+        STEPS = {}
+        for _, s in ipairs(MakeSteps()) do
+            if not s.craft or FT.S.showCraft then STEPS[#STEPS + 1] = s end
+        end
+    end
     FT.Show("market")
     if FT.News and FT.News.Hide then FT.News.Hide() end
     overlay:Show()

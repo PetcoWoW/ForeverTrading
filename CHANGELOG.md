@@ -1,5 +1,14 @@
 # The Wolf of Booty Bay
 
+## v0.3 - batch 2: slim and readable
+
+- Four tabs: Terminal, Money, Portfolio, Sell. The Craft tab is off by default (Settings > General > Craft tab).
+- Simple view (on by default): each item shows Normal price, 7-day low, Listed and Sells a day; what to do gets
+  the big card with hype, how fast it sells and vs normal price in one line; no indicators card.
+- Simple chart: one line, green when it went up over the period, red when down, with the room of both charts.
+  "Pro chart" brings back candles, the averages and the second chart.
+- Shorter texts in the tour and on the Money page; the header says Wolf of Booty Bay.
+
 ## v0.2 - batch 1: data and freshness
 
 - Signals count only the days the market was really seen: the feed's real days plus the days Auctionator scanned
