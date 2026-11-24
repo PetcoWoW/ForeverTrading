@@ -893,8 +893,11 @@ function H.WatchedDays(window)
             n = n + 1
         end
     end
-    -- the days the price feed saw the whole market
-    for _, d in ipairs(FT.Feed and FT.Feed.Days() or {}) do
+    -- the days the price feed and Auctionator saw the whole market
+    local others = {}
+    for _, d in ipairs(FT.Feed and FT.Feed.Days() or {}) do others[#others + 1] = d end
+    for _, d in ipairs(FT.Atr and FT.Atr.ScanDays() or {}) do others[#others + 1] = d end
+    for _, d in ipairs(others) do
         if d > today - window and d <= today and not seen[d] then
             seen[d] = true
             n = n + 1

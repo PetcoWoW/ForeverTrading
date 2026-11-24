@@ -4,7 +4,7 @@ local L = FT.L
 
 -- The version being released: a copy straight from the repository (not packaged) has no version in its TOC yet
 -- (the packager puts the tag there) and shows this one. Set it with every release.
-local RELEASE = "v0.1.0"
+local RELEASE = "v0.2.0"
 local GetMeta = (C_AddOns and C_AddOns.GetAddOnMetadata) or GetAddOnMetadata
 FT.VERSION = (GetMeta and GetMeta(ADDON, "Version")) or RELEASE
 if FT.VERSION == "" or FT.VERSION:find("@", 1, true) then FT.VERSION = RELEASE end
@@ -120,6 +120,8 @@ end
 FT.DEFAULTS = {
     words = "plain",        -- plain (Plain English) / trader (the trader terms), after a reload
     useFeed = true,         -- the price feed shipped with the addon (Sources/Feed.lua)
+    reloadReminder = true,  -- a chat line, at most hourly, when newer feed prices are likely out
+    scanWithAuctionator = true, -- Full scan runs Auctionator's scan when it's installed (one scan feeds both)
     useAuctionator = true,  -- its scans and searches go into our history; days we don't have come from it
     liveRefresh = true,     -- the item you have open is searched again every few seconds at the auction house
     shareAuto = true,       -- prices older than an hour: ask guild and group for fresher ones

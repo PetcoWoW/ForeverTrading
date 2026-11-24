@@ -11,6 +11,8 @@
 // Options (environment):
 //   FEED_REGIONS  comma list of us,eu,kr,tw (default: us)
 //   FEED_HOUSES   comma list of house ids to build (default: all twelve; see HOUSES below)
+//   FEED_KEEP_DAYS  days of daily lows and sales kept in the history (default 90)
+//   FEED_SHIP_DAYS  days of daily lows written into Data/Feed.lua (default 30)
 //   FEED_CACHE    folder for the last download and the history (default: tools/feed/cache)
 //   FEED_OUT      the Lua file to write (default: Data/Feed.lua)
 //   FEED_FIXTURE  a folder of saved API answers to build from instead of the network (tests)
@@ -38,7 +40,8 @@ const REGION_IDS = { us: 1, kr: 2, eu: 3, tw: 4 };
 const ONLY = process.env.FEED_HOUSES
   ? new Set(process.env.FEED_HOUSES.split(",").map((s) => Number(s.trim())).filter(Boolean))
   : null;
-const KEEP_DAYS = 14;         // daily lows kept and shipped
+const KEEP_DAYS = Number(process.env.FEED_KEEP_DAYS) || 90;  // daily lows and sales kept in the history
+const SHIP_DAYS = Math.min(KEEP_DAYS, Number(process.env.FEED_SHIP_DAYS) || 30); // daily lows shipped
 const SALES_DAYS = 7;         // what sold: over the last week
 const MAX_GAP = 3 * 3600;     // two downloads further apart than this: no sales are counted between them
 // A listing gone by the next download: with more than 2 hours left it was bought (or taken off by its seller,
@@ -176,6 +179,8 @@ function processHouse(region, houseId, got, hist) {
 
   // the history: daily lows, daily sales and how long each day was watched
   const h = hist[houseId] || (hist[houseId] = { items: {}, watched: {} });
+  h.seen = h.seen || {};
+  h.seen[day] = true; // a day this house was downloaded on
   if (watched > 0) h.watched[day] = (h.watched[day] || 0) + watched;
   for (const [item, e] of now) {
     const r = h.items[item] || (h.items[item] = { l: {}, s: {} });
@@ -189,6 +194,7 @@ function processHouse(region, houseId, got, hist) {
   // forget what's older than the window
   const from = day - KEEP_DAYS + 1;
   for (const d of Object.keys(h.watched)) if (Number(d) < from) delete h.watched[d];
+  for (const d of Object.keys(h.seen)) if (Number(d) < from) delete h.seen[d];
   for (const [item, r] of Object.entries(h.items)) {
     for (const d of Object.keys(r.l)) if (Number(d) < from) delete r.l[d];
     for (const d of Object.keys(r.s)) if (Number(d) < from) delete r.s[d];
@@ -202,11 +208,13 @@ function processHouse(region, houseId, got, hist) {
 // ---------------------------------------------------------------------------------------------------------------
 const b36 = (n) => (n === undefined || n === null ? "" : Math.round(n).toString(36));
 
-// one house: "item=p,q,n,sold,value,watchedHours,expired,low0..low13;" in base 36; low0 is the oldest day
+// one house: "item=p,q,n,sold,value,watchedHours,expired,low0..lowN;" in base 36; low0 is the oldest of the
+// SHIP_DAYS days
 function encodeHouse(res) {
   const { now, h, day } = res;
   const days = [];
-  for (let d = day - KEEP_DAYS + 1; d <= day; d++) days.push(d);
+  for (let d = day - SHIP_DAYS + 1; d <= day; d++) days.push(d);
+  const seen = days.filter((d) => h.seen && h.seen[d]);
   let watchedSec = 0;
   for (const d of days.slice(-SALES_DAYS)) watchedSec += h.watched[d] || 0;
   const parts = [];
@@ -223,7 +231,7 @@ function encodeHouse(res) {
     parts.push(`${item}=${[e ? b36(e.p) : "", e ? b36(e.q) : "", e ? b36(e.n) : "", b36(sold), b36(value),
       b36(watchedSec / 3600), b36(expired), ...lows].join(",")};`);
   }
-  return { text: parts.join(""), firstDay: days[0], items: ids.length, listed: now.size };
+  return { text: parts.join(""), firstDay: days[0], seen, items: ids.length, listed: now.size };
 }
 
 function luaString(s) {
@@ -239,7 +247,7 @@ function writeLua(results) {
     "FT.FEED = {",
     "    v = 1,",
     `    built = ${NOW},`,
-    `    days = ${KEEP_DAYS},`,
+    `    days = ${SHIP_DAYS},`,
     "    regions = {",
   ];
   for (const [region, houses] of Object.entries(results)) {
@@ -247,7 +255,7 @@ function writeLua(results) {
     lines.push(`            name = "${region}",`);
     lines.push("            houses = {");
     for (const [houseId, enc] of Object.entries(houses)) {
-      lines.push(`                [${houseId}] = { t = ${enc.t}, firstDay = ${enc.firstDay}, data = ${luaString(enc.text)} },`);
+      lines.push(`                [${houseId}] = { t = ${enc.t}, firstDay = ${enc.firstDay}, seen = "${enc.seen.join(",")}", data = ${luaString(enc.text)} },`);
     }
     lines.push("            },");
     lines.push("        },");

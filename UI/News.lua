@@ -12,6 +12,14 @@ FT.News = N
 -- start, after the files are read (a table made with them would keep the English)
 local function News()
     return {
+        ["v0.2"] = {
+            { L["Where your prices come from"], L["The status bar shows Blizzard's time and your scan's: the newer one in green. Yellow means newer prices are likely out: /reload."],
+                nil },
+            { L["One scan for both"], L["Full scan runs Auctionator's scan when it's installed, and its scans come into this addon too: no need to scan twice."],
+                function() FT.Show("settings") end },
+            { L["Your history counts"], L["Signals now count the days Auctionator scanned, so your old Auctionator history works from day one."],
+                nil },
+        },
         ["v0.1"] = {
             { L["Welcome to the Wolf of Booty Bay"], L["The auction house as a stock market. Built on ForeverTrading by thewoolfi - his scanner, history and price exchange, with our own look on top."],
                 nil },

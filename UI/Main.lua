@@ -333,19 +333,29 @@ function FT.UpdateStatus()
     UI.SetTexColor(scanDot, color, 1)
     scanText:SetText(text)
 
+    -- where the prices come from: Blizzard's (the price feed), your own scan (Auctionator's count), the exchange;
+    -- the newest one in green, the feed in yellow once a newer one is likely out
     local parts = {}
-    local full = FT.Hist.LastScan("full")
-    parts[#parts + 1] = L["Full scan"] .. ": " .. (full and FT.Ago(full) or L["never"])
-    -- a fresher scan received from someone else
+    local feedT = FT.Feed.On() and FT.Feed.Time() or nil
+    local own = FT.Hist.LastScan("full")
     local peer = FT.Hist.LastScan("peer")
-    if peer and (not full or peer > full) then parts[#parts + 1] = L["Exchange"] .. ": " .. FT.Ago(peer) end
-    local function Source(name, on)
-        return on and (FT.C("up", name) .. " " .. FT.C("up", L["on"])) or FT.C("dim", name .. " " .. L["off"])
+    local newest = math.max(feedT or 0, own or 0, peer or 0)
+    local feedOld = FT.Feed.Stale()
+    local function Part(label, t, old)
+        if not t then return FT.C("dim", label .. ": " .. L["never"]) end
+        local col = old and "accent" or (t == newest and "up" or "muted")
+        return FT.C(col, label) .. " " .. FT.C(old and "accent" or "text", FT.Ago(t))
     end
-    parts[#parts + 1] = Source(L["Feed"], FT.Feed.On() and FT.Feed.Time() ~= nil)
-    parts[#parts + 1] = Source("Auctionator", FT.Atr.On())
-    parts[#parts + 1] = string.format(L["Recipes: %d"], #FT.Craft.List())
-    parts[#parts + 1] = string.format(L["Tracked: %d"], FT.S.trackAll and #(FT.Market.Rows() or {}) or FT.Hist.UniverseSize())
+    if FT.Feed.On() then parts[#parts + 1] = Part(L["Blizzard"], feedT, feedOld) end
+    parts[#parts + 1] = Part(L["Your scan"], own)
+    if peer and peer > (own or 0) and peer > (feedT or 0) then parts[#parts + 1] = Part(L["Exchange"], peer) end
+    local from
+    if newest == 0 then from = L["No prices yet"]
+    elseif newest == feedT then from = L["Prices from Blizzard (newer)"]
+    elseif newest == own then from = L["Prices from your scan (newer)"]
+    else from = L["Prices from the exchange (newer)"] end
+    parts[#parts + 1] = FT.C("muted", from)
+    if feedOld then parts[#parts + 1] = FT.C("accent", L["Newer prices are likely out: /reload"]) end
     local rows = FT.Market.Rows()
     if rows then parts[#parts + 1] = string.format(L["Market: %s items"], FT.Num(#rows)) end
     statusLeft:SetText(table.concat(parts, FT.C("dim", "   ||   ")))
@@ -364,7 +374,11 @@ local function BuildScanBox(header, anchor, closeButton)
     f.mine = UI.Button(f, L["My items"], 10, 24, "default", function() FT.Scanner.AskMine() end)
     f.mine:FitText(24)
     f.mine:SetPoint("RIGHT", 0, 0)
-    f.full = UI.Button(f, L["Full scan"], 10, 24, "primary", function() FT.Scanner.StartFull() end)
+    f.full = UI.Button(f, L["Full scan"], 10, 24, "primary", function()
+        -- one scan for both: Auctionator's when it's there (its results come to us), else ours
+        if FT.Atr.StartScan(FT.Scanner.StartFull) then return end
+        FT.Scanner.StartFull()
+    end)
     f.full:FitText(24)
     f.full:SetPoint("RIGHT", f.mine, "LEFT", -6, 0)
     -- pressed again while it runs: it stops

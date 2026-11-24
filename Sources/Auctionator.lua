@@ -3,6 +3,7 @@
 -- its full scan (every auction: order books, day candles), its searches, and every price it saves.
 -- Days ForeverTrading has no candle for are filled from Auctionator's own price database.
 local ADDON, FT = ...
+local L = FT.L
 
 local A = {}
 FT.Atr = A
@@ -65,11 +66,64 @@ function A.Daily(itemID, fromDay)
     return out
 end
 
+-- The days Auctionator scanned the whole market: days on which at least SCAN_DAY_ITEMS items got a price (a
+-- search saves a few; a full scan thousands). Worked out at most every 5 minutes, and after each of its scans.
+local SCAN_DAY_ITEMS = 150
+local scanDays, scanDaysAt
+function A.ScanDays()
+    local db = A.DB()
+    if not db then return {} end
+    if scanDays and scanDaysAt and GetTime() - scanDaysAt < 300 then return scanDays end
+    local count = {}
+    for _, e in pairs(db) do
+        if type(e) == "table" and type(e.h) == "table" then
+            for dk in pairs(e.h) do
+                local d = tonumber(dk)
+                if d then count[d] = (count[d] or 0) + 1 end
+            end
+        end
+    end
+    scanDays = {}
+    for d, n in pairs(count) do
+        if n >= SCAN_DAY_ITEMS then scanDays[#scanDays + 1] = d end
+    end
+    table.sort(scanDays)
+    scanDaysAt = GetTime()
+    return scanDays
+end
+FT.On("FT_SCAN_DONE", function(src) if src == "auctionator" then scanDaysAt = nil end end)
+FT.On("FT_HOUSE_CHANGED", function() scanDaysAt = nil end)
+
 -- How many days of history Auctionator keeps (its setting)
 function A.HistoryDays()
     if not (Auctionator and Auctionator.Config and Auctionator.Config.Get and Auctionator.Config.Options) then return nil end
     local ok, days = pcall(Auctionator.Config.Get, Auctionator.Config.Options.PRICE_HISTORY_DAYS)
     return ok and days or nil
+end
+
+-- One scan for both addons: our Scan button starts Auctionator's own scan when it is there, and its results come
+-- to us through the hooks below. Auctionator has no public call for this, so its scan frames are tried by name;
+-- should none start a scan within 1.5 seconds (an Auctionator version that names them otherwise), `fallback`
+-- (our own scan) runs instead. Returns false when Auctionator isn't there at all (run your own scan then).
+function A.StartScan(fallback)
+    if not (A.On() and FT.ahOpen and FT.S.scanWithAuctionator ~= false) then return false end
+    local st = Auctionator.State
+    local started = false
+    -- the summary scan first (a few seconds, any time), then the full one (every auction, once every 15 minutes)
+    for _, key in ipairs({ "IncrementalScanFrameRef", "FullScanFrameRef" }) do
+        local ref = type(st) == "table" and st[key]
+        if not started and type(ref) == "table" and type(ref.InitiateScan) == "function" then
+            started = pcall(ref.InitiateScan, ref)
+        end
+    end
+    if not started then return false end
+    C_Timer.After(1.5, function()
+        if not FT.atrScanning and not FT.scanning and fallback then
+            FT.Debug("Auctionator's scan didn't start: ours instead")
+            fallback()
+        end
+    end)
+    return true
 end
 
 -- Searches the auction house in Auctionator's Shopping tab (the auction house must be open)
@@ -100,6 +154,7 @@ function A.OnFullScan(raw)
     local t = time()
     FT.Scanner.ReadList(raw, Info, function(acc)
         FT.Scanner.SaveFull(acc, t, "auctionator", function()
+            FT.Print(L["Took Auctionator's full scan: no need to scan again."])
             FT.Fire("FT_SCAN_DONE", "auctionator")
         end)
     end)
@@ -115,6 +170,7 @@ function A.OnSummaryScan(results)
     local sum = FT.Scanner.NewSummary()
     FT.Scanner.AddBrowse(sum, results)
     FT.Scanner.SaveSummary(sum, time(), "auctionator", function()
+        FT.Print(string.format(L["Took Auctionator's scan: %s items, no need to scan again."], FT.Num(sum.count)))
         FT.Fire("FT_SCAN_DONE", "auctionator")
     end)
 end
