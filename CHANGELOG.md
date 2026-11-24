@@ -1,5 +1,16 @@
 # The Wolf of Booty Bay
 
+## v0.2 - batch 1: data and freshness
+
+- Signals count only the days the market was really seen: the feed's real days plus the days Auctionator scanned
+  (your old Auctionator history counts from the start).
+- The feed keeps 90 days and ships 30; its record is saved in the repository's feed-history branch every run.
+- Status bar: Blizzard vs Your scan, the newer one in green, Blizzard in yellow once newer prices are likely out.
+- A chat reminder, at most hourly and never in combat, when newer prices are likely out: /reload.
+- A note in chat when Auctionator's scan was taken: no need to scan twice.
+- Full scan runs Auctionator's scan when it is installed, so one scan feeds both (Settings > Sources).
+- A merged change is released at once, not at the next hourly run.
+
 ## v0.1 - the price feed
 
 - Every release now carries the prices of every WoW Forever auction house, built hourly from Blizzard's own

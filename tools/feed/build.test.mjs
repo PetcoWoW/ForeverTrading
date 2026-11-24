@@ -20,16 +20,18 @@ test("counts what sold between two downloads", () => {
   run("run1", out, cache, 1795500100);
   run("run2", out, cache, 1795503700);
   const lua = fs.readFileSync(out, "utf8");
-  const data = lua.match(/\[114\] = \{ t = (\d+), firstDay = \d+, data = "([^"]*)" \}/);
+  const data = lua.match(/\[114\] = \{ t = (\d+), firstDay = \d+, seen = "([0-9,]*)", data = "([^"]*)" \}/);
   assert.ok(data, "house 114 written");
   assert.equal(Number(data[1]), 1795503600);
-  const items = Object.fromEntries(data[2].split(";").filter(Boolean).map((e) => {
+  const items = Object.fromEntries(data[3].split(";").filter(Boolean).map((e) => {
     const [id, rest] = e.split("=");
     return [id, rest.split(",").map((v) => (v === "" ? null : parseInt(v, 36)))];
   }));
   // item 7911: lowest now 5500, 3 listed in 2 auctions, 1 bought for 5000, today's low 5000
   assert.deepEqual(items["7911"].slice(0, 7), [5500, 3, 2, 1, 5000, 1, 0]);
-  assert.equal(items["7911"][20], 5000); // today: the last of 14 daily lows
+  assert.equal(items["7911"][items["7911"].length - 1], 5000); // today: the last daily low
+  assert.equal(items["7911"].length, 7 + 30); // 30 days of lows shipped
+  assert.equal(data[2], String(Math.floor(1795503600 / 86400))); // the one day it was downloaded on
   // goods 12359: 15 of a stack bought at 142, 40 ran out, the 30-min-to-2-h listing not counted
   assert.deepEqual(items["12359"].slice(0, 7), [139, 35, 2, 15, 15 * 142, 1, 40]);
   // the bid-only listing has no price: not shipped

@@ -9,6 +9,11 @@ on:
   schedule:
     - cron: "17 * * * *"
   workflow_dispatch:
+  # a merged change goes out at once, with fresh prices, instead of at the next :17
+  push:
+    branches: [main]
+    paths-ignore:
+      - "**.md"
 
 concurrency:
   group: price-feed
@@ -53,6 +58,20 @@ jobs:
           done
           exit $missing
 
+      - name: Bring back the history if the cache lost it
+        env:
+          FEED_REGIONS: ${{ vars.FEED_REGIONS || 'us' }}
+        run: |
+          mkdir -p tools/feed/cache
+          for region in ${FEED_REGIONS//,/ }; do
+            file="tools/feed/cache/history-$region.json"
+            if [ ! -f "$file" ] && git fetch -q --depth=1 origin feed-history 2>/dev/null; then
+              if git show "origin/feed-history:history-$region.json.gz" 2>/dev/null | gunzip > "$file.tmp" && [ -s "$file.tmp" ]; then
+                mv "$file.tmp" "$file" && echo "history for $region restored from the feed-history branch"
+              fi
+            fi
+          done
+
       - name: Build the price feed
         env:
           BLIZZARD_CLIENT_ID: ${{ secrets.BLIZZARD_CLIENT_ID }}
@@ -60,6 +79,8 @@ jobs:
           FEED_REGIONS: ${{ vars.FEED_REGIONS || 'us' }}
           # PvP Alliance (110) and PvP Blackwater (116); all twelve: set the repository variable FEED_HOUSES empty
           FEED_HOUSES: ${{ vars.FEED_HOUSES || '110,116' }}
+          FEED_KEEP_DAYS: "90"
+          FEED_SHIP_DAYS: "30"
         run: node tools/feed/build.mjs
 
       - name: Save the download and the history
@@ -67,6 +88,20 @@ jobs:
         with:
           path: tools/feed/cache
           key: feed-cache-${{ github.run_id }}
+
+      - name: Keep the history in the feed-history branch
+        # GitHub's cache is dropped after a week unused or when full; the branch keeps the record for good.
+        # One commit, replaced every run, so the repository doesn't grow.
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          rm -rf /tmp/history && mkdir -p /tmp/history
+          for f in tools/feed/cache/history-*.json; do gzip -c "$f" > "/tmp/history/$(basename "$f").gz"; done
+          cd /tmp/history
+          git init -q -b feed-history
+          git add .
+          git -c user.name="price-feed" -c user.email="price-feed@users.noreply.github.com" commit -q -m "Feed history as of $(date -u '+%Y-%m-%d %H:%M') UTC"
+          git push -q --force "https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git" feed-history
 
       - name: Package the addon with the feed
         run: |

@@ -1,7 +1,7 @@
 -- Wolf of Booty Bay: the price feed. Every release carries Data/Feed.lua, built hourly outside the game from
 -- Blizzard's own auction data for every WoW Forever auction house (tools/feed/build.mjs): the lowest price of each
 -- item, how many are listed and in how many auctions, what sold over the last 7 days and the daily lows of the
--- last 14 days (FT.FEED.days). So prices are there before your first scan, and for the house you aren't standing at.
+-- last 30 days (FT.FEED.days). So prices are there before your first scan, and for the house you aren't standing at.
 --
 -- How it is used:
 --  * at login (and when the house you look at changes) the feed's prices go into the history as a scan of the
@@ -107,7 +107,10 @@ local function Parse(h)
         }
         n = n + 1
     end
-    return { t = h.t, firstDay = h.firstDay, items = items, count = n }
+    -- the UTC days the house was really downloaded on (older feeds don't say: none counted)
+    local seen = {}
+    for d in (type(h.seen) == "string" and h.seen or ""):gmatch("(%d+)") do seen[#seen + 1] = tonumber(d) end
+    return { t = h.t, firstDay = h.firstDay, items = items, count = n, seen = seen }
 end
 
 -- the feed's data of one of our auction houses (default: the one you look at)
@@ -148,15 +151,12 @@ function F.Daily(itemID, fromDay, house)
     return any and out or nil
 end
 
--- the days the feed saw the whole market (our days), for "how long it has been watched"
+-- the days the feed really saw the whole market (our days), for "how long it has been watched"
 function F.Days(house)
     local h = F.House(house)
     if not h then return nil end
     local out = {}
-    local days = FT.FEED.days or 7
-    for k = 1, days do
-        out[#out + 1] = FT.Day((h.firstDay + k - 1) * 86400 + 43200)
-    end
+    for _, d in ipairs(h.seen) do out[#out + 1] = FT.Day(d * 86400 + 43200) end
     return out
 end
 
@@ -202,6 +202,33 @@ end
 FT.On("FT_READY", function() C_Timer.After(2, F.Take) end)
 FT.On("FT_HOUSE_CHANGED", function() C_Timer.After(0.5, F.Take) end)
 FT.On("FT_SOURCES_CHANGED", function() wipe(parsed); region = nil end)
+
+---------------------------------------------------------------------------
+-- Fresh prices are out: the reminder to /reload
+---------------------------------------------------------------------------
+-- A new feed is published every hour (WowUp puts it in place); the game reads it only at login or /reload. So
+-- once the feed we loaded is older than STALE, newer prices are likely waiting on disk.
+local STALE = 70 * 60
+local lastNudge
+
+-- the feed we loaded was built long enough ago for a newer one to be out
+function F.Stale()
+    if not F.On() then return false end
+    local built = FT.FEED.built
+    return built ~= nil and time() - built > STALE
+end
+
+local function Nudge()
+    if not (F.Stale() and FT.S and FT.S.reloadReminder ~= false) then return end
+    if InCombatLockdown and InCombatLockdown() then return end
+    if lastNudge and GetTime() - lastNudge < 3600 then return end
+    lastNudge = GetTime()
+    FT.Print(L["Newer AH prices are likely out: type /reload to load them."])
+end
+
+FT.On("FT_READY", function()
+    C_Timer.NewTicker(300, Nudge)
+end)
 
 -- for the status bar and /wolf debug
 function F.Describe()
