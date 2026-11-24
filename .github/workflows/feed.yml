@@ -22,19 +22,35 @@ jobs:
     timeout-minutes: 20
     steps:
       - name: Check out
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Set up Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: 22
 
       - name: Restore the last download and the history
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v5
         with:
           path: tools/feed/cache
           key: feed-cache-${{ github.run_id }}
           restore-keys: feed-cache-
+
+      - name: Check the Blizzard key
+        env:
+          BLIZZARD_CLIENT_ID: ${{ secrets.BLIZZARD_CLIENT_ID }}
+          BLIZZARD_CLIENT_SECRET: ${{ secrets.BLIZZARD_CLIENT_SECRET }}
+        run: |
+          missing=0
+          for name in BLIZZARD_CLIENT_ID BLIZZARD_CLIENT_SECRET; do
+            if [ -z "${!name}" ]; then
+              echo "::error::The repository secret $name is missing or empty. Add it under Settings > Secrets and variables > Actions > Secrets tab > New repository secret (not Variables, not an Environment, not Codespaces or Dependabot), named exactly $name."
+              missing=1
+            else
+              echo "$name is set (value hidden)"
+            fi
+          done
+          exit $missing
 
       - name: Build the price feed
         env:
@@ -44,7 +60,7 @@ jobs:
         run: node tools/feed/build.mjs
 
       - name: Save the download and the history
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@v5
         with:
           path: tools/feed/cache
           key: feed-cache-${{ github.run_id }}
