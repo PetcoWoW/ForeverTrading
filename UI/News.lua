@@ -12,6 +12,13 @@ FT.News = N
 -- start, after the files are read (a table made with them would keep the English)
 local function News()
     return {
+        ["v0.15"] = {
+            { L["Sessions"], L["Right-click the minimap button: Start a session. Everything you loot counts, valued at today's prices, with gold an hour on a small panel. Portfolio > Sessions keeps your runs."],
+                function() FT.Show("portfolio"); FT.Tabs.portfolio.SetView("sessions") end },
+            { L["It checks itself"], L["Every day it writes down its calls and a week later grades them. Each signal shows its record (right 7 of 10); a rule that keeps being wrong switches itself off."],
+                function() FT.Show("market") end },
+            { L["Recap, pings, sharing"], L["A market recap at login, a line when something you own has a good day to sell, Share on any item for guild chat, To Auctionator for shopping lists, and This week on the Terminal."] },
+        },
         ["v0.14"] = {
             { L["Disenchanting"], L["Gear tooltips say whether to disenchant it or sell it. Money > Make gold lists gear worth buying to disenchant, for your best enchanter's skill. Classic's odds: Forever's may differ."],
                 function() FT.Show("signals"); FT.Tabs.signals.SetView("make") end },

@@ -23,10 +23,103 @@ local function MinimapTooltip(self)
     local last = FT.Hist.LastScan()
     GameTooltip:AddLine(L["Scan"] .. ": " .. (last and FT.Ago(last) or L["never"]), 0.6, 0.64, 0.7)
     GameTooltip:AddLine(" ")
+    local s = FT.Session.Current()
+    if s then
+        local sum = FT.Session.Summary(s)
+        GameTooltip:AddLine(string.format(L["Session: %s, %s an hour"], FT.Money(math.floor(sum.worth), "short"),
+            sum.perHour and FT.Money(math.floor(sum.perHour), "short") or "..."), 0.05, 0.8, 0.5)
+    end
     GameTooltip:AddLine(L["Click: open / close"], 0.8, 0.8, 0.8)
-    GameTooltip:AddLine(L["Right-click: signals"], 0.8, 0.8, 0.8)
+    GameTooltip:AddLine(L["Right-click: menu (start a session...)"], 0.8, 0.8, 0.8)
     GameTooltip:AddLine(L["Drag: move"], 0.8, 0.8, 0.8)
     GameTooltip:Show()
+end
+
+-- the right-click menu: the session, the pages
+local menu, menuBlock
+local function MenuItems()
+    local S = FT.Session
+    local s = S.Current()
+    local items = {}
+    if not s then
+        items[#items + 1] = { L["Start a session"], function() S.Start() end, "up" }
+    else
+        items[#items + 1] = { s.paused and L["Resume the session"] or L["Pause the session"], function() S.Pause() end }
+        items[#items + 1] = { L["Stop the session"], function() S.Stop() end, "down" }
+    end
+    items[#items + 1] = { "-" }
+    items[#items + 1] = { L["Terminal"], function() FT.Show("market") end }
+    items[#items + 1] = { L["Money"], function() FT.Show("signals") end }
+    items[#items + 1] = { L["Portfolio"], function() FT.Show("portfolio") end }
+    items[#items + 1] = { L["Past sessions"], function() FT.Show("portfolio"); FT.Tabs.portfolio.SetView("sessions") end }
+    items[#items + 1] = { L["Settings"], function() FT.Show("settings") end }
+    return items
+end
+
+function FT.ShowMenu(anchor)
+    UI.ResolveFont()
+    if not menuBlock then
+        menuBlock = CreateFrame("Button", nil, UIParent)
+        menuBlock:SetAllPoints(UIParent)
+        menuBlock:SetFrameStrata("FULLSCREEN_DIALOG")
+        menuBlock:RegisterForClicks("AnyUp")
+        menuBlock:SetScript("OnClick", function() menu:Hide(); menuBlock:Hide() end)
+        menu = CreateFrame("Frame", nil, UIParent)
+        menu:SetFrameStrata("FULLSCREEN_DIALOG")
+        menu:SetFrameLevel(menuBlock:GetFrameLevel() + 5)
+        menu:SetClampedToScreen(true)
+        UI.Fill(menu, "bg2")
+        UI.Border(menu, "line")
+        menu.rows = {}
+        tinsert(UISpecialFrames, "WolfOfBootyBayMenu")
+    end
+    local items = MenuItems()
+    local y, w = -6, 170
+    for i, it in ipairs(items) do
+        local row = menu.rows[i]
+        if not row then
+            row = CreateFrame("Button", nil, menu)
+            row.hl = UI.RoundTex(row, "BACKGROUND", "hl", 1)
+            row.hl:SetAllPoints()
+            row.hl:Hide()
+            row.text = UI.Text(row, 12, "text")
+            row.text:SetPoint("LEFT", 10, 0)
+            row.line = UI.HLine(row, "line")
+            row.line:SetPoint("LEFT", 8, 0)
+            row.line:SetPoint("RIGHT", -8, 0)
+            row:SetScript("OnEnter", function(self) if self.fn then self.hl:Show() end end)
+            row:SetScript("OnLeave", function(self) self.hl:Hide() end)
+            row:SetScript("OnClick", function(self)
+                menu:Hide()
+                menuBlock:Hide()
+                if self.fn then self.fn() end
+            end)
+            menu.rows[i] = row
+        end
+        local sep = it[1] == "-"
+        row:SetHeight(sep and 9 or 22)
+        row:ClearAllPoints()
+        row:SetPoint("TOPLEFT", 4, y)
+        row:SetPoint("RIGHT", menu, "RIGHT", -4, 0)
+        row.fn = not sep and it[2] or nil
+        row.text:SetShown(not sep)
+        row.line:SetShown(sep)
+        if not sep then
+            row.text:SetText(it[1])
+            UI.SetTextColor(row.text, it[3] or "text")
+            w = math.max(w, math.ceil(row.text:GetStringWidth()) + 30)
+        end
+        row:Show()
+        y = y - row:GetHeight()
+    end
+    for i = #items + 1, #menu.rows do menu.rows[i]:Hide() end
+    menu:SetSize(w, -y + 6)
+    menu:ClearAllPoints()
+    local x, cy = GetCursorPosition()
+    local sc = UIParent:GetEffectiveScale()
+    menu:SetPoint("TOPRIGHT", UIParent, "BOTTOMLEFT", x / sc, cy / sc)
+    menuBlock:Show()
+    menu:Show()
 end
 
 local function BuildMinimap()
@@ -50,8 +143,8 @@ local function BuildMinimap()
     border:SetSize(52, 52)
     border:SetTexture("Interface\\Minimap\\MiniMap-TrackingBorder")
     border:SetPoint("TOPLEFT")
-    mb:SetScript("OnClick", function(_, button)
-        if button == "RightButton" then FT.Show("signals") else FT.Toggle() end
+    mb:SetScript("OnClick", function(self, button)
+        if button == "RightButton" then FT.ShowMenu(self) else FT.Toggle() end
     end)
     mb:SetScript("OnDragStart", function(self)
         self:SetScript("OnUpdate", function()
@@ -82,8 +175,8 @@ local function MakeBroker()
     if not (ldb and ldb.NewDataObject) then return end
     ldb:NewDataObject("Wolf of Booty Bay", {
         type = "launcher", label = "Wolf of Booty Bay", text = "Wolf of Booty Bay", icon = ICON,
-        OnClick = function(_, button)
-            if button == "RightButton" then FT.Show("signals") else FT.Toggle() end
+        OnClick = function(self, button)
+            if button == "RightButton" then FT.ShowMenu(self) else FT.Toggle() end
         end,
         OnTooltipShow = function(tt)
             if not (tt and tt.AddLine) then return end
@@ -749,6 +842,14 @@ local function CraftWindow()
     d.chart = UI.Button(d, L["Chart"], 10, 22, "default", function() if d.itemID then FT.OpenItem(d.itemID) end end)
     d.chart:FitText(24)
     d.chart:SetPoint("RIGHT", d.close, "LEFT", -6, 0)
+    d.shop = UI.Button(d, L["Shopping list"], 10, 22, "default", function()
+        local ids = {}
+        for _, p in ipairs(d.parts or {}) do if p.source ~= "vendor" then ids[#ids + 1] = p.itemID end end
+        FT.ToAuctionator(L["Wolf: "] .. (FT.Item(d.itemID) or "craft"), ids)
+    end)
+    d.shop:FitText(24)
+    d.shop:SetPoint("RIGHT", d.chart, "LEFT", -6, 0)
+    d.shop:SetTip(L["Shopping list"], L["The materials to buy (not the vendor ones) as an Auctionator shopping list."])
     local panel = UI.Panel(d, "bg0", "line")
     panel:SetPoint("TOPLEFT", 12, -60)
     panel:SetPoint("BOTTOMRIGHT", -12, 92)
@@ -804,6 +905,7 @@ function FT.ShowCraft(r)
     for name in pairs(r.knownBy or {}) do who[#who + 1] = name end
     d.sub:SetText(L[r.prof or "?"] .. "  ·  " .. (known and FT.C("up", L["Known by"] .. " " .. table.concat(who, ", "))
         or FT.C("accent", L["Recipe needed"])))
+    d.parts = e.parts
     d.list:SetItems(e.parts or {})
     local qty = r.outputQty or 1
     local buyReady = FT.Price(r.output)
@@ -828,6 +930,113 @@ function FT.ShowCraft(r)
     d:Raise()
 end
 
+---------------------------------------------------------------------------
+-- The session panel: small, movable, on screen only while a session runs
+---------------------------------------------------------------------------
+local hud
+local HUD_ROWS = 4
+
+local function BuildHUD()
+    UI.ResolveFont()
+    local h = CreateFrame("Frame", "WolfOfBootyBaySession", UIParent)
+    h:SetSize(250, 74 + HUD_ROWS * 16)
+    h:SetFrameStrata("MEDIUM")
+    h:SetClampedToScreen(true)
+    h:EnableMouse(true)
+    h:SetMovable(true)
+    h:RegisterForDrag("LeftButton")
+    h:SetScript("OnDragStart", h.StartMoving)
+    h:SetScript("OnDragStop", function(self)
+        self:StopMovingOrSizing()
+        local p, _, rp, x, y = self:GetPoint()
+        FT.db.ui = FT.db.ui or {}
+        FT.db.ui.hud = { p, rp, x, y }
+    end)
+    local pos = FT.db.ui and FT.db.ui.hud
+    if pos then h:SetPoint(pos[1], UIParent, pos[2], pos[3], pos[4]) else h:SetPoint("RIGHT", UIParent, "RIGHT", -60, 80) end
+    UI.Fill(h, "bg1", 0.92)
+    UI.Border(h, "line")
+    local bar = UI.RoundTex(h, "ARTWORK", "up", 1, nil, "top", UI.RADIUS - 1)
+    bar:SetHeight(2)
+    bar:SetPoint("TOPLEFT", 1, -1)
+    bar:SetPoint("TOPRIGHT", -1, -1)
+    h.bar = bar
+    h.title = UI.Text(h, 11, "accent")
+    h.title:SetPoint("TOPLEFT", 10, -8)
+    h.time = UI.Text(h, 11, "muted", "RIGHT")
+    h.time:SetPoint("TOPRIGHT", -10, -8)
+    h.worth = UI.Text(h, 15, "text")
+    h.worth:SetPoint("TOPLEFT", 10, -24)
+    h.rate = UI.Text(h, 12, "up", "RIGHT")
+    h.rate:SetPoint("TOPRIGHT", -10, -27)
+    h.rows = {}
+    for i = 1, HUD_ROWS do
+        local l = UI.Text(h, 11, "muted")
+        l:SetPoint("TOPLEFT", 10, -46 - (i - 1) * 16)
+        l:SetPoint("RIGHT", h, "RIGHT", -70, 0)
+        if l.SetWordWrap then l:SetWordWrap(false) end
+        local r = UI.Text(h, 11, "text", "RIGHT")
+        r:SetPoint("TOPRIGHT", -10, -46 - (i - 1) * 16)
+        h.rows[i] = { l, r }
+    end
+    h.pause = UI.Button(h, L["Pause"], 10, 20, "default", function() FT.Session.Pause() end)
+    h.pause:FitText(16)
+    h.pause:SetPoint("BOTTOMLEFT", 8, 6)
+    h.stop = UI.Button(h, L["Stop"], 10, 20, "down", function() FT.Session.Stop() end)
+    h.stop:FitText(16)
+    h.stop:SetPoint("LEFT", h.pause, "RIGHT", 6, 0)
+    h.open = UI.Button(h, L["Details"], 10, 20, "default", function()
+        FT.Show("portfolio")
+        FT.Tabs.portfolio.SetView("sessions")
+    end)
+    h.open:FitText(16)
+    h.open:SetPoint("BOTTOMRIGHT", -8, 6)
+    h.elapsed = 0
+    h:SetScript("OnUpdate", function(self, e)
+        self.elapsed = self.elapsed + e
+        if self.elapsed >= 1 then
+            self.elapsed = 0
+            FT.UpdateHUD()
+        end
+    end)
+    hud = h
+    return h
+end
+
+function FT.UpdateHUD()
+    local S = FT.Session
+    local s = S.Current()
+    if not s or FT.S.sessionPanel == false then
+        if hud then hud:Hide() end
+        return
+    end
+    local h = hud or BuildHUD()
+    h:Show()
+    local sum = S.Summary(s)
+    h.title:SetText(s.paused and (L["Session"] .. "  " .. FT.C("accent", s.afk and L["paused (AFK)"] or L["paused"])) or (L["Session"] .. "  ·  " .. (s.zone or "")))
+    UI.SetTexColor(h.bar, s.paused and "accent" or "up", 1)
+    local secs = math.floor(sum.secs)
+    h.time:SetText(string.format("%d:%02d:%02d", math.floor(secs / 3600), math.floor(secs % 3600 / 60), secs % 60))
+    h.worth:SetText(FT.Money(math.floor(sum.worth), "short"))
+    h.rate:SetText(sum.perHour and (FT.Money(math.floor(sum.perHour), "short") .. FT.C("dim", " " .. L["/ hour"])) or FT.C("dim", L["counting..."]))
+    local lines = {}
+    if (sum.money or 0) > 0 then lines[#lines + 1] = { L["Gold looted"], FT.Money(sum.money, "short") } end
+    for _, it in ipairs(sum.items) do
+        if #lines >= HUD_ROWS then break end
+        lines[#lines + 1] = { FT.ItemText(it.id, 22) .. FT.C("dim", " x" .. FT.Num(it.qty)), FT.Money(math.floor(it.value), "short") }
+    end
+    if #lines == 0 then lines[1] = { FT.C("dim", L["Loot something: it shows here."]), "" } end
+    for i, r in ipairs(h.rows) do
+        r[1]:SetText(lines[i] and lines[i][1] or "")
+        r[2]:SetText(lines[i] and lines[i][2] or "")
+    end
+    h.pause:SetLabel(s.paused and L["Resume"] or L["Pause"])
+    h.pause:FitText(16)
+end
+FT.On("FT_SESSION_CHANGED", function() FT.UpdateHUD() end)
+FT.On("FT_SESSION_LOOT", function() FT.Debounce("hud", 0.3, FT.UpdateHUD) end)
+FT.On("FT_READY", function() C_Timer.After(2, FT.UpdateHUD) end)
+
 function FT.ShowSupport()
     FT.ShowLink(L["Built on ForeverTrading"], L["Wolf of Booty Bay is built on ForeverTrading by thewoolfi (Apache License 2.0). Copy the link to see the original:"],
         FT.URL_SUPPORT)
@@ -836,4 +1045,25 @@ end
 function FT.ShowGitHub()
     FT.ShowLink(L["Wolf of Booty Bay on GitHub"], L["Source code, releases and bug reports. Copy the link and open it in your browser:"],
         FT.URL_GITHUB)
+end
+
+-- A tip for guild chat, in the chat box for you to send: "[Thorium Bar] $THOR is cheap today: 2.1g (usually 2.6g)"
+function FT.ShareTip(itemID)
+    local s = FT.An.Stats(itemID)
+    if not s.price then return end
+    local _, _, _, _, link = FT.Item(itemID)
+    local sym = FT.Symbol(itemID)
+    local name = (link or FT.ItemText(itemID)) .. (sym ~= "" and (" $" .. sym) or "")
+    local function G(c) return FT.MoneyPlain(math.floor(c)) end
+    local text
+    if s.avg and s.dev and s.dev <= -0.1 then
+        text = string.format(L["%s is cheap today: %s (usually %s)"], name, G(s.price), G(s.avg))
+    elseif s.avg and s.dev and s.dev >= 0.1 then
+        text = string.format(L["%s is high today: %s (usually %s), good time to sell"], name, G(s.price), G(s.avg))
+    else
+        text = string.format(L["%s is at its usual price: %s"], name, G(s.price))
+    end
+    text = text .. " - Wolf of Booty Bay"
+    local prefix = (IsInGuild and IsInGuild()) and "/g " or ""
+    if ChatFrame_OpenChat then ChatFrame_OpenChat(prefix .. text) else FT.Print(text) end
 end

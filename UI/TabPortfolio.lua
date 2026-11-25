@@ -12,6 +12,7 @@ local portfolioParts = {} -- what the Portfolio view shows (hidden in the Journa
 local journal             -- the Journal view
 local charsView           -- the Characters view
 local sellView            -- the Sell yours view (what to do with each thing you own)
+local sessView            -- the Sessions view (your farming runs)
 local STALE_DAYS = 7      -- a character's bank or mailbox not seen for this long: its numbers are old
 
 local function NameCell(row)
@@ -42,7 +43,7 @@ function T.Build(p)
     sub:SetText(L["Bags, banks and mailboxes of your characters on this server, at auction house prices"])
 
     -- what you own, or what your trading brought (the deals journal)
-    T.viewSeg = UI.Segmented(p, { { "portfolio", L["Holdings"] }, { "sell", L["Sell yours"] }, { "chars", L["Characters"] }, { "journal", L["Journal"] } }, function(v) T.SetView(v) end, 22)
+    T.viewSeg = UI.Segmented(p, { { "portfolio", L["Holdings"] }, { "sell", L["Sell yours"] }, { "chars", L["Characters"] }, { "sessions", L["Sessions"] }, { "journal", L["Journal"] } }, function(v) T.SetView(v) end, 22)
     T.viewSeg:SetPoint("TOPRIGHT", -8, -8)
     T.viewSeg:SetValue(state.view)
     T.head, T.sub = head, sub
@@ -126,6 +127,7 @@ function T.Build(p)
     T.BuildJournal(p)
     T.BuildChars(p)
     T.BuildSell(p)
+    T.BuildSessions(p)
 
     UI.OnSize(p, function(self, w, h)
         local cw = (w - 16 - 3 * 8) / 4
@@ -283,15 +285,17 @@ end
 function T.SetView(view)
     state.view = view
     if T.viewSeg then T.viewSeg:SetValue(view) end
-    local j, ch, sl = view == "journal", view == "chars", view == "sell"
-    for _, x in ipairs(portfolioParts) do x:SetShown(not j and not ch and not sl) end
+    local j, ch, sl, se = view == "journal", view == "chars", view == "sell", view == "sessions"
+    for _, x in ipairs(portfolioParts) do x:SetShown(not j and not ch and not sl and not se) end
+    if sessView then sessView:SetShown(se) end
     if journal then journal:SetShown(j) end
     if charsView then charsView:SetShown(ch) end
     if sellView then sellView:SetShown(sl) end
-    T.head:SetText((j and L["Journal"]) or (ch and L["Characters"]) or (sl and L["Sell yours"]) or L["Portfolio"])
+    T.head:SetText((j and L["Journal"]) or (ch and L["Characters"]) or (sl and L["Sell yours"]) or (se and L["Sessions"]) or L["Portfolio"])
     T.sub:SetText((j and L["What you bought and sold at the auction house, and what it brought"])
         or (ch and L["Every character on this server: gold, what it holds, when it was last seen"])
         or (sl and L["Everything you own and the best way to turn each into gold"])
+        or (se and L["Your farming runs: what you looted, what it's worth now, gold an hour"])
         or L["Bags, banks and mailboxes of your characters on this server, at auction house prices"])
     T.Refresh()
 end
@@ -428,8 +432,87 @@ function T.RefreshSell()
     sellView.list:SetItems(list, true)
 end
 
+---------------------------------------------------------------------------
+-- Sessions (FT.Session): your farming runs, the best gold an hour first
+---------------------------------------------------------------------------
+function T.BuildSessions(p)
+    local f = CreateFrame("Frame", nil, p)
+    f:SetPoint("TOPLEFT", 0, -30)
+    f:SetPoint("BOTTOMRIGHT", 0, 0)
+    f:Hide()
+    sessView = f
+    f.toggle = UI.Button(f, L["Start a session"], 10, 24, "primary", function()
+        if FT.Session.Current() then FT.Session.Stop() else FT.Session.Start() end
+    end)
+    f.toggle:FitText(24)
+    f.toggle:SetPoint("TOPLEFT", 10, -8)
+    f.note = UI.Text(f, 11, "dim")
+    f.note:SetPoint("LEFT", f.toggle, "RIGHT", 12, 0)
+    f.note:SetPoint("RIGHT", f, "RIGHT", -12, 0)
+    if f.note.SetWordWrap then f.note:SetWordWrap(false) end
+    local panel = UI.Panel(f, "bg1", "line")
+    panel:SetPoint("TOPLEFT", 8, -40)
+    panel:SetPoint("BOTTOMRIGHT", -8, 8)
+    local cols = {
+        { key = "name", title = L["Session"], width = "fill" },
+        { key = "when", title = L["When"], width = 100, justify = "RIGHT" },
+        { key = "time", title = L["Time"], width = 90, justify = "RIGHT" },
+        { key = "worth", title = L["Worth"], width = 100, justify = "RIGHT" },
+        { key = "rate", title = L["Per hour"], width = 100, justify = "RIGHT" },
+    }
+    f.header = UI.Header(panel, cols, function() end)
+    f.header:SetPoint("TOPLEFT", 1, -1)
+    f.header:SetPoint("TOPRIGHT", -1, -1)
+    f.list = UI.List(panel, {
+        rowHeight = 28, cols = cols,
+        update = function(row, s)
+            local rate = (s.secs or 0) >= 60 and (s.worth or 0) / s.secs * 3600 or nil
+            row.cells.name:SetText(s.name or s.zone or "?")
+            row.cells.when:SetText(FT.C("dim", s.stop and FT.Ago(s.stop) or ""))
+            row.cells.time:SetText(FT.Duration(s.secs))
+            row.cells.worth:SetText(FT.Money(s.worth or 0, "short"))
+            row.cells.rate:SetText(rate and FT.C("up", FT.Money(math.floor(rate), "short")) or "")
+        end,
+        onEnter = function(row, s)
+            GameTooltip:SetOwner(row, "ANCHOR_RIGHT")
+            GameTooltip:AddLine(s.name or s.zone or "?", 1, 1, 1)
+            local sum = FT.Session.Summary(s)
+            GameTooltip:AddLine(string.format(L["Worth now: %s (then: %s)"], FT.Money(math.floor(sum.worth), "short"), FT.Money(s.worth or 0, "short")), 0.8, 0.82, 0.86)
+            if (s.money or 0) > 0 then GameTooltip:AddDoubleLine(L["Gold looted"], FT.Money(s.money, "short"), 0.8, 0.82, 0.86, 1, 1, 1) end
+            for i, it in ipairs(sum.items) do
+                if i > 12 then break end
+                GameTooltip:AddDoubleLine(FT.ItemText(it.id, 30) .. " x" .. FT.Num(it.qty), FT.Money(math.floor(it.value), "short"), 0.8, 0.82, 0.86, 1, 1, 1)
+            end
+            GameTooltip:Show()
+        end,
+    })
+    f.list:SetPoint("TOPLEFT", f.header, "BOTTOMLEFT", 0, -2)
+    f.list:SetPoint("BOTTOMRIGHT", -1, 4)
+    f.list:SetEmptyText(L["No sessions yet. Start one before a farming run (here, or right-click the minimap button): everything you loot counts."])
+end
+
+function T.RefreshSessions()
+    if not sessView then return end
+    local cur = FT.Session.Current()
+    sessView.toggle:SetLabel(cur and L["Stop the session"] or L["Start a session"])
+    sessView.toggle:FitText(24)
+    local usual = FT.Session.UsualPerHour()
+    if cur then
+        local sum = FT.Session.Summary(cur)
+        sessView.note:SetText(string.format(L["Running: %s so far, %s an hour."], FT.Money(math.floor(sum.worth), "short"),
+            sum.perHour and FT.Money(math.floor(sum.perHour), "short") or "..."))
+    else
+        sessView.note:SetText(usual and string.format(L["Your usual: %s an hour."], FT.Money(math.floor(usual), "short")) or "")
+    end
+    local list = {}
+    for _, s in ipairs(FT.Session.List()) do list[#list + 1] = s end
+    sessView.list:SetItems(list, true)
+end
+FT.On("FT_SESSION_CHANGED", function() if sessView and sessView:IsShown() then T.RefreshSessions() end end)
+
 function T.Refresh()
     if state.view == "journal" then return T.RefreshJournal() end
+    if state.view == "sessions" then return T.RefreshSessions() end
     if state.view == "chars" then return T.RefreshChars() end
     if state.view == "sell" then return T.RefreshSell() end
     local rows, total, total7 = FT.Port.Rows()

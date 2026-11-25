@@ -219,7 +219,11 @@ function T.Build(p)
         L["Bars from ore, cloth bolts from cloth...: when one of your characters knows the recipe and it costs less than buying."])
 
     -- alerts
-    local al = Section(left, L["Alerts"], 5)
+    local al = Section(left, L["Alerts"], 8)
+    Check(al, "recap", L["Market recap at login"], L["One line in chat when you log in: your portfolio since last time, what's worth selling, the best move."])
+    Check(al, "sellPing", L["Good day to sell"], L["One line when something you own is on a good day to sell. Once a day per item, three at most."])
+    Check(al, "sessionPanel", L["Session panel"], L["The small panel on screen while a session runs: time, worth, gold an hour, your best loot."],
+        function() FT.UpdateHUD() end)
     Check(al, "alertPopup", L["Pop-up alerts"], L["Alerts as pop-ups on your screen, with a sound. Off: one line in chat, nothing to click away."])
     Check(al, "meme", L["Meme mode"],
         L["TO THE MOON and RUG PULL banners for what you own or watch, WHALE ALERT when one seller holds most of an item, APE IN on the strongest buys."])

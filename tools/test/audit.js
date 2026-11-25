@@ -62,5 +62,5 @@ const LUA = new Set(['ipairs','pairs','next','pcall','xpcall','select','type','t
   'table','setmetatable','getmetatable','rawset','rawget','rawequal','date','time','error','assert','print','wipe','tinsert',
   'tremove','strsplit','strjoin','strtrim','hooksecurefunc','geterrorhandler','collectgarbage','debugprofilestop','loadstring',
   'format','floor','ceil','abs','max','min','sort','debugstack','securecall','issecurevariable','_G','coroutine','bit','strlower','strupper']);
-const odd = [...gReads.keys()].filter(n => /^[a-z]/.test(n) && !LUA.has(n));
+const odd = [...gReads.keys()].filter(n => (/^[a-z]/.test(n) && !LUA.has(n)) || ['L', 'UI', 'FT', 'T'].includes(n));
 if (odd.length) { console.log('== SUSPICIOUS (lowercase globals: a local used before it is declared?): ' + odd.join(' ')); process.exitCode = 1; }

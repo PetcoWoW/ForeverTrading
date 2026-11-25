@@ -304,8 +304,20 @@ local function BuildDeals(p)
     f.check:FitText(24)
     f.check:SetPoint("TOPRIGHT", 0, 0)
     f.check:SetTip(L["Check order books"], L["Searches the auction house for the deals seen without an order book: how many cheap lots there really are (one search each, like My items)."])
+    -- the deals on the page as an Auctionator shopping list
+    f.toAtr = UI.Button(f, L["To Auctionator"], 10, 24, "default", function()
+        local ids = {}
+        for i, d in ipairs((ShownDeals())) do
+            if i > 30 then break end
+            if d.kind ~= "HOUSES" or d.buyHouse == FT.house then ids[#ids + 1] = d.id end
+        end
+        FT.ToAuctionator(L["Wolf: Make gold"], ids)
+    end)
+    f.toAtr:FitText(24)
+    f.toAtr:SetPoint("RIGHT", f.check, "LEFT", -6, 0)
+    f.toAtr:SetTip(L["To Auctionator"], L["The deals here (bought at this auction house) as an Auctionator shopping list: buy them from its Shopping tab."])
     f.count = UI.Text(f, 11, "dim", "RIGHT")
-    f.count:SetPoint("RIGHT", f.check, "LEFT", -12, 0)
+    f.count:SetPoint("RIGHT", f.toAtr, "LEFT", -12, 0)
     f.hint = UI.Text(f, 11, "dim")
     f.hint:SetPoint("TOPLEFT", 0, -32)
     f.hint:SetPoint("RIGHT", 0, 0)

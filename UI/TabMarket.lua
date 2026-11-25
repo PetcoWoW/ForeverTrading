@@ -720,6 +720,8 @@ function T.ShowOverview()
     overview.cards[4]:Set(FT.Money(math.floor((ptotal or 0) + FT.Port.Gold()), "short"),
         (pch and (FT.Pct(pch) .. FT.C("dim", " " .. L["today"])) or L["items and gold"]))
     T.FillMoves()
+    local week = FT.An.WeekText and FT.An.WeekText()
+    overview.hint:SetText(week and (FT.C("accent", L["This week"]) .. ":  " .. week) or L["Pick an item on the left to see its chart"])
 
     local points = {}
     for _, s in ipairs(scans) do
@@ -905,6 +907,11 @@ local function BuildItemView(parent)
         T.ShowItem(id, true)
     end)
     v.longHold:FitText(20)
+    v.share = UI.Button(v, L["Share"], 10, 22, "default", function()
+        if state.selected then FT.ShareTip(state.selected) end
+    end)
+    v.share:FitText(20)
+    v.share:SetTip(L["Share"], L["A line about this item for guild chat: its price today against usual. You send it yourself (Enter)."])
     v.longHold:SetTip(L["Long hold"], L["You know it'll be worth more later (a raid or phase coming): it never says CASH OUT until you unmark it."])
     v.bestUse:SetTip(L["Best use"], L["Every recipe this goes into, ranked by what one of it brings made into each."])
 
@@ -1076,6 +1083,10 @@ function T.UpdateWatchButton()
         v.longHold:FitText(20)
         v.longHold:ClearAllPoints()
         v.longHold:SetPoint("RIGHT", v.bestUse:IsShown() and v.bestUse or v.watch, "LEFT", -6, 0)
+        if v.share then
+            v.share:ClearAllPoints()
+            v.share:SetPoint("RIGHT", v.longHold, "LEFT", -6, 0)
+        end
     end
     local on = FT.Market.IsWatched(state.selected)
     v.watch:SetLabel(on and L["In watchlist"] or L["Watch"])
@@ -1190,15 +1201,19 @@ function T.ShowItem(id, keepView)
 
     -- signals
     -- the reason in plain words, how sure it is after it; the numbers behind it in the hover
-    local function Sure(conf) return conf and FT.C("dim", "  ·  " .. FT.An.ConfText(conf)) or "" end
+    -- how sure, and the rule's record ("right 7 of 10") once its calls have been graded
+    local function Sure(conf, rule)
+        local rec = rule and FT.An.RecordText(rule)
+        return conf and FT.C("dim", "  ·  " .. FT.An.ConfText(conf) .. (rec and (", " .. rec) or "")) or ""
+    end
     local sell, sellStrength, sellReason, sellWhy = FT.An.SellSignal(s)
-    local sellConf = s.conf
+    local sellConf, sellRule = s.conf, s.rule
     v.sellBadge:Set(sell, nil, sellStrength)
-    v.sellText:SetText((sellReason or "") .. Sure(sellConf))
+    v.sellText:SetText((sellReason or "") .. Sure(sellConf, sellRule))
     v.sellWhy = sellWhy
     local buy, buyStrength, buyReason, buyWhy = FT.An.BuySignal(s)
     v.buyBadge:Set(buy, nil, buyStrength)
-    v.buyText:SetText((buyReason or "") .. Sure(s.conf))
+    v.buyText:SetText((buyReason or "") .. Sure(s.conf, s.rule))
     v.buyWhy = buyWhy
     -- Simple view: the indicators in one line under what to do
     if FT.S.simple ~= false then
