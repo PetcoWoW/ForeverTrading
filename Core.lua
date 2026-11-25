@@ -4,7 +4,7 @@ local L = FT.L
 
 -- The version being released: a copy straight from the repository (not packaged) has no version in its TOC yet
 -- (the packager puts the tag there) and shows this one. Set it with every release.
-local RELEASE = "v0.14.0"
+local RELEASE = "v0.15.0"
 local GetMeta = (C_AddOns and C_AddOns.GetAddOnMetadata) or GetAddOnMetadata
 FT.VERSION = (GetMeta and GetMeta(ADDON, "Version")) or RELEASE
 if FT.VERSION == "" or FT.VERSION:find("@", 1, true) then FT.VERSION = RELEASE end
@@ -154,7 +154,10 @@ FT.DEFAULTS = {
     versionCheck = true,    -- tell guild and group which version we have, hear about newer ones
     minimap = true,
     minimapAngle = 205,
-    showAdvanced = false,   -- Settings: every section (off: the basics, alerts and About)
+    showAdvanced = false,
+    sessionPanel = true,    -- the session panel on screen while a session runs
+    recap = true,           -- a line at login: your portfolio, what to sell, the best move
+    sellPing = true,        -- a line when something you own has a good day to sell (once a day each)   -- Settings: every section (off: the basics, alerts and About)
     alertPopup = false,     -- alerts as pop-ups on screen (off: a line in chat, nothing to dismiss)
     alertSound = true,
     alertChat = true,
@@ -760,6 +763,11 @@ SlashCmdList.WOLFOFBOOTYBAY = function(msg)
         else
             FT.Print(L["Words changed. Type /reload to apply."])
         end
+    elseif cmd == "farm" or cmd == "session" then
+        local S = FT.Session
+        if rest == "stop" or (rest == "" and S.Current()) then S.Stop()
+        elseif rest == "pause" then S.Pause()
+        else S.Start() end
     elseif cmd == "reset" then
         FT.db.frame = {}
         if FT.ResetWindow then FT.ResetWindow() end

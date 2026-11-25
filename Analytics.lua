@@ -383,8 +383,30 @@ function An.LearnKinds(force)
             kinds[kind] = r
         end
         r.highs, r.held, r.lows, r.back = r.highs + b.highs, r.held + b.held, r.lows + b.lows, r.back + b.back
+        -- the week: the day this item usually sells highest, for the kind's calendar - real markets only (3+ sold
+        -- a day), and no one item's odd week counted as more than +30%
+        local rate = b.bestDay and FT.Sales.Rate(id)
+        if b.bestDay and (b.bestUp or 0) >= 0.03 and rate and (rate.sold or 0) >= 5 and (rate.perDay or 0) >= 3 then
+            r.wd = r.wd or {}
+            local d = r.wd[b.bestDay] or { n = 0, up = 0 }
+            r.wd[b.bestDay] = d
+            d.n, d.up = d.n + 1, d.up + math.min(b.bestUp, 0.3)
+        end
     end, function()
-        FT.db.learned[key] = { day = FT.Day(), kinds = kinds }
+        -- this week's calendar: kinds whose items mostly peak on the same day (5+ items), the clearest first
+        local week = {}
+        for _, k in pairs(kinds) do
+            local best
+            for wd, d in pairs(k.wd or {}) do
+                if d.n >= 8 and (not best or d.n > best.n) then best = { wd = wd, n = d.n, up = d.up / d.n } end
+            end
+            if best and best.up >= 0.05 then week[#week + 1] = { name = k.name, wd = best.wd, up = best.up, n = best.n } end
+            k.wd = nil
+        end
+        table.sort(week, function(a, b) return a.n * a.up > b.n * b.up end)
+        for i = #week, 4, -1 do week[i] = nil end
+        FT.db.learned[key] = { day = FT.Day(), kinds = kinds, week = week }
+        pcall(An.SeedScore, kinds)
         wipe(cache)
         FT.Fire("FT_LEARNED")
     end)
@@ -618,6 +640,172 @@ An.Pc = Pc
 local function AboveText(s, dev) return string.format(L["Higher than usual (%s)"], Pc(dev)) end
 local function BelowText(s, dev) return string.format(L["Cheaper than usual (%s)"], Pc(dev)) end
 
+---------------------------------------------------------------------------
+-- The scorecard: the engine grading its own calls. Every day it writes down what it said about the items that
+-- matter (yours, your watchlist, the busiest markets) and at what price; 5-9 days later it looks at what the price
+-- did and marks each call right or wrong. A rule's record (all items together) then decides how sure its calls
+-- are, and a rule that keeps being wrong (under 35% over 10+ calls) is switched off until it does better. Before
+-- there are graded calls, the market's own history stands in (what jumps and dips did, all items together).
+---------------------------------------------------------------------------
+local Allowed, RuleConf
+local OPTIONAL = { stick = true, rising = true, week = true, comeback = true, nowait = true, buyback = true }
+
+local function Score()
+    FT.db.score = FT.db.score or { rules = {}, pending = {} }
+    return FT.db.score
+end
+
+-- right, out of: what the rule's calls did (seeded from history until real calls come in)
+function An.RuleRecord(rule)
+    local sc = FT.db and FT.db.score
+    local r = rule and sc and sc.rules[rule]
+    if not r then return 0, 0 end
+    return (r.r or 0) + (r.sr or 0), (r.n or 0) + (r.sn or 0), r.r or 0, r.n or 0
+end
+
+-- a rule that keeps being wrong is left out (its branch isn't taken)
+Allowed = function(rule)
+    if not OPTIONAL[rule] then return true end
+    local right, n = An.RuleRecord(rule)
+    return not (n >= 10 and right / n < 0.35)
+end
+
+-- how sure, from the rule's own record (nil: too few calls graded)
+RuleConf = function(rule)
+    local right, n = An.RuleRecord(rule)
+    if n < 10 then return nil end
+    local rate = right / n
+    return (rate >= 0.65 and "sure") or (rate >= 0.45 and "likely") or "guess"
+end
+
+-- "right 7 of 10" (its real calls; nil while there are fewer than 5)
+function An.RecordText(rule)
+    local _, _, r, n = An.RuleRecord(rule)
+    if not n or n < 5 then return nil end
+    return string.format(L["right %d of %d"], r, n)
+end
+
+-- was a call right? p: the price called at, later: the close 5-9 days on
+local SELL_RULES = { spike = true, crack = true, fade = true, high = true, hype = true }
+local HOLD_UP = { rising = true, stick = true, week = true }
+local function Right(rule, p, later)
+    if SELL_RULES[rule] then return later <= p end
+    if rule == "trim" then return later <= p * 1.05 end
+    if HOLD_UP[rule] then return later >= p end
+    if rule == "comeback" or rule == "waitdip" then return later >= p * 1.05 end
+    if rule == "nowait" then return later <= p * 1.02 end
+    if rule == "buy" or rule == "buyback" then return later >= p * 1.03 end
+    if rule == "buyfalls" then return later < p * 1.03 end
+    return nil
+end
+An.Right = Right
+
+local function Tally(rule, ok)
+    local sc = Score()
+    local r = sc.rules[rule] or {}
+    sc.rules[rule] = r
+    r.n = (r.n or 0) + 1
+    if ok then r.r = (r.r or 0) + 1 end
+end
+
+local MAX_LOGGED = 400
+-- once a day: today's calls written down, the calls 5+ days old graded
+function An.ScoreDay()
+    local key = FT.houseKey
+    if not key then return end
+    local sc = Score()
+    local pend = sc.pending[key] or {}
+    sc.pending[key] = pend
+    local today = FT.Day()
+    -- grade
+    local graded = 0
+    for k, v in pairs(pend) do
+        local id, day = k:match("^(%d+):(%d+)b?$")
+        id, day = tonumber(id), tonumber(day)
+        local rule, p = v:match("^(%a+),(%d+)$")
+        p = tonumber(p)
+        if not (id and day and rule and p) then
+            pend[k] = nil
+        elseif today - day >= 5 then
+            local later
+            for _, c in ipairs(FT.Hist.Daily(id, 20) or {}) do
+                if c.day >= day + 5 and c.day <= day + 9 then later = c.c; break end
+            end
+            if later then
+                local ok = Right(rule, p, later)
+                if ok ~= nil then Tally(rule, ok); graded = graded + 1 end
+                pend[k] = nil
+            elseif today - day > 12 then
+                pend[k] = nil
+            end
+        end
+    end
+    -- write down today's (once a day)
+    if sc.loggedDay and sc.loggedDay[key] == today then return graded end
+    sc.loggedDay = sc.loggedDay or {}
+    sc.loggedDay[key] = today
+    local ids, seen = {}, {}
+    local function Add(id) if id and not seen[id] and #ids < MAX_LOGGED then seen[id] = true; ids[#ids + 1] = id end end
+    for _, h in ipairs((FT.Port.Rows())) do Add(h.id) end
+    for id in pairs(FT.db.watch or {}) do Add(id) end
+    local busy = {}
+    for _, r in ipairs(FT.Market.Rows() or {}) do
+        if FT.Market.Solid and FT.Market.Solid(r) then busy[#busy + 1] = r end
+    end
+    table.sort(busy, function(a, b) return (a.price * (a.perDay or 0)) > (b.price * (b.perDay or 0)) end)
+    for _, r in ipairs(busy) do Add(r.id) end
+    for _, id in ipairs(ids) do
+        local st = An.Stats(id)
+        if st.price and st.price > 0 then
+            An.SellSignal(st)
+            if st.rule then pend[id .. ":" .. today] = st.rule .. "," .. math.floor(st.price) end
+            An.BuySignal(st)
+            if st.rule and st.rule:find("^buy") then pend[id .. ":" .. today .. "b"] = st.rule .. "," .. math.floor(st.price) end
+        end
+    end
+    return graded
+end
+FT.On("FT_MARKET_READY", function() FT.Debounce("scoreDay", 20, function() pcall(An.ScoreDay) end) end)
+
+-- the market's own history as a starting record (all items' jumps and dips, from An.LearnKinds), weighed as up
+-- to 10 calls: real graded calls soon outweigh it
+function An.SeedScore(kinds)
+    local H, Hd, Lo, Bk = 0, 0, 0, 0
+    for _, k in pairs(kinds or {}) do H, Hd, Lo, Bk = H + k.highs, Hd + k.held, Lo + k.lows, Bk + k.back end
+    local sc = Score()
+    local function Seed(rule, rate, n)
+        if n < 30 then return end
+        local r = sc.rules[rule] or {}
+        sc.rules[rule] = r
+        r.sn, r.sr = 10, rate * 10
+    end
+    if H > 0 then Seed("high", (H - Hd) / H, H) end
+    if Lo > 0 then
+        Seed("waitdip", Bk / Lo, Lo)
+        Seed("buy", Bk / Lo, Lo)
+        Seed("nowait", (Lo - Bk) / Lo, Lo)
+    end
+end
+
+-- "Herb peaks Tuesday (+8%) · Potion peaks Monday (+11%)" (nil: no clear pattern yet)
+function An.WeekText()
+    local l = FT.db.learned and FT.db.learned[FT.houseKey or "?"]
+    local week = l and l.week
+    if not (week and week[1]) then return nil end
+    local parts = {}
+    for _, w in ipairs(week) do
+        parts[#parts + 1] = string.format(L["%s peaks %s (%s)"], w.name or "?", An.DayName(w.wd), Pc(w.up))
+    end
+    return table.concat(parts, "  ·  ")
+end
+
+-- all graded calls together: right, out of
+function An.Scorecard()
+    local right, n = 0, 0
+    for _, r in pairs((FT.db.score or { rules = {} }).rules) do right, n = right + (r.r or 0), n + (r.n or 0) end
+    return right, n
+end
+
 -- How sure a signal is: Sure (this item's own past cases), Likely (its kind's, or a long history), Guess (little to go by)
 local function Conf(s, own, kind)
     if own then return "sure" end
@@ -630,10 +818,10 @@ function An.ConfText(c) return c and L[CONF_TEXT[c]] or "" end
 -- For something you have or make: sell now? Returns kind, strength (1-3), a short reason anyone gets, and the
 -- numbers behind it (for a hover). How sure it is goes in s.conf.
 function An.SellSignal(s)
-    s.conf = nil
+    s.conf, s.rule = nil, nil
     -- a buyout: worth selling a little under it now - it won't last
     if s.spike then
-        s.conf = "likely"
+        s.conf, s.rule = "likely", "spike"
         return "SELL", 2, string.format(L["Someone bought out the cheap ones: sell a little under ~%s now, it won't last"], FT.Money(s.fair, "short")),
             string.format(L["%s over its fair price"], Pc(s.price / s.fair - 1))
     end
@@ -653,7 +841,7 @@ function An.SellSignal(s)
         s.conf = "sure"
         return "HOLD", 3, L["Your long hold: HODL until you unmark it"], (dev >= th) and AboveText(s, dev) or nil
     end
-    if (dev >= th or hot) and learn and (s.rising or sticky) then
+    if (dev >= th or hot) and learn and ((s.rising and Allowed("rising")) or (sticky and Allowed("stick"))) then
         local up = s.rising and string.format(L["%s this month"], Pc(s.ch30 or 0)) or nil
         s.conf = Conf(s, ownHighs or s.rising, kindHighs)
         -- the climb cracking: fell since the last check, under its fair price, more listed or sellers than usual,
@@ -665,50 +853,57 @@ function An.SellSignal(s)
         elseif s.crowd then why = L["more sellers than usual"]
         elseif s.slow then why = L["it's hardly selling"] end
         if why then
+            s.rule = "crack"
             return "SELL", 3, string.format(L["Was climbing, now slipping (%s): sell"], why), up or record
         end
         -- climbing, but stretched far above its average: bank half, let the rest ride
         if dev >= th * 3 or (s.rsi and s.rsi >= 80) then
+            s.rule = "trim"
             return "TRIM", 2, string.format(L["Way up (%s): sell half, keep half"], up or Pc(dev)), record
         end
-        if s.rising then
+        if s.rising and Allowed("rising") then
+            s.rule = "rising"
+            s.conf = RuleConf("rising") or s.conf
             return "HOLD", 3, string.format(L["Climbing for weeks (%s): let it ride"], up), record
         end
+        s.rule = "stick"
+        s.conf = RuleConf("stick") or s.conf
         return "HOLD", 3, L["Higher than usual, and jumps like this tend to stick: let it ride"], record
     end
     if dev >= th or hot then
         local strength = (dev >= th and hot) and 3 or ((dev >= th * 2) and 3 or 2)
         local detail = dev >= th and AboveText(s, dev) or string.format(L["Hype %d"], math.floor(s.rsi + 0.5))
         -- the week's rhythm: its best day is close and pays clearly more - list it then
-        if learn and b.bestDay and (b.bestUp or 0) >= 0.05 and not s.dropped and not s.flood then
+        if learn and b.bestDay and (b.bestUp or 0) >= 0.05 and not s.dropped and not s.flood and Allowed("week") then
             local today = Weekday(FT.Day())
             local wait = (b.bestDay - today) % 7
             if wait >= 1 and wait <= 3 then
-                s.conf = "likely"
+                s.conf, s.rule = RuleConf("week") or "likely", "week"
                 local day = An.DayName(b.bestDay)
                 return "HOLD", 2, string.format(L["Higher than usual, and %ss pay %s more: list it %s"], day, Pc(b.bestUp), day), detail
             end
         end
         if fades then
-            s.conf = Conf(s, ownHighs, kindHighs)
+            s.conf, s.rule = RuleConf("fade") or Conf(s, ownHighs, kindHighs), "fade"
             return "SELL", 3, L["Higher than usual, and jumps like this fade fast: sell now"], detail .. "; " .. record
         end
-        s.conf = Conf(s, false, false)
         if dev >= th then
+            s.conf, s.rule = RuleConf("high") or Conf(s, false, false), "high"
             return "SELL", strength, string.format(L["Higher than usual (%s): good time to sell"], Pc(dev)), nil
         end
+        s.conf, s.rule = RuleConf("hype") or Conf(s, false, false), "hype"
         return "SELL", strength, L["Hyped up right now: good time to sell"], detail
     end
     if dev <= -th then
-        if learn and b.knowsLows and b.rebound <= 0.3 then
-            s.conf = Conf(s, ownLows, kindLows)
+        if learn and b.knowsLows and b.rebound <= 0.3 and Allowed("nowait") then
+            s.conf, s.rule = RuleConf("nowait") or Conf(s, ownLows, kindLows), "nowait"
             return "FAIR", 1, L["Cheaper than usual, and dips here don't come back: no point waiting"], BelowText(s, dev) .. "; " .. An.LowRecord(b)
         end
-        if learn and b.knowsLows and b.rebound >= 0.6 then
-            s.conf = Conf(s, ownLows, kindLows)
+        if learn and b.knowsLows and b.rebound >= 0.6 and Allowed("comeback") then
+            s.conf, s.rule = RuleConf("comeback") or Conf(s, ownLows, kindLows), "comeback"
             return "HOLD", 3, L["Cheaper than usual, but dips like this come back: wait"], BelowText(s, dev) .. "; " .. An.LowRecord(b)
         end
-        s.conf = Conf(s, false, false)
+        s.conf, s.rule = RuleConf("waitdip") or Conf(s, false, false), "waitdip"
         return "HOLD", 2, string.format(L["Cheaper than usual (%s): wait for it to come back"], Pc(dev)), nil
     end
     s.conf = Conf(s, false, false)
@@ -717,7 +912,7 @@ end
 
 -- for a material you need: buy now?
 function An.BuySignal(s)
-    s.conf = nil
+    s.conf, s.rule = nil, nil
     if not Enough(s) then return "NODATA", 0, L["Not enough price history yet"] end
     local th = FT.S.buyBelow / 100
     local dev = s.dev or 0
@@ -728,13 +923,15 @@ function An.BuySignal(s)
         local detail = dev <= -th and BelowText(s, dev) or string.format(L["Hype %d"], math.floor(s.rsi + 0.5))
         if FT.S.holdTrends ~= false and b.knowsLows then
             s.conf = Conf(s, (b.lows or 0) >= MIN_CASES, b.kindLows ~= nil)
-            if b.rebound >= 0.6 then
+            if b.rebound >= 0.6 and Allowed("buyback") then
+                s.conf, s.rule = RuleConf("buyback") or s.conf, "buyback"
                 return "BUY", 3, string.format(L["Cheaper than usual (%s), and dips like this come back: good buy"], Pc(dev)), An.LowRecord(b)
             elseif b.rebound <= 0.3 then
+                s.rule = "buyfalls"
                 return "BUY", 1, string.format(L["Cheaper than usual (%s), but dips here keep falling: careful"], Pc(dev)), An.LowRecord(b)
             end
         end
-        s.conf = Conf(s, false, false)
+        s.conf, s.rule = RuleConf("buy") or Conf(s, false, false), "buy"
         if dev <= -th then
             return "BUY", strength, string.format(L["Cheaper than usual (%s): good time to buy"], Pc(dev)), nil
         end

@@ -1,5 +1,21 @@
 # The Wolf of Booty Bay
 
+## v0.15 - sessions and a scorecard
+
+- Sessions: start from the minimap button's right-click menu (or Portfolio > Sessions, /wolf farm). Counts your
+  own loot lines (loot, items pushed into your bags, gold looted; not mail, trades, auction buys or crafts), valued
+  at today's prices (AH after its cut, else a vendor). A small movable panel: time, worth, gold an hour, the best
+  loot; pause, stop. AFK pauses it; a /reload or relog keeps it (time logged out doesn't count). Portfolio >
+  Sessions lists your runs by gold an hour, the loot on hover.
+- Minimap (and broker) right-click: a menu - start/pause/stop a session, the pages, settings.
+- Scorecard: every day the calls on what you own, your watchlist and the busiest 400 markets are written down
+  with their price, and graded 5-9 days later (sold before a drop, held through a rise, waited for a dip that came
+  back...). A rule's record sets how sure its calls are and shows on the item ("Likely, right 7 of 10"); an
+  optional rule under 35% over 10+ calls switches off. Market history seeds the first records.
+- Market recap at login; Good day to sell pings (once a day per item, 3 at most); Share (a line for guild chat,
+  sent by you); To Auctionator (Make gold deals, a craft's materials) as an Auctionator shopping list; This week on
+  the Terminal (kinds whose items peak on the same weekday).
+
 ## v0.14 - disenchanting
 
 - Classic's disenchant odds (greens by item level: dust, essence, a shard; blues: a shard, Nexus Crystal at
