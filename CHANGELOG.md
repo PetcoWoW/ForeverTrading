@@ -1,5 +1,16 @@
 # The Wolf of Booty Bay
 
+## v0.13 - Craft for profit
+
+- Money > Craft for profit: every recipe (known and not) whose product sells every day (3+ sales seen, 1+ a day),
+  by profit x crafts a day (up to 20; cooldown crafts like Mooncloth and transmutes once every few days). Worked
+  out in the background, kept until new prices. "Ones you know" filter; recipes you don't know say so.
+- Craft window: every material (AH, vendor or crafted yourself), cost, sells for, profit, and crafting vs buying
+  it ready-made.
+- Make gold rows in plain words: buy for X, sell for Y, +Z each, how many, how fast it sells ("sells in ~2 days",
+  "slow: ~9 days"), what it costs against your gold (over a third: yellow; more than you have: red, and last).
+- The audit fails on lowercase globals (a local used before it's declared).
+
 ## v0.12 - tickers
 
 - Ticker symbols for every item ($THOR, $ACRY, $RUGG...), made from the name; on the tape, the Terminal's lists, the

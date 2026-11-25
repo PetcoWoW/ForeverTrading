@@ -167,31 +167,51 @@ local function Money(v)
     return FT.Money(math.floor(v + 0.5), "short")
 end
 
+-- how long what you'd buy takes to sell where you'd sell it (nil: not known)
+local function SellsIn(d)
+    local perDay = d.sales and d.sales.perDay
+    if not (perDay and perDay > 0) then return nil end
+    local days = (d.qty or 1) / perDay
+    if days < 1 then return FT.C("up", L["sells within a day"]) end
+    if days <= 3 then return string.format(L["sells in ~%d days"], math.ceil(days)) end
+    return FT.C("down", string.format(L["slow: ~%d days to sell"], math.ceil(days)))
+end
+T.SellsIn = SellsIn
+
+-- what it costs against the gold on this character: fine, a big part of it, or more than you have
+local function Budget(d)
+    local cost = d.cost or (d.unit and d.unit * (d.qty or 1))
+    local money = GetMoney and GetMoney() or 0
+    if not cost or money <= 0 then return nil, false end
+    if cost > money then return FT.C("down", string.format(L["costs %s: more than you have"], Money(cost))), true end
+    if cost > money / 3 then return FT.C("accent", string.format(L["costs %s: over a third of your gold"], Money(cost))), false end
+    return FT.C("dim", string.format(L["costs %s"], Money(cost))), false
+end
+T.Budget = Budget
+
+-- one line anyone gets: what to do, the gold, how fast it sells, what it costs you
 local function DealText(d)
+    local H = FT.House
     local text
     if d.kind == "HOUSES" then
-        local H = FT.House
-        text = string.format(L["%s each at %s, %s at %s: +%s each after its cut"], Money(d.unit), H.Name(d.buyHouse),
-            Money(d.target), H.Name(d.sellHouse), Money(d.perUnit))
-        local qty = d.noBook and L["the cheapest lot"] or string.format(L["%s pcs"], FT.Num(d.qty))
-        -- only in your list now (the deal itself is gone): when you took it on
         if d.carried then
-            return text .. FT.C("dim", "  ||  " .. qty .. "  ||  " .. string.format(L["in your list since %s"], FT.Ago(d.t)))
+            return string.format(L["In your carry list: sell at %s for ~%s"], H.Name(d.sellHouse), Money(d.target))
+                .. FT.C("dim", "  ·  " .. string.format(L["since %s"], FT.Ago(d.t)))
         end
-        local sells = d.sales and ("  ||  " .. L["sells there"] .. " " .. FT.Sales.PerDayText(d.sales)) or ""
-        local ages = string.format(L["here %s, there %s"], FT.Ago(d.buyHouse == FT.house and d.t or d.sellT),
-            FT.Ago(d.buyHouse == FT.house and d.sellT or d.t))
-        return text .. FT.C("dim", "  ||  " .. qty .. sells .. "  ||  " .. ages)
+        text = string.format(L["Buy at %s for %s, sell at %s for ~%s"], H.Name(d.buyHouse), Money(d.unit), H.Name(d.sellHouse), Money(d.target))
     elseif d.kind == "VENDOR" then
-        text = string.format(L["%s each, a vendor pays %s: +%s each"], Money(d.unit), Money(d.target), Money(d.perUnit))
+        text = string.format(L["Buy for %s, a vendor pays %s"], Money(d.unit), Money(d.target))
     else
-        text = string.format(L["%s each, fair ~%s: list at %s, +%s each after the cut"], Money(d.unit), Money(d.fair),
-            Money(d.target), Money(d.perUnit))
+        text = string.format(L["Buy for %s (usually ~%s), list at %s"], Money(d.unit), Money(d.fair), Money(d.target))
     end
-    local qty = d.noBook and L["the cheapest lot"] or string.format(L["%s pcs"], FT.Num(d.qty))
-    -- reselling: how much really sells, when seen
-    local sells = d.sales and ("  ||  " .. L["sells"] .. " " .. FT.Sales.PerDayText(d.sales)) or ""
-    return text .. FT.C("dim", "  ||  " .. qty .. sells .. "  ||  " .. FT.Ago(d.t))
+    local bits = { text, FT.C("up", "+" .. Money(d.perUnit) .. " " .. L["each"]) }
+    local qty = d.noBook and L["the cheapest one"] or string.format(L["%s of them"], FT.Num(d.qty))
+    bits[#bits + 1] = FT.C("dim", qty)
+    local sells = d.kind ~= "VENDOR" and SellsIn(d)
+    if sells then bits[#bits + 1] = sells end
+    local budget = Budget(d)
+    if budget then bits[#bits + 1] = budget end
+    return table.concat(bits, FT.C("dim", "  ·  "))
 end
 
 local function DealTip(row, d)
@@ -354,6 +374,18 @@ local function ShownDeals()
             return keyed[a] < keyed[b]
         end)
     end
+    -- what you can't pay for goes last (the carry list stays first)
+    local keyed2 = {}
+    for i, d in ipairs(out) do keyed2[d] = i end
+    local function Over(d) local _, over = Budget(d) return over end
+    local function Listed(d) return d.kind == "HOUSES" and FT.Carry.Get(d.id) ~= nil end
+    table.sort(out, function(a, b)
+        local la, lb = Listed(a), Listed(b)
+        if la ~= lb then return la end
+        local oa, ob = Over(a), Over(b)
+        if oa ~= ob then return ob end
+        return keyed2[a] < keyed2[b]
+    end)
     return out, total, noBook, building, older
 end
 
@@ -437,7 +469,7 @@ end
 
 local DEAL_VIEWS = { make = true }
 
-local sellView, farmView -- the Sell yours and Farm Board views (built in T.Build)
+local sellView, farmView, craftView -- the Sell yours, Farm Board and Craft for profit views (built in T.Build)
 
 function T.SetView(view)
     -- the old names (the tour, What's new, other pages): one Make gold list now; Sell yours is in Portfolio
@@ -460,6 +492,7 @@ function T.SetView(view)
     end
     if sellView then sellView:SetShown(view == "sell") end
     if farmView then farmView:SetShown(view == "farm") end
+    if craftView then craftView:SetShown(view == "craft") end
     T.Refresh()
 end
 
@@ -595,6 +628,62 @@ local function WowheadLink(id)
 end
 
 T.ListView, T.SellYours = ListView, SellYours
+
+-- Craft for profit: every recipe of WoW Forever whose product sells every day, by the gold it should make a day
+local function BuildCraftView(p)
+    local f = ListView(p, function(x)
+        if UI.ItemClick(x.id) then return end
+        FT.ShowCraft(x.recipe)
+    end, function(row, x)
+        UI.TipItem(row, x.id)
+        GameTooltip:AddLine(" ")
+        GameTooltip:AddLine(L["Click: every material, what it costs, and crafting vs buying it ready."], 0.6, 0.64, 0.7, true)
+        GameTooltip:Show()
+    end)
+    f.known = UI.Segmented(f, { { "all", L["All recipes"] }, { "known", L["Ones you know"] } }, function(v)
+        T.craftFilter = v
+        T.RefreshCraft()
+    end, 22)
+    f.known:SetPoint("TOPLEFT", 0, -1)
+    T.craftFilter = T.craftFilter or "all"
+    f.known:SetValue(T.craftFilter)
+    f.hint:SetText(L["Crafts that sell every day, by the gold they should make a day. A recipe you don't know yet says so: its recipe costs extra."])
+    f.list:SetEmptyText(L["Working out every recipe..."])
+    return f
+end
+
+function T.RefreshCraft()
+    if not (craftView and craftView:IsShown()) then return end
+    local list = FT.Craft.ProfitCrafts(function() T.RefreshCraft() end)
+    if not list then
+        craftView.list:SetEmptyText(L["Working out every recipe..."])
+        craftView.list:SetItems({}, true)
+        return
+    end
+    local matches = FT.NameMatcher(T.search)
+    local out = {}
+    for _, c in ipairs(list) do
+        if (T.craftFilter ~= "known" or c.known) and (not matches or matches(c.id)) then
+            local e = c.eval
+            local qty = c.recipe.outputQty or 1
+            out[#out + 1] = {
+                id = c.id, recipe = c.recipe, qty = qty > 1 and qty or nil,
+                signal = "CRAFT", label = c.known and L["CRAFT IT"] or L["RECIPE?"], strength = c.known and 3 or 1,
+                reason = string.format(L["Costs %s to make, sells for %s"], FT.Money(math.floor(e.cost), "short"), FT.Money(math.floor(e.revenue), "short"))
+                    .. FT.C("dim", "  ·  " .. string.format(L["sells %s a day"], FT.Num(math.floor(c.perDay + 0.5))))
+                    .. FT.C("dim", "  ·  " .. L[c.recipe.prof or "?"])
+                    .. (c.cooldown and FT.C("accent", "  ·  " .. string.format(L["once every %d days (cooldown)"], c.cooldown)) or "")
+                    .. (c.known and "" or FT.C("accent", "  ·  " .. L["recipe needed"])),
+                value = FT.C("up", "+" .. FT.Money(math.floor(c.profit), "short")) .. FT.C("dim", " " .. L["each craft"]),
+            }
+        end
+    end
+    craftView.list:SetEmptyText(T.craftFilter == "known" and L["None of the recipes you know makes a profit right now. Open your profession windows once so they're known."]
+        or L["No craft makes a profit on a product that sells every day right now."])
+    craftView.count:SetText(#out > 0 and string.format(L["%d crafts"], #out) or "")
+    craftView.list:SetItems(out, true)
+end
+FT.On("FT_CRAFTS_READY", function() T.RefreshCraft() end)
 T.FarmRows = function() return FarmRows() end
 
 local function BuildSellView(p)
@@ -702,11 +791,12 @@ function T.Build(p)
     end)
     -- one way to make gold per view; Signals: ForeverTrading's four columns
     T.view = T.view or "make"
-    T.viewSeg = UI.Segmented(head, { { "make", L["Make gold"] }, { "farm", L["Farm"] } }, function(v) T.SetView(v) end, 22)
+    T.viewSeg = UI.Segmented(head, { { "make", L["Make gold"] }, { "craft", L["Craft for profit"] }, { "farm", L["Farm"] } }, function(v) T.SetView(v) end, 22)
     T.viewSeg:SetPoint("LEFT", T.searchBox, "RIGHT", 12, 0)
     T.viewSeg:SetValue(T.view)
     dealsView = BuildDeals(p)
     farmView = BuildFarmView(p)
+    craftView = BuildCraftView(p)
     -- the deals are looked for again on new prices only while they are on the screen (Sell yours and the
     -- line under the title use them too)
     FT.Deals.watching = function() return dealsView:IsVisible() or (T.title and T.title:IsVisible()) end
@@ -738,11 +828,12 @@ end
 function T.Refresh()
     FT.Deals.Ensure()
     local best = BestMove()
-    if DEAL_VIEWS[T.view] or T.view == "sell" or T.view == "farm" then
+    if DEAL_VIEWS[T.view] or T.view == "sell" or T.view == "farm" or T.view == "craft" then
         T.rules:SetText(best or FT.C("dim", L["No deal right now: the list fills as prices come in."]))
         if DEAL_VIEWS[T.view] then T.RefreshDeals() end
         if T.view == "sell" then T.RefreshSell() end
         if T.view == "farm" then T.RefreshFarm() end
+        if T.view == "craft" then T.RefreshCraft() end
         return
     end
     T.rules:SetText(string.format(L["Sell: %d%% above the %d-day average or RSI 70+.  Buy: %d%% below or RSI 30-.  Craft: profit from %s and margin from %d%%."],

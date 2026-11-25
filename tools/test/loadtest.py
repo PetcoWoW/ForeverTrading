@@ -48,7 +48,7 @@ for _, tab in ipairs({ "market", "signals", "portfolio", "sell", "settings", "cr
   step("tab " .. tab, function() FT.Show(tab) end)
   mock.run(1)
 end
-for _, v in ipairs({ "make", "farm", "HOUSES", "sell" }) do
+for _, v in ipairs({ "make", "craft", "farm", "HOUSES", "sell" }) do
   step("money view " .. v, function() FT.Show("signals"); FT.Tabs.signals.SetView(v) end)
   mock.run(0.5)
 end
@@ -66,6 +66,18 @@ step("overview moves", function()
   for _, id in ipairs(ids) do syms[#syms + 1] = FT.Symbol(id) end
   print("symbols: " .. table.concat(syms, " "))
 end)
+step("craft for profit", function()
+  local t0 = os.clock()
+  FT.Craft.ProfitCrafts()
+end)
+mock.run(40)
+step("craft list", function()
+  local list = FT.Craft.ProfitCrafts()
+  print("profitable crafts:", list and #list, list and list[1] and (list[1].recipe.name .. " +" .. math.floor(list[1].profit) .. " x" .. string.format("%.1f", list[1].perDay) .. "/day"))
+  if list and list[1] then FT.ShowCraft(list[1].recipe) end
+  FT.Show("signals"); FT.Tabs.signals.SetView("craft")
+end)
+mock.run(1)
 step("open item", function() FT.OpenItem(12363) end)
 mock.run(1)
 step("best use", function() FT.ShowBestUse(12359) end)

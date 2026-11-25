@@ -344,12 +344,15 @@ local PROF_NAMES = {
 C.PROF_NAMES = PROF_NAMES
 
 local byReagent -- [materialID] = { recipe, ... } (recipes shaped like C.List()'s)
+local allRecipes -- every recipe once: the ones your characters know, then the rest of WoW Forever's
 
 local function BuildUses()
     byReagent = {}
+    allRecipes = {}
     local outputs = {} -- output:name of the known ones, so a recipe in both lists counts once (the known one)
     local function Index(r)
         local seen = {}
+        allRecipes[#allRecipes + 1] = r
         for _, rg in ipairs(r.reagents) do
             if rg.itemID and not seen[rg.itemID] then
                 seen[rg.itemID] = true
@@ -372,7 +375,61 @@ local function BuildUses()
         end
     end
 end
-FT.On("FT_RECIPES_CHANGED", function() byReagent = nil end)
+FT.On("FT_RECIPES_CHANGED", function() byReagent = nil; allRecipes = nil end)
+
+function C.AllRecipes()
+    if not allRecipes then BuildUses() end
+    return allRecipes
+end
+
+---------------------------------------------------------------------------
+-- Craft for profit: every recipe of WoW Forever whose product really sells, by the gold it should make a day
+-- (profit per craft x how many of it sell a day, up to 20). Worked out in the background (2,300 recipes), kept
+-- until new prices come.
+---------------------------------------------------------------------------
+local profitList, profitBusy, profitAt
+
+-- crafts with a cooldown (Classic's; Blizzard's recipe data doesn't say): days between two crafts
+local COOLDOWN_ITEMS = { [14342] = 4, [12360] = 2, [15409] = 3 } -- Mooncloth, Arcanite Bar, Refined Deeprock Salt
+function C.CooldownDays(r)
+    if COOLDOWN_ITEMS[r.output] then return COOLDOWN_ITEMS[r.output] end
+    if type(r.name) == "string" and r.name:find("^Transmute") then return 1 end
+    return nil
+end
+FT.On("FT_SCAN_DONE", function() profitList = nil end)
+FT.On("FT_PRICES_CHANGED", function(source) if source ~= "live" then profitList = nil end end)
+
+-- the list (nil while it's being worked out) - done(list) once ready
+function C.ProfitCrafts(done)
+    if profitList then return profitList end
+    if profitBusy then return nil end
+    profitBusy = true
+    local all = C.AllRecipes()
+    local out = {}
+    FT.Job("craftProfit", #all, function(k)
+        local r = all[k]
+        local e = C.Eval(r)
+        if not (e.profit and e.profit > 0 and e.complete and e.via == "ah") then return end
+        local rate = FT.Sales.Rate(r.output)
+        local perDay = rate and (rate.sold or 0) >= 3 and rate.perDay or nil
+        if not (perDay and perDay >= 1) then return end
+        local qty = r.outputQty or 1
+        local cd = C.CooldownDays(r)
+        -- a cooldown caps it: one craft every few days, however much sells
+        local crafts = cd and (1 / cd) or math.min(perDay / qty, 20)
+        out[#out + 1] = {
+            id = r.output, recipe = r, eval = e, perDay = perDay, cooldown = cd,
+            profit = e.profit, known = next(r.knownBy or {}) ~= nil,
+            daily = e.profit * crafts,
+        }
+    end, function()
+        table.sort(out, function(a, b) return a.daily > b.daily end)
+        profitList, profitBusy, profitAt = out, false, time()
+        FT.Fire("FT_CRAFTS_READY")
+        if done then done(out) end
+    end)
+    return nil
+end
 
 -- the recipes a material goes into (nil: none)
 function C.UsedIn(itemID)

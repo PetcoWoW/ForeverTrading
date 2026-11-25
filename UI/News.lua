@@ -12,6 +12,12 @@ FT.News = N
 -- start, after the files are read (a table made with them would keep the English)
 local function News()
     return {
+        ["v0.13"] = {
+            { L["Craft for profit"], L["Money > Craft for profit: every recipe in WoW Forever whose product sells every day, by the gold it should make a day. Click one: every material, what it costs, and crafting vs buying it ready."],
+                function() FT.Show("signals"); FT.Tabs.signals.SetView("craft") end },
+            { L["Before you buy"], L["Make gold now says how fast it sells and what it costs you, and warns when it's more than a third of your gold. What you can't afford goes last."],
+                function() FT.Show("signals"); FT.Tabs.signals.SetView("make") end },
+        },
         ["v0.12"] = {
             { L["Tickers"], L["Every item has a ticker now: $THOR, $ACRY, $RUGG. The tape shows your watchlist, then what you own, then the day's movers."],
                 function() FT.Show("market") end },
