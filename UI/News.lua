@@ -12,6 +12,12 @@ FT.News = N
 -- start, after the files are read (a table made with them would keep the English)
 local function News()
     return {
+        ["v0.12"] = {
+            { L["Tickers"], L["Every item has a ticker now: $THOR, $ACRY, $RUGG. The tape shows your watchlist, then what you own, then the day's movers."],
+                function() FT.Show("market") end },
+            { L["Today's 3 moves"], L["On the Terminal: the best thing to carry, to flip and to farm right now, with the gold each should make."],
+                function() FT.Show("market"); FT.Tabs.market.ShowOverview() end },
+        },
         ["v0.11"] = {
             { L["Where the prices come from"], L["Top left: AH (your last scan, Auctionator's too) and API (Blizzard's hourly prices). The lit one is what you see. Auctionator's last scan is taken at login by itself."] },
             { L["Fewer pages"], L["Terminal, Money (Make gold, Farm) and Portfolio (Holdings, Sell yours, Characters, Journal). Scanning, posting and undercuts: Auctionator does those."],

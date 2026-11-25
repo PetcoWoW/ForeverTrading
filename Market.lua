@@ -579,3 +579,57 @@ function W.Makers()
     local m = FT.R().makers
     return m and m.list or {}, m and m.t
 end
+
+---------------------------------------------------------------------------
+-- Ticker symbols: every item gets one, like a stock - $THOR (Thorium Bar), $ACRY (Arcane Crystal), $RUGG (Rugged
+-- Leather). Made from the name: the first word's first letters when the rest says only what kind of thing it is
+-- (Bar, Cloth, Ore...), else its initials and the last word. Two items with the same: the second gets a number.
+---------------------------------------------------------------------------
+local KIND_WORDS = { bar = true, cloth = true, leather = true, ore = true, hide = true, scale = true, scales = true,
+    dust = true, essence = true, shard = true, potion = true, elixir = true, flask = true, oil = true, stone = true,
+    powder = true, thread = true, dye = true, bolt = true, meat = true, steak = true, fillet = true, leaf = true,
+    bloom = true, root = true, gem = true, crystal = false }
+local SKIP_WORDS = { ["of"] = true, ["the"] = true, ["a"] = true, ["an"] = true, ["and"] = true }
+local symbolOf, idOf = {}, {}
+
+local function MakeSymbol(name)
+    local words = {}
+    for w in name:gmatch("[%a']+") do
+        w = w:gsub("'", "")
+        if w ~= "" and not SKIP_WORDS[w:lower()] then words[#words + 1] = w end
+    end
+    if #words == 0 then return nil end
+    local first = words[1]:upper()
+    if #words == 1 then return first:sub(1, 4) end
+    local last = words[#words]
+    if KIND_WORDS[last:lower()] then return first:sub(1, 4) end
+    local initials = ""
+    for i = 1, math.min(#words - 1, 2) do initials = initials .. words[i]:sub(1, 1):upper() end
+    return (initials .. last:upper()):sub(1, 4)
+end
+
+function FT.Symbol(itemID)
+    if not itemID then return "" end
+    local s = symbolOf[itemID]
+    if s then return s end
+    local name = FT.Item(itemID)
+    if not name then return "" end -- not loaded yet: asked again later
+    local base = MakeSymbol(name) or tostring(itemID)
+    s = base
+    -- taken (Thorium Bar has THOR): the last word's first letter instead (Thorium Ore: THOO), then a number
+    local lastWord = name:match("([%a]+)%s*$")
+    if idOf[s] and idOf[s] ~= itemID and lastWord then s = (base:sub(1, 3) .. lastWord:sub(1, 1)):upper() end
+    local n = 1
+    while idOf[s] and idOf[s] ~= itemID do
+        n = n + 1
+        s = base:sub(1, 3) .. n
+    end
+    symbolOf[itemID], idOf[s] = s, itemID
+    return s
+end
+
+-- "$THOR" in the accent colour (empty while the name isn't loaded)
+function FT.SymbolText(itemID)
+    local s = FT.Symbol(itemID)
+    return s ~= "" and FT.C("accent", "$" .. s) or ""
+end

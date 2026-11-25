@@ -268,8 +268,9 @@ local function BuildTicker(parent)
 end
 
 local function TickerText(id, price, ch)
-    local name = FT.Trunc(FT.Item(id) or ("#" .. id), 26)
-    return FT.C("muted", name) .. "  " .. FT.Money(price, "short") .. "  " .. FT.Pct(ch)
+    local sym = FT.Symbol(id)
+    local name = sym ~= "" and FT.C("accent", "$" .. sym) or FT.C("muted", FT.Trunc(FT.Item(id) or ("#" .. id), 20))
+    return name .. "  " .. FT.Money(price, "short") .. "  " .. FT.Pct(ch)
 end
 
 function FT.UpdateTicker()
@@ -281,6 +282,17 @@ function FT.UpdateTicker()
         if price then
             list[#list + 1] = { id = id, text = "|cfff0b90b*|r " .. TickerText(id, price, r and r.ch1) }
             seen[id] = true
+        end
+    end
+    -- what you own, the most valuable first
+    local owned = 0
+    for _, h in ipairs((FT.Port.Rows())) do
+        if owned >= 8 then break end
+        if not seen[h.id] then
+            local r = FT.Market.Row(h.id)
+            list[#list + 1] = { id = h.id, text = "|cff0ecb81•|r " .. TickerText(h.id, h.price, r and r.ch1) }
+            seen[h.id] = true
+            owned = owned + 1
         end
     end
     local movers = 0
@@ -309,7 +321,7 @@ function FT.UpdateTicker()
         end
     end
     if #list == 0 then
-        list[1] = { text = FT.C("dim", L["No market data yet: open the auction house and press Full scan."]) }
+        list[1] = { text = FT.C("dim", L["No market data yet: it comes with the next update, or scan in Auctionator."]) }
     end
     ticker:SetEntries(list)
 end
