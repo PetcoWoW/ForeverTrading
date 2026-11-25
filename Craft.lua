@@ -484,3 +484,147 @@ function C.BestUse(itemID)
     local raw, via = C.RawValue(itemID)
     return out, raw, via
 end
+
+---------------------------------------------------------------------------
+-- Disenchanting (Classic's odds - nobody has published WoW Forever's yet; they may differ): what a green, blue or
+-- purple weapon or armor piece breaks into, what that's worth sold at the auction house, and buy-to-disenchant
+-- deals for the skill of your best enchanter.
+---------------------------------------------------------------------------
+local E = {}
+FT.Enchant = E
+
+local DUST = { strange = 10940, soul = 11083, vision = 11137, dream = 11176, illusion = 16204 }
+local ESS = { lmagic = 10938, gmagic = 10939, lastral = 10998, gastral = 11082, lmystic = 11134, gmystic = 11135,
+    lnether = 11174, gnether = 11175, leternal = 16202, geternal = 16203 }
+local SHARD = { sglim = 10978, lglim = 11084, sglow = 11138, lglow = 11139, srad = 11177, lrad = 11178,
+    sbril = 14343, lbril = 14344 }
+local NEXUS = 20725
+
+-- greens by item level: { up to ilvl, skill, dust {id, min, max}, essence {id, min, max}, shard id }
+local GREEN = {
+    { 15, 1, { DUST.strange, 1, 2 }, { ESS.lmagic, 1, 2 }, nil },
+    { 20, 1, { DUST.strange, 2, 3 }, { ESS.gmagic, 1, 2 }, SHARD.sglim },
+    { 25, 25, { DUST.strange, 4, 6 }, { ESS.lastral, 1, 2 }, SHARD.sglim },
+    { 30, 50, { DUST.soul, 1, 2 }, { ESS.gastral, 1, 2 }, SHARD.lglim },
+    { 35, 75, { DUST.soul, 2, 5 }, { ESS.lmystic, 1, 2 }, SHARD.sglow },
+    { 40, 100, { DUST.vision, 1, 2 }, { ESS.gmystic, 1, 2 }, SHARD.lglow },
+    { 45, 125, { DUST.vision, 2, 5 }, { ESS.lnether, 1, 2 }, SHARD.srad },
+    { 50, 150, { DUST.dream, 1, 2 }, { ESS.gnether, 1, 2 }, SHARD.lrad },
+    { 55, 175, { DUST.dream, 2, 5 }, { ESS.leternal, 1, 2 }, SHARD.sbril },
+    { 60, 200, { DUST.illusion, 1, 2 }, { ESS.geternal, 1, 2 }, SHARD.lbril },
+    { 65, 225, { DUST.illusion, 2, 5 }, { ESS.geternal, 2, 3 }, SHARD.lbril },
+}
+-- blues: { up to ilvl, skill, shard }
+local BLUE = {
+    { 25, 1, SHARD.sglim }, { 30, 50, SHARD.lglim }, { 35, 75, SHARD.sglow }, { 40, 100, SHARD.lglow },
+    { 45, 125, SHARD.srad }, { 50, 150, SHARD.lrad }, { 55, 175, SHARD.sbril }, { 70, 200, SHARD.lbril },
+}
+
+-- what it breaks into: { { itemID, chance, average count }, ... } and the skill it needs; nil if it doesn't
+function E.Outcome(itemID)
+    local _, _, quality, ilvl = GetItemInfo(itemID)
+    local _, _, _, _, _, classID = GetItemInfoInstant(itemID)
+    if not (quality and ilvl and (classID == 2 or classID == 4)) then return nil end
+    if quality == 2 then
+        for _, b in ipairs(GREEN) do
+            if ilvl <= b[1] then
+                local weapon = classID == 2
+                -- weapons give more essence, armor more dust (Classic: 75/20/5 flipped to 20/75/5)
+                local pd, pe = weapon and 0.20 or 0.75, weapon and 0.75 or 0.20
+                if not b[5] then pd, pe = weapon and 0.20 or 0.80, weapon and 0.80 or 0.20 end
+                local out = {
+                    { b[3][1], pd, (b[3][2] + b[3][3]) / 2 },
+                    { b[4][1], pe, (b[4][2] + b[4][3]) / 2 },
+                }
+                if b[5] then out[3] = { b[5], 0.05, 1 } end
+                return out, b[2]
+            end
+        end
+    elseif quality == 3 then
+        for _, b in ipairs(BLUE) do
+            if ilvl <= b[1] then
+                if b[3] == SHARD.lbril and ilvl >= 56 then return { { b[3], 0.995, 1 }, { NEXUS, 0.005, 1 } }, b[2] end
+                return { { b[3], 1, 1 } }, b[2]
+            end
+        end
+    elseif quality == 4 and ilvl >= 56 then
+        return { { NEXUS, 1, ilvl <= 60 and 1 or 1.5 } }, ilvl <= 60 and 225 or 300
+    end
+    return nil
+end
+
+-- what disenchanting one is worth, its materials sold at the auction house after the cut, and the skill it needs
+-- (nil: can't be disenchanted, or its likely materials have no price)
+local valueCache = {}
+FT.On("FT_SCAN_DONE", function() wipe(valueCache) end)
+function E.Value(itemID)
+    local c = valueCache[itemID]
+    if c == nil then
+        c = false
+        local out, skill = E.Outcome(itemID)
+        if out then
+            local total, known = 0, 0
+            for _, o in ipairs(out) do
+                local p = FT.Price(o[1])
+                if p then
+                    total = total + p * (1 - FT.Cut()) * o[2] * o[3]
+                    known = known + o[2]
+                end
+            end
+            if known >= 0.9 then c = { v = total, skill = skill } end
+        end
+        -- an item the game hasn't loaded yet isn't remembered as "can't"
+        if c or GetItemInfo(itemID) then valueCache[itemID] = c end
+    end
+    if not c then return nil end
+    return c.v, c.skill
+end
+
+-- the best enchanting skill among your characters on this side (seen when each logs in), nil: no enchanter
+function E.Skill()
+    local best
+    for _, c in pairs(FT.db.chars or {}) do
+        if c.side == FT.sideKey and type(c.enchanting) == "number" then best = math.max(best or 0, c.enchanting) end
+    end
+    return best
+end
+
+-- this character's enchanting skill, read from the skill list
+local function ReadSkill()
+    local c = FT.charKey and FT.db.chars[FT.charKey]
+    if not (c and GetNumSkillLines and GetSkillLineInfo) then return end
+    for i = 1, GetNumSkillLines() do
+        local name, isHeader, _, rank = GetSkillLineInfo(i)
+        if not isHeader and FT.ProfKey(name) == "Enchanting" then
+            c.enchanting = rank
+            return
+        end
+    end
+end
+FT.On("FT_READY", function() C_Timer.After(3, ReadSkill) end)
+FT.On("SKILL_LINES_CHANGED", function() FT.Debounce("enchSkill", 2, ReadSkill) end)
+
+-- Buy it to disenchant: armor and weapons listed under what they break into, for your enchanter's skill.
+-- Shaped like FT.Deals' entries (kind "DE") so Make gold lists them with the rest.
+local dealsCache, dealsAt
+FT.On("FT_SCAN_DONE", function() dealsCache = nil end)
+function E.Deals()
+    if dealsCache and GetTime() - dealsAt < 60 then return dealsCache end
+    local skill = E.Skill()
+    if not skill then return {} end
+    local out = {}
+    local minProfit = FT.S.dealMin or 0
+    for _, r in ipairs(FT.Market.Rows() or {}) do
+        local v, need = E.Value(r.id)
+        if v and need and need <= skill and r.price and r.price > 0 then
+            local profit = v - r.price
+            if profit > math.max(minProfit, r.price * 0.15) then
+                out[#out + 1] = { id = r.id, kind = "DE", unit = r.price, target = math.floor(v), perUnit = profit,
+                    qty = 1, cost = r.price, profit = profit, t = r.t or time(), noBook = true }
+            end
+        end
+    end
+    table.sort(out, function(a, b) return a.profit > b.profit end)
+    dealsCache, dealsAt = out, GetTime()
+    return out
+end

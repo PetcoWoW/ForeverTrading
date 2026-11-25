@@ -12,6 +12,10 @@ FT.News = N
 -- start, after the files are read (a table made with them would keep the English)
 local function News()
     return {
+        ["v0.14"] = {
+            { L["Disenchanting"], L["Gear tooltips say whether to disenchant it or sell it. Money > Make gold lists gear worth buying to disenchant, for your best enchanter's skill. Classic's odds: Forever's may differ."],
+                function() FT.Show("signals"); FT.Tabs.signals.SetView("make") end },
+        },
         ["v0.13"] = {
             { L["Craft for profit"], L["Money > Craft for profit: every recipe in WoW Forever whose product sells every day, by the gold it should make a day. Click one: every material, what it costs, and crafting vs buying it ready."],
                 function() FT.Show("signals"); FT.Tabs.signals.SetView("craft") end },

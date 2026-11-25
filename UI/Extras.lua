@@ -314,7 +314,14 @@ local function TipLines(itemID, detail)
     end
     if not second and uses then second = BestUseLine(itemID) end
     if not second and de then
-        second = string.format(L["Disenchants for ~%s"], FT.Money(math.floor(de), "short"))
+        -- worth disenchanting, or worth more sold as it is (auction house after its cut, or a vendor)?
+        local asIs = math.max(s.price and s.price * (1 - FT.Cut()) or 0, FT.VendorSell(itemID) or 0)
+        if asIs > 0 and asIs >= de then
+            second = string.format(L["Sell it: %s beats disenchanting (~%s)"], FT.Money(math.floor(asIs), "short"), FT.Money(math.floor(de), "short"))
+        else
+            second = string.format(L["Disenchant it: ~%s"], FT.Money(math.floor(de), "short"))
+                .. (asIs > 0 and FT.C("dim", " " .. string.format(L["(sells for %s)"], FT.Money(math.floor(asIs), "short"))) or "")
+        end
     end
     if second then out[#out + 1] = { second } end
     -- Shift: the reason, how much sells, the week

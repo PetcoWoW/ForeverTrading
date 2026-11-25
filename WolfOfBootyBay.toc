@@ -1,7 +1,7 @@
 ## Interface: 16001
 ## Title: |cfff0b90bThe Wolf of Booty Bay|r
 ## Notes: The auction house as a stock market for WoW Forever: tickers, gainers and losers, plain-English picks, your net worth. Built on ForeverTrading by thewoolfi. Reads Auctionator's data too.
-## Version: 0.13.0
+## Version: 0.14.0
 ## Author: sain221b-sketch (built on ForeverTrading by thewoolfi)
 ## X-Website: https://github.com/sain221b-sketch/forevertrading
 ## X-License: Apache-2.0

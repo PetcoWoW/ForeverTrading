@@ -201,13 +201,15 @@ local function DealText(d)
         text = string.format(L["Buy at %s for %s, sell at %s for ~%s"], H.Name(d.buyHouse), Money(d.unit), H.Name(d.sellHouse), Money(d.target))
     elseif d.kind == "VENDOR" then
         text = string.format(L["Buy for %s, a vendor pays %s"], Money(d.unit), Money(d.target))
+    elseif d.kind == "DE" then
+        text = string.format(L["Buy for %s and disenchant it: worth ~%s in its materials"], Money(d.unit), Money(d.target))
     else
         text = string.format(L["Buy for %s (usually ~%s), list at %s"], Money(d.unit), Money(d.fair), Money(d.target))
     end
     local bits = { text, FT.C("up", "+" .. Money(d.perUnit) .. " " .. L["each"]) }
     local qty = d.noBook and L["the cheapest one"] or string.format(L["%s of them"], FT.Num(d.qty))
     bits[#bits + 1] = FT.C("dim", qty)
-    local sells = d.kind ~= "VENDOR" and SellsIn(d)
+    local sells = d.kind ~= "VENDOR" and d.kind ~= "DE" and SellsIn(d)
     if sells then bits[#bits + 1] = sells end
     local budget = Budget(d)
     if budget then bits[#bits + 1] = budget end
@@ -218,6 +220,16 @@ local function DealTip(row, d)
     UI.TipItem(row, d.id)
     local qty = d.noBook and L["the cheapest lot"] or string.format(L["%s pcs"], FT.Num(d.qty))
     GameTooltip:AddLine(" ")
+    if d.kind == "DE" then
+        GameTooltip:AddLine(L["Disenchanted, it usually gives:"], 0.85, 0.87, 0.9)
+        for _, o in ipairs(FT.Enchant.Outcome(d.id) or {}) do
+            GameTooltip:AddDoubleLine(string.format("%d%%  %s x%s", math.floor(o[2] * 100 + 0.5), FT.ItemText(o[1]), o[3] == math.floor(o[3]) and tostring(o[3]) or string.format("%.1f", o[3])),
+                FT.Price(o[1]) and FT.Money(FT.Price(o[1]), "short") or L["no price"], 0.8, 0.82, 0.86, 1, 1, 1)
+        end
+        GameTooltip:AddLine(L["Classic's odds: WoW Forever's may differ."], 0.6, 0.64, 0.7, true)
+        GameTooltip:Show()
+        return
+    end
     if d.kind == "HOUSES" then
         local H = FT.House
         GameTooltip:AddLine(string.format(L["Buy at %s: %s for %s (price of %s)"], H.Name(d.buyHouse), qty, Money(d.cost),
@@ -312,7 +324,8 @@ local function BuildDeals(p)
             row.name:SetText(FT.ItemText(d.id, 40) .. (listed and FT.C("accent", "  [" .. L["in your list"] .. "]") or ""))
             row.reason:SetText(DealText(d))
             row.value:SetText(FT.C("up", "+" .. Money(d.profit)))
-            local label = (d.kind == "HOUSES" and L["CARRY IT"]) or (d.kind == "RESELL" and L["FLIP IT"]) or (d.kind == "VENDOR" and L["VENDOR IT"]) or nil
+            local label = (d.kind == "HOUSES" and L["CARRY IT"]) or (d.kind == "RESELL" and L["FLIP IT"]) or (d.kind == "VENDOR" and L["VENDOR IT"])
+                or (d.kind == "DE" and L["DE IT"]) or nil
             row.badge:Set(d.kind, label, d.noBook and 1 or 3)
         end,
         onClick = function(d, button)
@@ -343,6 +356,15 @@ end
 -- the deals that pass the view's choices and the search (and how many only their prices' age hides)
 local function ShownDeals()
     local list, _, building = FT.Deals.List()
+    -- buy it to disenchant (your best enchanter's skill): with the rest, by profit
+    local de = FT.Enchant and FT.Enchant.Deals() or {}
+    if #de > 0 then
+        local merged = {}
+        for _, d in ipairs(list or {}) do merged[#merged + 1] = d end
+        for i = 1, math.min(#de, 40) do merged[#merged + 1] = de[i] end
+        table.sort(merged, function(a, b) return (a.profit or 0) > (b.profit or 0) end)
+        list = merged
+    end
     local matches = FT.NameMatcher(T.search)
     local since = time() - dstate.age
     local out, noBook, total, older = {}, {}, 0, 0
