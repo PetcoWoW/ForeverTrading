@@ -206,10 +206,11 @@ function T.Build(p)
         L["Bars from ore, cloth bolts from cloth...: when one of your characters knows the recipe and it costs less than buying."])
 
     -- alerts
-    local al = Section(left, L["Alerts"], 4)
+    local al = Section(left, L["Alerts"], 5)
+    Check(al, "alertPopup", L["Pop-up alerts"], L["Alerts as pop-ups on your screen, with a sound. Off: one line in chat, nothing to click away."])
     Check(al, "meme", L["Meme mode"],
         L["TO THE MOON and RUG PULL banners for what you own or watch, WHALE ALERT when one seller holds most of an item, APE IN on the strongest buys."])
-    Check(al, "alertSound", L["Sound on a price alert"])
+    Check(al, "alertSound", L["Sound with pop-up alerts"])
     Check(al, "alertChat", L["Message in chat on a price alert"])
     Check(al, "undercutAlert", L["Say in chat when you are undercut"],
         L["At the auction house: when an auction of yours is no longer the cheapest (your own other lots aside) - once per auction and price. Sell > My auctions tells whether to wait or post it again."])

@@ -1,5 +1,10 @@
 # The Wolf of Booty Bay
 
+## v0.9 - quiet alerts
+
+- No pop-ups by default: price alerts, TO THE MOON / RUG PULL and WHALE ALERT go to chat, the banners of one
+  scan grouped into one line per kind. Settings > Alerts > Pop-up alerts brings the pop-ups (and their sound) back.
+
 ## v0.8 - signals that learn
 
 - Each item's own record, from up to 60 days of daily prices: after a jump (10%+ over its 14-day average), did it

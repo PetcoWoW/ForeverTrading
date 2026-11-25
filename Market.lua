@@ -349,12 +349,12 @@ function M.SetAlert(id, kind, value)
 end
 
 local function Alert(id, text)
-    if FT.Toast then FT.Toast(id, text) end
+    if FT.S.alertPopup and FT.Toast then FT.Toast(id, text) end
     if FT.S.alertChat then
         local _, _, _, _, link = FT.Item(id)
         FT.Print((link or FT.ItemText(id)) .. " " .. text)
     end
-    if FT.S.alertSound then
+    if FT.S.alertSound and FT.S.alertPopup then
         pcall(PlaySound, (SOUNDKIT and SOUNDKIT.RAID_WARNING) or 8959)
     end
 end
@@ -403,13 +403,34 @@ local function Cares(id)
     return FT.db.watch[id] ~= nil or (FT.Port and FT.Port.Count(id) > 0)
 end
 
-local function Banner(id, text, title, color)
-    if FT.Toast then FT.Toast(id, text, title, color) end
-    if FT.S.alertChat then
-        local _, _, _, _, link = FT.Item(id)
-        FT.Print(FT.C(color, title) .. " " .. (link or FT.ItemText(id)) .. " " .. text)
+-- Banners wait a moment and go out together: one chat line per kind (TO THE MOON: a +40%, b +35%), no pop-up
+-- or sound unless Settings > Alerts > Pop-up alerts is on
+local pending = {}
+local function Flush()
+    local byTitle, order = {}, {}
+    for _, b in ipairs(pending) do
+        if not byTitle[b.title] then
+            byTitle[b.title] = { color = b.color }
+            order[#order + 1] = b.title
+        end
+        local _, _, _, _, link = FT.Item(b.id)
+        table.insert(byTitle[b.title], (link or FT.ItemText(b.id)) .. " " .. b.text)
+        if FT.S.alertPopup and FT.Toast then FT.Toast(b.id, b.text, b.title, b.color) end
     end
-    if FT.S.alertSound then pcall(PlaySound, (SOUNDKIT and SOUNDKIT.RAID_WARNING) or 8959) end
+    if FT.S.alertChat then
+        for _, title in ipairs(order) do
+            local g = byTitle[title]
+            FT.Print(FT.C(g.color, title) .. "  " .. table.concat(g, FT.C("dim", "  ·  ")))
+        end
+    end
+    if #pending > 0 and FT.S.alertPopup and FT.S.alertSound then
+        pcall(PlaySound, (SOUNDKIT and SOUNDKIT.RAID_WARNING) or 8959)
+    end
+    wipe(pending)
+end
+local function Banner(id, text, title, color)
+    pending[#pending + 1] = { id = id, text = text, title = title, color = color }
+    FT.Debounce("memeFlush", 1, Flush)
 end
 
 -- once a day per item and kind
