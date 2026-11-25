@@ -1,5 +1,10 @@
 # The Wolf of Booty Bay
 
+## v0.17.4 - right-click menu
+
+- Right-clicking the minimap button only offers Start a session, or Stop the session while one runs. The page
+  links are gone (a left-click opens the window); pause is on the session panel and /wolf farm pause.
+
 ## v0.17.3 - names, not tickers
 
 - Items go by their names again everywhere: the TO THE MOON / RUG PULLS lists, the market list, the item page,
