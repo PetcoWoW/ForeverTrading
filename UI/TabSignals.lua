@@ -674,14 +674,26 @@ local function BuildCraftView(p)
         GameTooltip:AddLine(L["Click: every material, what it costs, and crafting vs buying it ready."], 0.6, 0.64, 0.7, true)
         GameTooltip:Show()
     end)
-    f.known = UI.Segmented(f, { { "all", L["All recipes"] }, { "known", L["Ones you know"] } }, function(v)
+    -- every profession by default; one profession, and only what your characters know, on a choice
+    local profs = { { "all", L["All professions"] } }
+    for _, p in ipairs({ "Alchemy", "Blacksmithing", "Cooking", "Enchanting", "Engineering", "First Aid", "Leatherworking", "Mining", "Tailoring" }) do
+        profs[#profs + 1] = { p, L[p] }
+    end
+    f.prof = UI.Dropdown(f, 150, profs, function(v)
+        T.craftProf = v
+        T.RefreshCraft()
+    end)
+    f.prof:SetPoint("TOPLEFT", 0, 0)
+    T.craftProf = T.craftProf or "all"
+    f.prof:SetValue(T.craftProf)
+    f.known = UI.Segmented(f, { { "all", L["Every recipe"] }, { "known", L["Ones you know"] } }, function(v)
         T.craftFilter = v
         T.RefreshCraft()
     end, 22)
-    f.known:SetPoint("TOPLEFT", 0, -1)
+    f.known:SetPoint("LEFT", f.prof, "RIGHT", 8, 0)
     T.craftFilter = T.craftFilter or "all"
     f.known:SetValue(T.craftFilter)
-    f.hint:SetText(L["Crafts that sell every day, by the gold they should make a day. A recipe you don't know yet says so: its recipe costs extra."])
+    f.hint:SetText(L["Every profession's crafts worth making: sell what it makes, or disenchant it. A recipe nobody of yours knows says so."])
     f.list:SetEmptyText(L["Working out every recipe..."])
     return f
 end
@@ -696,22 +708,34 @@ function T.RefreshCraft()
     end
     local matches = FT.NameMatcher(T.search)
     local out = {}
+    local ench = FT.Enchant and FT.Enchant.Skill()
     for _, c in ipairs(list) do
-        if (T.craftFilter ~= "known" or c.known) and (not matches or matches(c.id)) then
+        if (T.craftFilter ~= "known" or c.known) and (T.craftProf == "all" or c.prof == T.craftProf) and (not matches or matches(c.id)) then
             local e = c.eval
             local qty = c.recipe.outputQty or 1
+            local how
+            if c.mode == "de" then
+                how = string.format(L["Costs %s to make, disenchants for ~%s"], FT.Money(math.floor(e.cost), "short"), FT.Money(math.floor(c.deValue or 0), "short"))
+                if not ench or (c.deSkill and ench < c.deSkill) then how = how .. FT.C("accent", "  ·  " .. string.format(L["needs an enchanter (%d)"], c.deSkill or 1)) end
+            else
+                how = string.format(L["Costs %s to make, sells for %s"], FT.Money(math.floor(e.cost), "short"), FT.Money(math.floor(e.revenue), "short"))
+                how = how .. FT.C("dim", "  ·  " .. (c.perDay and string.format(L["sells %s a day"], FT.Num(math.floor(c.perDay + 0.5))) or L["sales not seen yet"]))
+            end
             out[#out + 1] = {
                 id = c.id, recipe = c.recipe, qty = qty > 1 and qty or nil,
-                signal = "CRAFT", label = c.known and L["CRAFT IT"] or L["RECIPE?"], strength = c.known and 3 or 1,
-                reason = string.format(L["Costs %s to make, sells for %s"], FT.Money(math.floor(e.cost), "short"), FT.Money(math.floor(e.revenue), "short"))
-                    .. FT.C("dim", "  ·  " .. string.format(L["sells %s a day"], FT.Num(math.floor(c.perDay + 0.5))))
-                    .. FT.C("dim", "  ·  " .. L[c.recipe.prof or "?"])
+                signal = c.mode == "de" and "DE" or "CRAFT",
+                label = c.mode == "de" and L["CRAFT + DE"] or L["CRAFT IT"], strength = c.known and 3 or 1,
+                reason = how .. FT.C("dim", "  ·  " .. L[c.recipe.prof or "?"])
                     .. (c.cooldown and FT.C("accent", "  ·  " .. string.format(L["once every %d days (cooldown)"], c.cooldown)) or "")
-                    .. (c.known and "" or FT.C("accent", "  ·  " .. L["recipe needed"])),
+                    .. (c.known and FT.C("up", "  ·  " .. L["you know it"]) or FT.C("accent", "  ·  " .. L["recipe needed"])),
                 value = FT.C("up", "+" .. FT.Money(math.floor(c.profit), "short")) .. FT.C("dim", " " .. L["each craft"]),
             }
         end
     end
+    -- your crafters, on the line under the choices
+    local crafters = FT.Craft.CraftersText and FT.Craft.CraftersText()
+    craftView.hint:SetText(crafters and (FT.C("accent", L["Your crafters"]) .. ":  " .. crafters)
+        or L["Every profession's crafts worth making: sell what it makes, or disenchant it. Log in each crafter once so their professions show here."])
     craftView.list:SetEmptyText(T.craftFilter == "known" and L["None of the recipes you know makes a profit right now. Open your profession windows once so they're known."]
         or L["No craft makes a profit on a product that sells every day right now."])
     craftView.count:SetText(#out > 0 and string.format(L["%d crafts"], #out) or "")

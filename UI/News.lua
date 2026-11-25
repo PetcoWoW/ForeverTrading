@@ -12,6 +12,11 @@ FT.News = N
 -- start, after the files are read (a table made with them would keep the English)
 local function News()
     return {
+        ["v0.16"] = {
+            { L["Blizzard prices fixed"], L["They load now whatever the game calls your realm. The API chip and the status bar say how old they are; if they ever can't load, the chip says why (Settings > Basics > Realm type)."] },
+            { L["Craft for profit, every profession"], L["Every profession's crafts, whoever knows them: sell what it makes or disenchant it, whichever pays. Pick one profession, or only what you know; your crafters' skills are on top."],
+                function() FT.Show("signals"); FT.Tabs.signals.SetView("craft") end },
+        },
         ["v0.15"] = {
             { L["Sessions"], L["Right-click the minimap button: Start a session. Everything you loot counts, valued at today's prices, with gold an hour on a small panel. Portfolio > Sessions keeps your runs."],
                 function() FT.Show("portfolio"); FT.Tabs.portfolio.SetView("sessions") end },

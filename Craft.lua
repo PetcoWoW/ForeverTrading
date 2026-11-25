@@ -406,21 +406,41 @@ function C.ProfitCrafts(done)
     profitBusy = true
     local all = C.AllRecipes()
     local out = {}
+    -- every profession's recipes, whoever knows them: the best of selling what it makes and disenchanting it
     FT.Job("craftProfit", #all, function(k)
         local r = all[k]
         local e = C.Eval(r)
-        if not (e.profit and e.profit > 0 and e.complete and e.via == "ah") then return end
+        if not (e.complete and e.cost and e.cost > 0) then return end
+        local qty = r.outputQty or 1
         local rate = FT.Sales.Rate(r.output)
         local perDay = rate and (rate.sold or 0) >= 3 and rate.perDay or nil
-        if not (perDay and perDay >= 1) then return end
-        local qty = r.outputQty or 1
+        local unseen = not rate or (rate.hours or 0) < 6 -- no sales watched yet: not "doesn't sell"
+        -- 1) sell it: the product's market must really move (or not be watched yet, and be listed)
+        local sell
+        if e.revenue and e.via == "ah" and e.revenue > e.cost then
+            local listed = select(2, FT.Price(r.output))
+            if perDay and perDay >= 1 then sell = { profit = e.revenue - e.cost, crafts = math.min(perDay / qty, 20) }
+            elseif unseen and (listed or 0) >= 5 then sell = { profit = e.revenue - e.cost, crafts = 0.5, unseen = true } end
+        end
+        -- 2) disenchant it: its dust and essences sell whatever the product does
+        local de
+        local v, skill = FT.Enchant and FT.Enchant.Value(r.output)
+        if v and v * qty > e.cost then de = { profit = v * qty - e.cost, crafts = 5, skill = skill } end
+        local best = sell
+        if sell then sell.mode = "sell" end
+        if de and (not sell or de.profit > sell.profit) then
+            best = de
+            best.mode = "de"
+        end
+        if not best then return end
         local cd = C.CooldownDays(r)
         -- a cooldown caps it: one craft every few days, however much sells
-        local crafts = cd and (1 / cd) or math.min(perDay / qty, 20)
+        local crafts = cd and (1 / cd) or best.crafts
         out[#out + 1] = {
-            id = r.output, recipe = r, eval = e, perDay = perDay, cooldown = cd,
-            profit = e.profit, known = next(r.knownBy or {}) ~= nil,
-            daily = e.profit * crafts,
+            id = r.output, recipe = r, eval = e, perDay = perDay, cooldown = cd, mode = best.mode,
+            profit = best.profit, unseen = best.unseen, deSkill = best.skill, deValue = v and v * qty,
+            known = next(r.knownBy or {}) ~= nil, prof = r.prof,
+            daily = best.profit * crafts * (best.unseen and 0.5 or 1),
         }
     end, function()
         table.sort(out, function(a, b) return a.daily > b.daily end)
@@ -589,17 +609,41 @@ function E.Skill()
     return best
 end
 
--- this character's enchanting skill, read from the skill list
+-- this character's professions and their skill, read from the skill list (enchanting for disenchanting)
+local PROF_SET = { Alchemy = true, Blacksmithing = true, Enchanting = true, Engineering = true, Leatherworking = true,
+    Tailoring = true, Cooking = true, ["First Aid"] = true, Mining = true, Herbalism = true, Skinning = true, Fishing = true,
+    Jewelcrafting = true, Inscription = true }
 local function ReadSkill()
     local c = FT.charKey and FT.db.chars[FT.charKey]
     if not (c and GetNumSkillLines and GetSkillLineInfo) then return end
+    local profs = {}
     for i = 1, GetNumSkillLines() do
         local name, isHeader, _, rank = GetSkillLineInfo(i)
-        if not isHeader and FT.ProfKey(name) == "Enchanting" then
-            c.enchanting = rank
-            return
+        local key = not isHeader and FT.ProfKey(name)
+        if key and PROF_SET[key] and type(rank) == "number" then
+            profs[key] = rank
+            if key == "Enchanting" then c.enchanting = rank end
         end
     end
+    if next(profs) then c.profs = profs end
+end
+
+-- "Jay: Mining 300, Engineering 285 · Bankalt: Enchanting 300" (nil: none seen yet)
+function C.CraftersText()
+    local parts = {}
+    for _, c in pairs(FT.db.chars or {}) do
+        if c.side == FT.sideKey and type(c.profs) == "table" then
+            local list = {}
+            for p, rank in pairs(c.profs) do list[#list + 1] = { p, rank } end
+            table.sort(list, function(a, b) return a[2] > b[2] end)
+            local bits = {}
+            for _, x in ipairs(list) do bits[#bits + 1] = L[x[1]] .. " " .. x[2] end
+            if #bits > 0 then parts[#parts + 1] = (c.name or "?") .. ": " .. table.concat(bits, ", ") end
+        end
+    end
+    if #parts == 0 then return nil end
+    table.sort(parts)
+    return table.concat(parts, "  ·  ")
 end
 FT.On("FT_READY", function() C_Timer.After(3, ReadSkill) end)
 FT.On("SKILL_LINES_CHANGED", function() FT.Debounce("enchSkill", 2, ReadSkill) end)

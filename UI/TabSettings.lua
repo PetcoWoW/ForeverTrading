@@ -140,7 +140,14 @@ function T.Build(p)
     local right = CreateFrame("Frame", nil, content)
 
     -- the basics: what most people ever change; the rest behind "Show all settings"
-    local bs = Section(left, L["Basics"], 6)
+    local bs = Section(left, L["Basics"], 7)
+    Choice(bs, "realmType", L["Realm type"], { { "auto", L["Auto"] }, { "pvp", "PvP" }, { "normal", L["Normal"] }, { "roleplay", "RP" }, { "roleplay-pvp", "RP-PvP" } },
+        L["Which auction house's Blizzard prices are yours. Auto works it out; pick it if the API chip says it couldn't."],
+        function()
+            FT.Fire("FT_SOURCES_CHANGED")
+            if FT.Feed.Take then C_Timer.After(0.2, FT.Feed.Take) end
+            C_Timer.After(0.5, function() FT.UpdateAHPill(); FT.UpdateStatus() end)
+        end)
     Choice(bs, "textSize", L["Text size"], { { 0, L["Normal"] }, { 1, L["Large"] }, { 2, L["Larger"] } },
         L["Makes every text bigger without making the window bigger. Takes effect after a reload."],
         function() FT.AskReload(L["The new text size shows after the interface reloads. Reload now?"]) end)

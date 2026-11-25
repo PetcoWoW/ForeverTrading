@@ -1,5 +1,19 @@
 # The Wolf of Booty Bay
 
+## v0.16 - Blizzard prices fixed, Craft for profit for every profession
+
+- Fixed: Blizzard's prices didn't load when the game's region id or realm wasn't one the feed knew. The house is
+  now found by: Settings > Basics > Realm type (new, Auto by default), the realm's name, its id, Auctionator's
+  name for its price list ("PvP Alliance"), and last the one house of your side the feed carries. A region id the
+  feed doesn't know falls back to the only region in it.
+- When they still can't load: the API chip says why (and opens Settings), and one chat line at login.
+- API chip: how old the prices are and when they were taken, how old this copy is; the status bar shows both
+  ages (Blizzard API, your AH scan), the one in use green.
+- Craft for profit: every profession's recipes whoever knows them, the best of selling the product or
+  disenchanting it (CRAFT + DE, with the enchanting skill it needs); products whose sales aren't watched yet count
+  at half, tagged. A profession picker and Every recipe / Ones you know. Your crafters' professions and skills on
+  the line above (read at each character's login).
+
 ## v0.15.1 - our own branding
 
 - A wolf for the minimap button, the header, item windows and the AddOns list (was the original's gold coin).

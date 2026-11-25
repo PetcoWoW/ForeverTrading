@@ -59,25 +59,81 @@ local function Region()
     local id = GetCurrentRegion and GetCurrentRegion()
     region = (id and FT.FEED.regions[id]) or false
     if not region then
-        -- no region from the game: the only one in the feed, if it carries one
+        -- the game's region id isn't one the feed knows (WoW Forever may give its own): the only region in the
+        -- feed, when it carries one
         local only, count = nil, 0
         for _, r in pairs(FT.FEED.regions) do only, count = r, count + 1 end
-        if count == 1 and not id then region = only end
+        if count == 1 then region = only end
     end
     return region or nil
 end
 
--- this realm's ruleset: "pvp", "normal", "roleplay" or "roleplay-pvp" (nil: not told)
+-- "PvP", "us-pvp", "RP-PvP Alliance"... -> a ruleset (nil: no clue in it)
+local function KindIn(text)
+    if type(text) ~= "string" then return nil end
+    local t = text:lower()
+    if t:find("rp%-?pvp") or t:find("roleplay%-?pvp") then return "roleplay-pvp" end
+    if t:find("pvp") then return "pvp" end
+    if t:find("%f[%a]rp%f[%A]") or t:find("roleplay") then return "roleplay" end
+    if t:find("normal") or t:find("pve") then return "normal" end
+    return nil
+end
+
+-- this realm's ruleset: "pvp", "normal", "roleplay" or "roleplay-pvp" (nil: not told), and how it was told.
+-- In order: your choice (Settings > Basics > Realm type), the realm's name, its id, Auctionator's name for its
+-- price list ("PvP Alliance"), and last: the one ruleset the feed carries a house of your side for.
 function F.Ruleset()
-    local server = FT.ServerOf(GetRealmName and GetRealmName() or "")
+    local pick = FT.S and FT.S.realmType
+    if pick and pick ~= "auto" and HOUSE_IDS[pick] then return pick, "setting" end
+    local name = GetRealmName and GetRealmName() or ""
+    local server = FT.ServerOf(name)
     local kind = server and server:match("^%a%a%-(.+)$")
-    if kind and HOUSE_IDS[kind] then return kind end
+    if kind and HOUSE_IDS[kind] then return kind, "name" end
     local id = GetRealmID and GetRealmID()
     if not id then
         local guid = UnitGUID and UnitGUID("player")
         id = guid and tonumber(guid:match("^Player%-(%d+)"))
     end
-    return id and REALM_RULESET[id % 16384] or nil
+    if id and REALM_RULESET[id % 16384] then return REALM_RULESET[id % 16384], "id" end
+    kind = KindIn(name)
+    if kind then return kind, "name" end
+    if type(AUCTIONATOR_PRICE_DATABASE) == "table" then
+        local side = UnitFactionGroup and UnitFactionGroup("player") or ""
+        for key in pairs(AUCTIONATOR_PRICE_DATABASE) do
+            if type(key) == "string" and key:find(side, 1, true) then
+                kind = KindIn(key)
+                if kind then return kind, "auctionator" end
+            end
+        end
+    end
+    -- the feed carries one house of your side: that one
+    local r = Region()
+    if r and r.houses then
+        local side = UnitFactionGroup and UnitFactionGroup("player") or ""
+        local found
+        for rs, ids in pairs(HOUSE_IDS) do
+            if r.houses[ids[side]] then
+                if found then found = nil; break end
+                found = rs
+            end
+        end
+        if found then return found, "only" end
+    end
+    return nil, nil
+end
+F.HOUSE_IDS = HOUSE_IDS
+
+-- why the feed isn't on, in a sentence (nil: it is)
+function F.WhyOff()
+    if not F.Loaded() then return L["This copy has no Blizzard prices in it: update the addon (WowUp)."] end
+    if FT.S and FT.S.useFeed == false then return L["Turned off: Settings > Show all settings > Sources."] end
+    if not Region() then return L["The prices in this copy are for another region."] end
+    if not F.Ruleset() then
+        return string.format(L["Couldn't tell your realm type (realm \"%s\", id %s). Pick it: Settings > Basics > Realm type."],
+            GetRealmName and GetRealmName() or "?", tostring(GetRealmID and GetRealmID() or "?"))
+    end
+    if not F.House() then return L["No Blizzard prices for your auction house in this copy."] end
+    return nil
 end
 
 -- Blizzard's id of one of our two auction houses ("faction" or "neutral")
@@ -202,6 +258,16 @@ end
 FT.On("FT_READY", function() C_Timer.After(2, F.Take) end)
 FT.On("FT_HOUSE_CHANGED", function() C_Timer.After(0.5, F.Take) end)
 FT.On("FT_SOURCES_CHANGED", function() wipe(parsed); region = nil end)
+FT.On("FT_SETTINGS_CHANGED", function() wipe(parsed); region = nil end)
+-- not on: said once a login, with what to do
+FT.On("FT_READY", function()
+    C_Timer.After(6, function()
+        local why = F.WhyOff()
+        if why and F.Loaded() and not (FT.S and FT.S.useFeed == false) then
+            FT.Print(FT.C("accent", L["Blizzard's prices aren't loading"]) .. ": " .. why)
+        end
+    end)
+end)
 
 ---------------------------------------------------------------------------
 -- Fresh prices are out: the reminder to /reload
