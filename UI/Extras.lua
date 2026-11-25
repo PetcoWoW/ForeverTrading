@@ -29,8 +29,8 @@ local function MinimapTooltip(self)
         GameTooltip:AddLine(string.format(L["Session: %s, %s an hour"], FT.Money(math.floor(sum.worth), "short"),
             sum.perHour and FT.Money(math.floor(sum.perHour), "short") or "..."), 0.05, 0.8, 0.5)
     end
-    GameTooltip:AddLine(L["Click: menu (start or stop a session, open the window)"], 0.8, 0.8, 0.8)
-    GameTooltip:AddLine(L["Right-click: open / close the window"], 0.8, 0.8, 0.8)
+    GameTooltip:AddLine(L["Click: open / close the window"], 0.8, 0.8, 0.8)
+    GameTooltip:AddLine(L["Right-click: session tracker (start, pause, stop)"], 0.8, 0.8, 0.8)
     GameTooltip:AddLine(L["Drag: move"], 0.8, 0.8, 0.8)
     GameTooltip:Show()
 end
@@ -147,9 +147,9 @@ local function BuildMinimap()
     border:SetSize(52, 52)
     border:SetTexture("Interface\\Minimap\\MiniMap-TrackingBorder")
     border:SetPoint("TOPLEFT")
-    -- a click: the menu (start or stop a session, open the window...); right-click: the window right away
+    -- a click: the window; right-click: the session menu (start, pause, stop, its worth so far)
     mb:SetScript("OnClick", function(self, button)
-        if button == "RightButton" then FT.Toggle() else FT.ShowMenu(self) end
+        if button == "RightButton" then FT.ShowMenu(self) else FT.Toggle() end
     end)
     mb:SetScript("OnDragStart", function(self)
         self:SetScript("OnUpdate", function()
@@ -181,7 +181,7 @@ local function MakeBroker()
     ldb:NewDataObject("Wolf of Booty Bay", {
         type = "launcher", label = "Wolf of Booty Bay", text = "Wolf of Booty Bay", icon = ICON,
         OnClick = function(self, button)
-            if button == "RightButton" then FT.Toggle() else FT.ShowMenu(self) end
+            if button == "RightButton" then FT.ShowMenu(self) else FT.Toggle() end
         end,
         OnTooltipShow = function(tt)
             if not (tt and tt.AddLine) then return end

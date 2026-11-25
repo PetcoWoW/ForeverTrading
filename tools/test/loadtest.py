@@ -104,7 +104,7 @@ step("session", function()
   FT.Session.Pause(); mock.run(60); FT.Session.Pause()
   FT.ShowMenu(UIParent)
   local mb = _G["WolfOfBootyBayMinimapButton"]
-  if mb then mock.click(mb, "LeftButton") end
+  if mb then mock.click(mb, "RightButton"); mock.click(mb, "LeftButton") end
   FT.Show("portfolio"); FT.Tabs.portfolio.SetView("sessions")
   FT.Session.Stop()
   print("saved sessions:", #FT.Session.List(), FT.Session.List()[1].name)
