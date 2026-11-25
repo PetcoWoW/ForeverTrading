@@ -285,14 +285,15 @@ C_GuildInfo = { GuildRoster = function() end }
 
 -- items: a few known, the rest made up from the id
 mock.items = {}
-function GetItemInfo(id)
+local function GetItemInfo(id)
     if type(id) == "string" then id = tonumber(id:match("item:(%d+)")) or tonumber(id) end
     if not id then return nil end
     local name = "Item " .. id
-    return name, "|cffffffff|Hitem:" .. id .. "::::::::60:::::|h[" .. name .. "]|h|r", 1, 30, 0, "Trade Goods", "Herb",
+    local gear = id % 5 == 0
+    return name, "|cffffffff|Hitem:" .. id .. "::::::::60:::::|h[" .. name .. "]|h|r", gear and 2 or 1, gear and (45 + id % 15) or 30, 0, "Trade Goods", "Herb",
         20, "", 134400, 25 + (id % 100), 7, 9, 1
 end
-function GetItemInfoInstant(id)
+local function GetItemInfoInstant(id)
     if type(id) == "string" then id = tonumber(id:match("item:(%d+)")) or tonumber(id) end
     if not id then return nil end
     local cls = (id % 5 == 0) and 4 or 7

@@ -510,15 +510,25 @@ end
 ---------------------------------------------------------------------------
 -- Overview (no item chosen)
 ---------------------------------------------------------------------------
+-- one unit only: "12g", "35s", "80c" (a narrow column)
+function T.ShortMoney(c)
+    if not c then return "" end
+    local G, S, C = FT.COIN and FT.COIN.gold or "g", FT.COIN and FT.COIN.silver or "s", FT.COIN and FT.COIN.copper or "c"
+    if c >= 10000 then return FT.Thousands(math.floor(c / 10000 + 0.5)) .. G end
+    if c >= 100 then return math.floor(c / 100 + 0.5) .. S end
+    return math.floor(c) .. C
+end
+
 local function MoverList(parent, title)
     local box = UI.Panel(parent, "bg1", "line")
     box.title = UI.Text(box, 12, "text")
     box.title:SetPoint("TOPLEFT", 12, -10)
     box.title:SetText(title)
+    local bump = (UI.Size(12) - 12) * 5
     local cols = {
         { key = "name", title = "", width = "fill", make = NameCell, cellHeight = 24 },
-        { key = "price", title = "", width = 74, justify = "RIGHT" },
-        { key = "ch", title = "", width = 60, justify = "RIGHT" },
+        { key = "price", title = "", width = 46 + bump, justify = "RIGHT" },
+        { key = "ch", title = "", width = 46 + bump, justify = "RIGHT" },
     }
     box.list = UI.List(box, {
         rowHeight = 24, cols = cols,
@@ -526,10 +536,11 @@ local function MoverList(parent, title)
             local cell = row.cells.name
             cell.icon:SetItem(r.id)
             cell.star:SetText("")
+            -- the ticker when there is one (the name is in the hover), else the name
             local sym = FT.SymbolText(r.id)
-            cell.text:SetText((sym ~= "" and (sym .. "  ") or "") .. FT.ItemText(r.id))
-            row.cells.price:SetText(FT.Money(r.price, "short"))
-            row.cells.ch:SetText(FT.Pct(r.ch1))
+            cell.text:SetText(sym ~= "" and sym or FT.ItemText(r.id))
+            row.cells.price:SetText(T.ShortMoney(r.price))
+            row.cells.ch:SetText(FT.C(r.ch1 >= 0 and "up" or "down", FT.An.Pc(r.ch1)))
         end,
         onClick = function(r) if not UI.ItemClick(r.id) then T.Select(r.id) end end,
         onEnter = function(row, r) UI.TipItem(row, r.id) end,
@@ -549,14 +560,14 @@ function T.MakersList(parent)
     box.when:SetPoint("TOPRIGHT", -12, -11)
     local cols = {
         { key = "name", title = "", width = "fill" },
-        { key = "value", title = "", width = 74, justify = "RIGHT" },
-        { key = "items", title = "", width = 50, justify = "RIGHT" },
+        { key = "value", title = "", width = 52 + (UI.Size(12) - 12) * 5, justify = "RIGHT" },
+        { key = "items", title = "", width = 54 + (UI.Size(12) - 12) * 5, justify = "RIGHT" },
     }
     box.list = UI.List(box, {
         rowHeight = 24, cols = cols,
         update = function(row, x)
             row.cells.name:SetText(x.n .. (x.you and FT.C("dim", " " .. L["(you)"]) or ""))
-            row.cells.value:SetText(FT.Money(x.value, "short"))
+            row.cells.value:SetText(T.ShortMoney(x.value))
             row.cells.items:SetText(FT.C("dim", string.format(L["%d items"], x.items)))
         end,
         onClick = function(x) if x.top then T.Select(x.top) end end,
@@ -570,7 +581,7 @@ function T.MakersList(parent)
     })
     box.list:SetPoint("TOPLEFT", 1, -32)
     box.list:SetPoint("BOTTOMRIGHT", -1, 4)
-    box.list:SetEmptyText(L["Run a Full scan at the auction house: it names the sellers."])
+    box.list:SetEmptyText(L["Do a Full Scan in Auctionator: it names the sellers."])
     return box
 end
 
