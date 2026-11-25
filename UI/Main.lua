@@ -5,7 +5,7 @@ local L = FT.L
 
 FT.Tabs = {}
 
-local TAB_ORDER = { "market", "craft", "signals", "portfolio", "sell", "settings" }
+local TAB_ORDER = { "market", "craft", "signals", "portfolio", "settings" }
 local TAB_LABELS = { market = "Terminal", craft = "Craft", signals = "Money", portfolio = "Portfolio", sell = "Sell",
     settings = "Settings" }
 
@@ -337,23 +337,13 @@ function FT.UpdateStatus()
     -- the newest one in green, the feed in yellow once a newer one is likely out
     local parts = {}
     local feedT = FT.Feed.On() and FT.Feed.Time() or nil
-    local own = FT.Hist.LastScan("full")
-    local peer = FT.Hist.LastScan("peer")
-    local newest = math.max(feedT or 0, own or 0, peer or 0)
+    local own = FT.ScanTime()
+    local newest = math.max(feedT or 0, own or 0)
     local feedOld = FT.Feed.Stale()
-    local function Part(label, t, old)
-        if not t then return FT.C("dim", label .. ": " .. L["never"]) end
-        local col = old and "accent" or (t == newest and "up" or "muted")
-        return FT.C(col, label) .. " " .. FT.C(old and "accent" or "text", FT.Ago(t))
-    end
-    if FT.Feed.On() then parts[#parts + 1] = Part(L["Blizzard"], feedT, feedOld) end
-    parts[#parts + 1] = Part(L["Your scan"], own)
-    if peer and peer > (own or 0) and peer > (feedT or 0) then parts[#parts + 1] = Part(L["Exchange"], peer) end
     local from
     if newest == 0 then from = L["No prices yet"]
-    elseif newest == feedT then from = L["Prices from Blizzard (newer)"]
-    elseif newest == own then from = L["Prices from your scan (newer)"]
-    else from = L["Prices from the exchange (newer)"] end
+    elseif newest == feedT then from = string.format(L["Prices: Blizzard API, %s"], FT.Ago(feedT))
+    else from = string.format(L["Prices: your AH scan, %s"], FT.Ago(own)) end
     parts[#parts + 1] = FT.C("muted", from)
     if feedOld then parts[#parts + 1] = FT.C("accent", L["Newer prices are likely out: /reload"]) end
     local rows = FT.Market.Rows()
@@ -371,23 +361,6 @@ local function BuildScanBox(header, anchor, closeButton)
     f:SetSize(280, 40)
     f.anchor, f.closeButton = anchor, closeButton
     f:SetPoint("RIGHT", anchor, "LEFT", -18, 0)
-    f.mine = UI.Button(f, L["My items"], 10, 24, "default", function() FT.Scanner.AskMine() end)
-    f.mine:FitText(24)
-    f.mine:SetPoint("RIGHT", 0, 0)
-    f.full = UI.Button(f, L["Full scan"], 10, 24, "primary", function()
-        -- one scan for both: Auctionator's when it's there (its results come to us), else ours
-        if FT.Atr.StartScan(FT.Scanner.StartFull) then return end
-        FT.Scanner.StartFull()
-    end)
-    f.full:FitText(24)
-    f.full:SetPoint("RIGHT", f.mine, "LEFT", -6, 0)
-    -- pressed again while it runs: it stops
-    f.share = UI.Button(f, L["Exchange"], 10, 24, "default", function()
-        if FT.Share.Status() then FT.Share.Stop() else FT.Share.Ask(true) end
-    end)
-    f.share:FitText(24)
-    f.share.text = L["Exchange"]
-    f.share:SetTip(L["Price exchange"], L["Ask Wolf of Booty Bay users in your guild and group for fresher prices of the whole market. Works anywhere, no auction house needed. (Settings > Exchange: by itself when your prices are more than an hour old.)"])
     f.stop = UI.Button(f, L["Stop"], 10, 22, "down", function() FT.Scanner.Stop("user") end)
     f.stop:FitText(20)
     f.stop:SetPoint("RIGHT", 0, 0)
@@ -407,7 +380,7 @@ local function BuildScanBox(header, anchor, closeButton)
         if self.elapsed < 0.2 then return end
         self.elapsed = 0
         -- only while a scan or the exchange runs (and once when it ends): the rest comes with the events
-        local busy = FT.Scanner.mode ~= nil or FT.Share.Status() ~= nil
+        local busy = FT.Scanner.mode ~= nil
         if busy or self.busy then
             self.busy = busy
             FT.UpdateScanBox()
@@ -421,78 +394,17 @@ function FT.UpdateScanBox()
     local f = scanBox
     if not f then return end
     local S = FT.Scanner
-    local mode = S.mode
-    local running = mode ~= nil
-    -- only the full-screen window has room for Full scan and Exchange next to a running scan's progress (during
-    -- My items Full scan takes over there); My items while nothing runs
-    local roomy = SizeMode() == "max"
-    local crowded = running and not roomy
-    f.full:SetShown(mode ~= "full" and not crowded)
-    f.mine:SetShown(not running)
+    local running = S.mode ~= nil
+    f:SetShown(running)
     f.stop:SetShown(running)
     f.bar:SetShown(running)
     f.text:SetShown(running)
-    -- the scan status next to it: only in the full-screen window (the status bar at the bottom has it too)
-    scanText:SetShown(not running and roomy)
-    scanDot:SetShown(not running and roomy)
     f:ClearAllPoints()
-    if running or not roomy then
-        f:SetPoint("RIGHT", f.closeButton, "LEFT", -12, 0)
-    else
-        f:SetPoint("RIGHT", f.anchor, "LEFT", -18, 0)
-    end
-    f.full:ClearAllPoints()
+    f:SetPoint("RIGHT", f.closeButton, "LEFT", -12, 0)
     if running then
         local frac, text = S.Progress()
         f.fill:SetWidth(math.max(1, f.bar:GetWidth() * math.max(0, math.min(1, frac or 0))))
         f.text:SetText(text or "")
-        f.full:SetPoint("RIGHT", f.bar, "LEFT", -12, 3)
-    else
-        f.full:SetPoint("RIGHT", f.mine, "LEFT", -6, 0)
-    end
-    -- the exchange: how far it is
-    local kind, frac = FT.Share.Status()
-    local label = L["Exchange"]
-    if kind == "receive" then
-        label = string.format(L["Exchange %d%%"], math.floor((frac or 0) * 100))
-    elseif kind == "send" then
-        label = string.format(L["Sharing %d%%"], math.floor((frac or 0) * 100))
-    elseif kind == "ask" then
-        label = L["Exchange"] .. "..."
-    end
-    if f.share.text ~= label then
-        f.share.text = label
-        f.share:SetLabel(label)
-        f.share:FitText(24)
-    end
-    f.share:SetActive(kind ~= nil)
-    if (kind ~= nil) ~= f.share.running then
-        f.share.running = kind ~= nil
-        if kind then
-            f.share:SetTip(L["Price exchange"], L["Click: stop the exchange. What has come stays."])
-        else
-            f.share:SetTip(L["Price exchange"], L["Ask Wolf of Booty Bay users in your guild and group for fresher prices of the whole market. Works anywhere, no auction house needed. (Settings > Exchange: by itself when your prices are more than an hour old.)"])
-        end
-        -- the tooltip on screen follows
-        if GameTooltip:IsOwned(f.share) and f.share:GetScript("OnEnter") then f.share:GetScript("OnEnter")(f.share) end
-    end
-    -- no room for it next to a running scan but in the full-screen window
-    f.share:SetShown(not crowded)
-    f.share:ClearAllPoints()
-    if f.full:IsShown() then
-        f.share:SetPoint("RIGHT", f.full, "LEFT", -6, 0)
-    else
-        f.share:SetPoint("RIGHT", f.bar, "LEFT", -12, 3)
-    end
-    local ah = FT.ahOpen and S.Supported()
-    f.full:SetUsable(ah)
-    f.mine:SetUsable(ah)
-    if not ah then
-        f.full:SetTip(L["Full scan"], L["Open the auction house first."])
-        f.mine:SetTip(L["My items"], L["Open the auction house first."])
-    else
-        f.full:SetTip(L["Full scan"], L["The whole auction house in a few seconds: the lowest price and how many are listed of every item. Any time. (Settings > Scanning: a deep scan reads every auction and order book, once every 15 minutes.)"])
-        f.mine:SetTip(L["My items"], L["Only what matters to you: what your recipes make and use, your watchlist and what you own - one search each, cheapest first. Any time; it pauses while you search yourself."])
     end
 end
 
@@ -595,8 +507,10 @@ local function Build()
 
     scanText = UI.Text(header, 11, "muted", "RIGHT")
     scanText:SetPoint("RIGHT", gearBtn, "LEFT", -14, 0)
+    scanText:Hide()
     scanDot = UI.Dot(header, 7, "dim", 1, "OVERLAY")
     scanDot:SetPoint("RIGHT", scanText, "LEFT", -7, 0)
+    scanDot:Hide()
     BuildScanBox(header, scanDot, gearBtn)
     FT.UpdateScanBox()
     -- what the tour points at
@@ -696,7 +610,10 @@ end
 function FT.SelectTab(name)
     if not FT.Tabs[name] then name = "market" end
     FT.currentTab = name
-    if name ~= "settings" then lastPage = name end
+    if name ~= "settings" then
+        lastPage = name
+        if FT.db then FT.db.ui = FT.db.ui or {}; FT.db.ui.lastTab = name end
+    end
     nav:SetValue(name)
     if gearBtn then gearBtn:Update() end
     local page = Page(name)
@@ -713,7 +630,15 @@ function FT.Show(tab)
     if not win then Build() end
     win:Show()
     win:Raise()
-    FT.SelectTab(tab or FT.currentTab or "market")
+    if tab == "sell" then
+        FT.SelectTab("portfolio")
+        if FT.Tabs.portfolio and FT.Tabs.portfolio.SetView then FT.Tabs.portfolio.SetView("sell") end
+        tab = nil
+    else
+        local last = FT.db and FT.db.ui and FT.db.ui.lastTab
+        if last == "sell" or last == "settings" then last = nil end
+        FT.SelectTab(tab or FT.currentTab or last or "market")
+    end
     -- once a version: what's new (or, on a first install, the tour)
     if FT.News then C_Timer.After(0.4, FT.News.OnWindow) end
 end
@@ -761,6 +686,7 @@ end
 
 local function Later() FT.Debounce("uiRefresh", 0.6, RefreshVisible) end
 FT.On("FT_SCAN_DONE", Later)
+FT.On("FT_SCAN_DONE", function() FT.UpdateAHPill() end)
 FT.On("FT_PRICES_CHANGED", Later)
 FT.On("FT_RECIPES_CHANGED", Later)
 FT.On("FT_LEARNED", Later)
@@ -856,52 +782,106 @@ local function HookPanels()
     end)
 end
 
-function FT.UpdateAHPill()
-    if not pill then return end
-    local online = FT.ahOpen and true or false
-    -- at an auction house, the other house's prices on: offline here, a yellow light
-    local elsewhere = FT.ahHere and not online
-    UI.SetTexColor(pill.dot, online and "up" or (elsewhere and "accent" or "dim"), 1)
-    UI.SetTextColor(pill.text, online and "up" or (elsewhere and "accent" or "dim"))
-    if FT.Compact() then
-        pill.text:SetText("")
-        pill:SetWidth(25)
-    else
-        pill.text:SetText(online and L["AH: online"] or L["AH: offline"])
-        pill:SetWidth(math.ceil(pill.text:GetStringWidth()) + 30)
-    end
+-- Where the prices come from, in two chips: AH (your last auction house scan: Auctionator's or this addon's) and
+-- API (Blizzard's hourly prices, shipped with every update). The one the pages go by is lit; an old one is yellow.
+local function ShortAgo(t)
+    if not t then return "--" end
+    local s = math.max(0, time() - t)
+    if s < 3600 then return math.max(1, math.floor(s / 60)) .. "m" end
+    if s < 86400 then return math.floor(s / 3600) .. "h" end
+    return math.floor(s / 86400) .. "d"
 end
 
-function FT.BuildAHPill(header)
-    pill = CreateFrame("Button", nil, header)
-    pill:SetHeight(22)
-    pill.bg = UI.RoundTex(pill, "BACKGROUND", "bg2", 1)
-    pill.bg:SetAllPoints()
-    UI.Border(pill, "line")
-    pill.dot = UI.Dot(pill, 7, "dim", 1)
-    pill.dot:SetPoint("LEFT", 9, 0)
-    pill.text = UI.Text(pill, 11, "dim")
-    pill.text:SetPoint("LEFT", pill.dot, "RIGHT", 6, 0)
-    pill:SetScript("OnClick", function() FT.ToggleAHWindow() end)
-    pill:SetScript("OnEnter", function(self)
-        UI.SetTexColor(self.bg, "bg3", 1)
-        local H = FT.House
-        if FT.ahHere and not FT.ahOpen then
-            UI.TipText(self, L["Auction house: offline"], string.format(L["You stand at %s, the prices of %s are on: nothing is read here, bought or posted. The chip next to it switches back."],
-                H.Name(FT.atHouse), H.Name()))
-        elseif not FT.ahOpen then
-            UI.TipText(self, L["Auction house: offline"], L["Talk to an auctioneer. Until then: the last known prices."])
-        elseif ahHidden then
-            UI.TipText(self, L["Auction house: online"], L["The game's auction house window is hidden behind Wolf of Booty Bay. Click: show it (buying, selling, Auctionator)."])
-        else
-            UI.TipText(self, L["Auction house: online"], L["Click: hide the game's auction house window behind Wolf of Booty Bay (Settings: open Wolf of Booty Bay in its place)."])
-        end
-    end)
-    pill:SetScript("OnLeave", function(self)
+-- the newest scan of yours: this addon's own record, or Auctionator's last scan time
+function FT.ScanTime()
+    local own = FT.Hist.LastScan("full")
+    local atr = FT.Atr and FT.Atr.LastScanTime and FT.Atr.LastScanTime()
+    local t = math.max(own or 0, atr or 0)
+    return t > 0 and t or nil, (atr and atr >= (own or 0)) and "auctionator" or "own"
+end
+
+local function PaintChip(c, label, t, lit, old)
+    UI.SetTexColor(c.dot, (not t and "dim") or (old and "accent") or (lit and "up" or "muted"), 1)
+    UI.SetTextColor(c.text, lit and "text" or "muted")
+    c.text:SetText(FT.Compact() and label or (label .. " " .. FT.C(old and "accent" or (lit and "text" or "dim"), ShortAgo(t))))
+    c:SetWidth(math.ceil(c.text:GetStringWidth()) + 28)
+end
+
+function FT.UpdateAHPill()
+    if not pill then return end
+    local scanT = FT.ScanTime()
+    local apiT = FT.Feed.On() and FT.Feed.Time() or nil
+    local apiOld = FT.Feed.Stale()
+    local scanOld = scanT and time() - scanT > 12 * 3600
+    local useScan = (scanT or 0) >= (apiT or 0) and scanT ~= nil
+    PaintChip(pill.ah, L["AH"], scanT, useScan, scanOld)
+    PaintChip(pill.api, L["API"], apiT, not useScan and apiT ~= nil, apiOld)
+    pill:SetWidth(pill.ah:GetWidth() + pill.api:GetWidth() + 4)
+end
+
+local function SourceChip(parent)
+    local c = CreateFrame("Button", nil, parent)
+    c:SetHeight(22)
+    c.bg = UI.RoundTex(c, "BACKGROUND", "bg2", 1)
+    c.bg:SetAllPoints()
+    UI.Border(c, "line")
+    c.dot = UI.Dot(c, 7, "dim", 1)
+    c.dot:SetPoint("LEFT", 8, 0)
+    c.text = UI.Text(c, 11, "muted")
+    c.text:SetPoint("LEFT", c.dot, "RIGHT", 6, 0)
+    c:SetScript("OnLeave", function(self)
         UI.SetTexColor(self.bg, "bg2", 1)
         GameTooltip:Hide()
     end)
+    return c
+end
+
+function FT.BuildAHPill(header)
+    pill = CreateFrame("Frame", nil, header)
+    pill:SetHeight(22)
+    pill.ah = SourceChip(pill)
+    pill.ah:SetPoint("LEFT", 0, 0)
+    pill.api = SourceChip(pill)
+    pill.api:SetPoint("LEFT", pill.ah, "RIGHT", 4, 0)
+    pill.ah:SetScript("OnEnter", function(self)
+        UI.SetTexColor(self.bg, "bg3", 1)
+        local t, who = FT.ScanTime()
+        local text
+        if not t then
+            text = L["No scan of yours yet. Scan in Auctionator at the auction house: Wolf of Booty Bay takes it."]
+        else
+            text = string.format(L["Your last auction house scan%s: %s. The freshest prices there are, the moment you scan."],
+                who == "auctionator" and (" (" .. L["Auctionator's"] .. ")") or "", FT.Ago(t))
+            if FT.Atr and FT.Atr.On() then text = text .. "\n\n" .. L["Click: take Auctionator's last scan again."] end
+        end
+        if FT.ahOpen and ahHidden then text = text .. "\n\n" .. L["The game's auction house window is hidden behind Wolf of Booty Bay: right-click shows it."] end
+        UI.TipText(self, L["AH: your scans"], text)
+    end)
+    pill.ah:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+    pill.ah:SetScript("OnClick", function(_, button)
+        if button == "RightButton" then FT.ToggleAHWindow() return end
+        if FT.Atr and FT.Atr.TakeLatest then
+            local n = FT.Atr.TakeLatest(true)
+            if not n then FT.Print(L["Nothing newer from Auctionator: scan in Auctionator at the auction house."]) end
+        end
+    end)
+    pill.api:SetScript("OnEnter", function(self)
+        UI.SetTexColor(self.bg, "bg3", 1)
+        local t = FT.Feed.On() and FT.Feed.Time() or nil
+        local text
+        if not t then
+            text = L["Blizzard's hourly prices aren't loaded (Settings > Sources)."]
+        else
+            text = string.format(L["Blizzard's prices of every auction house, taken every hour and shipped with each update: %s."], FT.Ago(t))
+            if FT.Feed.Stale() then text = text .. "\n\n" .. FT.C("accent", L["Newer ones are likely downloaded: click to /reload."]) end
+        end
+        UI.TipText(self, L["API: Blizzard's hourly prices"], text)
+    end)
+    pill.api:SetScript("OnClick", function()
+        if FT.Feed.Stale() and not InCombatLockdown() then ReloadUI() end
+    end)
     FT.UpdateAHPill()
+    C_Timer.NewTicker(30, function() if pill:IsVisible() then FT.UpdateAHPill() end end)
     return pill
 end
 

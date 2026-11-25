@@ -139,6 +139,19 @@ function T.Build(p)
     local left = CreateFrame("Frame", nil, content)
     local right = CreateFrame("Frame", nil, content)
 
+    -- the basics: what most people ever change; the rest behind "Show all settings"
+    local bs = Section(left, L["Basics"], 6)
+    Choice(bs, "textSize", L["Text size"], { { 0, L["Normal"] }, { 1, L["Large"] }, { 2, L["Larger"] } },
+        L["Makes every text bigger without making the window bigger. Takes effect after a reload."],
+        function() FT.AskReload(L["The new text size shows after the interface reloads. Reload now?"]) end)
+    Check(bs, "meme", L["Meme mode"], L["TO THE MOON / RUG PULL, WHALE ALERT, APE IN, DIAMOND HANDS."])
+    Check(bs, "alertPopup", L["Pop-up alerts"], L["Alerts as pop-ups on your screen, with a sound. Off: one line in chat, nothing to click away."])
+    Check(bs, "tooltip", L["Lines in item tooltips"], L["Two lines on every item: what to do and its price, then its best use or craft profit. Hold Shift for more."])
+    Check(bs, "ticker", L["Ticker tape under the header"], L["Your watchlist and the day's biggest movers, scrolling. Takes effect after /reload."],
+        function() FT.AskReload() end)
+    Check(bs, "showAdvanced", L["Show all settings"], L["Thresholds, sources, scanning, your data and more."],
+        function() if T.Layout then T.Layout() end end)
+
     -- general
     local g = Section(left, L["General"], 12)
     Choice(g, "words", L["Words"], { { "plain", L["Plain English"] }, { "trader", L["Trader terms"] } },
@@ -357,8 +370,10 @@ function T.Build(p)
         right:ClearAllPoints()
         right:SetPoint("TOPLEFT", content, "TOPLEFT", cw + 10, 0)
         right:SetWidth(cw)
-        local h1 = Stack(left, { g, sc, so, pr, al })
-        local h2 = Stack(right, { sg, ex, dt, ab })
+        local all = FT.S.showAdvanced
+        for _, s in ipairs({ g, sc, so, pr, sg, ex, dt }) do s:SetShown(all and true or false) end
+        local h1 = Stack(left, all and { bs, g, sc, so, pr, al } or { bs, al })
+        local h2 = Stack(right, all and { sg, ex, dt, ab } or { ab })
         left:SetHeight(h1)
         right:SetHeight(h2)
         content:SetHeight(math.max(h1, h2))
@@ -376,6 +391,7 @@ function T.Build(p)
     p:HookScript("OnShow", Settled)
     -- the window's size mode changed (compact, standard, full screen)
     T.OnLayout = Settled
+    T.Layout = Settled
     Layout()
 end
 
@@ -398,8 +414,8 @@ function T.Refresh()
     local lines = {
         "Wolf of Booty Bay  ||  " .. string.format(L["version %s"], FT.C("text", FT.VERSION_TEXT)),
         "Auctionator: " .. (FT.Atr.Loaded() and FT.C("up", L["connected"]) or FT.C("down", L["not loaded"])),
-        L["Prices come from Wolf of Booty Bay's own scans (and Auctionator's when it is on); recipes from your profession windows."],
-        "/wolf  ||  /wolf scan  ||  /wolf scan mine  ||  /wolf stop  ||  /wolf reset",
+        L["Prices: Blizzard's hourly API, and your auction house scans (scan in Auctionator: it's taken right away). Recipes: every one in WoW Forever, from Blizzard."],
+        "/wolf  ||  /wolf tour  ||  /wolf reset",
     }
     T.about:SetText(table.concat(lines, "\n"))
 end

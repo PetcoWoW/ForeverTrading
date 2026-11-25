@@ -1,5 +1,23 @@
 # The Wolf of Booty Bay
 
+## v0.11 - simpler: an extension of Auctionator
+
+- Header: AH and API chips (your last scan, Auctionator's included; Blizzard's hourly prices) in place of
+  "AH: offline"; the one in use lit, old ones yellow. AH click: take Auctionator's last scan again; right-click:
+  the game's AH window (when it's hidden). API click when newer prices are out: /reload.
+- Auctionator's last scan (AUCTIONATOR_SAVEDVARS.TimeOfLastBrowseScan + its price database) is taken at login when
+  it's newer than what we have.
+- Cut what Auctionator does: the Sell tab (posting, My auctions), Full scan, My items, Exchange (off by default).
+- Money: Make gold (carry, flip, vendor in one ranked list) and Farm. Portfolio: Holdings, Sell yours, Characters,
+  Journal. The old links (What's new, the tour) lead to the new places.
+- Signals in plain words ("Higher than usual (+20%), and jumps like this fade fast: sell now") with Sure / Likely /
+  Guess; the numbers behind them on a hover of the badge.
+- Tooltips: two lines (signal and price; craft profit, best use or disenchant value), Shift for more. Cached
+  10 seconds per item, nothing worked out in combat, no redraw of the tooltip: bag addons aren't slowed.
+- Best use counts only products that really sell (3+ sales seen, one a day or more) first; others are marked.
+- Settings: Basics first, the rest behind Show all settings. The last page you used opens next time.
+- A shorter tour.
+
 ## v0.10 - bug pass
 
 - Fixed: Money > Sell yours and Farm Board weren't shown or hidden by the view switch (their frames were looked up

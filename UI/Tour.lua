@@ -18,57 +18,23 @@ local function Tab(key) return FT.Tabs[key] end
 -- the language is applied at start, after the files are read (a table made with them would keep the English)
 local STEPS
 local function MakeSteps() return {
-    { title = L["The pages"],
-      text = L["Market: the prices and charts of every item. Craft: what your recipes cost and bring. Signals: what to do now. Portfolio: what all you own is worth. Selling: post from your bags and watch your auctions."],
-      target = function() return FT.MainRefs and FT.MainRefs.nav end },
-    { title = L["The auction house"],
-      text = L["Green while you are at an auctioneer: the item you have open is searched again every few seconds, and you can buy, post and cancel right here. Click: the game's own auction house window."],
+    { title = L["Where the prices come from"],
+      text = L["AH: your last auction house scan (scan in Auctionator: it's taken right away). API: Blizzard's prices, every hour, with each update. The lit one is what you see."],
       target = function() return FT.MainRefs and FT.MainRefs.pill end },
     { title = L["Which auction house"],
-      text = L["Your faction's or Blackwater, the neutral one: each keeps its own prices. Talking to an auctioneer picks its house; a click shows the other one's prices (at an auctioneer: offline there). The pencil: this auctioneer is of the other house."],
+      text = L["Your faction's or Blackwater, the neutral one: each has its own prices. Click to look at the other one."],
       target = function() return FT.MainRefs and FT.MainRefs.house end },
-    { title = L["Scan and exchange"],
-      text = L["Full scan: the prices of the whole market in a couple of minutes (at an auctioneer). Exchange: fresh prices from Wolf of Booty Bay users in your guild and group, anywhere."],
-      target = function() return FT.MainRefs and FT.MainRefs.scan end },
     { title = L["Terminal"], tab = "market",
-      text = L["Search any item. Click one: its price, chart and what to do. Right-click: watchlist."],
+      text = L["The market board: search any item, see its chart and what to do with it. Right-click an item to watch it."],
       target = function() return Tab("market").listPanel end },
-    { title = L["Item windows"], tab = "market",
-      -- an item open on the Market (the first of the list when none is): its More button
-      prep = function()
-          local M = Tab("market")
-          if not M.Selected() then
-              local rows = FT.Market.Rows()
-              if rows and rows[1] then M.Select(rows[1].id) end
-          end
-      end,
-      text = L["More: the item in a window of its own - up to four at once, two items side by side. Each window has its own auction house (its chip) and a compact mode with the charts alone."],
-      target = function() return Tab("market").more end },
-    { title = L["The order book"], tab = "market",
-      text = L["Every listing by price, how many, by how many sellers. Click a price: how many to buy; Buy: at an auctioneer, at the server's exact price."],
-      target = function() return Tab("market").book end },
-    { title = L["Craft"], tab = "craft", craft = true, prep = function() Tab("craft").SetView("recipes") end,
-      text = L["What each recipe costs with its cheapest materials (auction house, vendor or crafting it yourself), what it brings, its risks. Queue: the materials to buy for several crafts at once."],
-      target = function() return Tab("craft").viewSeg end },
-    { title = L["Money"], tab = "signals", prep = function() Tab("signals").SetView("HOUSES") end,
-      text = L["Ways to make gold now: carry it to the other auction house, flip it, vendor it, sell what you own, and what's worth farming."],
+    { title = L["Money"], tab = "signals", prep = function() Tab("signals").SetView("make") end,
+      text = L["Ways to make gold right now, best first: carry it to the other auction house, flip it, vendor it. Farm: what's worth gathering."],
       target = function() return Tab("signals").viewSeg end },
-    { title = L["The carry list"], tab = "signals",
-      prep = function()
-          local S = Tab("signals")
-          S.SetView("deals")
-          S.SetDealKind("HOUSES")
-      end,
-      text = L["Cheaper at one auction house than the other sells it for. A right click on a deal puts it on your carry list: it stays here, and at the other auction house the Sell page shows what you brought and what it cost."],
-      target = function() return Tab("signals").viewSeg end },
-    { title = L["Sell"], tab = "sell", prep = function() Tab("sell").SetView("bags") end,
-      text = L["Your bags at market prices, a copper under the lowest. My auctions: who undercut you."],
-      target = function() return Tab("sell").viewSeg end },
-    { title = L["Portfolio and journal"], tab = "portfolio", prep = function() Tab("portfolio").SetView("portfolio") end,
-      text = L["What everything your characters own is worth. Deals journal: what you really earned, from the auction house's letters."],
+    { title = L["Portfolio"], tab = "portfolio", prep = function() Tab("portfolio").SetView("portfolio") end,
+      text = L["What everything you own is worth. Sell yours: what to do with each thing. Characters: your bank alt and alts."],
       target = function() return Tab("portfolio").viewSeg end },
     { title = L["Settings"],
-      text = L["Signal thresholds, the exchange, alerts, your data. In About: What's new, and this tour again (/wolf tour)."],
+      text = L["Alerts, the meme layer, and this tour again (/wolf tour)."],
       target = function() return FT.MainRefs and FT.MainRefs.gear end },
 } end
 

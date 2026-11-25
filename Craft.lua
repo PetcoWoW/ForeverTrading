@@ -411,10 +411,16 @@ function C.BestUse(itemID)
         if need > 0 and e.revenue and othersPriced then
             x.each = (e.revenue - (e.cost - mine)) / need
         end
+        -- a product that really sells (3+ sales seen, one a day or more): its price can be counted on; one odd
+        -- listing of a rare item isn't a market
+        local rate = FT.Sales.Rate(r.output)
+        x.perDay = rate and (rate.sold or 0) >= 3 and rate.perDay or nil
+        x.sells = (x.perDay and x.perDay >= 1) or (e.via == "vendor") or false
         out[#out + 1] = x
     end
     table.sort(out, function(a, b)
         if (a.each ~= nil) ~= (b.each ~= nil) then return a.each ~= nil end
+        if a.sells ~= b.sells then return a.sells end
         if a.each and a.each ~= b.each then return a.each > b.each end
         return (a.recipe.name or "") < (b.recipe.name or "")
     end)

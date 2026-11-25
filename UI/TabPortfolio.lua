@@ -11,6 +11,7 @@ local cards, chart, list, rangeSeg
 local portfolioParts = {} -- what the Portfolio view shows (hidden in the Journal view)
 local journal             -- the Journal view
 local charsView           -- the Characters view
+local sellView            -- the Sell yours view (what to do with each thing you own)
 local STALE_DAYS = 7      -- a character's bank or mailbox not seen for this long: its numbers are old
 
 local function NameCell(row)
@@ -41,7 +42,7 @@ function T.Build(p)
     sub:SetText(L["Bags, banks and mailboxes of your characters on this server, at auction house prices"])
 
     -- what you own, or what your trading brought (the deals journal)
-    T.viewSeg = UI.Segmented(p, { { "portfolio", L["Portfolio"] }, { "chars", L["Characters"] }, { "journal", L["Deals journal"] } }, function(v) T.SetView(v) end, 22)
+    T.viewSeg = UI.Segmented(p, { { "portfolio", L["Holdings"] }, { "sell", L["Sell yours"] }, { "chars", L["Characters"] }, { "journal", L["Journal"] } }, function(v) T.SetView(v) end, 22)
     T.viewSeg:SetPoint("TOPRIGHT", -8, -8)
     T.viewSeg:SetValue(state.view)
     T.head, T.sub = head, sub
@@ -124,6 +125,7 @@ function T.Build(p)
     for _, x in ipairs({ chartTitle, rangeSeg, chart, panel }) do portfolioParts[#portfolioParts + 1] = x end
     T.BuildJournal(p)
     T.BuildChars(p)
+    T.BuildSell(p)
 
     UI.OnSize(p, function(self, w, h)
         local cw = (w - 16 - 3 * 8) / 4
@@ -281,13 +283,15 @@ end
 function T.SetView(view)
     state.view = view
     if T.viewSeg then T.viewSeg:SetValue(view) end
-    local j, ch = view == "journal", view == "chars"
-    for _, x in ipairs(portfolioParts) do x:SetShown(not j and not ch) end
+    local j, ch, sl = view == "journal", view == "chars", view == "sell"
+    for _, x in ipairs(portfolioParts) do x:SetShown(not j and not ch and not sl) end
     if journal then journal:SetShown(j) end
     if charsView then charsView:SetShown(ch) end
-    T.head:SetText((j and L["Deals journal"]) or (ch and L["Characters"]) or L["Portfolio"])
+    if sellView then sellView:SetShown(sl) end
+    T.head:SetText((j and L["Journal"]) or (ch and L["Characters"]) or (sl and L["Sell yours"]) or L["Portfolio"])
     T.sub:SetText((j and L["What you bought and sold at the auction house, and what it brought"])
         or (ch and L["Every character on this server: gold, what it holds, when it was last seen"])
+        or (sl and L["Everything you own and the best way to turn each into gold"])
         or L["Bags, banks and mailboxes of your characters on this server, at auction house prices"])
     T.Refresh()
 end
@@ -390,9 +394,44 @@ function T.RefreshList()
     list:SetItems(rows, true)
 end
 
+---------------------------------------------------------------------------
+-- Sell yours (FT.Tabs.signals.SellYours): each thing you own and what to do with it - vendor it, sell it here,
+-- carry it to the other house or HODL; how many to list at once
+---------------------------------------------------------------------------
+function T.BuildSell(p)
+    local M = FT.Tabs.signals
+    local f = M.ListView(p, function(x)
+        if UI.ItemClick(x.id) then return end
+        FT.OpenItem(x.id)
+    end, function(row, x)
+        UI.TipItem(row, x.id)
+        if x.why then
+            GameTooltip:AddLine(" ")
+            GameTooltip:AddLine(x.why, 0.85, 0.87, 0.9, true)
+            GameTooltip:Show()
+        end
+    end)
+    f:ClearAllPoints()
+    f:SetPoint("TOPLEFT", 8, -36)
+    f:SetPoint("BOTTOMRIGHT", -8, 8)
+    f.hint:SetText(L["Sell it in Auctionator: this tells you where, at what and how many. A character counts once it has logged in and opened its bank and mailbox."])
+    f.list:SetEmptyText(L["Nothing priced yet. Log in each character once and open its bags, bank and mailbox."])
+    sellView = f
+end
+
+function T.RefreshSell()
+    if not (sellView and sellView:IsShown()) then return end
+    local list = FT.Tabs.signals.SellYours()
+    local total = 0
+    for _, x in ipairs(list) do total = total + x.sortV end
+    sellView.count:SetText(#list > 0 and string.format(L["%d items, worth %s"], #list, FT.Money(math.floor(total), "short")) or "")
+    sellView.list:SetItems(list, true)
+end
+
 function T.Refresh()
     if state.view == "journal" then return T.RefreshJournal() end
     if state.view == "chars" then return T.RefreshChars() end
+    if state.view == "sell" then return T.RefreshSell() end
     local rows, total, total7 = FT.Port.Rows()
     T.rows, T.total = rows, total
     local gold = FT.Port.Gold()
