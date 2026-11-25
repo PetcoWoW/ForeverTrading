@@ -1,5 +1,16 @@
 # The Wolf of Booty Bay
 
+## v0.16.1 - fixes from the game
+
+- Fixed: Craft for profit and disenchant values threw errors ("Craft.lua:545: attempt to call a nil value"):
+  WoW Forever has no global GetItemInfo / GetItemInfoInstant, only C_Item's. Every call goes through
+  FT.GetItemInfo / FT.GetItemInfoInstant now. The same fix makes the "its kind" learning (herbs, ore...) work in
+  game: it quietly never did. The fake WoW the tests run in has only the C_Item ones too now.
+- Terminal lists (TO THE MOON / RUG PULLS / Market Makers): the ticker in place of the name (the name is in the
+  hover), one-unit prices ("20s"), whole-number changes, columns that grow with the text size; nothing past the
+  box's edge.
+- A list's "nothing here" text stays inside a narrow list (wrapped).
+
 ## v0.16 - Blizzard prices fixed, Craft for profit for every profession
 
 - Fixed: Blizzard's prices didn't load when the game's region id or realm wasn't one the feed knew. The house is

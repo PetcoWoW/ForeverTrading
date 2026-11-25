@@ -258,8 +258,8 @@ An.Weekday = Weekday
 
 -- its kind (item class:subclass: herbs, ore, cloth, potions...): GetItemInfoInstant needs no server answer
 local function KindOf(itemID)
-    if not (itemID and GetItemInfoInstant) then return nil end
-    local _, _, subType, _, _, classID, subID = GetItemInfoInstant(itemID)
+    if not itemID then return nil end
+    local _, _, subType, _, _, classID, subID = FT.GetItemInfoInstant(itemID)
     if not classID then return nil end
     return classID .. ":" .. (subID or 0), subType
 end

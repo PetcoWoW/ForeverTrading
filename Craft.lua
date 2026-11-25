@@ -542,8 +542,8 @@ local BLUE = {
 
 -- what it breaks into: { { itemID, chance, average count }, ... } and the skill it needs; nil if it doesn't
 function E.Outcome(itemID)
-    local _, _, quality, ilvl = GetItemInfo(itemID)
-    local _, _, _, _, _, classID = GetItemInfoInstant(itemID)
+    local _, _, quality, ilvl = FT.GetItemInfo(itemID)
+    local _, _, _, _, _, classID = FT.GetItemInfoInstant(itemID)
     if not (quality and ilvl and (classID == 2 or classID == 4)) then return nil end
     if quality == 2 then
         for _, b in ipairs(GREEN) do
@@ -594,7 +594,7 @@ function E.Value(itemID)
             if known >= 0.9 then c = { v = total, skill = skill } end
         end
         -- an item the game hasn't loaded yet isn't remembered as "can't"
-        if c or GetItemInfo(itemID) then valueCache[itemID] = c end
+        if c or FT.GetItemInfo(itemID) then valueCache[itemID] = c end
     end
     if not c then return nil end
     return c.v, c.skill

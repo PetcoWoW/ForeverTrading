@@ -4,7 +4,7 @@ local L = FT.L
 
 -- The version being released: a copy straight from the repository (not packaged) has no version in its TOC yet
 -- (the packager puts the tag there) and shows this one. Set it with every release.
-local RELEASE = "v0.16.0"
+local RELEASE = "v0.16.1"
 local GetMeta = (C_AddOns and C_AddOns.GetAddOnMetadata) or GetAddOnMetadata
 FT.VERSION = (GetMeta and GetMeta(ADDON, "Version")) or RELEASE
 if FT.VERSION == "" or FT.VERSION:find("@", 1, true) then FT.VERSION = RELEASE end
@@ -427,6 +427,9 @@ end
 ---------------------------------------------------------------------------
 local GetInfo = (C_Item and C_Item.GetItemInfo) or GetItemInfo
 local GetInstant = (C_Item and C_Item.GetItemInfoInstant) or GetItemInfoInstant
+-- the game's item info, whichever this client has (WoW Forever has only the C_Item ones)
+FT.GetItemInfo = function(id) if GetInfo then return GetInfo(id) end end
+FT.GetItemInfoInstant = function(id) if GetInstant then return GetInstant(id) end end
 
 -- Item names we have seen, saved per game language: searching thousands of items needs their names
 -- without asking the server for each one

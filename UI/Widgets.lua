@@ -793,6 +793,11 @@ function UI.List(parent, opts)
     f.empty:SetPoint("CENTER")
     if f.empty.SetWordWrap then f.empty:SetWordWrap(true) end
     f.empty:SetWidth(260)
+    -- a page may ask for a wider one (SetWidth); a narrow list keeps it inside, wrapped
+    local setW = f.empty.SetWidth
+    f.empty.want = 260
+    function f.empty:SetWidth(w) self.want = w; setW(self, math.max(60, math.min(w, (f:GetWidth() or w) - 24))) end
+    f:HookScript("OnSizeChanged", function(self) self.empty:SetWidth(self.empty.want) end)
 
     local function Visible()
         return math.max(1, math.floor((f:GetHeight() or rh) / rh))
