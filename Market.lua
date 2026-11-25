@@ -249,6 +249,37 @@ local function Liquid(r)
     return r.days >= needDays and r.price >= 100 and (r.qty == nil or r.qty >= 3)
 end
 
+-- A real market, for the biggest moves and the banners: it sells 3+ a day, 1g+ a day changes hands and 5+ are
+-- up. A 4-silver item with one sale a day "up 300%" (1c to 4c), or a 5g item "down 90%" after one 50g listing,
+-- is noise. Known sales come from the price feed and your scans; with none known, a market isn't counted solid.
+local function Solid(r)
+    if not Liquid(r) or (r.qty or 0) < 5 then return false end
+    if r.perDay == nil then
+        local s = FT.Sales.Rate(r.id)
+        r.perDay = (s and (s.sold or 0) >= 5) and s.perDay or false
+    end
+    if not (r.perDay and r.perDay >= 3 and r.price * r.perDay >= 10000) then return false end
+    -- yesterday's close must look like the days before it (within 50% of their median): a move "down 85%" from
+    -- one overpriced day is no move
+    if r.sane == nil then
+        local s = FT.An.Stats(r.id)
+        local today, before, yest = FT.Day(), {}, nil
+        for _, c in ipairs(s.daily or {}) do
+            if c.day == today - 1 then yest = c.c
+            elseif c.day < today - 1 and c.day >= today - 8 then before[#before + 1] = c.c end
+        end
+        if yest and #before >= 3 then
+            table.sort(before)
+            local med = before[math.floor((#before + 1) / 2)]
+            r.sane = med > 0 and yest >= med * 0.5 and yest <= med * 1.5
+        else
+            r.sane = yest ~= nil
+        end
+    end
+    return r.sane
+end
+M.Solid = Solid
+
 -- the most valuable listings (price x quantity), for when there are no moves yet
 function M.TopByValue(n)
     local list = {}
@@ -275,7 +306,7 @@ function M.Movers(n, field, descending)
     local list = {}
     for _, r in ipairs(rows or {}) do
         local v = r[field]
-        if v and ((descending and v > 0) or (not descending and v < 0)) and Liquid(r) and Plausible(v) then
+        if v and ((descending and v > 0) or (not descending and v < 0)) and Solid(r) and Plausible(v) then
             list[#list + 1] = r
         end
     end
@@ -453,7 +484,7 @@ function M.CheckBanners()
     local topUp, topDown
     for _, r in ipairs(rows) do
         local ch = r.ch1
-        if ch and Liquid(r) and Plausible(ch) then
+        if ch and Solid(r) and Plausible(ch) then
             if ch >= MOON and (not topUp or ch > topUp.ch1) then topUp = r end
             if ch <= RUG and (not topDown or ch < topDown.ch1) then topDown = r end
             if shown < MAX_BANNERS and Cares(r.id) then

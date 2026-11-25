@@ -441,6 +441,8 @@ end
 
 local DEAL_VIEWS = { HOUSES = true, RESELL = true, VENDOR = true }
 
+local sellView, farmView -- the Sell yours and Farm Board views (built in T.Build)
+
 function T.SetView(view)
     -- the old names (the tour, other pages): the deals are now one view each
     if view == "deals" then view = (dstate.kind ~= "all" and dstate.kind) or "HOUSES" end
@@ -496,7 +498,6 @@ local function ListView(p, onClick, onEnter)
     return f
 end
 
-local sellView, farmView
 
 -- Sell yours: each thing you own (every character) and the best way to turn it into gold - the vendor, this
 -- auction house, or the other one when it pays clearly more after its cut; how many to list at once

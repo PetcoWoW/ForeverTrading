@@ -1,0 +1,58 @@
+// Static audit of a WoW addon: module functions called but never defined, globals written, globals read.
+const fs = require('fs'), path = require('path'), lp = require(process.env.LUAPARSE || 'luaparse');
+const root = process.argv[2];
+const toc = fs.readFileSync(path.join(root, 'WolfOfBootyBay.toc'), 'utf8').split(/\r?\n/)
+  .filter(l => l && !l.startsWith('#')).map(l => l.replace(/\\/g, '/'));
+const defs = new Set(), uses = [], gWrites = [], gReads = new Map();
+const MODS = /^(FT|UI|L)$/;
+function memberName(n) { // FT.X or FT.Y.Z -> "FT.X" / "FT.Y.Z"
+  const parts = [];
+  while (n && n.type === 'MemberExpression' && n.indexer === '.') { parts.unshift(n.identifier.name); n = n.base; }
+  if (n && n.type === 'Identifier') { parts.unshift(n.name); return parts.join('.'); }
+  return null;
+}
+for (const f of toc) {
+  const src = fs.readFileSync(path.join(root, f), 'utf8');
+  const ast = lp.parse(src, { luaVersion: '5.1', scope: true, locations: true });
+  // local module aliases: local X = FT.Something / local X = {} ; FT.Something = X
+  const alias = {};
+  const walk = (n, parent) => {
+    if (!n || typeof n !== 'object') return;
+    if (Array.isArray(n)) { n.forEach(c => walk(c, parent)); return; }
+    if (n.type === 'LocalStatement') {
+      n.variables.forEach((v, i) => { const init = n.init[i]; const m = init && memberName(init); if (m && /^FT\./.test(m)) alias[v.name] = m; });
+    }
+    if (n.type === 'AssignmentStatement') {
+      n.variables.forEach((v, i) => {
+        const m = memberName(v); if (m) defs.add(m.replace(/^(\w+)/, (a) => alias[a] || a));
+        const init = n.init[i];
+        if (m && /^FT\./.test(m) && init && init.type === 'Identifier') alias[init.name] = m;
+        if (v.type === 'Identifier' && v.isLocal === false) gWrites.push(`${f}:${v.loc.start.line} ${v.name}`);
+      });
+    }
+    if (n.type === 'FunctionDeclaration' && n.identifier) {
+      const id = n.identifier;
+      if (id.type === 'MemberExpression') { const m = memberName(id.indexer === ':' ? id.base : id); if (m) defs.add((id.indexer === ':' ? m + '.' + id.identifier.name : m).replace(/^(\w+)/, (a) => alias[a] || a)); }
+      else if (id.type === 'Identifier' && id.isLocal === false) gWrites.push(`${f}:${id.loc.start.line} function ${id.name}`);
+    }
+    if (n.type === 'CallExpression') {
+      const m = memberName(n.base);
+      if (m && m.includes('.')) uses.push({ name: m.replace(/^(\w+)/, (a) => alias[a] || a), at: `${f}:${n.loc.start.line}` });
+    }
+    if (n.type === 'Identifier' && n.isLocal === false && parent !== 'skip') {
+      gReads.set(n.name, (gReads.get(n.name) || 0) + 1);
+    }
+    for (const k of Object.keys(n)) if (k !== 'loc' && k !== 'range') walk(n[k], n.type === 'MemberExpression' && k === 'identifier' ? 'skip' : n);
+  };
+  walk(ast.body);
+}
+const missing = {};
+for (const u of uses) {
+  if (!/^FT\.|^UI\./.test(u.name)) continue;
+  if (defs.has(u.name)) continue;
+  (missing[u.name] = missing[u.name] || []).push(u.at);
+}
+console.log('== called, never defined (FT./UI.):');
+for (const [k, v] of Object.entries(missing)) console.log(' ', k, v.slice(0, 3).join(' '));
+console.log('== global writes:'); gWrites.forEach(w => console.log(' ', w));
+console.log('== global reads:'); console.log([...gReads.keys()].sort().join(' '));
