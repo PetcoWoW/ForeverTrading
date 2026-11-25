@@ -1,5 +1,10 @@
 # The Wolf of Booty Bay
 
+## v0.17.2 - minimap button
+
+- Click: open / close the window. Right-click: the session tracker menu (start, pause, stop, its worth so far).
+  The same on broker bars.
+
 ## v0.17.1 - Terminal fixes
 
 - Today's 3 moves: the texts were drawn under the card's own background (only the icon showed); empty slots
