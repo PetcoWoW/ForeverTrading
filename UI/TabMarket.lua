@@ -538,7 +538,7 @@ local function MoverList(parent, title)
             cell.star:SetText("")
             -- the ticker when there is one (the name is in the hover), else the name
             local sym = FT.SymbolText(r.id)
-            cell.text:SetText(sym ~= "" and sym or FT.ItemText(r.id))
+            cell.text:SetText((sym ~= "" and (sym .. " ") or "") .. FT.ItemText(r.id))
             row.cells.price:SetText(T.ShortMoney(r.price))
             row.cells.ch:SetText(FT.C(r.ch1 >= 0 and "up" or "down", FT.An.Pc(r.ch1)))
         end,
@@ -618,8 +618,8 @@ local function BuildOverview(parent)
     for i = 1, 3 do
         local c = CreateFrame("Button", nil, v)
         c:SetHeight(52)
-        c.bg = UI.Panel(c, "bg1", "line")
-        c.bg:SetAllPoints()
+        UI.Fill(c, "bg1")
+        UI.Border(c, "line")
         c.icon = UI.Icon(c, 30)
         c.icon:SetPoint("LEFT", 10, 0)
         c.kind = UI.Text(c, 10, "accent")
@@ -652,7 +652,23 @@ local function BuildOverview(parent)
     local meme = FT.S.meme ~= false
     v.gainers = MoverList(v, meme and L["TO THE MOON (24h)"] or L["Top gainers 24h"])
     v.losers = MoverList(v, meme and L["RUG PULLS (24h)"] or L["Top losers 24h"])
-    v.makers = T.MakersList(v)
+    -- Market Makers (the sellers with the most gold listed): in the hover of the Listed value card
+    v.cards[2]:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
+        GameTooltip:AddLine(L["Market Makers"], 1, 1, 1)
+        local makers, t = FT.Whales.Makers()
+        if #makers == 0 then
+            GameTooltip:AddLine(L["The sellers with the most gold listed show here after a Full Scan in Auctionator (it names every seller)."], 0.6, 0.64, 0.7, true)
+        else
+            GameTooltip:AddLine(string.format(L["The sellers with the most gold listed (scan of %s)"], FT.Ago(t)), 0.6, 0.64, 0.7, true)
+            for i = 1, math.min(8, #makers) do
+                local x = makers[i]
+                GameTooltip:AddDoubleLine(x.n .. (x.you and (" " .. L["(you)"]) or ""), FT.Money(x.value, "short") .. "  " .. string.format(L["%d items"], x.items), 0.85, 0.87, 0.9, 1, 1, 1)
+            end
+        end
+        GameTooltip:Show()
+    end)
+    v.cards[2]:SetScript("OnLeave", function() GameTooltip:Hide() end)
 
     UI.OnSize(v, function(self, w, h)
         local cw = (w - 3 * 8) / 4
@@ -676,16 +692,13 @@ local function BuildOverview(parent)
         self.chart:SetPoint("TOPRIGHT", 0, -212)
         local listsH = math.max(180, math.floor(h * 0.36))
         self.chart:SetPoint("BOTTOM", 0, listsH + 8)
-        local third = (w - 16) / 3
+        local half = (w - 8) / 2
         self.gainers:ClearAllPoints()
         self.gainers:SetPoint("BOTTOMLEFT", 0, 0)
-        self.gainers:SetSize(third, listsH)
+        self.gainers:SetSize(half, listsH)
         self.losers:ClearAllPoints()
-        self.losers:SetPoint("BOTTOMLEFT", third + 8, 0)
-        self.losers:SetSize(third, listsH)
-        self.makers:ClearAllPoints()
-        self.makers:SetPoint("BOTTOMRIGHT", 0, 0)
-        self.makers:SetSize(third, listsH)
+        self.losers:SetPoint("BOTTOMRIGHT", 0, 0)
+        self.losers:SetSize(half, listsH)
     end)
     return v
 end
@@ -746,9 +759,6 @@ function T.ShowOverview()
     })
     overview.gainers.list:SetItems(FT.Market.Movers(20, "ch1", true))
     overview.losers.list:SetItems(FT.Market.Movers(20, "ch1", false))
-    local makers, t = FT.Whales.Makers()
-    overview.makers.list:SetItems(makers)
-    overview.makers.when:SetText(t and FT.Ago(t) or "")
 end
 
 -- Today's 3 moves: the best carry and flip right now, and the best thing to farm (else the best vendor deal)
@@ -777,6 +787,24 @@ function T.FillMoves()
             what = string.format(L["%s: the market buys the most of it"], FT.ItemText(f1.id, 24)),
             tip = L["What the market pays for it a day, all sellers together: price x how many sell a day."] }
     end
+    -- fewer than three: the best craft, buy-to-disenchant and vendor deals fill in
+    if #cards < 3 then
+        local crafts = FT.Craft.ProfitCrafts and FT.Craft.ProfitCrafts()
+        local c = crafts and crafts[1]
+        if c then
+            cards[#cards + 1] = { id = c.id, kind = c.mode == "de" and L["CRAFT + DE"] or L["CRAFT IT"],
+                gold = "+" .. FT.Money(math.floor(c.profit), "short"),
+                what = string.format(L["%s: %s"], FT.ItemText(c.id, 24), L[c.recipe.prof or "?"]) }
+        end
+    end
+    if #cards < 3 then
+        local de = FT.Enchant and FT.Enchant.Deals()
+        local d = de and de[1]
+        if d then
+            cards[#cards + 1] = { id = d.id, kind = L["DE IT"], gold = "+" .. FT.Money(math.floor(d.profit), "short"),
+                what = string.format(L["%s: buy it, disenchant it"], FT.ItemText(d.id, 24)) }
+        end
+    end
     if #cards < 3 and best.VENDOR then
         cards[#cards + 1] = { id = best.VENDOR.id, kind = L["VENDOR IT"], gold = "+" .. FT.Money(math.floor(best.VENDOR.profit), "short"),
             what = string.format(L["%s: a vendor pays more than it costs"], FT.ItemText(best.VENDOR.id, 24)) }
@@ -785,13 +813,15 @@ function T.FillMoves()
         local m = cards[i]
         c.itemID = m and m.id
         c.tip = m and m.tip
-        c.icon:SetItem(m and m.id)
+        c.icon:SetShown(m ~= nil)
+        if m then c.icon:SetItem(m.id) end
         c.kind:SetText(m and m.kind or "")
         c.gold:SetText(m and m.gold or "")
         c.what:SetText(m and m.what or FT.C("dim", L["Nothing right now: new prices come every hour."]))
     end
 end
 FT.On("FT_DEALS_READY", function() if overview and overview:IsVisible() then T.FillMoves() end end)
+FT.On("FT_CRAFTS_READY", function() if overview and overview:IsVisible() then T.FillMoves() end end)
 
 ---------------------------------------------------------------------------
 -- One item
