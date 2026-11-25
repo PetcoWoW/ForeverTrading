@@ -1,5 +1,13 @@
 # The Wolf of Booty Bay
 
+## v0.17.1 - Terminal fixes
+
+- Today's 3 moves: the texts were drawn under the card's own background (only the icon showed); empty slots
+  showed a red "?" icon. The card is its own background now, an empty slot has no icon, and a slot without a
+  carry, flip or farm move takes the best craft, buy-to-disenchant or vendor deal.
+- Market Makers: no list of its own; the top sellers by gold listed are in the hover of the Listed value card.
+  The two mover lists get the room back and show the ticker and the name again.
+
 ## v0.17 - performance pass
 
 Measured in the fake WoW with real prices (tools/test), longest single frame of each piece of work at login:
