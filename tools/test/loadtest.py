@@ -58,6 +58,14 @@ for _, v in ipairs({ "portfolio", "sell", "chars", "journal" }) do
 end
 step("settings all", function() FT.S.showAdvanced = true; FT.Show("settings"); FT.Tabs.settings.Layout(); FT.S.showAdvanced = false; FT.Tabs.settings.Layout() end)
 mock.run(1)
+step("overview moves", function()
+  FT.Show("market"); FT.Tabs.market.ShowOverview(); FT.Tabs.market.FillMoves()
+  local ids = {}
+  for id in pairs(FT.Feed.House().items) do ids[#ids + 1] = id; if #ids >= 8 then break end end
+  local syms = {}
+  for _, id in ipairs(ids) do syms[#syms + 1] = FT.Symbol(id) end
+  print("symbols: " .. table.concat(syms, " "))
+end)
 step("open item", function() FT.OpenItem(12363) end)
 mock.run(1)
 step("best use", function() FT.ShowBestUse(12359) end)

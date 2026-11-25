@@ -595,6 +595,7 @@ local function WowheadLink(id)
 end
 
 T.ListView, T.SellYours = ListView, SellYours
+T.FarmRows = function() return FarmRows() end
 
 local function BuildSellView(p)
     local f = ListView(p, function(x)

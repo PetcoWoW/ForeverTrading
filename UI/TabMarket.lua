@@ -463,7 +463,8 @@ local function BuildList(parent)
             if r.child then
                 cell.text:SetText(FT.ItemText(r.id) .. FT.C("dim", " x" .. r.qty))
             else
-                cell.text:SetText(FT.ItemText(r.id))
+                local sym = FT.SymbolText(r.id)
+            cell.text:SetText((sym ~= "" and (sym .. "  ") or "") .. FT.ItemText(r.id))
             end
             row.cells.price:SetText(FT.Money(r.price, "short"))
             row.cells.ch1:SetText(FT.Pct(r.ch1))
@@ -525,7 +526,8 @@ local function MoverList(parent, title)
             local cell = row.cells.name
             cell.icon:SetItem(r.id)
             cell.star:SetText("")
-            cell.text:SetText(FT.ItemText(r.id))
+            local sym = FT.SymbolText(r.id)
+            cell.text:SetText((sym ~= "" and (sym .. "  ") or "") .. FT.ItemText(r.id))
             row.cells.price:SetText(FT.Money(r.price, "short"))
             row.cells.ch:SetText(FT.Pct(r.ch1))
         end,
@@ -583,7 +585,7 @@ local function BuildOverview(parent)
     v.hint:SetText(L["Pick an item on the left to see its chart"])
 
     v.cards = {}
-    local titles = { L["Items on the market"], L["Listed value"], L["Market mood"], L["Last scan"] }
+    local titles = { L["Items on the market"], L["Listed value"], L["Market mood"], L["Your portfolio"] }
     for i, t in ipairs(titles) do
         local c = UI.Stat(v, t)
         c:SetHeight(70)
@@ -597,6 +599,41 @@ local function BuildOverview(parent)
     v.moodFill = UI.Tex(v.moodBar, "ARTWORK", "up", 1)
     v.moodFill:SetPoint("TOPLEFT")
     v.moodFill:SetPoint("BOTTOMLEFT")
+
+    -- Today's 3 moves: the best carry, flip and farm right now, with the gold each should make
+    v.movesTitle = UI.Text(v, 12, "text")
+    v.movesTitle:SetText(L["Today's 3 moves"])
+    v.moves = {}
+    for i = 1, 3 do
+        local c = CreateFrame("Button", nil, v)
+        c:SetHeight(52)
+        c.bg = UI.Panel(c, "bg1", "line")
+        c.bg:SetAllPoints()
+        c.icon = UI.Icon(c, 30)
+        c.icon:SetPoint("LEFT", 10, 0)
+        c.kind = UI.Text(c, 10, "accent")
+        c.kind:SetPoint("TOPLEFT", c.icon, "TOPRIGHT", 8, 1)
+        c.gold = UI.Text(c, 12, "up", "RIGHT")
+        c.gold:SetPoint("TOPRIGHT", -10, -9)
+        c.what = UI.Text(c, 11, "text")
+        c.what:SetPoint("BOTTOMLEFT", c.icon, "BOTTOMRIGHT", 8, 0)
+        c.what:SetPoint("RIGHT", c, "RIGHT", -10, 0)
+        if c.what.SetWordWrap then c.what:SetWordWrap(false) end
+        c:SetScript("OnClick", function(self)
+            if self.itemID then FT.OpenItem(self.itemID) end
+        end)
+        c:SetScript("OnEnter", function(self)
+            if not self.itemID then return end
+            UI.TipItem(self, self.itemID)
+            if self.tip then
+                GameTooltip:AddLine(" ")
+                GameTooltip:AddLine(self.tip, 0.85, 0.87, 0.9, true)
+                GameTooltip:Show()
+            end
+        end)
+        c:SetScript("OnLeave", function() GameTooltip:Hide() end)
+        v.moves[i] = c
+    end
 
     v.chartTitle = UI.Text(v, 12, "text")
     v.chartTitle:SetText(L["Value listed on the auction house, by scan"])
@@ -613,11 +650,19 @@ local function BuildOverview(parent)
             c:SetPoint("TOPLEFT", (i - 1) * (cw + 8), -34)
             c:SetWidth(cw)
         end
+        self.movesTitle:ClearAllPoints()
+        self.movesTitle:SetPoint("TOPLEFT", 4, -114)
+        local mw = (w - 2 * 8) / 3
+        for i, c in ipairs(self.moves) do
+            c:ClearAllPoints()
+            c:SetPoint("TOPLEFT", (i - 1) * (mw + 8), -132)
+            c:SetWidth(mw)
+        end
         self.chartTitle:ClearAllPoints()
-        self.chartTitle:SetPoint("TOPLEFT", 4, -116)
+        self.chartTitle:SetPoint("TOPLEFT", 4, -194)
         self.chart:ClearAllPoints()
-        self.chart:SetPoint("TOPLEFT", 0, -134)
-        self.chart:SetPoint("TOPRIGHT", 0, -134)
+        self.chart:SetPoint("TOPLEFT", 0, -212)
+        self.chart:SetPoint("TOPRIGHT", 0, -212)
         local listsH = math.max(180, math.floor(h * 0.36))
         self.chart:SetPoint("BOTTOM", 0, listsH + 8)
         local third = (w - 16) / 3
@@ -664,7 +709,17 @@ function T.ShowOverview()
         overview.moodFill:Hide()
     end
     local last = FT.Hist.LastScan()
-    overview.cards[4]:Set(last and FT.Ago(last) or "—", last and date("%d.%m %H:%M", last) or L["press Full scan at the auction house"])
+    -- your portfolio today
+    local prows, ptotal = FT.Port.Rows()
+    local pvalue1 = 0
+    for _, h in ipairs(prows or {}) do
+        local r = FT.Market.Row(h.id)
+        if r and r.ch1 and r.ch1 > -1 then pvalue1 = pvalue1 + h.value / (1 + r.ch1) else pvalue1 = pvalue1 + h.value end
+    end
+    local pch = pvalue1 > 0 and (ptotal / pvalue1 - 1) or nil
+    overview.cards[4]:Set(FT.Money(math.floor((ptotal or 0) + FT.Port.Gold()), "short"),
+        (pch and (FT.Pct(pch) .. FT.C("dim", " " .. L["today"])) or L["items and gold"]))
+    T.FillMoves()
 
     local points = {}
     for _, s in ipairs(scans) do
@@ -682,6 +737,48 @@ function T.ShowOverview()
     overview.makers.list:SetItems(makers)
     overview.makers.when:SetText(t and FT.Ago(t) or "")
 end
+
+-- Today's 3 moves: the best carry and flip right now, and the best thing to farm (else the best vendor deal)
+function T.FillMoves()
+    if not overview then return end
+    local best = {}
+    for _, d in ipairs(FT.Deals.List() or {}) do
+        local k = d.kind
+        if not best[k] or d.profit > best[k].profit then best[k] = d end
+    end
+    local H = FT.House
+    local cards = {}
+    local carry, flip = best.HOUSES, best.RESELL
+    if carry then
+        cards[#cards + 1] = { id = carry.id, kind = L["CARRY IT"], gold = "+" .. FT.Money(math.floor(carry.profit), "short"),
+            what = string.format(L["%s: buy here, sell at %s"], FT.ItemText(carry.id, 24), H.Name(carry.sellHouse)) }
+    end
+    if flip then
+        cards[#cards + 1] = { id = flip.id, kind = L["FLIP IT"], gold = "+" .. FT.Money(math.floor(flip.profit), "short"),
+            what = string.format(L["%s: under its usual price, sells every day"], FT.ItemText(flip.id, 24)) }
+    end
+    local farm = FT.Tabs.signals and FT.Tabs.signals.FarmRows and FT.Tabs.signals.FarmRows()
+    local f1 = farm and farm[1]
+    if f1 then
+        cards[#cards + 1] = { id = f1.id, kind = L["FARM IT"], gold = FT.Money(math.floor(f1.sortV or 0), "short") .. FT.C("dim", " " .. L["a day"]),
+            what = string.format(L["%s: the market buys the most of it"], FT.ItemText(f1.id, 24)),
+            tip = L["What the market pays for it a day, all sellers together: price x how many sell a day."] }
+    end
+    if #cards < 3 and best.VENDOR then
+        cards[#cards + 1] = { id = best.VENDOR.id, kind = L["VENDOR IT"], gold = "+" .. FT.Money(math.floor(best.VENDOR.profit), "short"),
+            what = string.format(L["%s: a vendor pays more than it costs"], FT.ItemText(best.VENDOR.id, 24)) }
+    end
+    for i, c in ipairs(overview.moves) do
+        local m = cards[i]
+        c.itemID = m and m.id
+        c.tip = m and m.tip
+        c.icon:SetItem(m and m.id)
+        c.kind:SetText(m and m.kind or "")
+        c.gold:SetText(m and m.gold or "")
+        c.what:SetText(m and m.what or FT.C("dim", L["Nothing right now: new prices come every hour."]))
+    end
+end
+FT.On("FT_DEALS_READY", function() if overview and overview:IsVisible() then T.FillMoves() end end)
 
 ---------------------------------------------------------------------------
 -- One item
@@ -1025,7 +1122,8 @@ function T.ShowItem(id, keepView)
     local v = itemView
     local _, _, icon = FT.Item(id)
     v.icon:SetIcon(icon)
-    v.name:SetText(FT.ItemText(id, 40))
+    local sym = FT.SymbolText(id)
+    v.name:SetText((sym ~= "" and (sym .. "  ") or "") .. FT.ItemText(id, 40))
     local cls, sub = FT.ItemClass(id)
     local parts = {}
     if cls then

@@ -297,7 +297,8 @@ local function TipLines(itemID, detail)
     local out = {}
     -- 1: what to do with it, and its price
     local sig, _, reason = FT.An.SellSignal(s)
-    local left = "|cfff0b90bWolf|r"
+    local sym = FT.Symbol(itemID)
+    local left = "|cfff0b90bWolf|r" .. (sym ~= "" and ("  |cfff0b90b$" .. sym .. "|r") or "")
     if sig ~= "NODATA" and sig ~= "FAIR" then
         left = left .. "  " .. FT.C(FT.SIGNAL_COLORS[sig] or "muted", FT.SignalText(sig))
     end

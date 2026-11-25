@@ -1,5 +1,13 @@
 # The Wolf of Booty Bay
 
+## v0.12 - tickers
+
+- Ticker symbols for every item ($THOR, $ACRY, $RUGG...), made from the name; on the tape, the Terminal's lists, the
+  item's title and its tooltip.
+- The tape: your watchlist, then what you own (most valuable first), then the day's movers.
+- Terminal overview: Today's 3 moves (best carry, flip and farm, with the gold each should make) and Your
+  portfolio (worth and today's change) in place of Last scan.
+
 ## v0.11 - simpler: an extension of Auctionator
 
 - Header: AH and API chips (your last scan, Auctionator's included; Blizzard's hourly prices) in place of
