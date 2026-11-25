@@ -12,6 +12,14 @@ FT.News = N
 -- start, after the files are read (a table made with them would keep the English)
 local function News()
     return {
+        ["v0.11"] = {
+            { L["Where the prices come from"], L["Top left: AH (your last scan, Auctionator's too) and API (Blizzard's hourly prices). The lit one is what you see. Auctionator's last scan is taken at login by itself."] },
+            { L["Fewer pages"], L["Terminal, Money (Make gold, Farm) and Portfolio (Holdings, Sell yours, Characters, Journal). Scanning, posting and undercuts: Auctionator does those."],
+                function() FT.Show("signals"); FT.Tabs.signals.SetView("make") end },
+            { L["Plain reasons"], L["Every signal says why in plain words, and how sure it is: Sure, Likely or Guess. Hover the badge for the numbers."],
+                function() FT.Show("market") end },
+            { L["Lighter tooltips"], L["Two lines on every item, Shift for more. Worked out once, never in combat: no slowdown in your bags."] },
+        },
         ["v0.10"] = {
             { L["Bug pass"], L["Money > Sell yours and Farm Board switch properly now; the biggest movers and banners skip tiny markets and one-off prices."],
                 function() FT.Show("signals"); FT.Tabs.signals.SetView("farm") end },

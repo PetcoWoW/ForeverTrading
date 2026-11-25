@@ -256,56 +256,99 @@ end)
 ---------------------------------------------------------------------------
 -- Item tooltips
 ---------------------------------------------------------------------------
--- "Best use: Thorium Bar, 1.2g each (+40%)" - kept a minute per item (a tooltip shows many times a second)
-local bestLines = {}
+-- Two lines on an item's tooltip (bags, Bagnon, chat links...):
+--   Wolf  HODL                               2.1g  +4% today
+--   Best use: Thorium Bar, 2.6g each (+24%)   - or: Craft profit, or what it disenchants for
+-- Shift: the reason in plain words, how much sells a day, the week's move.
+-- The game refreshes a bag item's tooltip many times a second while you hover it: the lines are worked out once
+-- and kept (10 seconds, or until new prices come), and in combat only kept lines are shown - nothing is worked
+-- out there. Nothing of the bag addon is touched: lines are added after the game (or the bag addon) has set the
+-- tooltip, and the tooltip isn't redrawn by us.
+local tipCache = {}
+local TIP_FRESH = 10
+FT.On("FT_PRICES_CHANGED", function() wipe(tipCache) end)
+FT.On("FT_SCAN_DONE", function() wipe(tipCache) end)
+FT.On("FT_LEARNED", function() wipe(tipCache) end)
+
+-- "Best use: Thorium Bar, 2.6g each (+24%)" for a material, or nil - kept 2 minutes (a material in 100+
+-- recipes takes a moment to price)
+local bestCache = {}
+FT.On("FT_SCAN_DONE", function() wipe(bestCache) end)
 local function BestUseLine(itemID)
-    local c = bestLines[itemID]
-    if c and GetTime() - c.t < 60 then return c.text end
+    local c = bestCache[itemID]
+    if c and GetTime() - c.t < 120 then return c.text end
+    local text = nil
     local list, raw = FT.Craft.BestUse(itemID)
     local x = list[1]
-    local text
-    if x and x.each and x.each > 0 then
+    if x and x.each and x.each > 0 and x.sells then
         text = string.format(L["Best use: %s, %s each"], FT.ItemText(x.recipe.output, 26), FT.Money(math.floor(x.each), "short"))
         if raw and raw > 0 then text = text .. " " .. FT.Pct(x.each / raw - 1) end
-        if #list > 1 then text = text .. FT.C("dim", string.format(L["  (%d recipes)"], #list)) end
     end
-    bestLines[itemID] = { t = GetTime(), text = text }
+    bestCache[itemID] = { t = GetTime(), text = text }
     return text
 end
-FT.On("FT_PRICES_CHANGED", function() wipe(bestLines) end)
+
+local function TipLines(itemID, detail)
+    local s = FT.An.Stats(itemID)
+    local rs = FT.Craft.ByOutput(itemID)
+    local uses = FT.S.tooltipBestUse ~= false and FT.Craft.UsedIn(itemID)
+    local de = FT.Enchant and FT.Enchant.Value and FT.Enchant.Value(itemID)
+    if not s.price and not rs and not uses and not de then return false end
+    local out = {}
+    -- 1: what to do with it, and its price
+    local sig, _, reason = FT.An.SellSignal(s)
+    local left = "|cfff0b90bWolf|r"
+    if sig ~= "NODATA" and sig ~= "FAIR" then
+        left = left .. "  " .. FT.C(FT.SIGNAL_COLORS[sig] or "muted", FT.SignalText(sig))
+    end
+    local right = s.price and (FT.Money(s.price, "short") .. (s.ch1 and ("  " .. FT.Pct(s.ch1) .. FT.C("dim", " " .. L["today"])) or "")) or ""
+    out[#out + 1] = { left, right }
+    -- 2: the one fact worth most: a craft's profit, a material's best use, what it disenchants for
+    local second
+    if rs and rs[1] then
+        local e = FT.Craft.Eval(rs[1])
+        if e.profit then
+            second = string.format(L["Craft it: profit %s"], FT.C(e.profit >= 0 and "up" or "down", FT.Money(e.profit, "short")))
+        end
+    end
+    if not second and uses then second = BestUseLine(itemID) end
+    if not second and de then
+        second = string.format(L["Disenchants for ~%s"], FT.Money(math.floor(de), "short"))
+    end
+    if second then out[#out + 1] = { second } end
+    -- Shift: the reason, how much sells, the week
+    if detail then
+        if reason and sig ~= "NODATA" then out[#out + 1] = { FT.C("muted", reason) } end
+        local bits = {}
+        if s.sales and s.sales.perDay then bits[#bits + 1] = FT.Sales.PerDayText(s.sales) end
+        if s.ch7 then bits[#bits + 1] = L["7d"] .. " " .. FT.Pct(s.ch7) end
+        if s.rsi then bits[#bits + 1] = L["Hype"] .. " " .. string.format("%.0f", s.rsi) end
+        if #bits > 0 then out[#out + 1] = { FT.C("dim", table.concat(bits, "  ·  ")) } end
+    elseif FT.S.tooltipHint ~= false then
+        -- (the hint fits on line 2 when there's room)
+    end
+    return out
+end
 
 local function AddLines(tt, itemID)
     if not (FT.S and FT.S.tooltip and itemID) then return end
-    local ok, err = pcall(function()
-        local s = FT.An.Stats(itemID)
-        local rs = FT.Craft.ByOutput(itemID)
-        local uses = FT.S.tooltipBestUse ~= false and FT.Craft.UsedIn(itemID)
-        if not s.price and not rs and not uses then return end
-        local right = s.price and (FT.Money(s.price, "short") .. "  " .. FT.Pct(s.ch1)) or ""
-        tt:AddDoubleLine("|cfff0b90bWolf of Booty Bay|r", right)
-        local parts = {}
-        if s.ch7 then parts[#parts + 1] = L["7d"] .. " " .. FT.Pct(s.ch7) end
-        if s.rsi then parts[#parts + 1] = L["RSI"] .. " " .. string.format("%.0f", s.rsi) end
-        local sig = FT.An.SellSignal(s)
-        if sig ~= "NODATA" then
-            parts[#parts + 1] = FT.C(FT.SIGNAL_COLORS[sig] or "muted", FT.SignalText(sig))
-        end
-        if #parts > 0 then tt:AddLine(table.concat(parts, FT.C("dim", "  ||  ")), 0.8, 0.82, 0.86) end
-        if rs and rs[1] then
-            local e = FT.Craft.Eval(rs[1])
-            if e.profit then
-                tt:AddLine(string.format(L["Craft: costs %s, profit %s (%d%%)"], FT.Money(e.cost, "short"),
-                    FT.C(e.profit >= 0 and "up" or "down", FT.Money(e.profit, "short")),
-                    math.floor((e.margin or 0) * 100 + 0.5)), 0.8, 0.82, 0.86)
-            end
-        end
-        if uses then
-            local best = BestUseLine(itemID)
-            if best then tt:AddLine(best, 0.8, 0.82, 0.86) end
-        end
-    end)
-    if not ok then FT.Debug(err) end
-    tt:Show()
+    if tt.IsForbidden and tt:IsForbidden() then return end
+    local detail = IsShiftKeyDown and IsShiftKeyDown() or false
+    local key = itemID .. (detail and "+" or "")
+    local c = tipCache[key]
+    local now = GetTime()
+    if not (c and (now - c.t < TIP_FRESH or InCombatLockdown())) then
+        if InCombatLockdown() then return end -- nothing is worked out in a fight
+        local ok, lines = pcall(TipLines, itemID, detail)
+        if not ok then FT.Debug(lines) lines = false end
+        c = { t = now, lines = lines }
+        tipCache[key] = c
+    end
+    if not c.lines then return end
+    for _, l in ipairs(c.lines) do
+        if l[2] then tt:AddDoubleLine(l[1], l[2], 0.8, 0.82, 0.86, 1, 1, 1)
+        else tt:AddLine(l[1], 0.8, 0.82, 0.86) end
+    end
 end
 
 local function HookTooltips()
@@ -588,7 +631,8 @@ local function BestUseWindow()
         rowHeight = 24, cols = cols,
         update = function(row, x)
             local r = x.recipe
-            row.cells.name:SetText(FT.ItemText(r.output, 34) .. (x.known and FT.C("up", "  " .. L["known"]) or ""))
+            row.cells.name:SetText(FT.ItemText(r.output, 34) .. (x.known and FT.C("up", "  " .. L["known"]) or "")
+                .. ((not x.sells and x.each) and FT.C("down", "  " .. L["hardly sells"]) or ""))
             row.cells.prof:SetText(FT.C("dim", L[r.prof or "?"]))
             row.cells.need:SetText(FT.Num(x.need))
             if x.each then
@@ -642,7 +686,7 @@ function FT.ShowBestUse(itemID)
     d.title:SetText(L["Best use of"] .. " " .. FT.ItemText(itemID, 40))
     local list, raw, via = FT.Craft.BestUse(itemID)
     d.raw_ = raw
-    local best = list[1] and list[1].each
+    local best = list[1] and list[1].sells and list[1].each
     local line
     if raw then
         line = string.format(L["Sold as it is: %s each%s."], FT.Money(math.floor(raw), "short"),

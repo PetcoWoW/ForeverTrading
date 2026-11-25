@@ -177,6 +177,42 @@ function A.OnSummaryScan(results)
     end)
 end
 
+-- When Auctionator last scanned the whole auction house (it saves it: AUCTIONATOR_SAVEDVARS.TimeOfLastBrowseScan)
+function A.LastScanTime()
+    if not A.On() then return nil end
+    local sv = AUCTIONATOR_SAVEDVARS
+    local t = type(sv) == "table" and tonumber(sv.TimeOfLastBrowseScan) or nil
+    return (t and t > 0 and t <= time() + 60) and t or nil
+end
+
+-- Auctionator's last scan, taken as ours: every item it priced that day (its price and how many were up). Done by
+-- itself at login when it's newer than what we have, and on a click on the AH chip. Its price database is in the
+-- game already (no file to read): nothing to do at the auction house. Returns the number of items, or nil.
+function A.TakeLatest(manual)
+    local t = A.LastScanTime()
+    local db = A.DB()
+    if not (t and db) then return nil end
+    if FT.Hist.HasScan(t) then return nil end
+    local own = FT.Hist.LastScan("full")
+    if own and own >= t and not manual then return nil end
+    local day = tostring(FT.Day(t))
+    local sum = FT.Scanner.NewSummary()
+    for key, e in pairs(db) do
+        local id = tonumber(key)
+        if id and type(e) == "table" and type(e.m) == "number" and e.m > 0 and type(e.h) == "table" and e.h[day] then
+            local q = type(e.a) == "table" and tonumber(e.a[day]) or 1
+            sum.items[id] = { p = e.m, q = math.max(1, q or 1) }
+            sum.count = sum.count + 1
+        end
+    end
+    if sum.count < 100 then return nil end -- a search, not a scan of the market
+    FT.Scanner.SaveSummary(sum, t, "auctionator", function(items)
+        FT.Print(string.format(L["Took Auctionator's last scan (%s): %s items."], FT.Ago(t), FT.Num(items)))
+        FT.Fire("FT_SCAN_DONE", "auctionator")
+    end)
+    return sum.count
+end
+
 function A.OnSearchResults(results)
     if not (A.On() and FT.ahOpen and type(results) == "table" and #results > 0) then return end
     local t = time()
@@ -238,6 +274,8 @@ end
 A.TryHook = TryHook
 
 FT.On("FT_READY", function()
+    -- Auctionator scanned since we last looked (with this addon off, or before it was installed): take it
+    C_Timer.After(1, function() if not FT.ahOpen then A.TakeLatest(false) end end)
     if TryHook() then return end
     local tries = 0
     local ticker

@@ -612,21 +612,30 @@ end
 
 -- what the average is of, in the reasons: "the 14-day average" (as many days as the setting while there are 3 or
 -- more of them, otherwise as many as there are), or the price of the last hours
-local function AboveText(s, dev)
-    if s.avgFair then return string.format(L["%s above its price of the last hours"], FT.Pct(dev, true)) end
-    return string.format(L["%s above the %d-day average"], FT.Pct(dev, true), (s.avgN or 0) >= 3 and FT.S.avgDays or s.avgN)
-end
-local function BelowText(s, dev)
-    if s.avgFair then return string.format(L["%s below its price of the last hours"], FT.Pct(dev, true)) end
-    return string.format(L["%s below the %d-day average"], FT.Pct(dev, true), (s.avgN or 0) >= 3 and FT.S.avgDays or s.avgN)
-end
+-- "+20%" (whole percents: a reason is read at a glance)
+local function Pc(v) return string.format("%+d%%", math.floor(v * 100 + (v >= 0 and 0.5 or -0.5))) end
+An.Pc = Pc
+local function AboveText(s, dev) return string.format(L["Higher than usual (%s)"], Pc(dev)) end
+local function BelowText(s, dev) return string.format(L["Cheaper than usual (%s)"], Pc(dev)) end
 
--- for something you have or make: sell now?
+-- How sure a signal is: Sure (this item's own past cases), Likely (its kind's, or a long history), Guess (little to go by)
+local function Conf(s, own, kind)
+    if own then return "sure" end
+    if kind or (s.days or 0) >= 10 then return "likely" end
+    return "guess"
+end
+local CONF_TEXT = { sure = "Sure", likely = "Likely", guess = "Guess" }
+function An.ConfText(c) return c and L[CONF_TEXT[c]] or "" end
+
+-- For something you have or make: sell now? Returns kind, strength (1-3), a short reason anyone gets, and the
+-- numbers behind it (for a hover). How sure it is goes in s.conf.
 function An.SellSignal(s)
+    s.conf = nil
     -- a buyout: worth selling a little under it now - it won't last
     if s.spike then
-        return "SELL", 2, string.format(L["Price jump (buyout?): %s above its fair price ~%s - sell a little under it now, it won't last"],
-            FT.Pct(s.price / s.fair - 1, true), FT.Money(s.fair, "short"))
+        s.conf = "likely"
+        return "SELL", 2, string.format(L["Someone bought out the cheap ones: sell a little under ~%s now, it won't last"], FT.Money(s.fair, "short")),
+            string.format(L["%s over its fair price"], Pc(s.price / s.fair - 1))
     end
     if not Enough(s) then return "NODATA", 0, L["Not enough price history yet"] end
     local th = FT.S.sellAbove / 100
@@ -637,99 +646,106 @@ function An.SellSignal(s)
     local sticky = learn and b.knowsHighs and b.stick >= 0.6
     local fades = learn and b.knowsHighs and b.stick <= 0.3
     local record = b.knowsHighs and An.HighRecord(b) or nil
+    local ownHighs, kindHighs = (b.highs or 0) >= MIN_CASES, b.kindHighs ~= nil
+    local ownLows, kindLows = (b.lows or 0) >= MIN_CASES, b.kindLows ~= nil
     -- yours to hold: you marked it (a raid or phase coming that the numbers can't see)
     if FT.db.longHold and s.id and FT.db.longHold[s.id] then
-        return "HOLD", 3, L["Your long hold: kept until you unmark it"] .. ((dev >= th) and ("  (" .. AboveText(s, dev) .. ")") or "")
+        s.conf = "sure"
+        return "HOLD", 3, L["Your long hold: HODL until you unmark it"], (dev >= th) and AboveText(s, dev) or nil
     end
     if (dev >= th or hot) and learn and (s.rising or sticky) then
-        local up = s.rising and string.format(L["%s in 30 days"], FT.Pct(s.ch30, true)) or record
+        local up = s.rising and string.format(L["%s this month"], Pc(s.ch30 or 0)) or nil
+        s.conf = Conf(s, ownHighs or s.rising, kindHighs)
         -- the climb cracking: fell since the last check, under its fair price, more listed or sellers than usual,
         -- or not selling - take the gains while they're there
         local why
-        if s.dropped then why = L["fell since the last check"]
-        elseif s.falling then why = L["under its price of the last hours"]
+        if s.dropped then why = L["it just fell"]
+        elseif s.falling then why = L["it's under its price of the last hours"]
         elseif s.flood then why = L["far more listed than usual"]
         elseif s.crowd then why = L["more sellers than usual"]
-        elseif s.slow then why = L["hardly selling"] end
+        elseif s.slow then why = L["it's hardly selling"] end
         if why then
-            return "SELL", 3, string.format(L["%s, but it's cracking (%s): cash out"], up, why)
+            return "SELL", 3, string.format(L["Was climbing, now slipping (%s): sell"], why), up or record
         end
         -- climbing, but stretched far above its average: bank half, let the rest ride
         if dev >= th * 3 or (s.rsi and s.rsi >= 80) then
-            return "TRIM", 2, string.format(L["%s and stretched (%s over average): sell half, hold half"], up, FT.Pct(dev, true))
+            return "TRIM", 2, string.format(L["Way up (%s): sell half, keep half"], up or Pc(dev)), record
         end
         if s.rising then
-            return "HOLD", 3, string.format(L["Climbing for weeks (%s, higher lows, still selling): let it ride"],
-                up .. (record and (", " .. record) or ""))
+            return "HOLD", 3, string.format(L["Climbing for weeks (%s): let it ride"], up), record
         end
-        return "HOLD", 3, string.format(L["%s over average, and %s: let it ride"], FT.Pct(dev, true), record)
+        return "HOLD", 3, L["Higher than usual, and jumps like this tend to stick: let it ride"], record
     end
     if dev >= th or hot then
         local strength = (dev >= th and hot) and 3 or ((dev >= th * 2) and 3 or 2)
-        local reason
-        if dev >= th then
-            reason = AboveText(s, dev)
-        else
-            reason = string.format(L["RSI %d: overbought"], math.floor(s.rsi + 0.5))
-        end
+        local detail = dev >= th and AboveText(s, dev) or string.format(L["Hype %d"], math.floor(s.rsi + 0.5))
         -- the week's rhythm: its best day is close and pays clearly more - list it then
         if learn and b.bestDay and (b.bestUp or 0) >= 0.05 and not s.dropped and not s.flood then
             local today = Weekday(FT.Day())
             local wait = (b.bestDay - today) % 7
             if wait >= 1 and wait <= 3 then
-                return "HOLD", 2, reason .. "  " .. string.format(L["(but %ss usually run %s higher: list it then)"],
-                    An.DayName(b.bestDay), FT.Pct(b.bestUp, true))
+                s.conf = "likely"
+                local day = An.DayName(b.bestDay)
+                return "HOLD", 2, string.format(L["Higher than usual, and %ss pay %s more: list it %s"], day, Pc(b.bestUp), day), detail
             end
         end
         if fades then
-            return "SELL", 3, reason .. "  (" .. record .. L[": cash out"] .. ")"
+            s.conf = Conf(s, ownHighs, kindHighs)
+            return "SELL", 3, L["Higher than usual, and jumps like this fade fast: sell now"], detail .. "; " .. record
         end
-        return "SELL", strength, reason
+        s.conf = Conf(s, false, false)
+        if dev >= th then
+            return "SELL", strength, string.format(L["Higher than usual (%s): good time to sell"], Pc(dev)), nil
+        end
+        return "SELL", strength, L["Hyped up right now: good time to sell"], detail
     end
     if dev <= -th then
         if learn and b.knowsLows and b.rebound <= 0.3 then
-            return "FAIR", 1, string.format(L["%s below average, and %s: no point waiting"], FT.Pct(dev, true), An.LowRecord(b))
+            s.conf = Conf(s, ownLows, kindLows)
+            return "FAIR", 1, L["Cheaper than usual, and dips here don't come back: no point waiting"], BelowText(s, dev) .. "; " .. An.LowRecord(b)
         end
         if learn and b.knowsLows and b.rebound >= 0.6 then
-            return "HOLD", 3, string.format(L["%s below average: wait, %s"], FT.Pct(dev, true), An.LowRecord(b))
+            s.conf = Conf(s, ownLows, kindLows)
+            return "HOLD", 3, L["Cheaper than usual, but dips like this come back: wait"], BelowText(s, dev) .. "; " .. An.LowRecord(b)
         end
-        if s.avgFair then
-            return "HOLD", 2, string.format(L["%s below its price of the last hours: wait"], FT.Pct(dev, true))
-        end
-        return "HOLD", 2, string.format(L["%s below the %d-day average: wait"], FT.Pct(dev, true),
-            (s.avgN or 0) >= 3 and FT.S.avgDays or s.avgN)
+        s.conf = Conf(s, false, false)
+        return "HOLD", 2, string.format(L["Cheaper than usual (%s): wait for it to come back"], Pc(dev)), nil
     end
-    return "FAIR", 1, L["Price near its average"]
+    s.conf = Conf(s, false, false)
+    return "FAIR", 1, L["About its usual price"]
 end
 
 -- for a material you need: buy now?
 function An.BuySignal(s)
+    s.conf = nil
     if not Enough(s) then return "NODATA", 0, L["Not enough price history yet"] end
     local th = FT.S.buyBelow / 100
     local dev = s.dev or 0
     local cold = s.rsi and s.rsi <= 30
+    local b = s.behavior or {}
     if dev <= -th or cold then
         local strength = (dev <= -th and cold) and 3 or 2
-        local reason
-        if dev <= -th then
-            reason = BelowText(s, dev)
-        else
-            reason = string.format(L["RSI %d: oversold"], math.floor(s.rsi + 0.5))
-        end
-        local b = s.behavior or {}
+        local detail = dev <= -th and BelowText(s, dev) or string.format(L["Hype %d"], math.floor(s.rsi + 0.5))
         if FT.S.holdTrends ~= false and b.knowsLows then
+            s.conf = Conf(s, (b.lows or 0) >= MIN_CASES, b.kindLows ~= nil)
             if b.rebound >= 0.6 then
-                return "BUY", 3, reason .. "  (" .. An.LowRecord(b) .. ")"
+                return "BUY", 3, string.format(L["Cheaper than usual (%s), and dips like this come back: good buy"], Pc(dev)), An.LowRecord(b)
             elseif b.rebound <= 0.3 then
-                return "BUY", 1, reason .. "  (" .. L["careful: "] .. An.LowRecord(b) .. ")"
+                return "BUY", 1, string.format(L["Cheaper than usual (%s), but dips here keep falling: careful"], Pc(dev)), An.LowRecord(b)
             end
         end
-        return "BUY", strength, reason
+        s.conf = Conf(s, false, false)
+        if dev <= -th then
+            return "BUY", strength, string.format(L["Cheaper than usual (%s): good time to buy"], Pc(dev)), nil
+        end
+        return "BUY", strength, L["Nobody's buying right now: cheap"], detail
     end
     if dev >= th then
-        return "EXPENSIVE", 2, AboveText(s, dev)
+        s.conf = Conf(s, false, false)
+        return "EXPENSIVE", 2, string.format(L["Pricier than usual (%s): wait"], Pc(dev)), nil
     end
-    return "FAIR", 1, L["Price near its average"]
+    s.conf = Conf(s, false, false)
+    return "FAIR", 1, L["About its usual price"]
 end
 
 -- trend over a week

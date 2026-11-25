@@ -179,8 +179,9 @@ function methods:NumLines() return 0 end
 function methods:GetOwner() return self.__owner end
 function methods:SetOwner(o) self.__owner = o end
 function methods:GetItem() return nil end
-function methods:AddLine() end
-function methods:AddDoubleLine() end
+function methods:AddLine(t) self.__lines = self.__lines or {}; table.insert(self.__lines, tostring(t)) end
+function methods:AddDoubleLine(a, b) self.__lines = self.__lines or {}; table.insert(self.__lines, tostring(a) .. " | " .. tostring(b)) end
+function methods:ClearLines() self.__lines = {} end
 
 function CreateFrame(kind, name, parent, template)
     local f = newObj(kind or "Frame", name, parent)
@@ -230,7 +231,7 @@ function GetRealmID() return 366 end
 function GetCurrentRegion() return 1 end
 function GetLocale() return "enUS" end
 function GetMoney() return mock.money end
-function InCombatLockdown() return false end
+function InCombatLockdown() return mock.combat end
 function IsInGuild() return false end
 function IsInGroup() return false end
 function IsInRaid() return false end
@@ -310,7 +311,8 @@ C_Container = { GetContainerNumSlots = function() return 0 end, GetContainerItem
     GetContainerItemID = function() return nil end, GetContainerItemLink = function() return nil end }
 function GetContainerNumSlots() return 0 end
 function GetContainerItemInfo() return nil end
-TooltipDataProcessor = { AddTooltipPostCall = function() end }
+TooltipDataProcessor = { AddTooltipPostCall = function(_, fn) mock.tdp = fn end }
+mock.combat = false
 C_TooltipInfo = {}
 C_Map = { GetBestMapForUnit = function() return 1415 end, GetMapInfo = function() return { name = "Stormwind" } end }
 C_ChatInfo = { RegisterAddonMessagePrefix = function() return true end, SendAddonMessage = function() return true end }

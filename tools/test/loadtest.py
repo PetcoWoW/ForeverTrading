@@ -48,14 +48,16 @@ for _, tab in ipairs({ "market", "signals", "portfolio", "sell", "settings", "cr
   step("tab " .. tab, function() FT.Show(tab) end)
   mock.run(1)
 end
-for _, v in ipairs({ "HOUSES", "RESELL", "VENDOR", "sell", "farm", "signals" }) do
+for _, v in ipairs({ "make", "farm", "HOUSES", "sell" }) do
   step("money view " .. v, function() FT.Show("signals"); FT.Tabs.signals.SetView(v) end)
   mock.run(0.5)
 end
-for _, v in ipairs({ "portfolio", "chars", "journal" }) do
+for _, v in ipairs({ "portfolio", "sell", "chars", "journal" }) do
   step("portfolio view " .. v, function() FT.Show("portfolio"); FT.Tabs.portfolio.SetView(v) end)
   mock.run(0.5)
 end
+step("settings all", function() FT.S.showAdvanced = true; FT.Show("settings"); FT.Tabs.settings.Layout(); FT.S.showAdvanced = false; FT.Tabs.settings.Layout() end)
+mock.run(1)
 step("open item", function() FT.OpenItem(12363) end)
 mock.run(1)
 step("best use", function() FT.ShowBestUse(12359) end)
@@ -135,6 +137,35 @@ step("feed parse", function()
   print("feed item 25 days (ours):", days[1], "..", days[#days], "today", FT.Day(), "count", #days)
   print("house", FT.Feed.HouseID(), "neutral", FT.Feed.HouseID("neutral"), "cut here", FT.Cut and FT.Cut(FT.house), "cut neutral", FT.Cut and FT.Cut("neutral"))
 end)
+step("tooltips", function()
+  local fh = FT.Feed.House()
+  local ids = {}
+  for id in pairs(fh.items) do ids[#ids + 1] = id; if #ids >= 300 then break end end
+  ids[#ids + 1] = 4234; ids[#ids + 1] = 12359
+  local t0 = os.clock()
+  for _, id in ipairs(ids) do GameTooltip:ClearLines(); mock.tdp(GameTooltip, { id = id }) end
+  local first = (os.clock() - t0) * 1000
+  t0 = os.clock()
+  for r = 1, 20 do for _, id in ipairs(ids) do GameTooltip:ClearLines(); mock.tdp(GameTooltip, { id = id }) end end
+  local again = (os.clock() - t0) * 1000 / 20
+  print(string.format("tooltips: %d items, first %.1f ms (%.2f each), refresh %.2f ms (%.3f each)", #ids, first, first / #ids, again, again / #ids))
+  GameTooltip:ClearLines(); mock.tdp(GameTooltip, { id = 4234 })
+  print("tooltip Heavy Leather: " .. table.concat(GameTooltip.__lines or {}, " // "))
+  mock.combat = true
+  GameTooltip:ClearLines(); mock.tdp(GameTooltip, { id = 99999 })
+  print("tooltip in combat, never seen: " .. #(GameTooltip.__lines or {}) .. " lines")
+  mock.combat = false
+end)
+step("auctionator last scan", function()
+  AUCTIONATOR_SAVEDVARS = { TimeOfLastBrowseScan = time() - 600 }
+  local db = Auctionator.Database.db
+  local day = tostring(FT.Day(time() - 600))
+  for i = 1, 200 do db[tostring(5000 + i)] = { m = 1000 + i, h = { [day] = 1000 + i }, a = { [day] = 3 } } end
+  print("atr debug:", FT.Atr.On(), FT.Atr.LastScanTime(), FT.Atr.DB() ~= nil, FT.house, FT.Hist.HasScan(time() - 600))
+  print("took from Auctionator:", FT.Atr.TakeLatest(true))
+  FT.UpdateAHPill()
+end)
+mock.run(5)
 step("timing", function()
   local fh = FT.Feed.House()
   local ids = {}

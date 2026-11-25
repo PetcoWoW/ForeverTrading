@@ -1,7 +1,6 @@
--- Wolf of Booty Bay (built on ForeverTrading): the Money page - ways to make gold right now, one list each:
---  Carry it (cheaper at one auction house than the other pays), Flip it (far under its normal price, sells every day),
---  Vendor it (under what a vendor pays), Sell yours (each thing you own: where and how to sell it), the Farm Board
---  (raw materials by the gold the market pays for them a day) and Signals (ForeverTrading's four columns).
+-- Wolf of Booty Bay (built on ForeverTrading): the Money page - ways to make gold from the market right now:
+--  Make gold (one ranked list: carry it between the houses, flip it, vendor it) and the Farm Board (raw materials by
+--  the gold the market pays for them a day). What to do with what you own is Portfolio > Sell yours.
 local ADDON, FT = ...
 local UI = FT.UI
 local L = FT.L
@@ -57,11 +56,7 @@ local function Column(parent, title, sub)
         end,
         onClick = function(x)
             if UI.ItemClick(x.id) then return end
-            if x.auction then
-                -- your auction someone undercut: My auctions with it chosen
-                FT.Show("sell")
-                FT.Tabs.sell.OpenOwned(x.auction)
-            elseif x.recipe then
+            if x.recipe then
                 FT.OpenRecipe(x.recipe)
             else
                 FT.OpenItem(x.id)
@@ -283,7 +278,7 @@ local function BuildDeals(p)
     f.hint:SetPoint("TOPLEFT", 0, -32)
     f.hint:SetPoint("RIGHT", 0, 0)
     if f.hint.SetWordWrap then f.hint:SetWordWrap(false) end
-    DEALS_HINT = L["To a vendor: a sure profit. Resell: the cheap lots of a steady market, listed again near the fair price. Between houses: cheaper at one auction house than the other sells it for."]
+    DEALS_HINT = L["Buy it, then: CARRY IT to the other auction house, FLIP IT (list it again near its normal price) or VENDOR IT. Best first."]
     f.hint:SetText(DEALS_HINT)
     local box = UI.Panel(f, "bg1", "line")
     box:SetPoint("TOPLEFT", 0, -50)
@@ -297,7 +292,8 @@ local function BuildDeals(p)
             row.name:SetText(FT.ItemText(d.id, 40) .. (listed and FT.C("accent", "  [" .. L["in your list"] .. "]") or ""))
             row.reason:SetText(DealText(d))
             row.value:SetText(FT.C("up", "+" .. Money(d.profit)))
-            row.badge:Set(d.kind, nil, d.noBook and 1 or 3)
+            local label = (d.kind == "HOUSES" and L["CARRY IT"]) or (d.kind == "RESELL" and L["FLIP IT"]) or (d.kind == "VENDOR" and L["VENDOR IT"]) or nil
+            row.badge:Set(d.kind, label, d.noBook and 1 or 3)
         end,
         onClick = function(d, button)
             -- between the houses: a right click takes it on (or lets it go)
@@ -367,19 +363,19 @@ local function WhyNoDeals(older)
     if T.search ~= "" then return L["Nothing matches"] end
     local info = FT.Deals.Info()
     if info and info.items == 0 then
-        return L["No prices yet: deals are looked for in the auction house's prices - scan it at the auction house."]
+        return L["No prices yet. They come with the next update (Blizzard's hourly prices), or scan in Auctionator at the auction house."]
     end
     local why = { L["No good deals right now."] }
     if older > 0 then
-        why[#why + 1] = string.format(L["%d more with older prices: choose 24 h, or scan the auction house again."], older)
+        why[#why + 1] = string.format(L["%d more with older prices: choose 24 h, or scan in Auctionator."], older)
     elseif info and info.newest and info.newest < time() - dstate.age then
-        why[#why + 1] = string.format(L["Newest prices: %s - scan the auction house again."], FT.Ago(info.newest))
+        why[#why + 1] = string.format(L["Newest prices: %s. Scan in Auctionator, or /reload for Blizzard's newest."], FT.Ago(info.newest))
     end
     if FT.Deals.Loading() > 0 then
         why[#why + 1] = L["Vendor prices are still loading: deals to a vendor follow."]
     end
     if info and info.history == 0 and (dstate.kind == "all" or dstate.kind == "RESELL") then
-        why[#why + 1] = L["Reselling needs at least 3 days of prices: a full scan every day."]
+        why[#why + 1] = L["Flipping needs at least 3 days of prices."]
     end
     if dstate.kind == "all" or dstate.kind == "HOUSES" then
         local other = FT.House.IsNeutral() and "faction" or "neutral"
@@ -396,7 +392,7 @@ local function WhyNoDeals(older)
             Money(FT.S.dealMin))
     end
     if #why == 1 then
-        return L["No good deals right now. They are looked for in the latest prices: scan the auction house, or open items while it is open."]
+        return L["No good deals right now. New prices come every hour: check back after the next update."]
     end
     return table.concat(why, "\n\n")
 end
@@ -439,17 +435,22 @@ function T.SetDealKind(kind)
     T.SetView(kind)
 end
 
-local DEAL_VIEWS = { HOUSES = true, RESELL = true, VENDOR = true }
+local DEAL_VIEWS = { make = true }
 
 local sellView, farmView -- the Sell yours and Farm Board views (built in T.Build)
 
 function T.SetView(view)
-    -- the old names (the tour, other pages): the deals are now one view each
-    if view == "deals" then view = (dstate.kind ~= "all" and dstate.kind) or "HOUSES" end
+    -- the old names (the tour, What's new, other pages): one Make gold list now; Sell yours is in Portfolio
+    if view == "sell" then
+        FT.SelectTab("portfolio")
+        FT.Tabs.portfolio.SetView("sell")
+        return
+    end
+    if view == "deals" or view == "HOUSES" or view == "RESELL" or view == "VENDOR" or view == "signals" then view = "make" end
     T.view = view
     if T.viewSeg then T.viewSeg:SetValue(view) end
     local deals = DEAL_VIEWS[view]
-    if deals then dstate.kind = view end
+    if deals then dstate.kind = "all" end
     for _, c in ipairs(cols) do c:SetShown(view == "signals") end
     if dealsView then
         dealsView:SetShown(deals or false)
@@ -593,6 +594,8 @@ local function WowheadLink(id)
         "https://www.wowhead.com/classic/item=" .. id)
 end
 
+T.ListView, T.SellYours = ListView, SellYours
+
 local function BuildSellView(p)
     local f = ListView(p, function(x)
         if UI.ItemClick(x.id) then return end
@@ -684,9 +687,7 @@ function T.Build(p)
     T.rules = UI.Text(head, 11, "dim")
     T.rules:SetPoint("TOPLEFT", 4, -24)
     T.rules:SetPoint("RIGHT", head, "RIGHT", -150, 0)
-    local tune = UI.Button(head, L["Thresholds"], 10, 24, "default", function() FT.SelectTab("settings") end)
-    tune:FitText(24)
-    tune:SetPoint("RIGHT", 0, 0)
+
     -- the search, next to the title: every column keeps only what matches ("name" in quotes: that name exactly)
     T.search = ""
     T.searchBox = UI.Input(head, 220, 22, L["Search item..."], function(text)
@@ -699,13 +700,11 @@ function T.Build(p)
         T.Refresh()
     end)
     -- one way to make gold per view; Signals: ForeverTrading's four columns
-    T.view = T.view or "HOUSES"
-    T.viewSeg = UI.Segmented(head, { { "HOUSES", L["Carry it"] }, { "RESELL", L["Flip it"] }, { "VENDOR", L["Vendor it"] },
-        { "sell", L["Sell yours"] }, { "farm", L["Farm Board"] }, { "signals", L["Signals"] } }, function(v) T.SetView(v) end, 22)
+    T.view = T.view or "make"
+    T.viewSeg = UI.Segmented(head, { { "make", L["Make gold"] }, { "farm", L["Farm"] } }, function(v) T.SetView(v) end, 22)
     T.viewSeg:SetPoint("LEFT", T.searchBox, "RIGHT", 12, 0)
     T.viewSeg:SetValue(T.view)
     dealsView = BuildDeals(p)
-    sellView = BuildSellView(p)
     farmView = BuildFarmView(p)
     -- the deals are looked for again on new prices only while they are on the screen (Sell yours and the
     -- line under the title use them too)

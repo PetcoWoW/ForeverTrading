@@ -893,6 +893,21 @@ local function BuildItemView(parent)
     end
     v.sellBadge, v.sellText = SigRow(-28, L["If you sell"])
     v.buyBadge, v.buyText = SigRow(-64, L["If you buy"])
+    -- the numbers behind a reason, on a hover of its badge
+    for _, pair in ipairs({ { v.sellBadge, "sellWhy", L["If you sell"] }, { v.buyBadge, "buyWhy", L["If you buy"] } }) do
+        local badge, key, title = pair[1], pair[2], pair[3]
+        badge:EnableMouse(true)
+        badge:SetScript("OnEnter", function(self)
+            local why = v[key]
+            if not why then return end
+            GameTooltip:SetOwner(self, "ANCHOR_TOP")
+            GameTooltip:AddLine(title, 1, 1, 1)
+            GameTooltip:AddLine(why, 0.85, 0.87, 0.9, true)
+            GameTooltip:AddLine(L["Sure: this item did it before. Likely: items like it did. Guess: little to go by yet."], 0.6, 0.64, 0.7, true)
+            GameTooltip:Show()
+        end)
+        badge:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    end
     v.glance = UI.Text(v.sig, 11, "muted")
     v.glance:SetPoint("TOPLEFT", 10, -104)
     v.glance:SetPoint("RIGHT", v.sig, "RIGHT", -10, 0)
@@ -1076,18 +1091,23 @@ function T.ShowItem(id, keepView)
         .. (s.sales and (FT.C("dim", "  ||  ") .. FT.C(s.slow and "down" or "text", FT.Sales.PerDayText(s.sales))) or ""))
 
     -- signals
-    local sell, sellStrength, sellReason = FT.An.SellSignal(s)
+    -- the reason in plain words, how sure it is after it; the numbers behind it in the hover
+    local function Sure(conf) return conf and FT.C("dim", "  ·  " .. FT.An.ConfText(conf)) or "" end
+    local sell, sellStrength, sellReason, sellWhy = FT.An.SellSignal(s)
+    local sellConf = s.conf
     v.sellBadge:Set(sell, nil, sellStrength)
-    v.sellText:SetText(sellReason or "")
-    local buy, buyStrength, buyReason = FT.An.BuySignal(s)
+    v.sellText:SetText((sellReason or "") .. Sure(sellConf))
+    v.sellWhy = sellWhy
+    local buy, buyStrength, buyReason, buyWhy = FT.An.BuySignal(s)
     v.buyBadge:Set(buy, nil, buyStrength)
-    v.buyText:SetText(buyReason or "")
+    v.buyText:SetText((buyReason or "") .. Sure(s.conf))
+    v.buyWhy = buyWhy
     -- Simple view: the indicators in one line under what to do
     if FT.S.simple ~= false then
         local bits = {}
-        if s.rsi then bits[#bits + 1] = L["RSI"] .. " " .. string.format("%.0f", s.rsi) end
-        bits[#bits + 1] = L["Liquidity"] .. ": " .. FT.C(liqColors[liq], liqNames[liq])
-        if s.dev then bits[#bits + 1] = L["vs average"] .. " " .. FT.Pct(s.dev) end
+        if s.dev then bits[#bits + 1] = L["vs usual"] .. " " .. FT.Pct(s.dev) end
+        bits[#bits + 1] = L["Sells"] .. ": " .. FT.C(liqColors[liq], liqNames[liq])
+        if s.rsi then bits[#bits + 1] = L["Hype"] .. " " .. string.format("%.0f", s.rsi) end
         local b = s.behavior
         if b and b.highs >= FT.An.MIN_CASES then bits[#bits + 1] = string.format(L["Jumps held %d/%d"], b.held, b.highs)
         elseif b and b.kindHighs then bits[#bits + 1] = string.format(L["Its kind: jumps hold %d%%"], math.floor(b.kindHeld / b.kindHighs * 100 + 0.5)) end
