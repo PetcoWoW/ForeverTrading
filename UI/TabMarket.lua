@@ -798,6 +798,17 @@ local function BuildItemView(parent)
     end)
     v.bestUse:FitText(20)
     v.bestUse:SetPoint("RIGHT", v.watch, "LEFT", -6, 0)
+    v.longHold = UI.Button(v, L["Long hold"], 10, 22, "default", function()
+        local id = state.selected
+        if not id then return end
+        FT.db.longHold = FT.db.longHold or {}
+        FT.db.longHold[id] = (not FT.db.longHold[id]) or nil
+        FT.Fire("FT_SETTINGS_CHANGED")
+        T.UpdateWatchButton()
+        T.ShowItem(id, true)
+    end)
+    v.longHold:FitText(20)
+    v.longHold:SetTip(L["Long hold"], L["You know it'll be worth more later (a raid or phase coming): it never says CASH OUT until you unmark it."])
     v.bestUse:SetTip(L["Best use"], L["Every recipe this goes into, ranked by what one of it brings made into each."])
 
     -- charts: the price on top, the profitability under it (zero in the middle)
@@ -947,6 +958,13 @@ function T.UpdateWatchButton()
     local v = itemView
     if not (v and state.selected) then return end
     if v.bestUse then v.bestUse:SetShown(FT.Craft.UsedIn(state.selected) ~= nil) end
+    if v.longHold then
+        local on = FT.db.longHold and FT.db.longHold[state.selected]
+        v.longHold:SetLabel(on and L["Long hold: on"] or L["Long hold"])
+        v.longHold:FitText(20)
+        v.longHold:ClearAllPoints()
+        v.longHold:SetPoint("RIGHT", v.bestUse:IsShown() and v.bestUse or v.watch, "LEFT", -6, 0)
+    end
     local on = FT.Market.IsWatched(state.selected)
     v.watch:SetLabel(on and L["In watchlist"] or L["Watch"])
     v.watch:SetActive(on)
@@ -1070,6 +1088,10 @@ function T.ShowItem(id, keepView)
         if s.rsi then bits[#bits + 1] = L["RSI"] .. " " .. string.format("%.0f", s.rsi) end
         bits[#bits + 1] = L["Liquidity"] .. ": " .. FT.C(liqColors[liq], liqNames[liq])
         if s.dev then bits[#bits + 1] = L["vs average"] .. " " .. FT.Pct(s.dev) end
+        local b = s.behavior
+        if b and b.highs >= FT.An.MIN_CASES then bits[#bits + 1] = string.format(L["Jumps held %d/%d"], b.held, b.highs)
+        elseif b and b.kindHighs then bits[#bits + 1] = string.format(L["Its kind: jumps hold %d%%"], math.floor(b.kindHeld / b.kindHighs * 100 + 0.5)) end
+        if b and b.bestDay and (b.bestUp or 0) >= 0.03 then bits[#bits + 1] = string.format(L["Best day %s"], FT.An.DayName(b.bestDay)) end
         local whale = FT.Whales.Of(id)
         if whale then bits[#bits + 1] = FT.C("accent", string.format(L["Whale: %s has %s"], whale.n, FT.Whales.Whole(whale.s))) end
         v.glance:SetText(table.concat(bits, FT.C("dim", "   ·   ")))

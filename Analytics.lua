@@ -238,6 +238,162 @@ local function Falling(s)
     return s.price < s.fair * (1 - (FT.S.fallBelow or 20) / 100)
 end
 
+---------------------------------------------------------------------------
+-- How this item behaves, learned from its own daily closes (up to 60 days: the price feed, Auctionator's history,
+-- your scans). Each answer counts real past cases, and stays quiet until there are enough of them.
+--   highs, held: days 10%+ over the average of the 14 before, and how many still held 95% of it 5-9 days later
+--   lows, back:  days 10%+ under it, and how many were back to 97% of that average 5-9 days later
+--   stick, rebound: those rates, pulled toward a cautious guess while there are few cases (see PRIOR)
+--   bestDay, bestUp, cheapDay, cheapDown: the weekday (0 Sunday) it usually closes highest / lowest, and by how much
+-- One case per move: days right after a counted day (within 4) don't count again.
+---------------------------------------------------------------------------
+local PRIOR = { stick = 0.35, rebound = 0.5, weight = 2 }
+local MIN_CASES = 3
+An.MIN_CASES = MIN_CASES
+
+local function Weekday(day)
+    return tonumber(date("%w", FT.DayStart(day) + 43200))
+end
+An.Weekday = Weekday
+
+-- its kind (item class:subclass: herbs, ore, cloth, potions...): GetItemInfoInstant needs no server answer
+local function KindOf(itemID)
+    if not (itemID and GetItemInfoInstant) then return nil end
+    local _, _, subType, _, _, classID, subID = GetItemInfoInstant(itemID)
+    if not classID then return nil end
+    return classID .. ":" .. (subID or 0), subType
+end
+An.KindOf = KindOf
+
+-- what its kind did (An.LearnKinds), for this auction house: { highs, held, lows, back, name } or nil
+local KIND_MIN = 30 -- a kind's record counts from this many cases
+local function KindRecord(itemID)
+    local l = FT.db.learned and FT.db.learned[FT.houseKey or "?"]
+    local k = l and l.kinds and KindOf(itemID)
+    return k and l.kinds[k] or nil
+end
+
+function An.Behavior(daily, itemID)
+    local b = { highs = 0, held = 0, lows = 0, back = 0 }
+    local close = {}
+    for _, c in ipairs(daily or {}) do close[c.day] = c.c end
+    local lastHigh, lastLow = -99, -99
+    local wkSum, wkN = {}, {}
+    for _, c in ipairs(daily or {}) do
+        local d = c.day
+        local sum, n = 0, 0
+        for k = 1, 14 do
+            local v = close[d - k]
+            if v then sum, n = sum + v, n + 1 end
+        end
+        if n >= 5 then
+            local avg = sum / n
+            local later
+            for k = 5, 9 do
+                if close[d + k] then later = close[d + k]; break end
+            end
+            if later then
+                if c.c >= avg * 1.10 and d - lastHigh > 4 then
+                    lastHigh = d
+                    b.highs = b.highs + 1
+                    if later >= c.c * 0.95 then b.held = b.held + 1 end
+                elseif c.c <= avg * 0.90 and d - lastLow > 4 then
+                    lastLow = d
+                    b.lows = b.lows + 1
+                    if later >= avg * 0.97 then b.back = b.back + 1 end
+                end
+            end
+        end
+        -- the weekday pattern: the close against the week around it (3 days each side, 5 of them known)
+        local wSum, wN = 0, 0
+        for k = -3, 3 do
+            local v = close[d + k]
+            if v then wSum, wN = wSum + v, wN + 1 end
+        end
+        if wN >= 5 and wSum > 0 then
+            local wd = Weekday(d)
+            wkSum[wd] = (wkSum[wd] or 0) + c.c / (wSum / wN)
+            wkN[wd] = (wkN[wd] or 0) + 1
+        end
+    end
+    -- few cases of its own: lean on what its kind did (all herbs, all ore...) instead of a fixed guess
+    local kind = itemID and KindRecord(itemID)
+    local pStick, pRebound, wStick, wRebound = PRIOR.stick, PRIOR.rebound, PRIOR.weight, PRIOR.weight
+    if kind and kind.highs >= KIND_MIN then pStick, wStick, b.kindHighs, b.kindHeld = kind.held / kind.highs, 3, kind.highs, kind.held end
+    if kind and kind.lows >= KIND_MIN then pRebound, wRebound, b.kindLows, b.kindBack = kind.back / kind.lows, 3, kind.lows, kind.back end
+    b.kindName = kind and kind.name
+    b.stick = (b.held + pStick * wStick) / (b.highs + wStick)
+    b.rebound = (b.back + pRebound * wRebound) / (b.lows + wRebound)
+    -- enough to act on: its own cases, or its kind's (then said so)
+    b.knowsHighs = b.highs >= MIN_CASES or b.kindHighs ~= nil
+    b.knowsLows = b.lows >= MIN_CASES or b.kindLows ~= nil
+    local days = 0
+    for wd, n in pairs(wkN) do
+        if n >= 2 then
+            days = days + 1
+            local r = wkSum[wd] / n
+            if not b.bestUp or r - 1 > b.bestUp then b.bestDay, b.bestUp = wd, r - 1 end
+            if not b.cheapDown or r - 1 < b.cheapDown then b.cheapDay, b.cheapDown = wd, r - 1 end
+        end
+    end
+    if days < 5 then b.bestDay, b.bestUp, b.cheapDay, b.cheapDown = nil, nil, nil, nil end
+    return b
+end
+
+-- "its jumps held a week 4 of 5 times" / "Herb jumps held a week 210 of 340 times"
+function An.HighRecord(b)
+    if b.highs >= MIN_CASES then return string.format(L["its jumps held a week %d of %d times"], b.held, b.highs) end
+    if b.kindHighs then
+        return string.format(L["%s jumps held a week %d%% of the time"], b.kindName or L["its kind's"],
+            math.floor(b.kindHeld / b.kindHighs * 100 + 0.5))
+    end
+end
+function An.LowRecord(b)
+    if b.lows >= MIN_CASES then return string.format(L["its dips came back %d of %d times"], b.back, b.lows) end
+    if b.kindLows then
+        return string.format(L["%s dips came back %d%% of the time"], b.kindName or L["its kind's"],
+            math.floor(b.kindBack / b.kindLows * 100 + 0.5))
+    end
+end
+
+-- Once a day, in the background: every item's cases added up by kind, for this auction house
+function An.LearnKinds(force)
+    local key = FT.houseKey or "?"
+    FT.db.learned = FT.db.learned or {}
+    local l = FT.db.learned[key]
+    if l and l.day == FT.Day() and not force then return end
+    local ids, seen = {}, {}
+    local function Add(id)
+        id = tonumber(id)
+        if id and not seen[id] then seen[id] = true; ids[#ids + 1] = id end
+    end
+    FT.Hist.EachItem(Add)
+    local fh = FT.Feed and FT.Feed.House and FT.Feed.House()
+    if fh then for id in pairs(fh.items) do Add(id) end end
+    local kinds = {}
+    FT.Job("learn", #ids, function(k)
+        local id = ids[k]
+        local kind, name = KindOf(id)
+        if not kind then return end
+        local b = An.Behavior(FT.Hist.Daily(id, 60))
+        if b.highs + b.lows == 0 then return end
+        local r = kinds[kind]
+        if not r then
+            r = { highs = 0, held = 0, lows = 0, back = 0, name = name }
+            kinds[kind] = r
+        end
+        r.highs, r.held, r.lows, r.back = r.highs + b.highs, r.held + b.held, r.lows + b.lows, r.back + b.back
+    end, function()
+        FT.db.learned[key] = { day = FT.Day(), kinds = kinds }
+        wipe(cache)
+        FT.Fire("FT_LEARNED")
+    end)
+end
+FT.On("FT_READY", function() C_Timer.After(45, function() An.LearnKinds() end) end)
+
+local WEEKDAYS = { [0] = "Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday" }
+function An.DayName(wd) return wd and L[WEEKDAYS[wd]] or "" end
+
 -- { price, t, source, listed, ch1, ch7, ch30, avg, dev, rsi, hi7, lo7, hi30, lo30, vol, days, auctions,
 --   sellers, closes, daily, fair, typicalQ, spike, sale (the price to count on when selling),
 --   auctionsNow, sellersNow (of the newest measurement), typicalN, typicalS (usual auctions, sellers),
@@ -246,7 +402,7 @@ end
 function An.Stats(itemID)
     local s = cache[itemID]
     if s and GetTime() - s.countedAt < STATS_FRESH then return s end
-    s = { countedAt = GetTime() }
+    s = { countedAt = GetTime(), id = itemID }
     s.price, s.t, s.source, s.listed = FT.Price(itemID)
     local daily = FT.Hist.Daily(itemID, 60)
     s.daily = daily
@@ -294,6 +450,7 @@ function An.Stats(itemID)
     s.rising = (wN >= 4 and pN >= 7 and s.avgWeek >= s.avgBefore * 1.05 and (s.ch30 or 0) >= 0.15
         and lo7 ~= nil and loOld ~= nil and lo7 > loOld) and true or false
     s.hi7, s.lo7, s.hi30, s.lo30 = hi7, lo7, hi30, lo30
+    s.behavior = An.Behavior(daily, itemID)
     s.days = days14
     -- how many days this item has history at all (liquidity can't be judged on a day or two)
     s.span = #daily > 0 and (today - daily[1].day + 1) or 0
@@ -475,8 +632,17 @@ function An.SellSignal(s)
     local th = FT.S.sellAbove / 100
     local dev = s.dev or 0
     local hot = s.rsi and s.rsi >= 70
-    if (dev >= th or hot) and s.rising and FT.S.holdTrends ~= false then
-        local up30 = FT.Pct(s.ch30, true)
+    local b = s.behavior or {}
+    local learn = FT.S.holdTrends ~= false
+    local sticky = learn and b.knowsHighs and b.stick >= 0.6
+    local fades = learn and b.knowsHighs and b.stick <= 0.3
+    local record = b.knowsHighs and An.HighRecord(b) or nil
+    -- yours to hold: you marked it (a raid or phase coming that the numbers can't see)
+    if FT.db.longHold and s.id and FT.db.longHold[s.id] then
+        return "HOLD", 3, L["Your long hold: kept until you unmark it"] .. ((dev >= th) and ("  (" .. AboveText(s, dev) .. ")") or "")
+    end
+    if (dev >= th or hot) and learn and (s.rising or sticky) then
+        local up = s.rising and string.format(L["%s in 30 days"], FT.Pct(s.ch30, true)) or record
         -- the climb cracking: fell since the last check, under its fair price, more listed or sellers than usual,
         -- or not selling - take the gains while they're there
         local why
@@ -486,14 +652,17 @@ function An.SellSignal(s)
         elseif s.crowd then why = L["more sellers than usual"]
         elseif s.slow then why = L["hardly selling"] end
         if why then
-            return "SELL", 3, string.format(L["%s in 30 days, but the climb is cracking (%s): cash out"], up30, why)
+            return "SELL", 3, string.format(L["%s, but it's cracking (%s): cash out"], up, why)
         end
         -- climbing, but stretched far above its average: bank half, let the rest ride
         if dev >= th * 3 or (s.rsi and s.rsi >= 80) then
-            return "TRIM", 2, string.format(L["%s in 30 days and stretched (%s over average): sell half, hold half"],
-                up30, FT.Pct(dev, true))
+            return "TRIM", 2, string.format(L["%s and stretched (%s over average): sell half, hold half"], up, FT.Pct(dev, true))
         end
-        return "HOLD", 3, string.format(L["Climbing for weeks (%s in 30 days, higher lows, still selling): let it ride"], up30)
+        if s.rising then
+            return "HOLD", 3, string.format(L["Climbing for weeks (%s, higher lows, still selling): let it ride"],
+                up .. (record and (", " .. record) or ""))
+        end
+        return "HOLD", 3, string.format(L["%s over average, and %s: let it ride"], FT.Pct(dev, true), record)
     end
     if dev >= th or hot then
         local strength = (dev >= th and hot) and 3 or ((dev >= th * 2) and 3 or 2)
@@ -503,9 +672,27 @@ function An.SellSignal(s)
         else
             reason = string.format(L["RSI %d: overbought"], math.floor(s.rsi + 0.5))
         end
+        -- the week's rhythm: its best day is close and pays clearly more - list it then
+        if learn and b.bestDay and (b.bestUp or 0) >= 0.05 and not s.dropped and not s.flood then
+            local today = Weekday(FT.Day())
+            local wait = (b.bestDay - today) % 7
+            if wait >= 1 and wait <= 3 then
+                return "HOLD", 2, reason .. "  " .. string.format(L["(but %ss usually run %s higher: list it then)"],
+                    An.DayName(b.bestDay), FT.Pct(b.bestUp, true))
+            end
+        end
+        if fades then
+            return "SELL", 3, reason .. "  (" .. record .. L[": cash out"] .. ")"
+        end
         return "SELL", strength, reason
     end
     if dev <= -th then
+        if learn and b.knowsLows and b.rebound <= 0.3 then
+            return "FAIR", 1, string.format(L["%s below average, and %s: no point waiting"], FT.Pct(dev, true), An.LowRecord(b))
+        end
+        if learn and b.knowsLows and b.rebound >= 0.6 then
+            return "HOLD", 3, string.format(L["%s below average: wait, %s"], FT.Pct(dev, true), An.LowRecord(b))
+        end
         if s.avgFair then
             return "HOLD", 2, string.format(L["%s below its price of the last hours: wait"], FT.Pct(dev, true))
         end
@@ -528,6 +715,14 @@ function An.BuySignal(s)
             reason = BelowText(s, dev)
         else
             reason = string.format(L["RSI %d: oversold"], math.floor(s.rsi + 0.5))
+        end
+        local b = s.behavior or {}
+        if FT.S.holdTrends ~= false and b.knowsLows then
+            if b.rebound >= 0.6 then
+                return "BUY", 3, reason .. "  (" .. An.LowRecord(b) .. ")"
+            elseif b.rebound <= 0.3 then
+                return "BUY", 1, reason .. "  (" .. L["careful: "] .. An.LowRecord(b) .. ")"
+            end
         end
         return "BUY", strength, reason
     end

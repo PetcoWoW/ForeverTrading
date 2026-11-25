@@ -12,6 +12,12 @@ FT.News = N
 -- start, after the files are read (a table made with them would keep the English)
 local function News()
     return {
+        ["v0.8"] = {
+            { L["Signals that learn"], L["Each signal now checks what really happened before: did this item's jumps hold a week later, did its dips come back, which day it sells highest. Until an item has enough cases, it goes by its kind (all herbs, all ore...)."],
+                function() FT.Show("market") end },
+            { L["Long hold"], L["A button on any item's chart: you know it'll be worth more later. It says HODL until you unmark it."],
+                function() FT.Show("market") end },
+        },
         ["v0.7"] = {
             { L["HODL what's climbing"], L["A price that's high because it's climbed for weeks now says HODL, or SELL HALF when it's stretched. A sudden jump, or a climb that cracks, still says CASH OUT."],
                 function() FT.Show("signals") end },

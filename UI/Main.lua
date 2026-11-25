@@ -763,6 +763,7 @@ local function Later() FT.Debounce("uiRefresh", 0.6, RefreshVisible) end
 FT.On("FT_SCAN_DONE", Later)
 FT.On("FT_PRICES_CHANGED", Later)
 FT.On("FT_RECIPES_CHANGED", Later)
+FT.On("FT_LEARNED", Later)
 FT.On("FT_INVENTORY_CHANGED", Later)
 FT.On("FT_WHALES_READY", Later)
 FT.On("FT_WATCH_CHANGED", function()
