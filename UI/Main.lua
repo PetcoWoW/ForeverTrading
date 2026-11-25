@@ -1108,6 +1108,12 @@ FT.On("AUCTION_HOUSE_CLOSED", function()
     FT.UpdateAHPill()
     FT.UpdateHouseChip()
 end)
+FT.On("FT_MOVERS_READY", function()
+    if FT.IsShown() then
+        FT.UpdateTicker()
+        Later()
+    end
+end)
 FT.On("FT_MARKET_READY", function()
     if FT.IsShown() then
         FT.UpdateTicker()

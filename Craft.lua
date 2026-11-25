@@ -542,9 +542,14 @@ local BLUE = {
 
 -- what it breaks into: { { itemID, chance, average count }, ... } and the skill it needs; nil if it doesn't
 function E.Outcome(itemID)
-    local _, _, quality, ilvl = FT.GetItemInfo(itemID)
+    -- weapons and armor only - told without asking the server (GetItemInfoInstant)
     local _, _, _, _, _, classID = FT.GetItemInfoInstant(itemID)
-    if not (quality and ilvl and (classID == 2 or classID == 4)) then return nil end
+    if classID ~= 2 and classID ~= 4 then return nil end
+    -- quality and item level need the full info: only for items the game already has (asking the server for
+    -- thousands of items at once floods it and stutters the game)
+    if C_Item and C_Item.IsItemDataCachedByID and not C_Item.IsItemDataCachedByID(itemID) then return nil end
+    local _, _, quality, ilvl = FT.GetItemInfo(itemID)
+    if not (quality and ilvl) then return nil end
     if quality == 2 then
         for _, b in ipairs(GREEN) do
             if ilvl <= b[1] then
@@ -594,7 +599,8 @@ function E.Value(itemID)
             if known >= 0.9 then c = { v = total, skill = skill } end
         end
         -- an item the game hasn't loaded yet isn't remembered as "can't"
-        if c or FT.GetItemInfo(itemID) then valueCache[itemID] = c end
+        local cached = not (C_Item and C_Item.IsItemDataCachedByID) or C_Item.IsItemDataCachedByID(itemID)
+        if c or cached then valueCache[itemID] = c end
     end
     if not c then return nil end
     return c.v, c.skill

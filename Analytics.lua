@@ -369,7 +369,7 @@ function An.LearnKinds(force)
     end
     FT.Hist.EachItem(Add)
     local fh = FT.Feed and FT.Feed.House and FT.Feed.House()
-    if fh then for id in pairs(fh.items) do Add(id) end end
+    if fh then for id in pairs(fh.raw or fh.items) do Add(id) end end
     local kinds = {}
     FT.Job("learn", #ids, function(k)
         local id = ids[k]
@@ -411,7 +411,13 @@ function An.LearnKinds(force)
         FT.Fire("FT_LEARNED")
     end)
 end
-FT.On("FT_READY", function() C_Timer.After(45, function() An.LearnKinds() end) end)
+FT.On("FT_READY", function()
+    local function Go()
+        if InCombatLockdown and InCombatLockdown() then C_Timer.After(30, Go) return end
+        An.LearnKinds()
+    end
+    C_Timer.After(120, Go)
+end)
 
 local WEEKDAYS = { [0] = "Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday" }
 function An.DayName(wd) return wd and L[WEEKDAYS[wd]] or "" end
@@ -748,13 +754,19 @@ function An.ScoreDay()
     local function Add(id) if id and not seen[id] and #ids < MAX_LOGGED then seen[id] = true; ids[#ids + 1] = id end end
     for _, h in ipairs((FT.Port.Rows())) do Add(h.id) end
     for id in pairs(FT.db.watch or {}) do Add(id) end
+    -- the busiest markets: the most gold listed (cheap to sort; no sales lookups for 7,000 items)
     local busy = {}
     for _, r in ipairs(FT.Market.Rows() or {}) do
-        if FT.Market.Solid and FT.Market.Solid(r) then busy[#busy + 1] = r end
+        if r.price and (r.qty or 0) >= 5 then busy[#busy + 1] = r end
     end
-    table.sort(busy, function(a, b) return (a.price * (a.perDay or 0)) > (b.price * (b.perDay or 0)) end)
-    for _, r in ipairs(busy) do Add(r.id) end
-    for _, id in ipairs(ids) do
+    table.sort(busy, function(a, b) return a.price * a.qty > b.price * b.qty end)
+    for _, r in ipairs(busy) do
+        if #ids >= MAX_LOGGED then break end
+        Add(r.id)
+    end
+    -- the calls themselves, a little each frame
+    FT.Job("score", #ids, function(k)
+        local id = ids[k]
         local st = An.Stats(id)
         if st.price and st.price > 0 then
             An.SellSignal(st)
@@ -762,7 +774,7 @@ function An.ScoreDay()
             An.BuySignal(st)
             if st.rule and st.rule:find("^buy") then pend[id .. ":" .. today .. "b"] = st.rule .. "," .. math.floor(st.price) end
         end
-    end
+    end)
     return graded
 end
 FT.On("FT_MARKET_READY", function() FT.Debounce("scoreDay", 20, function() pcall(An.ScoreDay) end) end)

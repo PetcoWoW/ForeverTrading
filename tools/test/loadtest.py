@@ -36,7 +36,7 @@ lua.execute('''
 mock.fire("ADDON_LOADED", "WolfOfBootyBay")
 mock.fire("PLAYER_LOGIN")
 mock.fire("PLAYER_ENTERING_WORLD", true, false)
-mock.run(70, 0.25)
+mock.run(200, 0.25)
 ''')
 FT = ns
 script = r'''
@@ -61,7 +61,7 @@ mock.run(1)
 step("overview moves", function()
   FT.Show("market"); FT.Tabs.market.ShowOverview(); FT.Tabs.market.FillMoves()
   local ids = {}
-  for id in pairs(FT.Feed.House().items) do ids[#ids + 1] = id; if #ids >= 8 then break end end
+  for id in pairs(FT.Feed.House().raw) do ids[#ids + 1] = id; if #ids >= 8 then break end end
   local syms = {}
   for _, id in ipairs(ids) do syms[#syms + 1] = FT.Symbol(id) end
   print("symbols: " .. table.concat(syms, " "))
@@ -81,7 +81,7 @@ mock.run(1)
 step("disenchant", function()
   FT.db.chars[FT.charKey].enchanting = 300
   local n, v = 0, nil
-  for id in pairs(FT.Feed.House().items) do
+  for id in pairs(FT.Feed.House().raw) do
     if id % 5 == 0 then local x = FT.Enchant.Value(id) if x then n = n + 1; v = v or x end end
   end
   local deals = FT.Enchant.Deals()
@@ -138,7 +138,7 @@ mock.run(10)
 step("signals", function()
   local n, kinds = 0, {}
   local fh = FT.Feed.House()
-  for id in pairs(fh and fh.items or {}) do
+  for id in pairs(fh and fh.raw or {}) do
     local s = FT.An.Stats(id)
     local k = FT.An.SellSignal(s); kinds[k] = (kinds[k] or 0) + 1
     local b = FT.An.BuySignal(s); kinds["buy:" .. b] = (kinds["buy:" .. b] or 0) + 1
@@ -212,7 +212,7 @@ end)
 step("tooltips", function()
   local fh = FT.Feed.House()
   local ids = {}
-  for id in pairs(fh.items) do ids[#ids + 1] = id; if #ids >= 300 then break end end
+  for id in pairs(fh.raw) do ids[#ids + 1] = id; if #ids >= 300 then break end end
   ids[#ids + 1] = 4234; ids[#ids + 1] = 12359
   local t0 = os.clock()
   for _, id in ipairs(ids) do GameTooltip:ClearLines(); mock.tdp(GameTooltip, { id = id }) end
@@ -241,7 +241,7 @@ mock.run(5)
 step("timing", function()
   local fh = FT.Feed.House()
   local ids = {}
-  for id in pairs(fh.items) do ids[#ids + 1] = id end
+  for id in pairs(fh.raw) do ids[#ids + 1] = id end
   local t0 = os.clock()
   for i = 1, math.min(#ids, 2000) do FT.Hist.Daily(ids[i], 60) end
   local t1 = os.clock()
@@ -271,7 +271,7 @@ lua.execute('''
 mock.fire("ADDON_LOADED", "WolfOfBootyBay")
 mock.fire("PLAYER_LOGIN")
 mock.fire("PLAYER_ENTERING_WORLD", false, true)
-mock.run(70, 0.25)
+mock.run(200, 0.25)
 ''')
 lua.execute('return function(...) ' + script + ' end')(ns)
 errs = list(lua.eval('mock.errors').values())
