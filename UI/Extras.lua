@@ -395,8 +395,7 @@ local function TipLines(itemID, detail)
     local out = {}
     -- 1: what to do with it, and its price
     local sig, _, reason = FT.An.SellSignal(s)
-    local sym = FT.Symbol(itemID)
-    local left = "|cfff0b90bWolf|r" .. (sym ~= "" and ("  |cfff0b90b$" .. sym .. "|r") or "")
+    local left = "|cfff0b90bWolf|r"
     if sig ~= "NODATA" and sig ~= "FAIR" then
         left = left .. "  " .. FT.C(FT.SIGNAL_COLORS[sig] or "muted", FT.SignalText(sig))
     end
@@ -903,8 +902,7 @@ function FT.ShowCraft(r)
     local e = FT.Craft.Eval(r)
     d.itemID = r.output
     d.icon:SetItem(r.output)
-    local sym = FT.SymbolText(r.output)
-    d.title:SetText((sym ~= "" and (sym .. "  ") or "") .. FT.ItemText(r.output, 34) .. ((r.outputQty or 1) > 1 and FT.C("dim", "  x" .. r.outputQty) or ""))
+    d.title:SetText(FT.ItemText(r.output, 34) .. ((r.outputQty or 1) > 1 and FT.C("dim", "  x" .. r.outputQty) or ""))
     local known = next(r.knownBy or {}) ~= nil
     local who = {}
     for name in pairs(r.knownBy or {}) do who[#who + 1] = name end
@@ -1050,13 +1048,12 @@ function FT.ShowGitHub()
         FT.URL_GITHUB)
 end
 
--- A tip for guild chat, in the chat box for you to send: "[Thorium Bar] $THOR is cheap today: 2.1g (usually 2.6g)"
+-- A tip for guild chat, in the chat box for you to send: "[Thorium Bar] is cheap today: 2.1g (usually 2.6g)"
 function FT.ShareTip(itemID)
     local s = FT.An.Stats(itemID)
     if not s.price then return end
     local _, _, _, _, link = FT.Item(itemID)
-    local sym = FT.Symbol(itemID)
-    local name = (link or FT.ItemText(itemID)) .. (sym ~= "" and (" $" .. sym) or "")
+    local name = link or FT.ItemText(itemID)
     local function G(c) return FT.MoneyPlain(math.floor(c)) end
     local text
     if s.avg and s.dev and s.dev <= -0.1 then

@@ -4,7 +4,7 @@ local L = FT.L
 
 -- The version being released: a copy straight from the repository (not packaged) has no version in its TOC yet
 -- (the packager puts the tag there) and shows this one. Set it with every release.
-local RELEASE = "v0.17.2"
+local RELEASE = "v0.17.3"
 local GetMeta = (C_AddOns and C_AddOns.GetAddOnMetadata) or GetAddOnMetadata
 FT.VERSION = (GetMeta and GetMeta(ADDON, "Version")) or RELEASE
 if FT.VERSION == "" or FT.VERSION:find("@", 1, true) then FT.VERSION = RELEASE end

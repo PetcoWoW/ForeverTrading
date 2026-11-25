@@ -373,8 +373,7 @@ local function BestMove()
     end
     if not best then return nil end
     local H = FT.House
-    local sym = FT.Symbol(best.id)
-    local what = sym ~= "" and ("$" .. sym) or FT.ItemText(best.id)
+    local what = FT.ItemText(best.id)
     local how = (best.kind == "HOUSES" and string.format(L["carry %s to %s"], what, H.Name(best.sellHouse)))
         or (best.kind == "VENDOR" and string.format(L["vendor %s"], what)) or string.format(L["flip %s"], what)
     return how .. " " .. FT.C("up", "(+" .. FT.Money(math.floor(best.profit), "short") .. ")")
@@ -420,9 +419,8 @@ function P.SellPings()
         if not pinged[h.id] and (h.signal == "SELL" or h.signal == "TRIM") and (h.strength or 0) >= 2 then
             local s = FT.An.Stats(h.id)
             pinged[h.id] = true
-            local sym = FT.Symbol(h.id)
             local _, _, _, _, link = FT.Item(h.id)
-            lines[#lines + 1] = (sym ~= "" and ("$" .. sym .. " ") or "") .. (link or FT.ItemText(h.id)) .. " x" .. FT.Num(h.qty)
+            lines[#lines + 1] = (link or FT.ItemText(h.id)) .. " x" .. FT.Num(h.qty)
                 .. (s.dev and (" " .. FT.Pct(s.dev)) or "")
         end
     end

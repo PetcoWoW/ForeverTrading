@@ -1,6 +1,6 @@
 # The Wolf of Booty Bay
 
-The WoW Forever auction house as a stock market: tickers, gainers and losers, charts, plain-English
+The WoW Forever auction house as a stock market: a ticker tape, 7-day trend lines, gainers and losers, charts, plain-English
 "what to do" signals, deals and your net worth across every character.
 
 Built on [ForeverTrading](https://github.com/thewoolfi/ForeverTrading) by thewoolfi (Apache License 2.0).
