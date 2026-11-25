@@ -1,5 +1,12 @@
 # The Wolf of Booty Bay
 
+## v0.15.1 - our own branding
+
+- A wolf for the minimap button, the header, item windows and the AddOns list (was the original's gold coin).
+- Every on-screen trace of ForeverTrading gone (the Credits button and link, the welcome note, the AddOns-list
+  notes and author); the original's credit stays in NOTICE and LICENSE in the addon's folder, and /wolf credits.
+- Guild price sharing and version news on our own addon channels (the old ones were the original addon's).
+
 ## v0.15 - sessions and a scorecard
 
 - Sessions: start from the minimap button's right-click menu (or Portfolio > Sessions, /wolf farm). Counts your

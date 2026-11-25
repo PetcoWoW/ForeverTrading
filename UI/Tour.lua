@@ -1,4 +1,4 @@
--- Wolf of Booty Bay (built on ForeverTrading): the tour - step by step over the real window: everything but the part a step is about is
+-- Wolf of Booty Bay: the tour - step by step over the real window: everything but the part a step is about is
 -- dimmed, the part is ringed, and a note beside it says what it is and does (Back, Next, Esc to end). A step
 -- whose part isn't on the screen (the compact window has no order book) is passed over. Offered on a first
 -- install; again any time: Settings > About, /wolf tour.

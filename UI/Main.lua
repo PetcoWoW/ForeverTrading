@@ -1,4 +1,4 @@
--- Wolf of Booty Bay (built on ForeverTrading): the main window - header with navigation, the ticker tape, pages, status bar.
+-- Wolf of Booty Bay: the main window - header with navigation, the ticker tape, pages, status bar.
 local ADDON, FT = ...
 local UI = FT.UI
 local L = FT.L
@@ -461,7 +461,7 @@ local function Build()
     hl:SetPoint("BOTTOMRIGHT")
 
     local logo = UI.Icon(header, 24)
-    logo:SetIcon("Interface\\Icons\\INV_Misc_Coin_02")
+    logo:SetIcon("Interface\\Icons\\Ability_Hunter_Pet_Wolf")
     logo:SetPoint("LEFT", 14, 0)
     local brand1 = UI.Text(header, 15, "accent")
     brand1:SetPoint("LEFT", logo, "RIGHT", 10, 0)
@@ -565,11 +565,9 @@ local function Build()
     end
     local gh = StatusLink("GitHub", "muted", function() FT.ShowGitHub() end)
     gh:SetPoint("RIGHT", statusRight, "LEFT", -12, 0)
-    local support = StatusLink(L["Credits"], "accent", function() FT.ShowSupport() end)
-    support:SetPoint("RIGHT", gh, "LEFT", -4, 0)
     -- a newer version was heard of: where to get it
     local newer = StatusLink("", "up", function() FT.ShowGitHub() end)
-    newer:SetPoint("RIGHT", support, "LEFT", -8, 0)
+    newer:SetPoint("RIGHT", gh, "LEFT", -8, 0)
     local function ShowNewer()
         local v = FT.Ver.Newest()
         newer:SetShown(v ~= nil)
@@ -744,7 +742,7 @@ FT.On("FT_AH_CHANGED", function()
 end)
 
 ---------------------------------------------------------------------------
--- In place of the auction house window (Settings): talking to an auctioneer opens ForeverTrading. The game's
+-- In place of the auction house window (Settings): talking to an auctioneer opens Wolf of Booty Bay. The game's
 -- window stays open behind it, unseen (closing it would end the visit): see-through and off the screen. The
 -- pill in the header shows whether you are at the auction house and brings the game's window back for buying
 -- and selling (and Auctionator). Walking away ends the visit: the terminal goes "offline".
@@ -1032,7 +1030,7 @@ function FT.ToggleAHWindow()
     if GameTooltip:IsOwned(pill) and pill:GetScript("OnEnter") then pill:GetScript("OnEnter")(pill) end
 end
 
--- the game's window on the screen (when it was hidden behind ForeverTrading)
+-- the game's window on the screen (when it was hidden behind Wolf of Booty Bay)
 function FT.ShowGameAH()
     if FT.ahHere and ahHidden then ShowAHWindow() end
 end

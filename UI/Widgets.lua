@@ -1,4 +1,4 @@
--- Wolf of Booty Bay (built on ForeverTrading): widgets (buttons, inputs, lists, badges, sparklines...)
+-- Wolf of Booty Bay: widgets (buttons, inputs, lists, badges, sparklines...)
 local ADDON, FT = ...
 local UI = FT.UI
 local C = UI.C
@@ -251,7 +251,7 @@ function UI.Confirm(opts)
     if not d then
         UI.ResolveFont()
         d = CreateFrame("Frame", "WolfOfBootyBayConfirm", UIParent, UI.EdgeTemplate())
-        -- above every window (the full-screen ForeverTrading included)
+        -- above every window (the full-screen Wolf of Booty Bay included)
         d:SetFrameStrata("FULLSCREEN_DIALOG")
         d:SetFrameLevel(100)
         d:SetToplevel(true)
@@ -272,7 +272,7 @@ function UI.Confirm(opts)
             d.accent:SetPoint("TOPRIGHT", -1, -1)
         end
         d.logo = UI.Icon(d, 22)
-        d.logo:SetIcon("Interface\\Icons\\INV_Misc_Coin_02")
+        d.logo:SetIcon("Interface\\Icons\\Ability_Hunter_Pet_Wolf")
         d.logo:SetPoint("TOPLEFT", 18, -18)
         d.title = UI.Text(d, 14, "text")
         d.title:SetPoint("LEFT", d.logo, "RIGHT", 10, 0)

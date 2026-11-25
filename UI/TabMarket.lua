@@ -1,4 +1,4 @@
--- Wolf of Booty Bay (built on ForeverTrading): Market page - every item with its price and moves, the chart of one item, its order
+-- Wolf of Booty Bay: Market page - every item with its price and moves, the chart of one item, its order
 -- book, indicators, signals and price alerts. With no item chosen: the market overview.
 local ADDON, FT = ...
 local UI = FT.UI

@@ -1,9 +1,9 @@
--- Wolf of Booty Bay (built on ForeverTrading): minimap button, the button on the auction house, item tooltip lines, alert toasts.
+-- Wolf of Booty Bay: minimap button, the button on the auction house, item tooltip lines, alert toasts.
 local ADDON, FT = ...
 local UI = FT.UI
 local L = FT.L
 
-local ICON = "Interface\\Icons\\INV_Misc_Coin_02"
+local ICON = "Interface\\Icons\\Ability_Hunter_Pet_Wolf"
 
 ---------------------------------------------------------------------------
 -- Minimap button (and a launcher for broker bars when one is loaded)
@@ -188,7 +188,7 @@ local function MakeBroker()
 end
 
 ---------------------------------------------------------------------------
--- Auction house: a button that opens ForeverTrading right next to it
+-- Auction house: a button that opens Wolf of Booty Bay right next to it
 ---------------------------------------------------------------------------
 local ahButton
 local docked = false
@@ -312,7 +312,7 @@ local function BuildAHButton()
     if not ah or ahButton then return end
     if ah == AuctionHouseFrame then ahButton = BuildAHTab(ah) end
     ahButton = ahButton or BuildAHPlainButton(ah)
-    -- while ForeverTrading scans, the button shows how far it got
+    -- while Wolf of Booty Bay scans, the button shows how far it got
     ahButton.ftElapsed = 0
     ahButton:HookScript("OnUpdate", function(self, elapsed)
         self.ftElapsed = self.ftElapsed + elapsed
@@ -575,7 +575,7 @@ function FT.DebugReport()
     FT.Print("feed: " .. FT.Feed.Describe() .. " (ruleset " .. tostring(FT.Feed.Ruleset()) .. ", house "
         .. tostring(FT.Feed.HouseID(FT.house)) .. ")")
     FT.Print("recipes " .. #FT.Craft.List() .. ", tracked " .. FT.Hist.UniverseSize())
-    -- recipes by profession: how many the Craft page has, how many ForeverTrading read itself (Mastercraft: the rest)
+    -- recipes by profession: how many the Craft page has, how many Wolf of Booty Bay read itself (Mastercraft: the rest)
     local all, own = {}, {}
     for _, r in ipairs(FT.Craft.List()) do all[r.prof] = (all[r.prof] or 0) + 1 end
     for _, profs in pairs(FT.db.recipes or {}) do
@@ -1037,8 +1037,9 @@ FT.On("FT_SESSION_CHANGED", function() FT.UpdateHUD() end)
 FT.On("FT_SESSION_LOOT", function() FT.Debounce("hud", 0.3, FT.UpdateHUD) end)
 FT.On("FT_READY", function() C_Timer.After(2, FT.UpdateHUD) end)
 
+-- /wolf credits: where the code began (the license's notice; NOTICE and LICENSE ship in the addon's folder)
 function FT.ShowSupport()
-    FT.ShowLink(L["Built on ForeverTrading"], L["Wolf of Booty Bay is built on ForeverTrading by thewoolfi (Apache License 2.0). Copy the link to see the original:"],
+    FT.ShowLink(L["Credits"], L["The Wolf of Booty Bay is a modified version of an addon by thewoolfi, under the Apache License 2.0 (see NOTICE in the addon's folder). The original:"],
         FT.URL_SUPPORT)
 end
 

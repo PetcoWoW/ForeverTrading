@@ -1,4 +1,4 @@
--- Wolf of Booty Bay (built on ForeverTrading): the materials of one craft of an item (its most profitable recipe) - each at its cheapest
+-- Wolf of Booty Bay: the materials of one craft of an item (its most profitable recipe) - each at its cheapest
 -- (auction house, vendor or your own craft) with its 24h move - and what one craft costs, brings in and leaves.
 -- Under the order book on the Market page and in the item window.
 local ADDON, FT = ...

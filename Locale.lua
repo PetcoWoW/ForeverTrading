@@ -1,4 +1,4 @@
--- Wolf of Booty Bay (built on ForeverTrading): texts. English is the key. With "Plain English" on (Settings >
+-- Wolf of Booty Bay: texts. English is the key. With "Plain English" on (Settings >
 -- General, the default) the trader terms are swapped for plain words: the table below, applied once at start.
 -- Every other text shows as written in the code.
 local ADDON, FT = ...
@@ -67,7 +67,7 @@ plain["The order book"] = "Listings by price"
 plain["Check order books"] = "Check listings"
 plain["Check order books (%d)"] = "Check listings (%d)"
 
--- the normal price (ForeverTrading's "fair price": a median that ignores spikes)
+-- the normal price (the "fair price": a median that ignores spikes)
 plain["Fair price"] = "Normal price"
 plain["The median of the last days' prices, weighted by how many were listed and how recent."] =
     "What it normally goes for: the middle of the last days' prices, counting busier and newer ones more."

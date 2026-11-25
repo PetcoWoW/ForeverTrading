@@ -1,4 +1,4 @@
--- Wolf of Booty Bay (built on ForeverTrading): the whole market at a glance - every item seen on the auction house (by our scans, and
+-- Wolf of Booty Bay: the whole market at a glance - every item seen on the auction house (by our scans, and
 -- by Auctionator and Mastercraft when they are on), its price, how it moved in a day and a week, top movers,
 -- the market mood, the watchlist and its price alerts.
 local ADDON, FT = ...
@@ -56,7 +56,7 @@ local function RowFromOwn(id, today)
     }
 end
 
--- an item only Auctionator has seen (from before you scanned with ForeverTrading)
+-- an item only Auctionator has seen (from before you scanned with this addon)
 local function RowFromAuctionator(id, e, today, dayKeys)
     local m = type(e.m) == "number" and e.m > 0 and e.m or nil
     if not m then return nil end

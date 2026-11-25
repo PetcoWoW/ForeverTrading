@@ -1,13 +1,13 @@
 ## Interface: 16001
 ## Title: |cfff0b90bThe Wolf of Booty Bay|r
-## Notes: The auction house as a stock market for WoW Forever: tickers, gainers and losers, plain-English picks, your net worth. Built on ForeverTrading by thewoolfi. Reads Auctionator's data too.
-## Version: 0.15.0
-## Author: sain221b-sketch (built on ForeverTrading by thewoolfi)
+## Notes: The auction house as a stock market for WoW Forever: tickers, what to buy, sell and craft, your portfolio and farming sessions. Works with Auctionator.
+## Version: 0.15.1
+## Author: sain221b-sketch
 ## X-Website: https://github.com/sain221b-sketch/forevertrading
 ## X-License: Apache-2.0
 ## SavedVariables: WolfOfBootyBayDB
 ## OptionalDeps: Auctionator
-## IconTexture: Interface\Icons\INV_Misc_Coin_02
+## IconTexture: Interface\Icons\Ability_Hunter_Pet_Wolf
 ## Category: Auction/Economy
 ## X-Category: Auction/Economy
 
