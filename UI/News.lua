@@ -12,6 +12,10 @@ FT.News = N
 -- start, after the files are read (a table made with them would keep the English)
 local function News()
     return {
+        ["v0.9"] = {
+            { L["Quiet alerts"], L["Alerts are one line in chat now, nothing to click away. Want pop-ups back? Settings > Alerts > Pop-up alerts."],
+                function() FT.Show("settings") end },
+        },
         ["v0.8"] = {
             { L["Signals that learn"], L["Each signal now checks what really happened before: did this item's jumps hold a week later, did its dips come back, which day it sells highest. Until an item has enough cases, it goes by its kind (all herbs, all ore...)."],
                 function() FT.Show("market") end },

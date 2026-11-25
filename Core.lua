@@ -4,7 +4,7 @@ local L = FT.L
 
 -- The version being released: a copy straight from the repository (not packaged) has no version in its TOC yet
 -- (the packager puts the tag there) and shows this one. Set it with every release.
-local RELEASE = "v0.8.0"
+local RELEASE = "v0.9.0"
 local GetMeta = (C_AddOns and C_AddOns.GetAddOnMetadata) or GetAddOnMetadata
 FT.VERSION = (GetMeta and GetMeta(ADDON, "Version")) or RELEASE
 if FT.VERSION == "" or FT.VERSION:find("@", 1, true) then FT.VERSION = RELEASE end
@@ -154,6 +154,7 @@ FT.DEFAULTS = {
     versionCheck = true,    -- tell guild and group which version we have, hear about newer ones
     minimap = true,
     minimapAngle = 205,
+    alertPopup = false,     -- alerts as pop-ups on screen (off: a line in chat, nothing to dismiss)
     alertSound = true,
     alertChat = true,
     trackAll = false,       -- intraday history for every item (more memory)
