@@ -1,5 +1,18 @@
 # The Wolf of Booty Bay
 
+## v0.8 - signals that learn
+
+- Each item's own record, from up to 60 days of daily prices: after a jump (10%+ over its 14-day average), did it
+  still hold 95% of it 5-9 days later; after a dip, was it back within 3% of the average; which weekday closes
+  highest. Shrunk toward a cautious guess while cases are few.
+- Its kind's record (item class and subclass: herbs, ore, cloth, potions...), worked out once a day in the
+  background over every item, stands in until the item has 3 cases of its own (30+ cases for the kind).
+- Sell: jumps that hold -> HODL; jumps that fade -> CASH OUT; its best weekday 1-3 days away and 5%+ higher ->
+  HOLD till then. Low: dips that come back -> wait; dips that don't -> no point waiting. Buy: dips that come back
+  -> APE IN, dips that don't -> careful.
+- Long hold: mark an item on its chart; it says HODL until you unmark it.
+- The item's glance line shows what it learned (jumps held, best day).
+
 ## v0.7 - hold what's climbing
 
 - The sell signal tells a jump from a climb. Climbing for weeks (this week's average 5%+ over the two weeks

@@ -221,8 +221,8 @@ function T.Build(p)
     Number(sg, "sellAbove", L["Sell when the price is above average by"], "%", nil, false, 1, 500)
     Number(sg, "buyBelow", L["Buy when the price is below average by"], "%", nil, false, 1, 95)
     Choice(sg, "avgDays", L["Average over"], { { 7, L["7 days"] }, { 14, L["14 days"] }, { 30, L["30 days"] } })
-    Check(sg, "holdTrends", L["Hold what's climbing"],
-        L["High because it's been climbing for weeks (up 15%+ in 30 days, higher lows, still selling): HODL instead of cash out. Far above its average: sell half. The climb cracking (price falling, flooded, more sellers, not selling): cash out. Needs 3 weeks of prices."])
+    Check(sg, "holdTrends", L["Learn from price history"],
+        L["Signals use what each item (or, until it has enough cases, its kind: herbs, ore, cloth...) really did: did its jumps hold a week later, did its dips come back, which weekday sells highest. Climbing for weeks: HODL; stretched: sell half; cracking: cash out. Off: sell anything above average, buy anything below."])
     Check(sg, "spikeGuard", L["Don't trust buyouts"],
         L["Someone bought out the cheap lots and listed them far higher: the lowest price then says little. The fair price is the median of the prices of the last days up to an hour ago, each weighted by how many were listed at it and how recent it is. When the price is far above it, profits and signals count the fair price."])
     Choice(sg, "spikeAbove", L["Jump: above the fair price by"], { { 30, "30%" }, { 50, "50%" }, { 100, "100%" }, { 200, "200%" } })
