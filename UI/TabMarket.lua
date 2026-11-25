@@ -463,8 +463,7 @@ local function BuildList(parent)
             if r.child then
                 cell.text:SetText(FT.ItemText(r.id) .. FT.C("dim", " x" .. r.qty))
             else
-                local sym = FT.SymbolText(r.id)
-            cell.text:SetText((sym ~= "" and (sym .. "  ") or "") .. FT.ItemText(r.id))
+                cell.text:SetText(FT.ItemText(r.id))
             end
             row.cells.price:SetText(FT.Money(r.price, "short"))
             row.cells.ch1:SetText(FT.Pct(r.ch1))
@@ -527,6 +526,7 @@ local function MoverList(parent, title)
     local bump = (UI.Size(12) - 12) * 5
     local cols = {
         { key = "name", title = "", width = "fill", make = NameCell, cellHeight = 24 },
+        { key = "spark", title = "", width = 40, justify = "RIGHT", make = SparkCell, cellHeight = 16 },
         { key = "price", title = "", width = 46 + bump, justify = "RIGHT" },
         { key = "ch", title = "", width = 46 + bump, justify = "RIGHT" },
     }
@@ -536,9 +536,10 @@ local function MoverList(parent, title)
             local cell = row.cells.name
             cell.icon:SetItem(r.id)
             cell.star:SetText("")
-            -- the ticker when there is one (the name is in the hover), else the name
-            local sym = FT.SymbolText(r.id)
-            cell.text:SetText((sym ~= "" and (sym .. " ") or "") .. FT.ItemText(r.id))
+            cell.text:SetText(FT.ItemText(r.id))
+            -- its last week, colored by the week's move (today's move is the number beside it)
+            local wk = r.ch7 or r.ch1 or 0
+            row.cells.spark:SetValues(r.spark, wk > 0 and "up" or (wk < 0 and "down" or "muted"))
             row.cells.price:SetText(T.ShortMoney(r.price))
             row.cells.ch:SetText(FT.C(r.ch1 >= 0 and "up" or "down", FT.An.Pc(r.ch1)))
         end,
@@ -1174,8 +1175,7 @@ function T.ShowItem(id, keepView)
     local v = itemView
     local _, _, icon = FT.Item(id)
     v.icon:SetIcon(icon)
-    local sym = FT.SymbolText(id)
-    v.name:SetText((sym ~= "" and (sym .. "  ") or "") .. FT.ItemText(id, 40))
+    v.name:SetText(FT.ItemText(id, 40))
     local cls, sub = FT.ItemClass(id)
     local parts = {}
     if cls then

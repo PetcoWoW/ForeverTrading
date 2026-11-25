@@ -1,5 +1,13 @@
 # The Wolf of Booty Bay
 
+## v0.17.3 - names, not tickers
+
+- Items go by their names again everywhere: the TO THE MOON / RUG PULLS lists, the market list, the item page,
+  the tooltip, the craft window, shared tips, the login recap and sell pings. The $THOR-style tickers stay on the
+  scrolling tape at the top, as decoration.
+- A small 7-day trend line beside each item in the two mover lists and in Portfolio holdings, green or red by
+  the week's move.
+
 ## v0.17.2 - minimap button
 
 - Click: open / close the window. Right-click: the session tracker menu (start, pause, stop, its worth so far).

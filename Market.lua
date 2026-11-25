@@ -652,7 +652,7 @@ function W.Makers()
 end
 
 ---------------------------------------------------------------------------
--- Ticker symbols: every item gets one, like a stock - $THOR (Thorium Bar), $ACRY (Arcane Crystal), $RUGG (Rugged
+-- Ticker symbols, for the scrolling tape only (names everywhere else): $THOR (Thorium Bar), $ACRY (Arcane Crystal), $RUGG (Rugged
 -- Leather). Made from the name: the first word's first letters when the rest says only what kind of thing it is
 -- (Bar, Cloth, Ore...), else its initials and the last word. Two items with the same: the second gets a number.
 ---------------------------------------------------------------------------
@@ -699,8 +699,3 @@ function FT.Symbol(itemID)
     return s
 end
 
--- "$THOR" in the accent colour (empty while the name isn't loaded)
-function FT.SymbolText(itemID)
-    local s = FT.Symbol(itemID)
-    return s ~= "" and FT.C("accent", "$" .. s) or ""
-end

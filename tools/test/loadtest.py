@@ -91,6 +91,17 @@ step("disenchant", function()
   print("tooltip gear: " .. table.concat(GameTooltip.__lines or {}, " // "))
 end)
 mock.run(1)
+-- every "To Auctionator" button, clicked (Make gold's once called a function before it was declared)
+step("to auctionator buttons", function()
+  FT.Show("signals"); FT.Tabs.signals.SetView("make")
+  local n = 0
+  for _, f in ipairs(mock.frames) do
+    local t = f.label and f.label.GetText and f.label:GetText()
+    if t == "To Auctionator" then n = n + 1; mock.click(f) end
+  end
+  print("to auctionator buttons clicked:", n)
+end)
+mock.run(1)
 step("session", function()
   FT.Session.Start()
   mock.run(120)

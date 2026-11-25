@@ -70,6 +70,7 @@ function T.Build(p)
         { key = "qty", title = L["Qty"], width = 64, justify = "RIGHT", sort = "qty" },
         { key = "price", title = L["Price"], width = 86, justify = "RIGHT", sort = "price" },
         { key = "value", title = L["Value"], width = 96, justify = "RIGHT", sort = "value" },
+        { key = "spark", title = "", width = 44, justify = "RIGHT", make = function(row) return UI.Sparkline(row, 40, 16) end, cellHeight = 16 },
         { key = "ch7", title = L["7d"], width = 60, justify = "RIGHT", sort = "ch7" },
         { key = "share", title = L["Share"], width = 56, justify = "RIGHT", sort = "share" },
         { key = "signal", title = L["Signal"], width = 84, justify = "CENTER", make = function(row) return UI.Badge(row, 82, 18) end, cellHeight = 18 },
@@ -91,6 +92,9 @@ function T.Build(p)
             row.cells.price:SetText(FT.Money(x.price, "short"))
             row.cells.value:SetText(FT.Money(x.value, "short"))
             row.cells.ch7:SetText(FT.Pct(x.ch7))
+            local m = FT.Market.Row(x.id)
+            local wk = x.ch7 or 0
+            row.cells.spark:SetValues(m and m.spark, wk > 0 and "up" or (wk < 0 and "down" or "muted"))
             row.cells.share:SetText(T.total and T.total > 0 and string.format("%.1f%%", x.value / T.total * 100) or "")
             row.cells.signal:Set(x.signal, nil, x.strength)
         end,

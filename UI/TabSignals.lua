@@ -278,6 +278,8 @@ local function DealTip(row, d)
     GameTooltip:Show()
 end
 
+local ShownDeals -- below (the To Auctionator button needs it first)
+
 local function BuildDeals(p)
     local f = CreateFrame("Frame", nil, p)
     f:SetPoint("TOPLEFT", 8, -56)
@@ -366,7 +368,7 @@ local function BuildDeals(p)
 end
 
 -- the deals that pass the view's choices and the search (and how many only their prices' age hides)
-local function ShownDeals()
+function ShownDeals()
     local list, _, building = FT.Deals.List()
     -- buy it to disenchant (your best enchanter's skill): with the rest, by profit
     local de = FT.Enchant and FT.Enchant.Deals() or {}
