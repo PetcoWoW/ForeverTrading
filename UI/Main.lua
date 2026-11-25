@@ -5,9 +5,9 @@ local L = FT.L
 
 FT.Tabs = {}
 
-local TAB_ORDER = { "market", "craft", "signals", "portfolio", "settings" }
+local TAB_ORDER = { "market", "craft", "signals", "portfolio", "sessions", "settings" }
 local TAB_LABELS = { market = "Terminal", craft = "Craft", signals = "Money", portfolio = "Portfolio", sell = "Sell",
-    settings = "Settings" }
+    sessions = "Sessions", settings = "Settings" }
 
 local win, nav, content, ticker, statusLeft, statusRight, scanDot, scanText, sizeBox, gearBtn, brand
 local lastPage = "market"
