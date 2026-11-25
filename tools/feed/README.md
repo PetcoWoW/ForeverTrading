@@ -54,3 +54,10 @@ BLIZZARD_CLIENT_ID=... BLIZZARD_CLIENT_SECRET=... node tools/feed/build.mjs
 
 `FEED_FIXTURE=<folder>` builds from saved API answers instead (`<region>-<house>.json` with `auctions`,
 `commodities` and `modified`), for testing.
+
+## Backfill
+
+`backfill/<house>-<source>.json.gz` holds daily lows from before the robot started:
+`{ seen: [unix days scanned whole], items: { itemID: { unixDay: low } } }`. Every run fills the days the robot has
+no price of its own for (inside the 90-day window, never today). `110-auctionator.json.gz` came from your
+Auctionator price history (21 days, Nov 4 - 24 2026, PvP Alliance).
