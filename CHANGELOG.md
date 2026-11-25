@@ -1,5 +1,12 @@
 # The Wolf of Booty Bay
 
+## v0.16.2 - Sessions on its own
+
+- Sessions is a tab of its own (Terminal, Money, Portfolio, Sessions); Portfolio's Sessions view is gone.
+- The minimap button: a click opens the menu (start, pause or stop a session - with its worth so far - open or
+  close the window, the pages); a right-click opens or closes the window right away. The same for broker bars.
+- /wolf sessions opens it; /wolf farm still starts and stops one.
+
 ## v0.16.1 - fixes from the game
 
 - Fixed: Craft for profit and disenchant values threw errors ("Craft.lua:545: attempt to call a nil value"):

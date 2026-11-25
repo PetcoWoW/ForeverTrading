@@ -29,8 +29,8 @@ local function MinimapTooltip(self)
         GameTooltip:AddLine(string.format(L["Session: %s, %s an hour"], FT.Money(math.floor(sum.worth), "short"),
             sum.perHour and FT.Money(math.floor(sum.perHour), "short") or "..."), 0.05, 0.8, 0.5)
     end
-    GameTooltip:AddLine(L["Click: open / close"], 0.8, 0.8, 0.8)
-    GameTooltip:AddLine(L["Right-click: menu (start a session...)"], 0.8, 0.8, 0.8)
+    GameTooltip:AddLine(L["Click: menu (start or stop a session, open the window)"], 0.8, 0.8, 0.8)
+    GameTooltip:AddLine(L["Right-click: open / close the window"], 0.8, 0.8, 0.8)
     GameTooltip:AddLine(L["Drag: move"], 0.8, 0.8, 0.8)
     GameTooltip:Show()
 end
@@ -44,14 +44,17 @@ local function MenuItems()
     if not s then
         items[#items + 1] = { L["Start a session"], function() S.Start() end, "up" }
     else
+        local sum = S.Summary(s)
+        items[#items + 1] = { FT.C("dim", string.format(L["Running: %s, %s an hour"], FT.Money(math.floor(sum.worth), "short"),
+            sum.perHour and FT.Money(math.floor(sum.perHour), "short") or "...")), nil }
         items[#items + 1] = { s.paused and L["Resume the session"] or L["Pause the session"], function() S.Pause() end }
         items[#items + 1] = { L["Stop the session"], function() S.Stop() end, "down" }
     end
     items[#items + 1] = { "-" }
-    items[#items + 1] = { L["Terminal"], function() FT.Show("market") end }
+    items[#items + 1] = { (FT.IsShown() and L["Close Wolf of Booty Bay"]) or L["Open Wolf of Booty Bay"], function() FT.Toggle() end }
+    items[#items + 1] = { L["Sessions"], function() FT.Show("sessions") end }
     items[#items + 1] = { L["Money"], function() FT.Show("signals") end }
     items[#items + 1] = { L["Portfolio"], function() FT.Show("portfolio") end }
-    items[#items + 1] = { L["Past sessions"], function() FT.Show("portfolio"); FT.Tabs.portfolio.SetView("sessions") end }
     items[#items + 1] = { L["Settings"], function() FT.Show("settings") end }
     return items
 end
@@ -102,6 +105,7 @@ function FT.ShowMenu(anchor)
         row:SetPoint("TOPLEFT", 4, y)
         row:SetPoint("RIGHT", menu, "RIGHT", -4, 0)
         row.fn = not sep and it[2] or nil
+        row:EnableMouse(row.fn ~= nil)
         row.text:SetShown(not sep)
         row.line:SetShown(sep)
         if not sep then
@@ -143,8 +147,9 @@ local function BuildMinimap()
     border:SetSize(52, 52)
     border:SetTexture("Interface\\Minimap\\MiniMap-TrackingBorder")
     border:SetPoint("TOPLEFT")
+    -- a click: the menu (start or stop a session, open the window...); right-click: the window right away
     mb:SetScript("OnClick", function(self, button)
-        if button == "RightButton" then FT.ShowMenu(self) else FT.Toggle() end
+        if button == "RightButton" then FT.Toggle() else FT.ShowMenu(self) end
     end)
     mb:SetScript("OnDragStart", function(self)
         self:SetScript("OnUpdate", function()
@@ -176,7 +181,7 @@ local function MakeBroker()
     ldb:NewDataObject("Wolf of Booty Bay", {
         type = "launcher", label = "Wolf of Booty Bay", text = "Wolf of Booty Bay", icon = ICON,
         OnClick = function(self, button)
-            if button == "RightButton" then FT.ShowMenu(self) else FT.Toggle() end
+            if button == "RightButton" then FT.Toggle() else FT.ShowMenu(self) end
         end,
         OnTooltipShow = function(tt)
             if not (tt and tt.AddLine) then return end
@@ -985,10 +990,7 @@ local function BuildHUD()
     h.stop = UI.Button(h, L["Stop"], 10, 20, "down", function() FT.Session.Stop() end)
     h.stop:FitText(16)
     h.stop:SetPoint("LEFT", h.pause, "RIGHT", 6, 0)
-    h.open = UI.Button(h, L["Details"], 10, 20, "default", function()
-        FT.Show("portfolio")
-        FT.Tabs.portfolio.SetView("sessions")
-    end)
+    h.open = UI.Button(h, L["Details"], 10, 20, "default", function() FT.Show("sessions") end)
     h.open:FitText(16)
     h.open:SetPoint("BOTTOMRIGHT", -8, 6)
     h.elapsed = 0

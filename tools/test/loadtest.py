@@ -44,7 +44,7 @@ local FT = ...
 local function step(name, fn) mock.call("step " .. name, fn) end
 step("slash", function() SlashCmdList["WOLFOFBOOTYBAY"]("") end)
 mock.run(1)
-for _, tab in ipairs({ "market", "signals", "portfolio", "sell", "settings", "craft" }) do
+for _, tab in ipairs({ "market", "signals", "portfolio", "sessions", "sell", "settings", "craft" }) do
   step("tab " .. tab, function() FT.Show(tab) end)
   mock.run(1)
 end
@@ -103,6 +103,8 @@ step("session", function()
   print(string.format("session: %d items, worth %d, per hour %s, money %d, %ds", #sum.items, sum.worth, tostring(sum.perHour and math.floor(sum.perHour)), sum.money, sum.secs))
   FT.Session.Pause(); mock.run(60); FT.Session.Pause()
   FT.ShowMenu(UIParent)
+  local mb = _G["WolfOfBootyBayMinimapButton"]
+  if mb then mock.click(mb, "LeftButton") end
   FT.Show("portfolio"); FT.Tabs.portfolio.SetView("sessions")
   FT.Session.Stop()
   print("saved sessions:", #FT.Session.List(), FT.Session.List()[1].name)
