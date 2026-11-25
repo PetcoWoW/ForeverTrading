@@ -1,4 +1,4 @@
--- Wolf of Booty Bay (built on ForeverTrading): buying from the order book, at the auction house.
+-- Wolf of Booty Bay: buying from the order book, at the auction house.
 --  * Stackable goods: the server is asked what that many of the cheapest cost right now; you see its exact
 --    price (and a warning when it is dearer than the book showed, or changed meanwhile) and confirm.
 --  * Gear: the cheapest auction of exactly that version with a buyout (not yours) is found; you confirm it.

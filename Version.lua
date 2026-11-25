@@ -1,5 +1,5 @@
--- Wolf of Booty Bay (built on ForeverTrading): is there a newer version? An addon can't go online, so guild and group members who use
--- ForeverTrading tell each other which version they have (a hidden addon message): at login and when you join
+-- Wolf of Booty Bay: is there a newer version? An addon can't go online, so guild and group members who use
+-- Wolf of Booty Bay tell each other which version they have (a hidden addon message): at login and when you join
 -- a group - at most once a minute per channel, never in a fight. A newer one than yours: one line in chat a
 -- session and a link in the status bar. Someone with an older version hears yours back, so the news gets round.
 local ADDON, FT = ...
@@ -73,7 +73,7 @@ FT.On("GROUP_ROSTER_UPDATE", function() FT.Debounce("verGroup", 5, function() Sa
 
 FT.On("CHAT_MSG_ADDON", function(prefix, text, channel, sender)
     if prefix ~= PREFIX or type(text) ~= "string" then return end
-    -- whoever says its version uses ForeverTrading: the price exchange can whisper them later
+    -- whoever says its version uses Wolf of Booty Bay: the price exchange can whisper them later
     if sender and FT.Share and text:find("^V\t") then FT.Share.Met(sender) end
     if not On() then return end
     local theirs = text:match("^V\t(.+)$")

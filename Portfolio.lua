@@ -1,4 +1,4 @@
--- Wolf of Booty Bay (built on ForeverTrading): what your characters own (bags, bank, mail) and what it is worth at market prices.
+-- Wolf of Booty Bay: what your characters own (bags, bank, mail) and what it is worth at market prices.
 local ADDON, FT = ...
 
 local L = FT.L

@@ -1,4 +1,4 @@
--- Wolf of Booty Bay (built on ForeverTrading): what crafting materials cost at a vendor.
+-- Wolf of Booty Bay: what crafting materials cost at a vendor.
 -- 1. what a merchant really charged you (recorded when you visit one: Sources/Game.lua)
 -- 2. what Mastercraft recorded the same way
 -- 3. for the common vendor-sold reagents below: an estimate from the item's sell price (vendors sell

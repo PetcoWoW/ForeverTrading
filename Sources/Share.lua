@@ -1,4 +1,4 @@
--- Wolf of Booty Bay (built on ForeverTrading): price exchange between ForeverTrading users of a guild or a group.
+-- Wolf of Booty Bay: price exchange between Wolf of Booty Bay users of a guild or a group.
 -- When your prices of the whole market are more than an hour old (or you press Exchange), the guild (then the
 -- group) is asked who has fresher ones. Those who have offer them; the freshest is picked and sends its last
 -- full scan in the background: hidden addon messages, paused in a fight. The game lets each prefix send about
@@ -9,7 +9,7 @@
 -- The live Forever realms restrict what an addon may send (C_ChatInfo.AreOutgoingAddonChatMessagesRestricted:
 -- LayerSwap's author found its messages in a chat channel refused there; a hidden whisper is the one message
 -- they surely carry). So when the guild and the group bring nothing, the same question goes as hidden whispers:
--- to the group, to the ForeverTrading users met before who are online in the guild and, when you pressed
+-- to the group, to the Wolf of Booty Bay users met before who are online in the guild and, when you pressed
 -- Exchange, to the rest of the guild online. The answer and the transfer then go by whisper too.
 --   Q  ask:    "Q", proto, side, the time of our newest market prices, "m" when you pressed Exchange, lanes
 --   O  offer:  "O", proto, side, the time of theirs, how many items
@@ -30,10 +30,10 @@ local L = FT.L
 local X = {}
 FT.Share = X
 
-local PREFIX = "FTDATA"
+local PREFIX = "WOLFBBD"
 -- the lanes of a transfer: their prefixes (the first is PREFIX: everything else goes on it); how many are used
 -- at most - the one number to turn down should the server ever take it for flooding
-local LANE_PREFIX = { PREFIX, "FTDAT2", "FTDAT3" }
+local LANE_PREFIX = { PREFIX, "WOLFBBD2", "WOLFBBD3" }
 local LANES = 3
 local LANE_OF = {}
 for i, p in ipairs(LANE_PREFIX) do LANE_OF[p] = i end
@@ -54,8 +54,8 @@ local MAX_PRICE = 1e10        -- a million gold
 local WHISPER_BURST = 8       -- the game lets about 10 messages of an addon out at once, then about one a second
 local WHISPER_GAP = 1.1
 local WHISPER_MAX = 25        -- players whispered when you press Exchange
-local WHISPER_AUTO = 6        -- by itself: only the group and the ForeverTrading users met before
-local PEER_DAYS = 60          -- a ForeverTrading user not heard from for this long is forgotten
+local WHISPER_AUTO = 6        -- by itself: only the group and the Wolf of Booty Bay users met before
+local PEER_DAYS = 60          -- a Wolf of Booty Bay user not heard from for this long is forgotten
 
 local ask        -- { channels, i, channel, offers, picked, manual, round, replies, sentAny, heardBroadcast }
 local offer      -- { channel, t, count, beaten }: our offer, said after a short random wait
@@ -272,14 +272,14 @@ end
 ---------------------------------------------------------------------------
 -- Who can be whispered
 ---------------------------------------------------------------------------
--- ForeverTrading users heard before (this server and side): short name -> { n = full name, t = when }
+-- Wolf of Booty Bay users heard before (this server and side): short name -> { n = full name, t = when }
 local function Peers()
     local r = FT.Side()
     r.peers = r.peers or {}
     return r.peers
 end
 
--- a ForeverTrading user heard (anything of ours, or its version)
+-- a Wolf of Booty Bay user heard (anything of ours, or its version)
 function X.Met(sender)
     local key = Short(sender)
     if not FT.db or key == "" or IsMe(sender) then return end
@@ -299,7 +299,7 @@ local function AskRoster()
     end
 end
 
--- the group, then the ForeverTrading users met before who are online in the guild, then (asked by hand)
+-- the group, then the Wolf of Booty Bay users met before who are online in the guild, then (asked by hand)
 -- the rest of the guild online
 local function WhisperTargets(manual)
     local list, seen = {}, {}

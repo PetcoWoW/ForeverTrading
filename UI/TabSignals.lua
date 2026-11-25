@@ -1,4 +1,4 @@
--- Wolf of Booty Bay (built on ForeverTrading): the Money page - ways to make gold from the market right now:
+-- Wolf of Booty Bay: the Money page - ways to make gold from the market right now:
 --  Make gold (one ranked list: carry it between the houses, flip it, vendor it) and the Farm Board (raw materials by
 --  the gold the market pays for them a day). What to do with what you own is Portfolio > Sell yours.
 local ADDON, FT = ...
@@ -823,7 +823,7 @@ function T.Build(p)
         T.search = ""
         T.Refresh()
     end)
-    -- one way to make gold per view; Signals: ForeverTrading's four columns
+    -- one way to make gold per view; Signals: the four columns
     T.view = T.view or "make"
     T.viewSeg = UI.Segmented(head, { { "make", L["Make gold"] }, { "craft", L["Craft for profit"] }, { "farm", L["Farm"] } }, function(v) T.SetView(v) end, 22)
     T.viewSeg:SetPoint("LEFT", T.searchBox, "RIGHT", 12, 0)

@@ -1,4 +1,4 @@
--- Wolf of Booty Bay (built on ForeverTrading): the look and the basic pieces every window uses. Three styles (Settings > General):
+-- Wolf of Booty Bay: the look and the basic pieces every window uses. Three styles (Settings > General):
 -- dark (an exchange terminal at night, the default), light (the same by day) and classic (the game's own look).
 local ADDON, FT = ...
 
@@ -49,7 +49,7 @@ end
 
 -- once, when the saved settings are known, before any window is built
 function UI.ApplyTheme()
-    -- one style: the dark terminal (ForeverTrading's light and classic styles are gone)
+    -- one style: the dark terminal (the old light and classic styles are gone)
     UI.theme = "dark"
     UI.INSET = 1
     UI.SEL_A = 0.07

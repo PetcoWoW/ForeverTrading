@@ -1,4 +1,4 @@
--- Wolf of Booty Bay (built on ForeverTrading): Settings page.
+-- Wolf of Booty Bay: Settings page.
 local ADDON, FT = ...
 local UI = FT.UI
 local L = FT.L
@@ -337,12 +337,10 @@ function T.Build(p)
     if T.about.SetWordWrap then T.about:SetWordWrap(true) end
     T.about:SetJustifyV("TOP")
     T.about:SetHeight(4 * ROW)
-    local support = UI.Button(ab, L["Credits: ForeverTrading"], 10, 24, "primary", function() FT.ShowSupport() end)
-    support:FitText(28)
-    support:SetPoint("BOTTOMLEFT", 14, 12)
     local gh = UI.Button(ab, "GitHub", 10, 24, "default", function() FT.ShowGitHub() end)
     gh:FitText(28)
-    gh:SetPoint("LEFT", support, "RIGHT", 8, 0)
+    gh:SetPoint("BOTTOMLEFT", 14, 12)
+    local support = gh
     local news = UI.Button(ab, L["What's new"], 10, 24, "default", function() FT.News.Show() end)
     news:FitText(28)
     news:SetPoint("BOTTOMLEFT", support, "TOPLEFT", 0, 8)

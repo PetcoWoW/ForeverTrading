@@ -1,4 +1,4 @@
--- Wolf of Booty Bay (built on ForeverTrading): the craft queue - recipes and how many crafts of each, and what to buy for them: every material
+-- Wolf of Booty Bay: the craft queue - recipes and how many crafts of each, and what to buy for them: every material
 -- of the queue together, less what this character has in its bags and bank, each at its cheapest (the auction
 -- house walked up its order book for the whole amount, a vendor, or crafting it yourself), with what the crafts
 -- bring and how long they take to sell (FT.Sales). Kept per server and side.

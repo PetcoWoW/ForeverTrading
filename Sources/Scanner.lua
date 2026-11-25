@@ -1,4 +1,4 @@
--- Wolf of Booty Bay (built on ForeverTrading): our own auction house scanner (WoW Forever has the modern auction house, C_AuctionHouse).
+-- Wolf of Booty Bay: our own auction house scanner (WoW Forever has the modern auction house, C_AuctionHouse).
 --  * Full scan: the whole auction house as the game's browse list - the lowest price and how many are listed
 --    of every item, in a few seconds, any time. Optionally "deep" (Settings): every single auction
 --    (ReplicateItems) - order books of everything - once every 15 minutes.
@@ -1137,7 +1137,7 @@ end)
 -- "Search on AH" buttons
 ---------------------------------------------------------------------------
 -- Auctionator's Shopping tab when it is installed; without it the game's own search (one item) or
--- ForeverTrading's scanner for a list (an item and its materials): fresh prices and order books either way
+-- Wolf of Booty Bay's scanner for a list (an item and its materials): fresh prices and order books either way
 function FT.SearchItems(ids)
     local names = {}
     for _, id in ipairs(ids) do

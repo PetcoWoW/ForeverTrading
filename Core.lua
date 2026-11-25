@@ -1,10 +1,10 @@
--- Wolf of Booty Bay (built on ForeverTrading): core (saved data, events, formatting helpers, slash commands)
+-- Wolf of Booty Bay: core (saved data, events, formatting helpers, slash commands)
 local ADDON, FT = ...
 local L = FT.L
 
 -- The version being released: a copy straight from the repository (not packaged) has no version in its TOC yet
 -- (the packager puts the tag there) and shows this one. Set it with every release.
-local RELEASE = "v0.15.0"
+local RELEASE = "v0.15.1"
 local GetMeta = (C_AddOns and C_AddOns.GetAddOnMetadata) or GetAddOnMetadata
 FT.VERSION = (GetMeta and GetMeta(ADDON, "Version")) or RELEASE
 if FT.VERSION == "" or FT.VERSION:find("@", 1, true) then FT.VERSION = RELEASE end
@@ -169,7 +169,7 @@ FT.DEFAULTS = {
     textSize = 1,           -- added to every text's size: 0 normal, 1 large, 2 larger (after a reload)
     ticker = true,
     ahButton = true,
-    replaceAH = false,      -- talking to an auctioneer opens ForeverTrading in place of the game's window
+    replaceAH = false,      -- talking to an auctioneer opens Wolf of Booty Bay in place of the game's window
     sellDuration = 2,       -- posting: 1 short, 2 medium, 3 long (WoW Forever: 2, 8, 24 hours)
     dockAH = true,
     chartTF = "1D",
@@ -819,6 +819,6 @@ FT.On("FT_READY", function()
     local loaded = (C_AddOns and C_AddOns.IsAddOnLoaded and C_AddOns.IsAddOnLoaded("ForeverTrading"))
         or (IsAddOnLoaded and IsAddOnLoaded("ForeverTrading"))
     if loaded then
-        FT.Print(FT.L["ForeverTrading is also turned on. Wolf of Booty Bay already does everything it does: turn ForeverTrading off in the AddOns list so they don't scan and fill your tooltips twice."])
+        FT.Print(FT.L["ForeverTrading is also turned on: Wolf of Booty Bay does everything it does. Turn ForeverTrading off in the AddOns list so they don't scan and fill your tooltips twice."])
     end
 end)

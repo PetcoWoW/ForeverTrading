@@ -1,4 +1,4 @@
--- Wolf of Booty Bay (built on ForeverTrading): Craft page - every recipe your characters know: what it costs, what it brings in,
+-- Wolf of Booty Bay: Craft page - every recipe your characters know: what it costs, what it brings in,
 -- the profit and a signal; one recipe in detail with its margin over time and its materials.
 local ADDON, FT = ...
 local UI = FT.UI

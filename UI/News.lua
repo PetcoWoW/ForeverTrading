@@ -1,4 +1,4 @@
--- Wolf of Booty Bay (built on ForeverTrading): "What's new" - once a version, the first time the window opens after an update: a few lines on
+-- Wolf of Booty Bay: "What's new" - once a version, the first time the window opens after an update: a few lines on
 -- what came, each with a button to where it is. On a first install the tour is offered instead (UI/Tour.lua).
 -- Again any time: Settings > About, /wolf news.
 local ADDON, FT = ...
@@ -97,7 +97,7 @@ local function News()
                 nil },
         },
         ["v0.1"] = {
-            { L["Welcome to the Wolf of Booty Bay"], L["The auction house as a stock market. Built on ForeverTrading by thewoolfi - his scanner, history and price exchange, with our own look on top."],
+            { L["Welcome to the Wolf of Booty Bay"], L["The auction house as a stock market: tickers, moves, what to buy and sell, and your portfolio."],
                 nil },
             { L["Easier to read"], L["The game's own wide font, bigger text and window sizes up to 150%: Settings > General."],
                 function() FT.Show("settings") end },

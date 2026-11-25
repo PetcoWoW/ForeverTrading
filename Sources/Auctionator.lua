@@ -1,7 +1,7 @@
--- Wolf of Booty Bay (built on ForeverTrading): Auctionator link (Settings > Sources can turn it off).
--- What Auctionator scans goes into ForeverTrading's own history, as if we had scanned it ourselves:
+-- Wolf of Booty Bay: Auctionator link (Settings > Sources can turn it off).
+-- What Auctionator scans goes into Wolf of Booty Bay's own history, as if we had scanned it ourselves:
 -- its full scan (every auction: order books, day candles), its searches, and every price it saves.
--- Days ForeverTrading has no candle for are filled from Auctionator's own price database.
+-- Days Wolf of Booty Bay has no candle for are filled from Auctionator's own price database.
 local ADDON, FT = ...
 local L = FT.L
 
