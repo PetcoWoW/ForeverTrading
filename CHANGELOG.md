@@ -1,5 +1,15 @@
 # The Wolf of Booty Bay
 
+## v0.10 - bug pass
+
+- Fixed: Money > Sell yours and Farm Board weren't shown or hidden by the view switch (their frames were looked up
+  before they were declared, so the switch never found them).
+- Biggest movers (Terminal lists, banners) count only real markets: 3+ sold a day from 5+ known sales, 1g+ a day
+  changing hands, 5+ listed, and yesterday's price in line with the week before (no "down 85%" from one
+  overpriced day, no "up 300%" on a 4-silver item).
+- A note in chat when the original ForeverTrading is also turned on (both would scan and fill tooltips).
+- tools/test: a static audit and a load test that runs the whole addon in a fake WoW.
+
 ## v0.9 - quiet alerts
 
 - No pop-ups by default: price alerts, TO THE MOON / RUG PULL and WHALE ALERT go to chat, the banners of one
