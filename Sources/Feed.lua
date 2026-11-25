@@ -145,28 +145,40 @@ function F.HouseID(house)
     return ids[UnitFactionGroup and UnitFactionGroup("player") or ""]
 end
 
--- "7911=p,q,n,sold,value,hours,expired,low0,...,low6;" -> entries, read once per house
+-- "7911=p,q,n,sold,value,hours,expired,low0,...,low29;" - read lazily: one quick pass keeps each item's text
+-- (h.raw), an item is decoded the first time it's asked for (h.items[id]) and forgotten again when nothing holds
+-- it; its daily lows only when they're asked for (F.Daily). Decoding all 7,000+ items at once took ~100 ms in one
+-- frame (a stutter at login) and ~4 MB.
+local function Decode(rest)
+    local p, q, n, sold, value, hours, expired, lows = rest:match("^([^,]*),([^,]*),([^,]*),([^,]*),([^,]*),([^,]*),([^,]*),?(.*)$")
+    if not p then return nil end
+    return {
+        p = Dec(p), q = Dec(q), n = Dec(n), sold = Dec(sold) or 0, value = Dec(value) or 0, hours = Dec(hours) or 0,
+        expired = Dec(expired) or 0, lowsRaw = lows or "",
+    }
+end
+F.Decode = Decode
+
 local function Parse(h)
-    local items, n = {}, 0
+    local raw, n = {}, 0
     for id, rest in h.data:gmatch("(%d+)=([^;]*);") do
-        local f, i = {}, 0
-        for v in (rest .. ","):gmatch("([^,]*),") do
-            i = i + 1
-            f[i] = v
-        end
-        local lows = {}
-        for k = 8, i do lows[k - 7] = Dec(f[k]) end
-        items[tonumber(id)] = {
-            p = Dec(f[1]), q = Dec(f[2]), n = Dec(f[3]),
-            sold = Dec(f[4]) or 0, value = Dec(f[5]) or 0, hours = Dec(f[6]) or 0, expired = Dec(f[7]) or 0,
-            lows = lows,
-        }
+        raw[tonumber(id)] = rest
         n = n + 1
     end
+    local items = setmetatable({}, {
+        __mode = "v",
+        __index = function(t, id)
+            local rest = raw[id]
+            if not rest then return nil end
+            local e = Decode(rest)
+            rawset(t, id, e)
+            return e
+        end,
+    })
     -- the UTC days the house was really downloaded on (older feeds don't say: none counted)
     local seen = {}
     for d in (type(h.seen) == "string" and h.seen or ""):gmatch("(%d+)") do seen[#seen + 1] = tonumber(d) end
-    return { t = h.t, firstDay = h.firstDay, items = items, count = n, seen = seen }
+    return { t = h.t, firstDay = h.firstDay, items = items, raw = raw, count = n, seen = seen }
 end
 
 -- the feed's data of one of our auction houses (default: the one you look at)
@@ -195,13 +207,17 @@ function F.Daily(itemID, fromDay, house)
     local h = F.House(house)
     local e = h and h.items[itemID]
     if not e then return nil end
-    local out, any = {}, false
-    for k, low in pairs(e.lows) do
-        -- the feed's days are UTC days: each counts for the day its middle falls on here
-        local d = FT.Day((h.firstDay + k - 1) * 86400 + 43200)
-        if low and (not fromDay or d >= fromDay) then
-            out[d] = { low = low }
-            any = true
+    local out, any, k = {}, false, 0
+    for v in (e.lowsRaw .. ","):gmatch("([^,]*),") do
+        k = k + 1
+        local low = Dec(v)
+        if low then
+            -- the feed's days are UTC days: each counts for the day its middle falls on here
+            local d = FT.Day((h.firstDay + k - 1) * 86400 + 43200)
+            if not fromDay or d >= fromDay then
+                out[d] = { low = low }
+                any = true
+            end
         end
     end
     return any and out or nil
@@ -242,16 +258,23 @@ function F.Take()
     if FT.Hist.HasScan(h.t) then return end         -- taken before
     taking = true
     local sum = FT.Scanner.NewSummary()
-    for id, e in pairs(h.items) do
-        if e.p and e.p > 0 and e.q and e.q > 0 then
-            sum.items[id] = { p = e.p, q = e.q }
+    local ids = {}
+    for id in pairs(h.raw) do ids[#ids + 1] = id end
+    -- a little each frame (only the price and how many are listed are read)
+    FT.Job("feed:read", #ids, function(k)
+        local id = ids[k]
+        local p, q = h.raw[id]:match("^([^,]*),([^,]*),")
+        p, q = Dec(p), Dec(q)
+        if p and p > 0 and q and q > 0 then
+            sum.items[id] = { p = p, q = q }
             sum.count = sum.count + 1
         end
-    end
-    FT.Scanner.SaveSummary(sum, h.t, "feed", function(items)
-        taking = false
-        FT.Debug("feed: taken", items, "items of", FT.Ago(h.t))
-        FT.Fire("FT_SCAN_DONE", "feed")
+    end, function()
+        FT.Scanner.SaveSummary(sum, h.t, "feed", function(items)
+            taking = false
+            FT.Debug("feed: taken", items, "items of", FT.Ago(h.t))
+            FT.Fire("FT_SCAN_DONE", "feed")
+        end)
     end)
 end
 

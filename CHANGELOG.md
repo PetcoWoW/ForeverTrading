@@ -1,5 +1,23 @@
 # The Wolf of Booty Bay
 
+## v0.17 - performance pass
+
+Measured in the fake WoW with real prices (tools/test), longest single frame of each piece of work at login:
+- TO THE MOON / RUG PULL check: 192 ms -> 3.5 ms. The biggest movers are worked out once per market build, in
+  the background (M.PrepareMovers: cheap tests first, the costly real-market check only until 40 are found each
+  way), not on every redraw of the Terminal and the tape.
+- Blizzard prices: read lazily. One quick pass keeps each item's text; an item is decoded when asked for and
+  forgotten when nothing holds it; daily lows only when a chart asks. Was ~100 ms in one frame and ~7 MB parsed;
+  the take into history reads them a little each frame.
+- Background work gets 4 ms of each frame (2 in a fight), down from 8: loading in stays smooth. Market build's
+  worst frame 23 -> 9.5 ms.
+- The scorecard's daily calls are written down a little each frame; the "its kind" learning starts 2 minutes
+  after login and never in a fight.
+- Disenchant values: weapon/armor told without asking the server; only items the game already has are looked
+  at (no flood of item requests when Make gold opens).
+- Delayed tasks report what they cost in /wolf perf.
+- Memory after login: 26.9 MB -> 23.7 MB (and far less garbage while loading in).
+
 ## v0.16.2 - Sessions on its own
 
 - Sessions is a tab of its own (Terminal, Money, Portfolio, Sessions); Portfolio's Sessions view is gone.

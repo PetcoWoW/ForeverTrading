@@ -267,7 +267,7 @@ end
 function Ses.Start()
     if FT.db.session then return end
     FT.db.session = { start = time(), since = time(), secs = 0, items = {}, money = 0, zone = Zone() }
-    FT.Print(L["Session started: everything you loot counts. Stop it from the minimap button's right-click menu, or /wolf farm."])
+    FT.Print(L["Session started: everything you loot counts. Stop it from the minimap button's menu, or /wolf farm."])
     FT.Fire("FT_SESSION_CHANGED")
 end
 

@@ -199,6 +199,7 @@ function M.Refresh()
         end
     end, function()
         building = false
+        if M.ForgetMovers then M.ForgetMovers() end -- some rows changed in place: the movers again
         FT.Fire("FT_MARKET_READY")
         Again()
     end)
@@ -302,11 +303,20 @@ local function Plausible(ch)
 end
 
 -- the biggest moves: up (descending) - only what rose - or down - only what fell
-function M.Movers(n, field, descending)
+-- The biggest moves. The cheap tests first, the biggest first, and the costly one (Solid: sales, the week before)
+-- only until n are found - not on all 7,000 items (that was a long frame every time the Terminal showed).
+-- Worked out once per market build, in the background (M.PrepareMovers): the top 40 each way, each a real
+-- market (Solid reads sales and the week before - too much for one frame across thousands of items). Until it's
+-- ready, the cheap tests alone.
+local moversCache = setmetatable({}, { __mode = "k" })
+local MOVERS_KEPT = 40
+function M.ForgetMovers() if rows then moversCache[rows] = nil end end
+
+local function Candidates(field, descending)
     local list = {}
     for _, r in ipairs(rows or {}) do
         local v = r[field]
-        if v and ((descending and v > 0) or (not descending and v < 0)) and Solid(r) and Plausible(v) then
+        if v and ((descending and v > 0) or (not descending and v < 0)) and Plausible(v) and Liquid(r) and (r.qty or 0) >= 5 then
             list[#list + 1] = r
         end
     end
@@ -314,8 +324,66 @@ function M.Movers(n, field, descending)
         if descending then return a[field] > b[field] end
         return a[field] < b[field]
     end)
+    return list
+end
+
+local preparing
+function M.PrepareMovers()
+    if not rows or preparing then return end
+    local forRows = rows
+    local sets = {}
+    for _, spec in ipairs({ { "ch1", true }, { "ch1", false }, { "ch7", true }, { "ch7", false } }) do
+        sets[#sets + 1] = { key = spec[1] .. (spec[2] and "+" or "-"), list = Candidates(spec[1], spec[2]), top = {}, i = 1 }
+    end
+    preparing = true
+    -- one item's check per step, across the four lists, until each has its 40 (or runs out)
+    local total = 0
+    for _, set in ipairs(sets) do total = total + #set.list end
+    local si = 1
+    FT.Job("movers", total, function()
+        local tries = 0
+        while tries < #sets do
+            local set = sets[si]
+            si = si % #sets + 1
+            if #set.top < MOVERS_KEPT and set.i <= #set.list then
+                local r = set.list[set.i]
+                set.i = set.i + 1
+                if Solid(r) then set.top[#set.top + 1] = r end
+                return
+            end
+            tries = tries + 1
+        end
+        return false -- every list is full or done
+    end, nil)
+    -- the job stops itself with false: finish when it's done
+    local function Finish()
+        for _, set in ipairs(sets) do
+            if #set.top < MOVERS_KEPT and set.i <= #set.list then return C_Timer.After(0.2, Finish) end
+        end
+        preparing = false
+        if rows ~= forRows then return end
+        local byRows = {}
+        for _, set in ipairs(sets) do byRows[set.key] = set.top end
+        moversCache[forRows] = byRows
+        FT.Fire("FT_MOVERS_READY")
+    end
+    C_Timer.After(0.2, Finish)
+end
+FT.On("FT_MARKET_READY", function() M.ForgetMovers(); C_Timer.After(0.5, M.PrepareMovers) end)
+
+function M.Movers(n, field, descending)
+    local byRows = rows and moversCache[rows]
+    local top = byRows and byRows[field .. (descending and "+" or "-")]
     local out = {}
-    for i = 1, math.min(n, #list) do out[i] = list[i] end
+    if top then
+        for i = 1, math.min(n, #top) do out[i] = top[i] end
+        return out
+    end
+    -- not worked out yet: the cheap tests only (a moment after login)
+    for _, r in ipairs(Candidates(field, descending)) do
+        if #out >= n then break end
+        out[#out + 1] = r
+    end
     return out
 end
 
@@ -481,13 +549,16 @@ end
 function M.CheckBanners()
     if FT.S.meme == false or not rows then return end
     local shown = 0
-    local topUp, topDown
+    -- the market's biggest each way: the cheap way (M.Movers tests only the top few fully)
+    local topUp = M.Movers(1, "ch1", true)[1]
+    local topDown = M.Movers(1, "ch1", false)[1]
+    if topUp and topUp.ch1 < MOON then topUp = nil end
+    if topDown and topDown.ch1 > RUG then topDown = nil end
     for _, r in ipairs(rows) do
         local ch = r.ch1
-        if ch and Solid(r) and Plausible(ch) then
-            if ch >= MOON and (not topUp or ch > topUp.ch1) then topUp = r end
-            if ch <= RUG and (not topDown or ch < topDown.ch1) then topDown = r end
-            if shown < MAX_BANNERS and Cares(r.id) then
+        -- a big move first (cheap), then yours, then a real market (costly) - in that order
+        if ch and (ch >= MOON or ch <= RUG) and Plausible(ch) and Cares(r.id) and Solid(r) then
+            if shown < MAX_BANNERS then
                 if ch >= MOON and not Seen(r.id, "moon") then
                     Banner(r.id, string.format(L["up %s today"], Whole(ch)), L["TO THE MOON"], "up")
                     shown = shown + 1
@@ -508,7 +579,7 @@ function M.CheckBanners()
     end
 end
 
-FT.On("FT_MARKET_READY", function() FT.Debounce("meme", 3, M.CheckBanners) end)
+FT.On("FT_MOVERS_READY", function() FT.Debounce("meme", 1, M.CheckBanners) end)
 
 -- Whales and Market Makers, from your own deep scans (Full scan): the Blizzard feed has no seller names.
 -- R().whales = { t, items = { [itemID] = { n = seller, s = share, q = how many } } }

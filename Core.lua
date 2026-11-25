@@ -4,7 +4,7 @@ local L = FT.L
 
 -- The version being released: a copy straight from the repository (not packaged) has no version in its TOC yet
 -- (the packager puts the tag there) and shows this one. Set it with every release.
-local RELEASE = "v0.16.2"
+local RELEASE = "v0.17.0"
 local GetMeta = (C_AddOns and C_AddOns.GetAddOnMetadata) or GetAddOnMetadata
 FT.VERSION = (GetMeta and GetMeta(ADDON, "Version")) or RELEASE
 if FT.VERSION == "" or FT.VERSION:find("@", 1, true) then FT.VERSION = RELEASE end
@@ -62,8 +62,14 @@ function FT.Debounce(key, delay, fn)
             return
         end
         pending[key] = nil
+        -- what it cost, for /wolf perf (a task done all at once shows as one long frame)
+        local t0 = debugprofilestop and debugprofilestop()
         local ok, err = pcall(p.fn)
         if not ok then geterrorhandler()(err) end
+        if t0 and FT.PerfNote then
+            local ms = debugprofilestop() - t0
+            FT.PerfNote("delayed:" .. tostring(key), 1, ms, 1, ms, ms / 1000)
+        end
     end
     C_Timer.After(delay, Check)
 end
@@ -72,7 +78,7 @@ end
 -- Long jobs, a little each frame - and what they cost (/wolf perf)
 ---------------------------------------------------------------------------
 -- a job works this many milliseconds of a frame (fewer in a fight): smooth on a slow computer, quick on a fast one
-local FRAME_MS, FIGHT_MS = 8, 3
+local FRAME_MS, FIGHT_MS = 4, 2 -- of a 16 ms frame (60 fps): a quarter, so loading in stays smooth
 local clock = debugprofilestop
 FT.Clock = clock
 FT.perf = {} -- name -> its last run: { n, ms (work), frames, worst (the longest frame), wall (seconds), at, runs }

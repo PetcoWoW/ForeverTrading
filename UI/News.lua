@@ -12,6 +12,9 @@ FT.News = N
 -- start, after the files are read (a table made with them would keep the English)
 local function News()
     return {
+        ["v0.17"] = {
+            { L["Smoother"], L["Loading in no longer stutters: the price data is read item by item as it's needed, the heavy work at login is spread thinner and later, and nothing heavy runs in a fight. About 15% less memory."] },
+        },
         ["v0.16"] = {
             { L["Blizzard prices fixed"], L["They load now whatever the game calls your realm. The API chip and the status bar say how old they are; if they ever can't load, the chip says why (Settings > Basics > Realm type)."] },
             { L["Craft for profit, every profession"], L["Every profession's crafts, whoever knows them: sell what it makes or disenchant it, whichever pays. Pick one profession, or only what you know; your crafters' skills are on top."],
