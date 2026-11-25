@@ -20,6 +20,7 @@
 
 import fs from "node:fs";
 import path from "node:path";
+import zlib from "node:zlib";
 import { fileURLToPath } from "node:url";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
@@ -204,6 +205,34 @@ function processHouse(region, houseId, got, hist) {
 }
 
 // ---------------------------------------------------------------------------------------------------------------
+// Backfill: daily lows from before the robot started (tools/feed/backfill/<house>-*.json.gz, e.g. converted from
+// Auctionator's price history). Fills only days the robot has no price of its own for, inside the window and
+// before today; every run, so a history restored or lost gets them again. Days scanned whole count as seen.
+// ---------------------------------------------------------------------------------------------------------------
+const BACKFILL = process.env.FEED_BACKFILL || path.join(path.dirname(fileURLToPath(import.meta.url)), "backfill");
+
+function mergeBackfill(houseId, h, day) {
+  let files = [];
+  try { files = fs.readdirSync(BACKFILL).filter((f) => f.startsWith(`${houseId}-`) && f.endsWith(".json.gz")); } catch { return 0; }
+  const from = day - KEEP_DAYS + 1;
+  let filled = 0;
+  for (const f of files) {
+    let b;
+    try { b = JSON.parse(zlib.gunzipSync(fs.readFileSync(path.join(BACKFILL, f))).toString("utf8")); } catch { continue; }
+    for (const d of b.seen || []) if (d >= from && d < day) h.seen[d] = true;
+    for (const [item, lows] of Object.entries(b.items || {})) {
+      for (const [dText, low] of Object.entries(lows)) {
+        const d = Number(dText);
+        if (d < from || d >= day || !(low > 0)) continue;
+        const r = h.items[item] || (h.items[item] = { l: {}, s: {} });
+        if (r.l[d] === undefined) { r.l[d] = low; filled++; }
+      }
+    }
+  }
+  return filled;
+}
+
+// ---------------------------------------------------------------------------------------------------------------
 // The Lua file
 // ---------------------------------------------------------------------------------------------------------------
 const b36 = (n) => (n === undefined || n === null ? "" : Math.round(n).toString(36));
@@ -280,6 +309,8 @@ async function main() {
       const got = await fetchHouse(region, houseId, auth);
       if (!got || got.listings.length === 0) continue;
       const res = processHouse(region, houseId, got, hist);
+      const filled = mergeBackfill(houseId, res.h, res.day);
+      if (filled > 0) log(`${region} ${houseId}: ${filled} daily prices filled in from the backfill`);
       const enc = encodeHouse(res);
       results[region][houseId] = { ...enc, t: res.t };
       total += got.listings.length;
