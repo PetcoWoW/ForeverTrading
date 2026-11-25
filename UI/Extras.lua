@@ -30,33 +30,18 @@ local function MinimapTooltip(self)
             sum.perHour and FT.Money(math.floor(sum.perHour), "short") or "..."), 0.05, 0.8, 0.5)
     end
     GameTooltip:AddLine(L["Click: open / close the window"], 0.8, 0.8, 0.8)
-    GameTooltip:AddLine(L["Right-click: session tracker (start, pause, stop)"], 0.8, 0.8, 0.8)
+    GameTooltip:AddLine(L["Right-click: start or stop a session"], 0.8, 0.8, 0.8)
     GameTooltip:AddLine(L["Drag: move"], 0.8, 0.8, 0.8)
     GameTooltip:Show()
 end
 
--- the right-click menu: the session, the pages
-local menu, menuBlock
+-- the right-click menu: start or stop a session, nothing else (the rest is a left-click away; pause is on the panel)
 local function MenuItems()
     local S = FT.Session
-    local s = S.Current()
-    local items = {}
-    if not s then
-        items[#items + 1] = { L["Start a session"], function() S.Start() end, "up" }
-    else
-        local sum = S.Summary(s)
-        items[#items + 1] = { FT.C("dim", string.format(L["Running: %s, %s an hour"], FT.Money(math.floor(sum.worth), "short"),
-            sum.perHour and FT.Money(math.floor(sum.perHour), "short") or "...")), nil }
-        items[#items + 1] = { s.paused and L["Resume the session"] or L["Pause the session"], function() S.Pause() end }
-        items[#items + 1] = { L["Stop the session"], function() S.Stop() end, "down" }
+    if S.Current() then
+        return { { L["Stop the session"], function() S.Stop() end, "down" } }
     end
-    items[#items + 1] = { "-" }
-    items[#items + 1] = { (FT.IsShown() and L["Close Wolf of Booty Bay"]) or L["Open Wolf of Booty Bay"], function() FT.Toggle() end }
-    items[#items + 1] = { L["Sessions"], function() FT.Show("sessions") end }
-    items[#items + 1] = { L["Money"], function() FT.Show("signals") end }
-    items[#items + 1] = { L["Portfolio"], function() FT.Show("portfolio") end }
-    items[#items + 1] = { L["Settings"], function() FT.Show("settings") end }
-    return items
+    return { { L["Start a session"], function() S.Start() end, "up" } }
 end
 
 function FT.ShowMenu(anchor)
@@ -147,7 +132,7 @@ local function BuildMinimap()
     border:SetSize(52, 52)
     border:SetTexture("Interface\\Minimap\\MiniMap-TrackingBorder")
     border:SetPoint("TOPLEFT")
-    -- a click: the window; right-click: the session menu (start, pause, stop, its worth so far)
+    -- a click: the window; right-click: start or stop a session
     mb:SetScript("OnClick", function(self, button)
         if button == "RightButton" then FT.ShowMenu(self) else FT.Toggle() end
     end)
