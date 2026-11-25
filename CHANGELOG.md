@@ -1,5 +1,15 @@
 # The Wolf of Booty Bay
 
+## v0.14 - disenchanting
+
+- Classic's disenchant odds (greens by item level: dust, essence, a shard; blues: a shard, Nexus Crystal at
+  56+; purples: Nexus Crystal), weapons giving more essence than armor. Forever's may differ.
+- Value of disenchanting an item: its materials at auction house prices after the cut, when the likely ones are
+  priced.
+- Gear tooltips: "Disenchant it: ~1.2g (sells for 40s)" or "Sell it: 2.1g beats disenchanting (~1.2g)".
+- Make gold: DE IT deals, gear listed under what it breaks into (15%+ profit), for the best enchanting skill
+  among your characters (read at login); the odds on hover.
+
 ## v0.13 - Craft for profit
 
 - Money > Craft for profit: every recipe (known and not) whose product sells every day (3+ sales seen, 1+ a day),

@@ -761,7 +761,7 @@ FT.SIGNAL_COLORS = {
     HOLD = "accent", WATCH = "accent", EXPENSIVE = "accent", RISKY = "accent",
     AVOID = "down", LOSS = "down",
     FAIR = "muted", NODATA = "dim",
-    VENDOR = "up", RESELL = "blue", UNDERCUT = "down", HOUSES = "accent",
+    VENDOR = "up", RESELL = "blue", UNDERCUT = "down", HOUSES = "accent", DE = "blue",
 }
 
 function FT.SignalText(kind)

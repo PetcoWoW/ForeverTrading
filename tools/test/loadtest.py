@@ -78,6 +78,23 @@ step("craft list", function()
   FT.Show("signals"); FT.Tabs.signals.SetView("craft")
 end)
 mock.run(1)
+step("disenchant", function()
+  FT.db.chars[FT.charKey].enchanting = 300
+  -- mock items: class 4 when id % 5 == 0, quality 1 from GetItemInfo; make some green gear
+  local real = GetItemInfo
+  GetItemInfo = function(id) local a, b, q, l = real(id) if type(id) == "number" and id % 5 == 0 then return a, b, 2, 45 + (id % 15) end return real(id) end
+  local n, v = 0, nil
+  for id in pairs(FT.Feed.House().items) do
+    if id % 5 == 0 then local x = FT.Enchant.Value(id) if x then n = n + 1; v = v or x end end
+  end
+  local deals = FT.Enchant.Deals()
+  print("disenchantable priced:", n, "first value:", v and math.floor(v), "DE deals:", #deals, deals[1] and math.floor(deals[1].profit))
+  FT.Show("signals"); FT.Tabs.signals.SetView("make")
+  GameTooltip:ClearLines(); mock.tdp(GameTooltip, { id = deals[1] and deals[1].id or 10 })
+  print("tooltip gear: " .. table.concat(GameTooltip.__lines or {}, " // "))
+  GetItemInfo = real
+end)
+mock.run(1)
 step("open item", function() FT.OpenItem(12363) end)
 mock.run(1)
 step("best use", function() FT.ShowBestUse(12359) end)
