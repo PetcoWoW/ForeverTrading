@@ -56,3 +56,11 @@ console.log('== called, never defined (FT./UI.):');
 for (const [k, v] of Object.entries(missing)) console.log(' ', k, v.slice(0, 3).join(' '));
 console.log('== global writes:'); gWrites.forEach(w => console.log(' ', w));
 console.log('== global reads:'); console.log([...gReads.keys()].sort().join(' '));
+// a lowercase global read is almost always a local used before its declaration (WoW's globals are CamelCase or
+// UPPER_CASE; Lua's own are listed)
+const LUA = new Set(['ipairs','pairs','next','pcall','xpcall','select','type','tostring','tonumber','unpack','math','string',
+  'table','setmetatable','getmetatable','rawset','rawget','rawequal','date','time','error','assert','print','wipe','tinsert',
+  'tremove','strsplit','strjoin','strtrim','hooksecurefunc','geterrorhandler','collectgarbage','debugprofilestop','loadstring',
+  'format','floor','ceil','abs','max','min','sort','debugstack','securecall','issecurevariable','_G','coroutine','bit','strlower','strupper']);
+const odd = [...gReads.keys()].filter(n => /^[a-z]/.test(n) && !LUA.has(n));
+if (odd.length) { console.log('== SUSPICIOUS (lowercase globals: a local used before it is declared?): ' + odd.join(' ')); process.exitCode = 1; }

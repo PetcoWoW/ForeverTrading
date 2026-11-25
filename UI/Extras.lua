@@ -706,6 +706,121 @@ function FT.ShowBestUse(itemID)
     d:Raise()
 end
 
+---------------------------------------------------------------------------
+-- A craft, laid out: every material and what it costs (bought, from a vendor, or crafted yourself), what the
+-- product sells for, the profit - and against buying the product ready-made
+---------------------------------------------------------------------------
+local craftWin
+
+local function CraftWindow()
+    if craftWin then return craftWin end
+    UI.ResolveFont()
+    local d = CreateFrame("Frame", "WolfOfBootyBayCraft", UIParent)
+    d:SetSize(520, 400)
+    d:SetPoint("CENTER", 40, 40)
+    d:SetFrameStrata("DIALOG")
+    d:SetToplevel(true)
+    d:EnableMouse(true)
+    d:SetMovable(true)
+    d:SetClampedToScreen(true)
+    d:RegisterForDrag("LeftButton")
+    d:SetScript("OnDragStart", d.StartMoving)
+    d:SetScript("OnDragStop", d.StopMovingOrSizing)
+    UI.Fill(d, "bg1")
+    UI.Border(d, "line")
+    d.icon = UI.Icon(d, 30)
+    d.icon:SetPoint("TOPLEFT", 16, -14)
+    d.title = UI.Text(d, 14, "text")
+    d.title:SetPoint("TOPLEFT", d.icon, "TOPRIGHT", 10, -1)
+    d.title:SetPoint("RIGHT", d, "RIGHT", -110, 0)
+    d.sub = UI.Text(d, 11, "muted")
+    d.sub:SetPoint("TOPLEFT", d.title, "BOTTOMLEFT", 0, -4)
+    d.sub:SetPoint("RIGHT", d, "RIGHT", -16, 0)
+    d.close = UI.Button(d, L["Close"], 10, 22, "default", function() d:Hide() end)
+    d.close:FitText(24)
+    d.close:SetPoint("TOPRIGHT", -14, -14)
+    d.chart = UI.Button(d, L["Chart"], 10, 22, "default", function() if d.itemID then FT.OpenItem(d.itemID) end end)
+    d.chart:FitText(24)
+    d.chart:SetPoint("RIGHT", d.close, "LEFT", -6, 0)
+    local panel = UI.Panel(d, "bg0", "line")
+    panel:SetPoint("TOPLEFT", 12, -60)
+    panel:SetPoint("BOTTOMRIGHT", -12, 92)
+    local cols = {
+        { key = "name", title = L["Material"], width = "fill" },
+        { key = "qty", title = L["Qty"], width = 40, justify = "RIGHT" },
+        { key = "unit", title = L["Each"], width = 80, justify = "RIGHT" },
+        { key = "total", title = L["Total"], width = 80, justify = "RIGHT" },
+        { key = "from", title = L["From"], width = 70, justify = "RIGHT" },
+    }
+    d.header = UI.Header(panel, cols, function() end)
+    d.header:SetPoint("TOPLEFT", 1, -1)
+    d.header:SetPoint("TOPRIGHT", -1, -1)
+    local FROM = { ah = "AH", vendor = "Vendor", craft = "Craft it" }
+    d.list = UI.List(panel, {
+        rowHeight = 24, cols = cols,
+        update = function(row, p)
+            row.cells.name:SetText(FT.ItemText(p.itemID, 30))
+            row.cells.qty:SetText(FT.Num(p.qty))
+            row.cells.unit:SetText(p.unit and FT.Money(math.floor(p.unit), "short") or FT.C("dim", L["no price"]))
+            row.cells.total:SetText(p.total and FT.Money(math.floor(p.total), "short") or "")
+            row.cells.from:SetText(FT.C("dim", FROM[p.source or ""] and L[FROM[p.source]] or ""))
+        end,
+        onClick = function(p) if not UI.ItemClick(p.itemID) then FT.OpenItem(p.itemID) end end,
+        onEnter = function(row, p) UI.TipItem(row, p.itemID) end,
+    })
+    d.list:SetPoint("TOPLEFT", d.header, "BOTTOMLEFT", 0, -2)
+    d.list:SetPoint("BOTTOMRIGHT", -1, 2)
+    d.sum = {}
+    for i = 1, 4 do
+        local l = UI.Text(d, 12, "muted")
+        l:SetPoint("BOTTOMLEFT", 18, 76 - i * 18)
+        local r = UI.Text(d, 12, "text", "RIGHT")
+        r:SetPoint("BOTTOMRIGHT", -18, 76 - i * 18)
+        d.sum[i] = { l, r }
+    end
+    tinsert(UISpecialFrames, "WolfOfBootyBayCraft")
+    d:Hide()
+    craftWin = d
+    return d
+end
+
+function FT.ShowCraft(r)
+    if not r then return end
+    local d = CraftWindow()
+    local e = FT.Craft.Eval(r)
+    d.itemID = r.output
+    d.icon:SetItem(r.output)
+    local sym = FT.SymbolText(r.output)
+    d.title:SetText((sym ~= "" and (sym .. "  ") or "") .. FT.ItemText(r.output, 34) .. ((r.outputQty or 1) > 1 and FT.C("dim", "  x" .. r.outputQty) or ""))
+    local known = next(r.knownBy or {}) ~= nil
+    local who = {}
+    for name in pairs(r.knownBy or {}) do who[#who + 1] = name end
+    d.sub:SetText(L[r.prof or "?"] .. "  ·  " .. (known and FT.C("up", L["Known by"] .. " " .. table.concat(who, ", "))
+        or FT.C("accent", L["Recipe needed"])))
+    d.list:SetItems(e.parts or {})
+    local qty = r.outputQty or 1
+    local buyReady = FT.Price(r.output)
+    local rows = {
+        { L["Materials cost"], e.cost and FT.Money(math.floor(e.cost), "short") or FT.C("dim", L["no price"]) },
+        { L["Sells for"] .. (e.via == "vendor" and (" (" .. L["vendor"] .. ")") or ""), e.revenue and FT.Money(math.floor(e.revenue), "short") or FT.C("dim", L["no price"]) },
+        { L["Profit"], e.profit and FT.C(e.profit >= 0 and "up" or "down", FT.Money(math.floor(e.profit), "short")) or "" },
+    }
+    if buyReady and e.cost then
+        local ready = buyReady * qty
+        local diff = ready - e.cost
+        rows[#rows + 1] = { L["Need it yourself?"], diff > 0
+            and FT.C("up", string.format(L["crafting saves %s vs buying it"], FT.Money(math.floor(diff), "short")))
+            or FT.C("accent", string.format(L["buying it ready is %s cheaper"], FT.Money(math.floor(-diff), "short"))) }
+    end
+    for i, s in ipairs(d.sum) do
+        local row = rows[i]
+        s[1]:SetText(row and row[1] or "")
+        s[2]:SetText(row and row[2] or "")
+    end
+    d:Show()
+    d:Raise()
+end
+
 function FT.ShowSupport()
     FT.ShowLink(L["Built on ForeverTrading"], L["Wolf of Booty Bay is built on ForeverTrading by thewoolfi (Apache License 2.0). Copy the link to see the original:"],
         FT.URL_SUPPORT)
