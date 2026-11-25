@@ -4,7 +4,7 @@ local L = FT.L
 
 -- The version being released: a copy straight from the repository (not packaged) has no version in its TOC yet
 -- (the packager puts the tag there) and shows this one. Set it with every release.
-local RELEASE = "v0.15.1"
+local RELEASE = "v0.16.0"
 local GetMeta = (C_AddOns and C_AddOns.GetAddOnMetadata) or GetAddOnMetadata
 FT.VERSION = (GetMeta and GetMeta(ADDON, "Version")) or RELEASE
 if FT.VERSION == "" or FT.VERSION:find("@", 1, true) then FT.VERSION = RELEASE end
@@ -155,6 +155,7 @@ FT.DEFAULTS = {
     minimap = true,
     minimapAngle = 205,
     showAdvanced = false,
+    realmType = "auto",     -- your realm's ruleset for Blizzard's prices: auto, pvp, normal, roleplay, roleplay-pvp
     sessionPanel = true,    -- the session panel on screen while a session runs
     recap = true,           -- a line at login: your portfolio, what to sell, the best move
     sellPing = true,        -- a line when something you own has a good day to sell (once a day each)   -- Settings: every section (off: the basics, alerts and About)

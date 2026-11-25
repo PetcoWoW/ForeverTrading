@@ -352,11 +352,12 @@ function FT.UpdateStatus()
     local own = FT.ScanTime()
     local newest = math.max(feedT or 0, own or 0)
     local feedOld = FT.Feed.Stale()
-    local from
-    if newest == 0 then from = L["No prices yet"]
-    elseif newest == feedT then from = string.format(L["Prices: Blizzard API, %s"], FT.Ago(feedT))
-    else from = string.format(L["Prices: your AH scan, %s"], FT.Ago(own)) end
-    parts[#parts + 1] = FT.C("muted", from)
+    local function Age(label, t, used)
+        if not t then return FT.C("dim", label .. ": " .. L["none"]) end
+        return FT.C(used and "up" or "muted", label) .. " " .. FT.C(used and "text" or "muted", FT.Ago(t))
+    end
+    parts[#parts + 1] = Age(L["Blizzard API"], feedT, feedT and feedT >= (own or 0))
+    parts[#parts + 1] = Age(L["Your AH scan"], own, own and own > (feedT or 0))
     if feedOld then parts[#parts + 1] = FT.C("accent", L["Newer prices are likely out: /reload"]) end
     local rows = FT.Market.Rows()
     if rows then parts[#parts + 1] = string.format(L["Market: %s items"], FT.Num(#rows)) end
@@ -880,14 +881,19 @@ function FT.BuildAHPill(header)
         local t = FT.Feed.On() and FT.Feed.Time() or nil
         local text
         if not t then
-            text = L["Blizzard's hourly prices aren't loaded (Settings > Sources)."]
+            text = FT.C("accent", FT.Feed.WhyOff() or L["Not loaded."]) .. "\n\n" .. L["Click: Settings."]
         else
-            text = string.format(L["Blizzard's prices of every auction house, taken every hour and shipped with each update: %s."], FT.Ago(t))
-            if FT.Feed.Stale() then text = text .. "\n\n" .. FT.C("accent", L["Newer ones are likely downloaded: click to /reload."]) end
+            text = string.format(L["Blizzard's prices of every item, taken every hour and shipped with each update.\n\nThese: %s (at %s)."],
+                FT.C("text", FT.Ago(t)), date("%H:%M", t))
+            local built = FT.FEED and FT.FEED.built
+            if built then text = text .. "\n" .. string.format(L["This copy of the addon: built %s."], FT.Ago(built)) end
+            if FT.Feed.Stale() then text = text .. "\n\n" .. FT.C("accent", L["Newer ones are likely downloaded: click to /reload."])
+            else text = text .. "\n\n" .. FT.C("dim", L["New ones come every hour: WowUp downloads them, a /reload loads them."]) end
         end
         UI.TipText(self, L["API: Blizzard's hourly prices"], text)
     end)
     pill.api:SetScript("OnClick", function()
+        if not (FT.Feed.On() and FT.Feed.Time()) then FT.Show("settings") return end
         if FT.Feed.Stale() and not InCombatLockdown() then ReloadUI() end
     end)
     FT.UpdateAHPill()
