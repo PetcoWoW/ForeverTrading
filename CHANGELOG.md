@@ -1,5 +1,16 @@
 # Wolf
 
+## v0.32 - tidy-up
+
+- Futures > Key materials: "you hold" no longer runs into the 7-day change; the rows give bigger text room.
+- Your top 3: each card's sentence gets two lines instead of being cut off.
+- Charts: the axis numbers stay clear of the last-price tag, and the H / L marks of the dates.
+- Market list: wider price and 24h columns (big prices and big moves fit).
+- Shorter wording where it was cut off (market mood, "no one knows its recipe yet").
+- /wolf curseforge: the link to the newest version.
+- Behind the scenes: the tests now lay out every page, in both looks, at the smallest window and the largest text,
+  and flag any text that runs into another or gets cut.
+
 ## v0.31 - Wolf, with a new face
 
 - The addon is now just **Wolf**, with its own logo: in the header, the minimap button, the addon list and the

@@ -62,7 +62,7 @@ local function ItemMove(c, m, r, p, days)
             return "CRAFT", string.format(L["You know it and no one sells it: the market is yours (materials ~%s)"],
                 FT.Money(math.floor(e and e.cost or 0), "short"))
         end
-        return "NORECIPE", L["No one makes it yet: where its recipe drops isn't known. Its materials are the play."]
+        return "NORECIPE", L["No one knows its recipe yet: its materials are the play."]
     end
     if Known(r) and e and e.cost and e.revenue then
         local margin = e.revenue > 0 and (e.revenue - e.cost) / e.revenue or 0

@@ -8,6 +8,8 @@ local T = {}
 FT.Tabs.market = T
 
 -- open: under "My recipes", the item whose materials are shown under it
+-- the height of a move card: two lines of its sentence, at the chosen text size
+local function MOVE_H() return 60 + 6 * (tonumber(FT.S and FT.S.textSize) or 0) end
 local state = { filter = "all", cls = "all", sub = "all", sort = "cap", desc = true, search = "", selected = nil, open = nil }
 -- the auction house's own filters: required level, usable, not collected, quality
 local QUALITIES = { 0, 1, 2, 3, 4, 5 }
@@ -445,8 +447,8 @@ local function BuildList(parent)
 
     local cols = {
         { key = "name", title = L["Item"], width = "fill", sort = "name", make = NameCell, cellHeight = 24 },
-        { key = "price", title = L["Price"], width = 70, justify = "RIGHT", sort = "price" },
-        { key = "ch1", title = L["24h"], width = 52, justify = "RIGHT", sort = "ch1" },
+        { key = "price", title = L["Price"], width = 82, justify = "RIGHT", sort = "price" },
+        { key = "ch1", title = L["24h"], width = 60, justify = "RIGHT", sort = "ch1" },
         { key = "spark", title = L["7d"], width = 40, justify = "RIGHT", sort = "ch7", make = SparkCell, cellHeight = 16 },
     }
     T.header = UI.Header(panel, cols, function(key)
@@ -653,7 +655,7 @@ local function BuildOverview(parent)
     v.moves = {}
     for i = 1, 3 do
         local c = CreateFrame("Button", nil, v)
-        c:SetHeight(52)
+        c:SetHeight(MOVE_H())
         UI.Fill(c, "bg1")
         UI.Border(c, "line")
         c.icon = UI.Icon(c, 30)
@@ -666,9 +668,12 @@ local function BuildOverview(parent)
         c.kind:SetPoint("RIGHT", c.gold, "LEFT", -6, 0)
         if c.kind.SetWordWrap then c.kind:SetWordWrap(false) end
         c.what = UI.Text(c, 11, "text")
-        c.what:SetPoint("BOTTOMLEFT", c.icon, "BOTTOMRIGHT", 8, 0)
+        c.what:SetPoint("TOPLEFT", c.kind, "BOTTOMLEFT", 0, -3)
         c.what:SetPoint("RIGHT", c, "RIGHT", -10, 0)
-        if c.what.SetWordWrap then c.what:SetWordWrap(false) end
+        c.what:SetPoint("BOTTOM", c, "BOTTOM", 0, 5)
+        c.what:SetJustifyV("TOP")
+        if c.what.SetWordWrap then c.what:SetWordWrap(true) end
+        if c.what.SetMaxLines then c.what:SetMaxLines(2) end
         c:SetScript("OnClick", function(self)
             if self.itemID then FT.OpenItem(self.itemID) end
         end)
@@ -728,10 +733,11 @@ local function BuildOverview(parent)
             c:SetWidth(mw)
         end
         self.chartTitle:ClearAllPoints()
-        self.chartTitle:SetPoint("TOPLEFT", 4, -194)
+        local below = 132 + MOVE_H() + 10
+        self.chartTitle:SetPoint("TOPLEFT", 4, -below)
         self.chart:ClearAllPoints()
-        self.chart:SetPoint("TOPLEFT", 0, -212)
-        self.chart:SetPoint("TOPRIGHT", 0, -212)
+        self.chart:SetPoint("TOPLEFT", 0, -below - 18)
+        self.chart:SetPoint("TOPRIGHT", 0, -below - 18)
         local listsH = math.max(180, math.floor(h * 0.36))
         self.chart:SetPoint("BOTTOM", 0, listsH + 8)
         local half = (w - 8) / 2
@@ -765,7 +771,7 @@ function T.ShowOverview()
     local mood, counted = FT.Market.Mood()
     local moodText, moodColor = FT.Market.MoodText(mood)
     overview.cards[3]:Set(mood and (FT.C(moodColor, mood) .. "  " .. FT.C(moodColor, moodText)) or "—",
-        mood and string.format(L["%d%% of %d liquid items rose this week"], mood, counted) or L["needs a few days of prices"])
+        mood and string.format(L["%d%% of %s liquid items up (7d)"], mood, FT.Num(counted)) or L["needs a few days of prices"])
     if mood then
         overview.moodFill:Show()
         overview.moodFill:SetWidth(math.max(1, overview.moodBar:GetWidth() * mood / 100))

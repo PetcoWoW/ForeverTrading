@@ -69,11 +69,11 @@ local function MatSetup(row)
     row.icon = UI.Icon(row, 24)
     row.icon:SetPoint("LEFT", 10, 0)
     row.name = UI.Text(row, 12, "text")
-    row.name:SetPoint("TOPLEFT", row.icon, "TOPRIGHT", 8, 1)
+    row.name:SetPoint("TOPLEFT", row, "TOPLEFT", 42, -5)
     row.name:SetPoint("RIGHT", row, "RIGHT", -150, 0)
     row.line = UI.Text(row, 10, "dim")
-    row.line:SetPoint("BOTTOMLEFT", row.icon, "BOTTOMRIGHT", 8, -1)
-    row.line:SetPoint("RIGHT", row, "RIGHT", -86, 0)
+    row.line:SetPoint("BOTTOMLEFT", row, "BOTTOMLEFT", 42, 5)
+    row.line:SetPoint("RIGHT", row, "RIGHT", -150, 0)
     for _, t in ipairs({ row.name, row.line }) do if t.SetWordWrap then t:SetWordWrap(false) end end
     row.price = UI.Text(row, 11, "text", "RIGHT")
     row.price:SetPoint("TOPRIGHT", row, "TOPRIGHT", -88, -6)
@@ -144,6 +144,7 @@ function T.Build(p)
         T.Layout()
         T.Refresh()
     end, 22)
+    T.seg = seg
     seg:SetPoint("TOPRIGHT", -8, -8 - SIGN_H)
     seg:SetValue(state.section)
 
@@ -193,7 +194,7 @@ function T.Build(p)
     matBox = UI.Panel(p, "bg1", "line")
     matBox:SetPoint("TOPRIGHT", -8, -40 - SIGN_H)
     matBox:SetPoint("BOTTOMRIGHT", -8, 8)
-    matBox:SetWidth(330)
+    matBox:SetWidth(360)
     matTitle = UI.Text(matBox, 12, "accent")
     matTitle:SetPoint("TOPLEFT", 10, -8)
     matTitle:SetText(L["Key materials"])
@@ -202,14 +203,14 @@ function T.Build(p)
     matSub:SetPoint("RIGHT", matBox, "RIGHT", -10, 0)
     matSub:SetText(L["What most of the raid consumables are made of"])
     matList = UI.List(matBox, {
-        rowHeight = 40, setup = MatSetup,
+        rowHeight = 40 + 2 * (tonumber(FT.S.textSize) or 0), setup = MatSetup,
         update = function(row, x)
             row.icon:SetItem(x.id)
             row.name:SetText(FT.ItemText(x.id, 26))
-            local bits = { string.format(L["in %d of the list"], #x.into) }
+            local bits = { string.format(L["%d recipes"], #x.into) }
             if x.held > 0 then bits[#bits + 1] = string.format(L["you hold %s"], FT.Num(x.held)) end
             if (x.gathered or 0) > 0 then bits[#bits + 1] = string.format(L["gathered %s"], FT.Num(x.gathered)) end
-            row.line:SetText(table.concat(bits, "  ·  "))
+            row.line:SetText(table.concat(bits, " · "))
             row.price:SetText(x.market.price and FT.Money(x.market.price, "short") or FT.C("dim", "—"))
             row.ch:SetText(Change(x.market.ch7))
             row.chip:SetMove(x.move)
@@ -231,6 +232,13 @@ function T.Build(p)
     matList:SetPoint("TOPLEFT", 1, -40)
     matList:SetPoint("BOTTOMRIGHT", -1, 4)
     T.Layout()
+end
+
+function T.SetSection(v)
+    state.section = v
+    if T.seg and T.seg.SetValue then T.seg:SetValue(v) end
+    T.Layout()
+    T.Refresh()
 end
 
 -- Consumables: the list and the key materials beside it; Gear: the list, wide

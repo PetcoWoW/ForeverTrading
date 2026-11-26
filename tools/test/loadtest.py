@@ -5,6 +5,7 @@ root = sys.argv[1]
 feed = sys.argv[2] if len(sys.argv) > 2 else None
 lua = L51.LuaRuntime(unpack_returned_tuples=True)
 lua.execute(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'wowmock.lua')).read())
+lua.execute(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'layout.lua')).read())
 G = lua.globals()
 toc = [l.strip().replace('\\', '/') for l in open(os.path.join(root, 'WolfOfBootyBay.toc')) if l.strip() and not l.startswith('#')]
 ns = lua.eval('{}')
@@ -32,8 +33,9 @@ Auctionator = {
 }
 ''')
 # WOLF_LOOK=dark: the dark look (the default is classic)
-if os.environ.get('WOLF_LOOK'):
-    lua.execute('WolfOfBootyBayDB = { settings = { look = "%s" } }' % os.environ['WOLF_LOOK'])
+# WOLF_TEXT=2: the largest text size
+if os.environ.get('WOLF_LOOK') or os.environ.get('WOLF_TEXT'):
+    lua.execute('WolfOfBootyBayDB = { settings = { look = "%s", textSize = %s } }' % (os.environ.get('WOLF_LOOK', 'classic'), os.environ.get('WOLF_TEXT', 'nil')))
 load_all()
 lua.execute('''
 mock.fire("ADDON_LOADED", "WolfOfBootyBay")
@@ -384,6 +386,74 @@ step("companion", function()
   SetItemRef("addon:WolfOfBootyBay:get", "[Get it]", "LeftButton")
   FT.FEED.built, FT.Feed.Time, FT.COMPANION = realBuilt, realTime, nil
   FT.UpdateAHPill()
+end)
+step("layout", function()
+  -- every page with things in it (a gatherer holding the key materials), and texts that draw over each other
+  local inv = FT.db.inv[FT.charKey]
+  local held = {}
+  for i, x in ipairs(FT.Futures.Materials(10)) do held[x.id] = inv.bags[x.id]; inv.bags[x.id] = 1234 * i end
+  FT.Fire("FT_INVENTORY_CHANGED"); FT.Port.Holdings()
+  local seen = {}
+  local total, cuts = 0, 0
+  FT.S.showCraft = true
+  local pages = {
+    { "market", "market" }, { "market item", "market", function() FT.OpenItem(12363) end },
+    { "money: make", "signals", function() FT.Tabs.signals.SetView("make") end },
+    { "money: farm", "signals", function() FT.Tabs.signals.SetView("farm") end },
+    { "money: craft", "signals", function() FT.Tabs.signals.SetView("craft") end },
+    { "portfolio", "portfolio", function() FT.Tabs.portfolio.SetView("portfolio") end },
+    { "portfolio: sell", "portfolio", function() FT.Tabs.portfolio.SetView("sell") end },
+    { "portfolio: chars", "portfolio", function() FT.Tabs.portfolio.SetView("chars") end },
+    { "sessions", "sessions" },
+    { "craft", "craft", function() if FT.Tabs.craft and FT.Tabs.craft.SetView then FT.Tabs.craft.SetView("recipes") end end },
+    { "craft queue", "craft", function() if FT.Tabs.craft and FT.Tabs.craft.SetView then FT.Tabs.craft.SetView("queue") end end },
+    { "futures", "radar", function() FT.Tabs.radar.SetSection("consumables") end },
+    { "futures: gear", "radar", function() FT.Tabs.radar.SetSection("gear") end },
+    { "settings", "settings" },
+    { "settings: all", "settings", function() FT.S.showAdvanced = true; FT.Tabs.settings.Layout() end },
+  }
+  for _, size in ipairs({ "std", "min" }) do
+  FT.db.frame.size = size
+  FT.ResetWindow()
+  for _, pg in ipairs(pages) do
+    local key = pg[1] .. " @" .. size
+    FT.Show(pg[2])
+    if pg[3] then pg[3]() end
+    if FT.Tabs[pg[2]] and FT.Tabs[pg[2]].Refresh then FT.Tabs[pg[2]].Refresh() end
+    mock.layout.Settle(WolfOfBootyBayFrame)
+    if FT.Tabs[pg[2]] and FT.Tabs[pg[2]].Refresh then FT.Tabs[pg[2]].Refresh() end
+    mock.run(1)
+    mock.layout.Settle(WolfOfBootyBayFrame)
+    local found, texts = mock.layout.Overlaps(WolfOfBootyBayFrame)
+    for _, t in ipairs(texts) do
+      if t.cut and not seen["cut|" .. t.text] then
+        seen["cut|" .. t.text] = true
+        cuts = cuts + 1
+        if cuts <= 40 then
+          local r = mock.layout.Rect(t.f)
+          print(string.format("CUT [%s] %q  box %d, text %d, size %s  in %s", key, t.text:sub(1, 70), r[2] - r[1], mock.layout.TextWidth(t.f), tostring(t.f.__fsize), mock.layout.Where(t.f)))
+        end
+      end
+    end
+    for _, o in ipairs(found) do
+      local k = o[1].text .. "|" .. o[2].text
+      if not seen[k] then
+        seen[k] = true
+        total = total + 1
+        if total <= 60 then
+          print(string.format("OVERLAP [%s] %q x %q  (%dx%d px)  in %s", key, o[1].text:sub(1, 50), o[2].text:sub(1, 50), o[3], o[4], mock.layout.Where(o[1].f)))
+        end
+      end
+    end
+  end
+  FT.S.showAdvanced = false
+  FT.Tabs.radar.SetSection("consumables")
+  end
+  FT.db.frame.size = nil
+  FT.ResetWindow()
+  print("layout: " .. total .. " overlapping text pairs, " .. cuts .. " texts cut short")
+  for id, n in pairs(held) do inv.bags[id] = n end
+  FT.Fire("FT_INVENTORY_CHANGED")
 end)
 step("open item", function() FT.OpenItem(12363) end)
 mock.run(1)

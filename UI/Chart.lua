@@ -202,7 +202,8 @@ function UI.Chart(parent)
         local function X(i) return (i - first + 0.5) * slot end
         self.X, self.Y = X, Y
 
-        -- horizontal grid and price labels
+        -- horizontal grid and price labels (a label where the last price's tag sits is left out: the tag says it)
+        local tagY = (candles[n].c >= lo and candles[n].c <= hi) and Y(candles[n].c) or nil
         local step = NiceStep((hi - lo) / 4)
         local g = math.ceil(lo / step) * step
         local guard = 0
@@ -215,11 +216,13 @@ function UI.Chart(parent)
             t:SetPoint("BOTTOMRIGHT", self.plot, "BOTTOMRIGHT", 0, y)
             t:SetHeight(1)
             t:Show()
-            local fs = self.ylabels:Get()
-            fs:ClearAllPoints()
-            fs:SetPoint("LEFT", self.plot, "BOTTOMRIGHT", 6, y)
-            fs:SetText(Fmt(d, g))
-            fs:Show()
+            if not (tagY and math.abs(y - tagY) < 14) then
+                local fs = self.ylabels:Get()
+                fs:ClearAllPoints()
+                fs:SetPoint("LEFT", self.plot, "BOTTOMRIGHT", 6, y)
+                fs:SetText(Fmt(d, g))
+                fs:Show()
+            end
             g = g + step
             guard = guard + 1
         end
@@ -347,6 +350,9 @@ function UI.Chart(parent)
             if count >= 3 and hiI ~= loI then
                 for _, m in ipairs({ { hiI, "H", 1 }, { loI, "L", -1 } }) do
                     local i, tag, side = m[1], m[2], m[3]
+                    -- no room under the low (the dates) or over the high (the title): the other side of its dot
+                    local py = Y(candles[i].c)
+                    if side < 0 and py < 20 then side = 1 elseif side > 0 and py > H - 20 then side = -1 end
                     local dot = self.rects:Get()
                     dot:SetTexture("Interface\\AddOns\\WolfOfBootyBay\\media\\round.tga")
                     dot:SetVertexColor(color[1], color[2], color[3], 0.9)
