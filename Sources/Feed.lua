@@ -125,7 +125,7 @@ F.HOUSE_IDS = HOUSE_IDS
 
 -- why the feed isn't on, in a sentence (nil: it is)
 function F.WhyOff()
-    if not F.Loaded() then return L["This copy has no Blizzard prices in it: update the addon (WowUp)."] end
+    if not F.Loaded() then return L["This copy has no Blizzard prices in it: update the addon, or get the prices companion (Settings > About)."] end
     if FT.S and FT.S.useFeed == false then return L["Turned off: Settings > Show all settings > Sources."] end
     if not Region() then return L["The prices in this copy are for another region."] end
     if not F.Ruleset() then
@@ -317,7 +317,7 @@ end)
 -- What the login or /reload brought: new prices, or the same ones
 ---------------------------------------------------------------------------
 -- The game reads the price file only at login or /reload, and the addon can't see the disk in between: it can't
--- know when newer prices have been downloaded (by WowUp or the companion app), so it doesn't guess. It says, once
+-- know when newer prices have been downloaded (by the companion app or an addon update), so it doesn't guess. It says, once
 -- after loading, whether these are newer than the ones it had last time - and remembers them (the saved data is
 -- written at every reload: the companion app reads it to tell what the game has).
 local OLD = 2 * 3600
