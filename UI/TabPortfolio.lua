@@ -25,6 +25,13 @@ local function NameCell(row)
     return f
 end
 
+-- the groups of the list, the most valuable first; a closed one shows its header only (remembered)
+local GROUPS = { mat = "Materials", crafted = "Crafted", gear = "BoE gear", other = "Other" }
+local function Closed()
+    FT.db.portClosed = FT.db.portClosed or { other = true }
+    return FT.db.portClosed
+end
+
 local SORT_GET = {
     value = function(x) return x.value end,
     qty = function(x) return x.qty end,
@@ -424,13 +431,6 @@ function T.DrawChart()
         emptyTitle = L["No price history yet"],
         emptyBody = L["Shows once there are a few days of prices for what you own."],
     })
-end
-
--- the groups of the list, the most valuable first; a closed one shows its header only (remembered)
-local GROUPS = { mat = "Materials", crafted = "Crafted", gear = "BoE gear", other = "Other" }
-local function Closed()
-    FT.db.portClosed = FT.db.portClosed or { other = true }
-    return FT.db.portClosed
 end
 
 function T.RefreshList()

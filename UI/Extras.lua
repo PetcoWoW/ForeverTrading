@@ -35,6 +35,8 @@ local function MinimapTooltip(self)
     GameTooltip:Show()
 end
 
+local menu, menuBlock -- the right-click menu and the click-anywhere-to-close layer under it
+
 -- the right-click menu: start or stop a session, nothing else (the rest is a left-click away; pause is on the panel)
 local function MenuItems()
     local S = FT.Session
