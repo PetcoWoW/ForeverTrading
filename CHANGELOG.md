@@ -1,5 +1,14 @@
 # The Wolf of Booty Bay
 
+## v0.20.1 - fixes from the first in-game pass
+
+- Portfolio: clicking a group's header didn't close it (the click called a function defined further down the
+  file: an error, quietly). Fixed; the load test clicks a header.
+- The right-click menu's two frames had lost their `local` in v0.17.4 and were globals named `menu` and
+  `menuBlock` (a name another addon could use). Local again. The static audit now fails on a name read as a
+  global that its own file declares as a local, and on any global written but the saved data and slash commands.
+- The ticker tape keeps moving under the mouse.
+
 ## v0.20 - one price everywhere
 
 - The session panel valued loot after the auction house's 5% cut (or at a vendor's price when that was higher),

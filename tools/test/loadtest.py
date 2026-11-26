@@ -173,8 +173,16 @@ step("portfolio groups", function()
   }
   P.total = 84000
   P.RefreshList()
-  FT.db.portClosed = { mat = true }
+  FT.db.portClosed = {}
   P.RefreshList()
+  -- click a group's header row: it closes (its items leave the list)
+  local header
+  for _, f in ipairs(mock.frames) do
+    if f.item and f.item.header and f.item.toSell ~= nil and f:IsVisible() then header = f break end
+  end
+  local before = header and header:GetParent() and #(header:GetParent().items or header:GetParent():GetParent().items or {})
+  if header then mock.click(header) end
+  print("group header click:", header and header.item.key or "no header row", "closed now:", tostring(FT.db.portClosed and FT.db.portClosed[header and header.item.key or "?"]))
   local groups = {}
   for id in pairs({ [12363] = 1, [2770] = 1, [13444] = 1 }) do groups[#groups + 1] = id .. "=" .. FT.Port.Group(id) end
   table.sort(groups)

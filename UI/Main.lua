@@ -181,12 +181,11 @@ local function BuildTicker(parent)
         e:SetScript("OnClick", function(self)
             if self.itemID then FT.OpenItem(self.itemID) end
         end)
+        -- the tape keeps moving under the mouse (the hover follows the item)
         e:SetScript("OnEnter", function(self)
-            t.paused = true
             if self.itemID then UI.TipItem(self, self.itemID, "ANCHOR_BOTTOM") end
         end)
         e:SetScript("OnLeave", function()
-            t.paused = false
             GameTooltip:Hide()
         end)
         t.entries[i] = e
@@ -262,8 +261,6 @@ local function BuildTicker(parent)
         end
     end)
     t.clips = t.SetClipsChildren ~= nil
-    t:SetScript("OnEnter", function(self) self.paused = true end)
-    t:SetScript("OnLeave", function(self) self.paused = false end)
     return t
 end
 
