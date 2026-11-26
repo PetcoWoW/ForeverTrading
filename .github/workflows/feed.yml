@@ -10,7 +10,14 @@ on:
   schedule:
     # every 15 minutes, off the busy minutes (GitHub delays and drops scheduled runs at :00 the most)
     - cron: "4,19,34,49 * * * *"
+  # by hand from the Actions page (publishes whatever the prices are), or from an outside timer that sends
+  # inputs.only_new = "true" (publishes only when Blizzard has refreshed, like the schedule)
   workflow_dispatch:
+    inputs:
+      only_new:
+        description: "Publish only when Blizzard has new prices"
+        required: false
+        default: "false"
   # a merged change goes out at once (with the prices as they are, new or not)
   push:
     branches: [main]
@@ -78,7 +85,7 @@ jobs:
         id: feed
         env:
           # the frequent checks publish only new prices; a merge or a manual run always builds
-          FEED_ONLY_NEW: ${{ github.event_name == 'schedule' && '1' || '' }}
+          FEED_ONLY_NEW: ${{ (github.event_name == 'schedule' || inputs.only_new == 'true') && '1' || '' }}
           BLIZZARD_CLIENT_ID: ${{ secrets.BLIZZARD_CLIENT_ID }}
           BLIZZARD_CLIENT_SECRET: ${{ secrets.BLIZZARD_CLIENT_SECRET }}
           FEED_REGIONS: ${{ vars.FEED_REGIONS || 'us' }}
