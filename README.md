@@ -9,7 +9,7 @@ and the words and adds its own features. See `NOTICE`.
 
 ## Install
 
-1. **The addon:** search "Wolf" in the CurseForge app (or on curseforge.com) and install it. New
+1. **The addon:** [Wolf on CurseForge](https://www.curseforge.com/wow/addons/wolf-ah-stock-market) - install it with the CurseForge app. New
    versions arrive through CurseForge. Or take the newest zip from this repository's **Releases** page and put the
    `WolfOfBootyBay` folder into `World of Warcraft/<your Forever client>/Interface/AddOns/`.
 2. **Hourly prices (Windows):** [WolfPricesSetup.exe](https://github.com/PetcoWoW/ForeverTrading/releases/download/companion/WolfPricesSetup.exe), the Wolf prices companion. Run it, click Install.

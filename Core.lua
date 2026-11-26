@@ -12,6 +12,7 @@ FT.VERSION_TEXT = FT.VERSION:match("^%d") and ("v" .. FT.VERSION) or FT.VERSION
 FT.MEDIA = "Interface\\AddOns\\" .. ADDON .. "\\media\\"
 FT.URL_SUPPORT = "https://github.com/thewoolfi/ForeverTrading"
 FT.URL_GITHUB = "https://github.com/PetcoWoW/ForeverTrading"
+FT.URL_CURSEFORGE = "https://www.curseforge.com/wow/addons/wolf-ah-stock-market"
 
 ---------------------------------------------------------------------------
 -- Events: game events and our own ("FT_*") share one dispatcher
@@ -829,6 +830,7 @@ FT.COMMANDS = {
     { "/wolf reset", "put the window back in the middle" },
     { "/wolf perf", "how fast it runs and the memory it takes" },
     { "/wolf debug", "extra lines in chat, for bug reports" },
+    { "/wolf curseforge", "the link to the newest version" },
     { "/wolf github | credits", "where the code is, who it's built on" },
 }
 
@@ -869,6 +871,8 @@ SlashCmdList.WOLFOFBOOTYBAY = function(msg)
         FT.ShowSupport()
     elseif cmd == "github" or cmd == "git" then
         FT.ShowGitHub()
+    elseif cmd == "curseforge" or cmd == "cf" or cmd == "update" then
+        FT.ShowCurseForge()
     elseif cmd == "stop" then
         FT.Scanner.Stop("user")
     elseif cmd == "share" or cmd == "exchange" then

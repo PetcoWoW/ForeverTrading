@@ -81,7 +81,7 @@ FT.On("CHAT_MSG_ADDON", function(prefix, text, channel, sender)
     if V.Newer(theirs, FT.VERSION) then
         if not V.newest or V.Newer(theirs, V.newest) then
             V.newest = theirs
-            FT.Print(string.format(L["A newer Wolf is out: %s (you have %s). Get it on CurseForge or GitHub (/wolf github)."],
+            FT.Print(string.format(L["A newer Wolf is out: %s (you have %s). Update it in the CurseForge app or WowUp (link: /wolf curseforge)."],
                 theirs, FT.VERSION))
             FT.Fire("FT_NEWER_VERSION", theirs)
         end

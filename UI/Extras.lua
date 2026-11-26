@@ -1191,6 +1191,11 @@ function FT.ShowSupport()
         FT.URL_SUPPORT)
 end
 
+function FT.ShowCurseForge()
+    FT.ShowLink(L["Wolf on CurseForge"], L["The newest version, for the CurseForge app. Copy the link and open it in your browser:"],
+        FT.URL_CURSEFORGE)
+end
+
 function FT.ShowGitHub()
     FT.ShowLink(L["Wolf on GitHub"], L["Source code, releases and bug reports. Copy the link and open it in your browser:"],
         FT.URL_GITHUB)
