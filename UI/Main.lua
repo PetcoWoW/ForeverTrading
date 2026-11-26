@@ -921,7 +921,7 @@ function FT.BuildAHPill(header)
             text = FT.C("accent", FT.Feed.WhyOff() or L["Not loaded."]) .. "\n\n" .. L["Click: Settings."]
         else
             text = string.format(L["Blizzard's prices of every item.\n\nThese: %s (%s)."], FT.C(FT.Feed.Stale() and "accent" or "text", FT.TimeOfDay(t)), FT.Ago(t))
-            text = text .. "\n\n" .. FT.C("dim", L["New ones come about every hour. WowUp downloads them (it checks hourly; Check Updates in WowUp checks now), then /reload loads them. The game can't see a download until you reload."])
+            text = text .. "\n\n" .. FT.C("dim", L["New ones come about every hour. The prices companion puts them in your addon folder (Settings > About > Prices companion), then /reload loads them. The game can't see a download until you reload."])
         end
         UI.TipText(self, L["API: Blizzard's hourly prices"], text)
     end)

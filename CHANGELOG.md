@@ -1,5 +1,12 @@
 # The Wolf of Booty Bay
 
+## v0.29 - on CurseForge
+
+- The addon is on CurseForge: search "Wolf of Booty Bay" in the CurseForge app. Each new version goes there by
+  itself; CurseForge checks every file before it shows up.
+- Hourly prices come from the prices companion (Settings > About > Prices companion), whatever installed the
+  addon. The hints no longer send you to WowUp.
+
 ## v0.28 - your faction's auction house only
 
 - Blackwater, the neutral auction house, isn't followed any more: its prices arrive too late to act on (whoever is

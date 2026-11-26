@@ -9,10 +9,14 @@ and the words and adds its own features. See `NOTICE`.
 
 ## Install
 
-Get the newest release from this repository's **Releases** page (or add the repository to WowUp as a GitHub
-source, so it updates itself) and put the `WolfOfBootyBay` folder into
-`World of Warcraft/<your Forever client>/Interface/AddOns/`. Restart the game fully the first time (new
-addon files load at launch, not on `/reload`), then type `/wolf`.
+1. **The addon:** search "Wolf of Booty Bay" in the CurseForge app (or on curseforge.com) and install it. New
+   versions arrive through CurseForge. Or take the newest zip from this repository's **Releases** page and put the
+   `WolfOfBootyBay` folder into `World of Warcraft/<your Forever client>/Interface/AddOns/`.
+2. **Hourly prices (Windows):** the prices companion, a small app by the clock that puts the newest prices in your
+   addon folder every 15 minutes: [WolfPrices.zip](https://github.com/sain221b-sketch/ForeverTrading/releases/latest/download/WolfPrices.zip).
+   In game: Settings > About > Prices companion.
+
+Restart the game fully the first time (new addon files load at launch, not on `/reload`), then type `/wolf`.
 
 ## The price feed
 
@@ -20,7 +24,7 @@ Every release carries the prices of every WoW Forever auction house, built hourl
 data (`tools/feed/`): the lowest price, how many are listed, what sold over the last 7 days and the daily lows.
 So the addon has prices before your first scan, charts for the days you didn't scan, and "sells ~N a day" from
 a whole week of watching. Your own scans and prices from other players still win when they are newer. Fresh
-feed: update the addon (WowUp does it by itself) and `/reload`. Settings > Sources turns it off.
+feed: the prices companion fetches it, then `/reload`. Settings > Sources turns it off.
 
 Don't run ForeverTrading at the same time: two scanners do the same work twice.
 

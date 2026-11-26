@@ -12,6 +12,9 @@ FT.News = N
 -- start, after the files are read (a table made with them would keep the English)
 local function News()
     return {
+        ["v0.29"] = {
+            { L["On CurseForge"], L["Search Wolf of Booty Bay in the CurseForge app for new versions. Hourly prices: the prices companion (Windows)."], function() FT.Show("settings") end },
+        },
         ["v0.28"] = {
             { L["Your faction's auction house only"], L["Blackwater, the neutral house, isn't tracked any more: its prices came too late to act on. No more AH TO AH deals."], nil },
         },

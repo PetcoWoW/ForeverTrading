@@ -215,7 +215,7 @@ function T.Build(p)
     -- sources
     local so = Section(left, L["Sources"], 3)
     Check(so, "useFeed", L["Price feed"],
-        L["Prices of every auction house, built hourly from Blizzard's own auction data and shipped with each update: prices before your first scan, and charts for the days you didn't scan. New ones about every hour: WowUp downloads them, /reload loads them."],
+        L["Prices of every auction house, built hourly from Blizzard's own auction data and shipped with each update: prices before your first scan, and charts for the days you didn't scan. New ones about every hour: the prices companion (Settings > About) downloads them, /reload loads them."],
         function() FT.Fire("FT_SOURCES_CHANGED"); if FT.Feed then FT.Feed.Take() end end)
     Check(so, "scanWithAuctionator", L["One scan for both"],
         L["Full scan runs Auctionator's scan when Auctionator is installed: one scan, and both addons get the prices."])
@@ -355,7 +355,7 @@ function T.Build(p)
     local tour = UI.Button(ab, L["Take the tour again"], 10, 24, "default", function() FT.Tour.Start() end)
     tour:FitText(28)
     tour:SetPoint("LEFT", news, "RIGHT", 8, 0)
-    -- the companion app: fresh prices every 15 minutes without waiting for WowUp (Windows)
+    -- the companion app: fresh prices every 15 minutes, whatever installed the addon (Windows)
     local comp = UI.Button(ab, L["Prices companion"], 10, 24, "default", function()
         FT.ShowLink(L["Wolf prices companion (Windows)"], L["A small app by the clock: every 15 minutes it puts the newest prices in your addon folder and tells you to /reload. Download, unzip, double-click Start Wolf prices:"],
             "https://github.com/sain221b-sketch/ForeverTrading/releases/latest/download/WolfPrices.zip")
