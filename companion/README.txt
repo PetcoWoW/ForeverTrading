@@ -1,4 +1,4 @@
-Wolf prices - the companion of The Wolf of Booty Bay
+Wolf prices - the companion of Wolf
 =====================================================
 
 Download WolfPricesSetup.exe from the "companion" release and run it. It finds World of Warcraft and the addon,

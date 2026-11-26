@@ -1,4 +1,4 @@
--- Wolf of Booty Bay: the prices companion, from the game's side. The companion (a small Windows app by the clock,
+-- Wolf: the prices companion, from the game's side. The companion (a small Windows app by the clock,
 -- silent) checks for new prices every 15 minutes and saves them into the addon folder; it also leaves a note,
 -- Data\Companion.lua, of when it last checked. The game reads files only at login or /reload, so the addon can't
 -- see a download - but with the note it knows the companion is running, and the price robot publishes hourly: an

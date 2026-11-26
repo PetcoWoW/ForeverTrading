@@ -1,4 +1,4 @@
--- Wolf of Booty Bay: the Eye - what the addon sees of you, and what it says because of it.
+-- Wolf: the Eye - what the addon sees of you, and what it says because of it.
 -- It reads everything it already keeps: every character's professions and skill, every bag, bank and mailbox, your
 -- gold, what you loot (all the time, not only in a session), what you bought and sold at the auction house (its
 -- letters), your watchlist. From that, with no question asked, it works out what kind of player you are (gatherer,

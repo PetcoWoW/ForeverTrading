@@ -1,4 +1,4 @@
--- Wolf of Booty Bay: Market page - every item with its price and moves, the chart of one item, and three answers
+-- Wolf: Market page - every item with its price and moves, the chart of one item, and three answers
 -- under it: the market's health, the price's trend, the call. With no item chosen: the market overview.
 local ADDON, FT = ...
 local UI = FT.UI

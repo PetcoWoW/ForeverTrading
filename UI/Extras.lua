@@ -1,9 +1,9 @@
--- Wolf of Booty Bay: minimap button, the button on the auction house, item tooltip lines, alert toasts.
+-- Wolf: minimap button, the button on the auction house, item tooltip lines, alert toasts.
 local ADDON, FT = ...
 local UI = FT.UI
 local L = FT.L
 
-local ICON = "Interface\\Icons\\Ability_Hunter_Pet_Wolf"
+local ICON = "Interface\\AddOns\\WolfOfBootyBay\\media\\logo"
 
 ---------------------------------------------------------------------------
 -- Minimap button (and a launcher for broker bars when one is loaded)
@@ -19,7 +19,7 @@ end
 
 local function MinimapTooltip(self)
     GameTooltip:SetOwner(self, "ANCHOR_LEFT")
-    GameTooltip:AddLine("|cfff0b90bWolf of Booty Bay|r")
+    GameTooltip:AddLine("|cfff0b90bWolf|r")
     local last = FT.Hist.LastScan()
     GameTooltip:AddLine(L["Scan"] .. ": " .. (last and FT.Ago(last) or L["never"]), 0.6, 0.64, 0.7)
     GameTooltip:AddLine(" ")
@@ -126,9 +126,9 @@ local function BuildMinimap()
     bg:SetTexture("Interface\\Minimap\\UI-Minimap-Background")
     bg:SetPoint("CENTER")
     local icon = mb:CreateTexture(nil, "ARTWORK")
-    icon:SetSize(18, 18)
+    icon:SetSize(20, 20)
     icon:SetTexture(ICON)
-    icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+    if icon.SetMask then icon:SetMask("Interface\\CharacterFrame\\TempPortraitAlphaMask") end
     icon:SetPoint("CENTER")
     local border = mb:CreateTexture(nil, "OVERLAY")
     border:SetSize(52, 52)
@@ -165,14 +165,14 @@ end
 local function MakeBroker()
     local ldb = LibStub and LibStub("LibDataBroker-1.1", true)
     if not (ldb and ldb.NewDataObject) then return end
-    ldb:NewDataObject("Wolf of Booty Bay", {
-        type = "launcher", label = "Wolf of Booty Bay", text = "Wolf of Booty Bay", icon = ICON,
+    ldb:NewDataObject("Wolf", {
+        type = "launcher", label = "Wolf", text = "Wolf", icon = ICON,
         OnClick = function(self, button)
             if button == "RightButton" then FT.ShowMenu(self) else FT.Toggle() end
         end,
         OnTooltipShow = function(tt)
             if not (tt and tt.AddLine) then return end
-            tt:AddLine("Wolf of Booty Bay")
+            tt:AddLine("Wolf")
             local last = FT.Hist.LastScan()
             tt:AddLine(L["Scan"] .. ": " .. (last and FT.Ago(last) or L["never"]), 0.6, 0.64, 0.7)
         end,
@@ -180,7 +180,7 @@ local function MakeBroker()
 end
 
 ---------------------------------------------------------------------------
--- Auction house: a button that opens Wolf of Booty Bay right next to it
+-- Auction house: a button that opens Wolf right next to it
 ---------------------------------------------------------------------------
 local ahButton
 
@@ -203,7 +203,7 @@ end
 
 local function TipAH(self)
     GameTooltip:SetOwner(self, "ANCHOR_TOP")
-    GameTooltip:AddLine("|cfff0b90bWolf of Booty Bay|r  " .. L["Snipe"])
+    GameTooltip:AddLine("|cfff0b90bWolf|r  " .. L["Snipe"])
     GameTooltip:AddLine(L["After a scan: what's listed under its price, how sure, and Buy. Plus the items worth searching again and again."], 0.8, 0.8, 0.8, true)
     GameTooltip:Show()
 end
@@ -223,7 +223,7 @@ local function BuildAHTab(ah)
     local lib = LibStub and LibStub("LibAHTab-1-0", true)
     if lib and lib.CreateTab then
         local ok = pcall(function()
-            if not lib:DoesIDExist("Wolf of Booty Bay") then
+            if not lib:DoesIDExist("Wolf") then
                 -- the Snipe panel, shown inside the auction house when its tab is picked (like Auctionator's)
                 local holder = CreateFrame("Frame", nil, ah)
                 holder:SetPoint("TOPLEFT", ah, "TOPLEFT", 4, -60)
@@ -232,9 +232,9 @@ local function BuildAHTab(ah)
                 p:SetParent(holder)
                 p:SetAllPoints(holder)
                 p:Show()
-                lib:CreateTab("Wolf of Booty Bay", holder, L["Snipe"])
+                lib:CreateTab("Wolf", holder, L["Snipe"])
             end
-            tab = lib:GetButton("Wolf of Booty Bay")
+            tab = lib:GetButton("Wolf")
         end)
         if not ok then tab = nil end
         if tab then libTab = true end
@@ -243,7 +243,7 @@ local function BuildAHTab(ah)
         local ok, made = pcall(CreateFrame, "Button", "WolfOfBootyBayAHTab", ah, "AuctionHouseFrameDisplayModeTabTemplate")
         if not ok or not made then return nil end
         tab = made
-        tab:SetText("Wolf of Booty Bay")
+        tab:SetText("Wolf")
         -- after the game's last tab (the template may have put ours in that list already: not after itself)
         local last
         for i = #(ah.Tabs or {}), 1, -1 do
@@ -289,7 +289,7 @@ local function BuildAHPlainButton(ah)
     else
         b:SetPoint("TOPRIGHT", ah, "BOTTOMRIGHT", -4, -2)
     end
-    b:SetTip("Wolf of Booty Bay  " .. L["Snipe"], L["After a scan: what's listed under its price, how sure, and Buy. Plus the items worth searching again and again."])
+    b:SetTip("Wolf  " .. L["Snipe"], L["After a scan: what's listed under its price, how sure, and Buy. Plus the items worth searching again and again."])
     local set = b.SetLabel
     b.SetLabel = function(self, text)
         set(self, text)
@@ -304,7 +304,7 @@ local function BuildAHButton()
     if not ah or ahButton then return end
     if ah == AuctionHouseFrame then ahButton = BuildAHTab(ah) end
     ahButton = ahButton or BuildAHPlainButton(ah)
-    -- while Wolf of Booty Bay scans, the button shows how far it got
+    -- while Wolf scans, the button shows how far it got
     ahButton.ftElapsed = 0
     ahButton:HookScript("OnUpdate", function(self, elapsed)
         self.ftElapsed = self.ftElapsed + elapsed
@@ -601,7 +601,7 @@ function FT.DebugReport()
     FT.Print("feed: " .. FT.Feed.Describe() .. " (ruleset " .. tostring(FT.Feed.Ruleset()) .. ", house "
         .. tostring(FT.Feed.HouseID(FT.house)) .. ")")
     FT.Print("recipes " .. #FT.Craft.List() .. ", tracked " .. FT.Hist.UniverseSize())
-    -- recipes by profession: how many the Craft page has, how many Wolf of Booty Bay read itself (Mastercraft: the rest)
+    -- recipes by profession: how many the Craft page has, how many Wolf read itself (Mastercraft: the rest)
     local all, own = {}, {}
     for _, r in ipairs(FT.Craft.List()) do all[r.prof] = (all[r.prof] or 0) + 1 end
     for _, profs in pairs(FT.db.recipes or {}) do
@@ -1187,12 +1187,12 @@ FT.On("FT_READY", function() C_Timer.After(2, FT.UpdateHUD) end)
 
 -- /wolf credits: where the code began (the license's notice; NOTICE and LICENSE ship in the addon's folder)
 function FT.ShowSupport()
-    FT.ShowLink(L["Credits"], L["The Wolf of Booty Bay is a modified version of an addon by thewoolfi, under the Apache License 2.0 (see NOTICE in the addon's folder). The original:"],
+    FT.ShowLink(L["Credits"], L["Wolf is a modified version of an addon by thewoolfi, under the Apache License 2.0 (see NOTICE in the addon's folder). The original:"],
         FT.URL_SUPPORT)
 end
 
 function FT.ShowGitHub()
-    FT.ShowLink(L["Wolf of Booty Bay on GitHub"], L["Source code, releases and bug reports. Copy the link and open it in your browser:"],
+    FT.ShowLink(L["Wolf on GitHub"], L["Source code, releases and bug reports. Copy the link and open it in your browser:"],
         FT.URL_GITHUB)
 end
 
@@ -1211,7 +1211,7 @@ function FT.ShareTip(itemID)
     else
         text = string.format(L["%s is at its usual price: %s"], name, G(s.price))
     end
-    text = text .. " - Wolf of Booty Bay"
+    text = text .. " - Wolf"
     local prefix = (IsInGuild and IsInGuild()) and "/g " or ""
     if ChatFrame_OpenChat then ChatFrame_OpenChat(prefix .. text) else FT.Print(text) end
 end

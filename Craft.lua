@@ -1,4 +1,4 @@
--- Wolf of Booty Bay: what your recipes cost and bring in.
+-- Wolf: what your recipes cost and bring in.
 -- Recipes come from Mastercraft (every character it knows) and from your own profession windows.
 local ADDON, FT = ...
 local L = FT.L

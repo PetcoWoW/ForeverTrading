@@ -1,4 +1,4 @@
--- Wolf of Booty Bay: how much really sells. The game tells no one's sales, so they are told from the listings:
+-- Wolf: how much really sells. The game tells no one's sales, so they are told from the listings:
 -- two looks at the same item (a few seconds to a few hours apart), seller by seller and price by price:
 --  * fewer at the same price by the same seller: bought (an auction is cancelled whole, a stack is bought in part);
 --  * a seller's listing gone and the same seller listing anew (another price): cancelled and listed again - no sale;

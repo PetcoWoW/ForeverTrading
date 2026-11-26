@@ -1,4 +1,4 @@
--- Wolf of Booty Bay: price history, kept by Wolf of Booty Bay itself.
+-- Wolf: price history, kept by Wolf itself.
 --  * every item seen on the auction house gets a day candle (open, high, low, close of its lowest price,
 --    the most listed and the most auctions that day) - for as long as Settings > Data says;
 --  * the items that matter to you (your recipes and their materials, your watchlist, what you own, what you
@@ -854,7 +854,7 @@ function H.HasScan(t)
     return false
 end
 
--- kind: "full", "mine", "peer" (a whole-market scan received from another Wolf of Booty Bay user) or "feed" (the
+-- kind: "full", "mine", "peer" (a whole-market scan received from another Wolf user) or "feed" (the
 -- price feed shipped with the addon, Sources/Feed.lua)
 function H.MarkScan(kind, t)
     local meta = FT.R().meta

@@ -1,4 +1,10 @@
-# The Wolf of Booty Bay
+# Wolf
+
+## v0.31 - Wolf, with a new face
+
+- The addon is now just **Wolf**, with its own logo: in the header, the minimap button, the addon list and the
+  prices companion. Nothing to redo: your settings, history and portfolio carry over (the folder is still
+  WolfOfBootyBay), and /wolf works as before.
 
 ## v0.30 - mail to your bank alt, and the new prices companion
 

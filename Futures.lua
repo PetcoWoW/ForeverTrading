@@ -1,4 +1,4 @@
--- Wolf of Booty Bay: Futures - what raiders will need, and how you make gold from it. The pre-raid study's list
+-- Wolf: Futures - what raiders will need, and how you make gold from it. The pre-raid study's list
 -- (Data/Futures.lua: what each class is expected to use, ranked) meets the live market (price, its trend, how fast
 -- it sells) and the recipe data (what it's made of), and then you: through the Eye it knows if you gather, craft or
 -- trade, and gives each item and each key material the move that's yours - craft it (a character of yours knows

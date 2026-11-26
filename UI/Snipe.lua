@@ -1,4 +1,4 @@
--- Wolf of Booty Bay: the Snipe panel - the auction house tab. Right after a scan: what's listed under its snipe
+-- Wolf: the Snipe panel - the auction house tab. Right after a scan: what's listed under its snipe
 -- price (with how sure, and a Buy button: the server's price, your click), and the items worth searching again
 -- and again. Re-check searches the hit list without a new full scan.
 local ADDON, FT = ...
@@ -67,7 +67,7 @@ local function Build(parent)
     f.sub = UI.Text(f, 11, "dim")
     f.sub:SetPoint("LEFT", f.head, "RIGHT", 12, -1)
     f.sub:SetPoint("RIGHT", f, "RIGHT", -330, 0)
-    f.open = UI.Button(f, L["Open Wolf of Booty Bay"], 10, 22, "default", function() FT.Show("market") end)
+    f.open = UI.Button(f, L["Open Wolf"], 10, 22, "default", function() FT.Show("market") end)
     f.open:FitText(20)
     f.open:SetPoint("TOPRIGHT", -10, -8)
     f.toAtr = UI.Button(f, L["To Auctionator"], 10, 22, "default", function()

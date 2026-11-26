@@ -1,4 +1,4 @@
--- Wolf of Booty Bay: Craft page - every recipe your characters know: what it costs, what it brings in,
+-- Wolf: Craft page - every recipe your characters know: what it costs, what it brings in,
 -- the profit and a signal; one recipe in detail with its margin over time and its materials.
 local ADDON, FT = ...
 local UI = FT.UI
@@ -452,7 +452,7 @@ local function BuildDetail(p)
     end)
     d.btnSearch:FitText(24)
     d.btnSearch:SetPoint("BOTTOMLEFT", 12, 10)
-    d.btnSearch:SetTip(L["Search on AH"], L["Searches the item and all its materials: in Auctionator's Shopping tab when it is installed, otherwise with Wolf of Booty Bay's scanner. The auction house must be open; fresh prices and order books follow."])
+    d.btnSearch:SetTip(L["Search on AH"], L["Searches the item and all its materials: in Auctionator's Shopping tab when it is installed, otherwise with Wolf's scanner. The auction house must be open; fresh prices and order books follow."])
     d.btnChart = UI.Button(d, L["Price chart"], 10, 24, "default", function()
         if d.r then FT.OpenItem(d.r.output) end
     end)

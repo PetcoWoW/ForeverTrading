@@ -1,4 +1,4 @@
--- Wolf of Booty Bay: Portfolio page - what your characters on this server own, valued at market prices.
+-- Wolf: Portfolio page - what your characters on this server own, valued at market prices.
 local ADDON, FT = ...
 local UI = FT.UI
 local L = FT.L

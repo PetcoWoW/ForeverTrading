@@ -1,4 +1,4 @@
--- Wolf of Booty Bay: the price feed. Every release carries Data/Feed.lua, built hourly outside the game from
+-- Wolf: the price feed. Every release carries Data/Feed.lua, built hourly outside the game from
 -- Blizzard's own auction data for every WoW Forever auction house (tools/feed/build.mjs): the lowest price of each
 -- item, how many are listed and in how many auctions, what sold over the last 7 days and the daily lows of the
 -- last 30 days (FT.FEED.days). So prices are there before your first scan, and for the house you aren't standing at.

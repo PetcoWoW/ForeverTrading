@@ -1,4 +1,4 @@
--- Wolf of Booty Bay: Snipe - what to buy at the auction house right after a scan, and what to keep an eye on.
+-- Wolf: Snipe - what to buy at the auction house right after a scan, and what to keep an eye on.
 --  * Underpriced now: items whose price from a fresh scan (two hours or newer) is under their snipe price - their
 --    real price (the lower of the fair price and the recent average) less the deal margin (Settings: 30%) -
 --    on a market that isn't being dumped or pushed up. Each with how sure (FT.Snipe.Confidence).

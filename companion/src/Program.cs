@@ -1,4 +1,4 @@
-// Wolf prices: the companion of The Wolf of Booty Bay (a World of Warcraft addon). One program:
+// Wolf prices: the companion of Wolf (a World of Warcraft addon). One program:
 //   started from a download:   setup (installs itself for you, no admin rights)
 //   installed, at Windows start (--tray): the wolf by the clock, fetching new prices every 15 minutes
 //   --uninstall:               removes itself (Settings > Apps > Uninstall runs this)

@@ -1,4 +1,4 @@
--- Wolf of Booty Bay: the main window - header with navigation, the ticker tape, pages, status bar.
+-- Wolf: the main window - header with navigation, the ticker tape, pages, status bar.
 local ADDON, FT = ...
 local UI = FT.UI
 local L = FT.L
@@ -471,7 +471,7 @@ local function Build()
     PlaceWindow()
     UI.Skin(win, "window", "bg0")
     -- the classic look: the game's title banner over the top edge
-    win.banner = UI.TitleBanner(win, "The Wolf of Booty Bay")
+    win.banner = UI.TitleBanner(win, "Wolf")
     table.insert(UISpecialFrames, "WolfOfBootyBayFrame")
 
     -- header
@@ -495,15 +495,15 @@ local function Build()
     hl:SetPoint("BOTTOMRIGHT")
 
     -- the classic look: a round portrait with the gold ring
-    local logo = UI.Classic() and UI.Portrait(header, 22, "Interface\\Icons\\Ability_Hunter_Pet_Wolf") or UI.Icon(header, 24)
-    logo:SetIcon("Interface\\Icons\\Ability_Hunter_Pet_Wolf")
+    local logo = UI.Classic() and UI.Portrait(header, 22, "Interface\\AddOns\\WolfOfBootyBay\\media\\logo") or UI.Icon(header, 24)
+    logo:SetIcon("Interface\\AddOns\\WolfOfBootyBay\\media\\logo")
     logo:SetPoint("LEFT", UI.Classic() and 10 or 14, 0)
     local brand1 = UI.Text(header, 15, "accent")
     brand1:SetPoint("LEFT", logo, "RIGHT", UI.Classic() and 18 or 10, 0)
-    brand1:SetText("WOLF OF")
+    brand1:SetText("WOLF")
     local brand2 = UI.Text(header, 15, "text")
     brand2:SetPoint("LEFT", brand1, "RIGHT", 1, 0)
-    brand2:SetText(" BOOTY BAY")
+    brand2:SetText("")
 
     -- the pages; Settings is the gear on the right
     local items = {}
@@ -780,7 +780,7 @@ FT.On("FT_AH_CHANGED", function()
 end)
 
 ---------------------------------------------------------------------------
--- In place of the auction house window (Settings): talking to an auctioneer opens Wolf of Booty Bay. The game's
+-- In place of the auction house window (Settings): talking to an auctioneer opens Wolf. The game's
 -- window stays open behind it, unseen (closing it would end the visit): see-through and off the screen. The
 -- pill in the header shows whether you are at the auction house and brings the game's window back for buying
 -- and selling (and Auctionator). Walking away ends the visit: the terminal goes "offline".
@@ -897,13 +897,13 @@ function FT.BuildAHPill(header)
         local t, who = FT.ScanTime()
         local text
         if not t then
-            text = L["No scan of yours yet. Scan in Auctionator at the auction house: Wolf of Booty Bay takes it."]
+            text = L["No scan of yours yet. Scan in Auctionator at the auction house: Wolf takes it."]
         else
             text = string.format(L["Your last auction house scan%s: %s. The freshest prices there are, the moment you scan."],
                 who == "auctionator" and (" (" .. L["Auctionator's"] .. ")") or "", FT.Ago(t))
             if FT.Atr and FT.Atr.On() then text = text .. "\n\n" .. L["Click: take Auctionator's last scan again."] end
         end
-        if FT.ahOpen and ahHidden then text = text .. "\n\n" .. L["The game's auction house window is hidden behind Wolf of Booty Bay: right-click shows it."] end
+        if FT.ahOpen and ahHidden then text = text .. "\n\n" .. L["The game's auction house window is hidden behind Wolf: right-click shows it."] end
         UI.TipText(self, L["AH: your scans"], text)
     end)
     pill.ah:RegisterForClicks("LeftButtonUp", "RightButtonUp")
@@ -998,7 +998,7 @@ function UI.HouseChip(parent, opts)
         UI.SetTexColor(self.bg, "bg3", 1)
         local H = FT.House
         local house = self.get and self.get() or FT.house
-        local text = L["The auction house Wolf of Booty Bay follows: your faction's. Blackwater, the neutral one, isn't tracked: its prices come too late to act on."]
+        local text = L["The auction house Wolf follows: your faction's. Blackwater, the neutral one, isn't tracked: its prices come too late to act on."]
         if FT.ahHere and FT.atHouse ~= house then
             text = text .. "\n\n" .. string.format(L["You stand at %s: offline here."], H.Name(FT.atHouse))
         end
@@ -1022,7 +1022,7 @@ function UI.HouseChip(parent, opts)
         self.icon:SetColor("text")
         local H = FT.House
         local here = FT.atHouse or "faction"
-        UI.TipText(self, L["Wrong auction house?"], string.format(L["Click if this auctioneer is of %s, not %s: Wolf of Booty Bay puts it right and remembers it for the auctioneers here."],
+        UI.TipText(self, L["Wrong auction house?"], string.format(L["Click if this auctioneer is of %s, not %s: Wolf puts it right and remembers it for the auctioneers here."],
             H.Name(here == "neutral" and "faction" or "neutral"), H.Name(here)))
     end)
     c.fix:SetScript("OnLeave", function(self)
@@ -1070,7 +1070,7 @@ function FT.ToggleAHWindow()
     if GameTooltip:IsOwned(pill) and pill:GetScript("OnEnter") then pill:GetScript("OnEnter")(pill) end
 end
 
--- the game's window on the screen (when it was hidden behind Wolf of Booty Bay)
+-- the game's window on the screen (when it was hidden behind Wolf)
 function FT.ShowGameAH()
     if FT.ahHere and ahHidden then ShowAHWindow() end
 end

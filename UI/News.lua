@@ -1,4 +1,4 @@
--- Wolf of Booty Bay: "What's new" - once a version, the first time the window opens after an update: a few lines on
+-- Wolf: "What's new" - once a version, the first time the window opens after an update: a few lines on
 -- what came, each with a button to where it is. On a first install the tour is offered instead (UI/Tour.lua).
 -- Again any time: Settings > About, /wolf news.
 local ADDON, FT = ...
@@ -12,12 +12,15 @@ FT.News = N
 -- start, after the files are read (a table made with them would keep the English)
 local function News()
     return {
+        ["v0.31"] = {
+            { L["Wolf, with a new face"], L["The addon is now just Wolf, with its own logo. Everything of yours carries over."], nil },
+        },
         ["v0.30"] = {
             { L["Mail to your bank alt"], L["What you mail to your own characters stays in your portfolio until they open the mailbox."], function() FT.Show("portfolio") end },
             { L["The new prices companion"], L["A real Windows app now: silent, starts with Windows, updates itself. Chat says when newer prices are ready to load."], function() FT.Show("settings") end },
         },
         ["v0.29"] = {
-            { L["On CurseForge"], L["Search Wolf of Booty Bay in the CurseForge app for new versions. Hourly prices: the prices companion (Windows)."], function() FT.Show("settings") end },
+            { L["On CurseForge"], L["Search Wolf in the CurseForge app for new versions. Hourly prices: the prices companion (Windows)."], function() FT.Show("settings") end },
         },
         ["v0.28"] = {
             { L["Your faction's auction house only"], L["Blackwater, the neutral house, isn't tracked any more: its prices came too late to act on. No more AH TO AH deals."], nil },
@@ -162,7 +165,7 @@ local function News()
                 nil },
         },
         ["v0.1"] = {
-            { L["Welcome to the Wolf of Booty Bay"], L["The auction house as a stock market: tickers, moves, what to buy and sell, and your portfolio."],
+            { L["Welcome to Wolf"], L["The auction house as a stock market: tickers, moves, what to buy and sell, and your portfolio."],
                 nil },
             { L["Easier to read"], L["The game's own wide font, bigger text and window sizes up to 150%: Settings > General."],
                 function() FT.Show("settings") end },
@@ -268,7 +271,7 @@ function N.Show()
     if not win then Build() end
     local width = 560
     win:SetWidth(width)
-    win.title:SetText(string.format(L["What's new in Wolf of Booty Bay %s"], FT.VERSION_TEXT))
+    win.title:SetText(string.format(L["What's new in Wolf %s"], FT.VERSION_TEXT))
     local y = -64
     for i, item in ipairs(list) do
         local r = Row(i)
@@ -300,7 +303,7 @@ function N.OnWindow()
         FT.db.newsSeen = NewsKey()
         UI.Confirm({
             owner = "tourOffer",
-            title = L["Welcome to Wolf of Booty Bay"],
+            title = L["Welcome to Wolf"],
             text = L["A short tour: where everything is and how to use it (a couple of minutes). It can be taken again any time: Settings > About, /wolf tour."],
             ok = L["Take the tour"],
             cancel = L["Later"],

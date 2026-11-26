@@ -1,4 +1,4 @@
--- Wolf of Booty Bay: the tour - step by step over the real window: everything but the part a step is about is
+-- Wolf: the tour - step by step over the real window: everything but the part a step is about is
 -- dimmed, the part is ringed, and a note beside it says what it is and does (Back, Next, Esc to end). A step
 -- whose part isn't on the screen (the compact window has no order book) is passed over. Offered on a first
 -- install; again any time: Settings > About, /wolf tour.
@@ -22,7 +22,7 @@ local function MakeSteps() return {
       text = L["AH: your last auction house scan (scan in Auctionator: it's taken right away). API: Blizzard's prices, every hour, with each update. The lit one is what you see."],
       target = function() return FT.MainRefs and FT.MainRefs.pill end },
     { title = L["Which auction house"],
-      text = L["Your faction's auction house: the one Wolf of Booty Bay follows. Blackwater, the neutral one, isn't tracked: its prices come too late to act on."],
+      text = L["Your faction's auction house: the one Wolf follows. Blackwater, the neutral one, isn't tracked: its prices come too late to act on."],
       target = function() return FT.MainRefs and FT.MainRefs.house end },
     { title = L["Terminal"], tab = "market",
       text = L["The market board: search any item, see its chart and what to do with it. Right-click an item to watch it."],

@@ -1,4 +1,4 @@
--- Wolf of Booty Bay: what we read from the game ourselves, so it also works without Mastercraft:
+-- Wolf: what we read from the game ourselves, so it also works without Mastercraft:
 -- the recipes of your profession windows, your bags and bank, and what merchants charge.
 local ADDON, FT = ...
 local L = FT.L

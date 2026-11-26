@@ -1,4 +1,4 @@
--- Wolf of Booty Bay: order book - what is listed at each price, with the depth behind it, and what
+-- Wolf: order book - what is listed at each price, with the depth behind it, and what
 -- buying a quantity really costs.
 local ADDON, FT = ...
 local UI = FT.UI

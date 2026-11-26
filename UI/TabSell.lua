@@ -1,4 +1,4 @@
--- Wolf of Booty Bay: Selling page. On the left what you carry that the auction house takes, at market prices with
+-- Wolf: Selling page. On the left what you carry that the auction house takes, at market prices with
 -- a signal; in the middle one item to post: the market (the cheapest listing, the fair price, the vendor's, the
 -- signal), the quantity, the price per unit (a copper under the cheapest to begin with), how long, and what it
 -- comes to - deposit, the auction house's cut, what you get - with warnings (under the vendor price, far under the fair one,

@@ -1,4 +1,4 @@
--- Wolf of Booty Bay: the look and the basic pieces every window uses. Two looks (Settings > General > Look, after a
+-- Wolf: the look and the basic pieces every window uses. Two looks (Settings > General > Look, after a
 -- reload): classic (the game's own auction house: its stone-and-gold dialog edges, red buttons, gold labels; the
 -- default) and dark (an exchange terminal at night).
 local ADDON, FT = ...

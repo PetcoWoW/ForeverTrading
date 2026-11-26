@@ -1,4 +1,4 @@
--- Wolf of Booty Bay: the Futures page (the tab key stays "radar") - what raiders will need before the raids and how
+-- Wolf: the Futures page (the tab key stays "radar") - what raiders will need before the raids and how
 -- you make gold from it (FT.Futures). Two sections: Consumables (ranked by how many raiders burn how much, with the
 -- key materials beside them) and Gear (the crafted pre-raid pieces). Every row has the move that's yours.
 local ADDON, FT = ...

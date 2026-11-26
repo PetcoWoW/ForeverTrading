@@ -1,4 +1,4 @@
--- Wolf of Booty Bay: Radar - demand forming, spotted from the market itself (nobody's list of what to hold).
+-- Wolf: Radar - demand forming, spotted from the market itself (nobody's list of what to hold).
 --  * Demand rising: sales speeding up (the last 3 days against the week before, from the price robot's daily
 --    sales) while the price holds or climbs and what's listed doesn't pile up - real buying, not a pump (a pump
 --    is a price jump without the sales). Early while the price has hardly moved yet, late once it has.

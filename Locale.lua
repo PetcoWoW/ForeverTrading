@@ -1,4 +1,4 @@
--- Wolf of Booty Bay: texts. English is the key. With "Plain English" on (Settings >
+-- Wolf: texts. English is the key. With "Plain English" on (Settings >
 -- General, the default) the trader terms are swapped for plain words: the table below, applied once at start.
 -- Every other text shows as written in the code.
 local ADDON, FT = ...

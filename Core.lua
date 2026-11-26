@@ -1,10 +1,10 @@
--- Wolf of Booty Bay: core (saved data, events, formatting helpers, slash commands)
+-- Wolf: core (saved data, events, formatting helpers, slash commands)
 local ADDON, FT = ...
 local L = FT.L
 
 -- The version being released: a copy straight from the repository (not packaged) has no version in its TOC yet
 -- (the packager puts the tag there) and shows this one. Set it with every release.
-local RELEASE = "v0.30"
+local RELEASE = "v0.31"
 local GetMeta = (C_AddOns and C_AddOns.GetAddOnMetadata) or GetAddOnMetadata
 FT.VERSION = (GetMeta and GetMeta(ADDON, "Version")) or RELEASE
 if FT.VERSION == "" or FT.VERSION:find("@", 1, true) then FT.VERSION = RELEASE end
@@ -180,7 +180,7 @@ FT.DEFAULTS = {
     textSize = 1,           -- added to every text's size: 0 normal, 1 large, 2 larger (after a reload)
     ticker = true,
     ahButton = true,
-    replaceAH = false,      -- talking to an auctioneer opens Wolf of Booty Bay in place of the game's window
+    replaceAH = false,      -- talking to an auctioneer opens Wolf in place of the game's window
     sellDuration = 2,       -- posting: 1 short, 2 medium, 3 long (WoW Forever: 2, 8, 24 hours)
     chartTF = "1D",
     chartRange = "30D",     -- the simple chart: 7D, 30D or 90D
@@ -697,7 +697,7 @@ end
 -- Messages
 ---------------------------------------------------------------------------
 function FT.Print(msg)
-    DEFAULT_CHAT_FRAME:AddMessage("|cfff0b90bWolf of Booty Bay|r: " .. tostring(msg))
+    DEFAULT_CHAT_FRAME:AddMessage("|cfff0b90bWolf|r: " .. tostring(msg))
 end
 
 function FT.Debug(...)
@@ -781,7 +781,7 @@ function FT.PerfReport()
         local ok, kb = pcall(usage, ADDON)
         if ok and type(kb) == "number" then mine = kb end
     end
-    FT.Print("  " .. string.format(L["Memory: Wolf of Booty Bay %s, all addons %s"], mine and MB(mine) or "?",
+    FT.Print("  " .. string.format(L["Memory: Wolf %s, all addons %s"], mine and MB(mine) or "?",
         MB(collectgarbage("count"))))
     local items, size = FT.Hist.Footprint()
     FT.Print("  " .. string.format(L["Saved prices: %s items, %s characters; %s waiting to be written (at logout or /reload)"],
@@ -789,7 +789,7 @@ function FT.PerfReport()
     local rowsN, deep, movers = FT.Market.Depth()
     FT.Print("  " .. string.format(L["Market: %s items, %s with prices on 3+ days of the last two weeks, %s can be top gainers or losers"],
         FT.Num(rowsN), FT.Num(deep), FT.Num(movers)) .. (FT.Atr.On() and "" or
-        (" " .. L["(Auctionator is off: only the days Wolf of Booty Bay saw itself count)"])))
+        (" " .. L["(Auctionator is off: only the days Wolf saw itself count)"])))
     local lo = FT.db.perfLogout
     if type(lo) == "table" and lo.ms then
         FT.Print("  " .. string.format(L["Writing them at the last logout: %s ms (%s records)"], Ms(lo.ms), FT.Num(lo.n or 0)))
@@ -897,6 +897,6 @@ FT.On("FT_READY", function()
     local loaded = (C_AddOns and C_AddOns.IsAddOnLoaded and C_AddOns.IsAddOnLoaded("ForeverTrading"))
         or (IsAddOnLoaded and IsAddOnLoaded("ForeverTrading"))
     if loaded then
-        FT.Print(FT.L["ForeverTrading is also turned on: Wolf of Booty Bay does everything it does. Turn ForeverTrading off in the AddOns list so they don't scan and fill your tooltips twice."])
+        FT.Print(FT.L["ForeverTrading is also turned on: Wolf does everything it does. Turn ForeverTrading off in the AddOns list so they don't scan and fill your tooltips twice."])
     end
 end)

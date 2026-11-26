@@ -1,4 +1,4 @@
--- Wolf of Booty Bay: the pre-raid study as data (the Futures page). What raiders across every class are expected to
+-- Wolf: the pre-raid study as data (the Futures page). What raiders across every class are expected to
 -- use before the first raids (9 December 2026), from the guide sites that check against the Forever database
 -- (RankedBoost, Method, the Warcraft wiki, Icy Veins) and the crafted pre-raid lists (Frostyboost), cross-checked:
 -- one site alone is a guess. The study: "WoW Forever pre-raid study - what raiders will need" (26 Nov 2026).

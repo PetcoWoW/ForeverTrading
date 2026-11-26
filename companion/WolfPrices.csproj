@@ -1,5 +1,5 @@
 <Project Sdk="Microsoft.NET.Sdk">
-  <!-- Wolf prices: the companion of The Wolf of Booty Bay. One small Windows program (.NET Framework 4.8, part of
+  <!-- Wolf prices: the companion of Wolf. One small Windows program (.NET Framework 4.8, part of
        Windows 10 and 11: nothing else to install). Built by .github/workflows/companion.yml. -->
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
@@ -12,10 +12,10 @@
     <Version>$([System.IO.File]::ReadAllText('$(MSBuildProjectDirectory)/VERSION').Trim())</Version>
     <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
     <Product>Wolf prices</Product>
-    <AssemblyTitle>Wolf prices - fresh auction prices for The Wolf of Booty Bay</AssemblyTitle>
-    <Description>Fresh auction prices for The Wolf of Booty Bay</Description>
-    <Company>The Wolf of Booty Bay</Company>
-    <Copyright>The Wolf of Booty Bay - Apache License 2.0</Copyright>
+    <AssemblyTitle>Wolf prices - fresh auction prices for Wolf</AssemblyTitle>
+    <Description>Fresh auction prices for Wolf</Description>
+    <Company>Wolf</Company>
+    <Copyright>Wolf - Apache License 2.0</Copyright>
     <GenerateDocumentationFile>false</GenerateDocumentationFile>
     <DebugType>none</DebugType>
     <Nullable>disable</Nullable>

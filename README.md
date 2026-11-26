@@ -1,4 +1,4 @@
-# The Wolf of Booty Bay
+# Wolf
 
 The WoW Forever auction house as a stock market: a ticker tape, 7-day trend lines, gainers and losers, charts, plain-English
 "what to do" signals, deals and your net worth across every character.
@@ -9,7 +9,7 @@ and the words and adds its own features. See `NOTICE`.
 
 ## Install
 
-1. **The addon:** search "Wolf of Booty Bay" in the CurseForge app (or on curseforge.com) and install it. New
+1. **The addon:** search "Wolf" in the CurseForge app (or on curseforge.com) and install it. New
    versions arrive through CurseForge. Or take the newest zip from this repository's **Releases** page and put the
    `WolfOfBootyBay` folder into `World of Warcraft/<your Forever client>/Interface/AddOns/`.
 2. **Hourly prices (Windows):** [WolfPricesSetup.exe](https://github.com/PetcoWoW/ForeverTrading/releases/download/companion/WolfPricesSetup.exe), the Wolf prices companion. Run it, click Install.
@@ -70,4 +70,4 @@ on the Farm Board (click), the item's Best use button on the Terminal, and a lin
 ## Prices from other players
 
 The price exchange speaks ForeverTrading's protocol, so you swap prices with ForeverTrading users in your
-guild or group as well as with other Wolf of Booty Bay users.
+guild or group as well as with other Wolf users.

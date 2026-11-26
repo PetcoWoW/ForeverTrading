@@ -160,7 +160,7 @@ jobs:
           node -e '
             const [file, version, iface] = process.argv.slice(1);
             const flavors = ["mainline", "classic", "bcc", "wrath", "cata", "mists"];
-            const release = { name: "The Wolf of Booty Bay", version, filename: file, nolib: false,
+            const release = { name: "Wolf", version, filename: file, nolib: false,
               metadata: flavors.map(flavor => ({ flavor, interface: Number(iface) })) };
             require("fs").writeFileSync("dist/release.json", JSON.stringify({ releases: [release] }));
           ' "WolfOfBootyBay-$VERSION.zip" "$VERSION" "$(grep -m1 '^## Interface:' WolfOfBootyBay.toc | sed 's/^## Interface: *//; s/\r//')"
@@ -174,7 +174,7 @@ jobs:
         run: |
           gh release create "v$VERSION" "dist/WolfOfBootyBay-$VERSION.zip" dist/Feed.lua dist/latest.json dist/release.json \
             --title "v$VERSION" \
-            --notes "The Wolf of Booty Bay with prices as of $(date -u '+%Y-%m-%d %H:%M') UTC." \
+            --notes "Wolf with prices as of $(date -u '+%Y-%m-%d %H:%M') UTC." \
             --latest
           # keep the newest 12 releases, by when they were published: createdAt is the commit's date, the same for
           # every hourly build of one commit, so sorting on it threw away new releases at random (often the one
@@ -219,13 +219,13 @@ jobs:
           fi
           # this version's part of the changelog
           awk -v v="## v$MAJMIN " 'index($0, v) == 1 { on = 1; next } on && /^## v/ { exit } on { print }' CHANGELOG.md > /tmp/cf-changelog.md
-          [ -s /tmp/cf-changelog.md ] || echo "The Wolf of Booty Bay $VERSION" > /tmp/cf-changelog.md
+          [ -s /tmp/cf-changelog.md ] || echo "Wolf $VERSION" > /tmp/cf-changelog.md
           node -e '
             const fs = require("fs");
             const meta = {
               changelog: fs.readFileSync("/tmp/cf-changelog.md", "utf8"),
               changelogType: "markdown",
-              displayName: "The Wolf of Booty Bay v" + process.argv[1],
+              displayName: "Wolf v" + process.argv[1],
               releaseType: "release",
               gameVersions: process.argv[2].split(",").map(Number).filter(Boolean),
             };

@@ -1,4 +1,4 @@
--- Wolf of Booty Bay: the Money page - ways to make gold from the market right now:
+-- Wolf: the Money page - ways to make gold from the market right now:
 --  Make gold (one ranked list: carry it between the houses, flip it, vendor it) and the Farm Board (raw materials by
 --  the gold the market pays for them a day). What to do with what you own is Portfolio > Sell yours.
 local ADDON, FT = ...

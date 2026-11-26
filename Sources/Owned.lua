@@ -1,4 +1,4 @@
--- Wolf of Booty Bay: your auctions. Read from the server at the auction house (when it opens, after you post or
+-- Wolf: your auctions. Read from the server at the auction house (when it opens, after you post or
 -- cancel, and when you ask), kept for this character so they show away from it too; cancelling one asks first
 -- (the item comes back by mail, the deposit is gone). Whether someone undercut you is told by the market's
 -- lowest price of the item against yours.

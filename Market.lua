@@ -1,4 +1,4 @@
--- Wolf of Booty Bay: the whole market at a glance - every item seen on the auction house (by our scans, and
+-- Wolf: the whole market at a glance - every item seen on the auction house (by our scans, and
 -- by Auctionator and Mastercraft when they are on), its price, how it moved in a day and a week, top movers,
 -- the market mood, the watchlist and its price alerts.
 local ADDON, FT = ...

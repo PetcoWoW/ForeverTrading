@@ -1,4 +1,4 @@
--- Wolf of Booty Bay: good deals - what to buy at the auction house right now for a profit.
+-- Wolf: good deals - what to buy at the auction house right now for a profit.
 --  * to a vendor: listed under what a vendor pays for it - buy it and sell it to the vendor: a sure profit
 --    (no cut, no waiting);
 --  * to resell: listed far under its fair price on a steady market (listed most days, not flooded, no crowd

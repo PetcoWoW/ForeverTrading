@@ -1,4 +1,4 @@
--- Wolf of Booty Bay: the price chart. Candles or a line with a soft fill, moving averages, a lower panel
+-- Wolf: the price chart. Candles or a line with a soft fill, moving averages, a lower panel
 -- (listed quantity or profit), a dashed last-price line with its tag on the axis, a crosshair with an
 -- OHLC legend, mouse-wheel zoom and drag to look back in time.
 local ADDON, FT = ...

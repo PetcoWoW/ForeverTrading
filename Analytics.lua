@@ -1,4 +1,4 @@
--- Wolf of Booty Bay: indicators and signals.
+-- Wolf: indicators and signals.
 local ADDON, FT = ...
 local L = FT.L
 

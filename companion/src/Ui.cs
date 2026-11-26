@@ -1,4 +1,4 @@
-// Wolf prices: its look. One window drawn by hand in the addon's colours (night brown, Booty Bay gold): the wolf
+// Wolf prices: its look. One window drawn by hand in the addon's colours (night brown, gold): the wolf
 // in a gold ring, a title, a few lines, ticks for what was found, and gold buttons. Used for setup, the status
 // window and the two small questions (remove it?). Nothing here pops up on its own: only when you start something.
 using System;
@@ -237,8 +237,16 @@ namespace WolfPrices
             }
             using (var ring = new Pen(Theme.GoldDim, S(2))) g.DrawEllipse(ring, medal);
             using (var ring2 = new Pen(Color.FromArgb(90, Theme.Gold), S(1))) g.DrawEllipse(ring2, RectangleF.Inflate(medal, -S(5), -S(5)));
-            float wi = m * 0.74f;
-            g.DrawImage(Theme.Wolf, medal.X + (m - wi) / 2, medal.Y + (m - wi) / 2, wi, wi);
+            var art = RectangleF.Inflate(medal, -S(4), -S(4));
+            using (var clip = new GraphicsPath())
+            {
+                clip.AddEllipse(art);
+                var keep = g.Clip;
+                g.SetClip(clip);
+                g.DrawImage(Theme.Wolf, art);
+                g.Clip = keep;
+            }
+            using (var ring3 = new Pen(Theme.GoldDim, S(1.5f))) g.DrawEllipse(ring3, art);
 
             // title and subtitle
             float tx = medal.Right + S(22);

@@ -1,4 +1,4 @@
--- Wolf of Booty Bay: widgets (buttons, inputs, lists, badges, sparklines...)
+-- Wolf: widgets (buttons, inputs, lists, badges, sparklines...)
 local ADDON, FT = ...
 local UI = FT.UI
 local C = UI.C
@@ -354,7 +354,7 @@ function UI.Confirm(opts)
     if not d then
         UI.ResolveFont()
         d = CreateFrame("Frame", "WolfOfBootyBayConfirm", UIParent, UI.EdgeTemplate())
-        -- above every window (the full-screen Wolf of Booty Bay included)
+        -- above every window (the full-screen Wolf included)
         d:SetFrameStrata("FULLSCREEN_DIALOG")
         d:SetFrameLevel(100)
         d:SetToplevel(true)
@@ -372,7 +372,7 @@ function UI.Confirm(opts)
             d.accent:SetPoint("TOPRIGHT", -1, -1)
         end
         d.logo = UI.Icon(d, 22)
-        d.logo:SetIcon("Interface\\Icons\\Ability_Hunter_Pet_Wolf")
+        d.logo:SetIcon("Interface\\AddOns\\WolfOfBootyBay\\media\\logo")
         d.logo:SetPoint("TOPLEFT", 18, -18)
         d.title = UI.Text(d, 14, "text")
         d.title:SetPoint("LEFT", d.logo, "RIGHT", 10, 0)
@@ -416,7 +416,7 @@ function UI.Confirm(opts)
     d.owner = owner
     d.onOK, d.onCancel, d.accepted = opts.onOK, opts.onCancel, false
     d:SetScale(FT.S.scale or 1)
-    d.title:SetText(opts.title or "Wolf of Booty Bay")
+    d.title:SetText(opts.title or "Wolf")
     d.text:SetText(opts.text or "")
     d.ok.style = UI.ButtonStyle(opts.okStyle or "primary")
     d.ok:SetLabel(opts.ok or L["Continue"])

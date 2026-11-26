@@ -16,7 +16,7 @@ namespace WolfPrices
             var p = new Page
             {
                 Title = App.Name,
-                Subtitle = "the companion of The Wolf of Booty Bay",
+                Subtitle = "fresh auction prices for the Wolf addon",
                 Body = Pitch,
                 CheckText = "Start with Windows",
                 Checked = true,
@@ -43,9 +43,9 @@ namespace WolfPrices
             else
                 p.Rows.Add(new Row { Ok = false, Label = "World of Warcraft", Detail = "not found", Link = new Button_ { Text = "Pick folder...", Click = pick } });
             if (found != null)
-                p.Rows.Add(new Row { Ok = true, Label = "The Wolf of Booty Bay", Detail = "installed" });
+                p.Rows.Add(new Row { Ok = true, Label = "Wolf addon", Detail = "installed" });
             else
-                p.Rows.Add(new Row { Ok = false, Label = "The Wolf of Booty Bay", Detail = "get it from CurseForge first",
+                p.Rows.Add(new Row { Ok = false, Label = "Wolf addon", Detail = "get it from CurseForge first",
                     Link = new Button_ { Text = "Look again", Click = () => retry(Wow.Resolve(s)) } });
             p.Buttons.Add(new Button_ { Text = "Cancel", Click = () => w.Close() });
             p.Buttons.Add(new Button_ { Text = Installer.IsInstalled ? "Update" : "Install", Primary = true, Enabled = found != null });
@@ -122,7 +122,7 @@ namespace WolfPrices
                     var p = new Page { Title = App.Name, Subtitle = "running by your clock - version " + App.Version };
                     if (f == null)
                     {
-                        p.Body = "It can't find The Wolf of Booty Bay in World of Warcraft's folder. Install the addon, then start Wolf prices again.";
+                        p.Body = "It can't find Wolf in World of Warcraft's folder. Install the addon, then start Wolf prices again.";
                     }
                     else
                     {

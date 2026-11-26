@@ -1,4 +1,4 @@
--- Wolf of Booty Bay: Settings page.
+-- Wolf: Settings page.
 local ADDON, FT = ...
 local UI = FT.UI
 local L = FT.L
@@ -196,11 +196,11 @@ function T.Build(p)
     Check(g, "tickerMove", L["Keep the ticker moving under the mouse"], L["Off: the tape stops while you point at it, so an item is easy to click."])
     Check(g, "minimap", L["Minimap button"], nil, function() if FT.UpdateMinimap then FT.UpdateMinimap() end end)
     Check(g, "ahButton", L["Snipe tab at the auction house"], L["A Snipe tab in the auction house window: after a scan, what's listed under its price, with how sure and a Buy button."])
-    Check(g, "replaceAH", L["Open Wolf of Booty Bay instead of the auction house window"],
-        L["Talking to an auctioneer opens Wolf of Booty Bay; the game's window stays open behind it, unseen. The \"AH: online\" pill in the header brings it back for buying and selling (and Auctionator). Walking away: the terminal goes offline with the last known prices."])
+    Check(g, "replaceAH", L["Open Wolf instead of the auction house window"],
+        L["Talking to an auctioneer opens Wolf; the game's window stays open behind it, unseen. The \"AH: online\" pill in the header brings it back for buying and selling (and Auctionator). Walking away: the terminal goes offline with the last known prices."])
     Check(g, "tooltip", L["Lines in item tooltips"], L["Price change, RSI, the signal and the craft profit of the item, and a material's best use."])
     Check(g, "versionCheck", L["Tell me about new versions"],
-        L["Wolf of Booty Bay users in your guild and group tell each other which version they have (a hidden addon message): a newer one shows in chat and in the status bar."])
+        L["Wolf users in your guild and group tell each other which version they have (a hidden addon message): a newer one shows in chat and in the status bar."])
 
     -- scanning
     local sc = Section(left, L["Scanning"], 4)
@@ -220,7 +220,7 @@ function T.Build(p)
     Check(so, "scanWithAuctionator", L["One scan for both"],
         L["Full scan runs Auctionator's scan when Auctionator is installed: one scan, and both addons get the prices."])
     Check(so, "useAuctionator", "Auctionator",
-        L["Its full scans and searches go into Wolf of Booty Bay's history, and the days you haven't scanned yourself come from its price database."],
+        L["Its full scans and searches go into Wolf's history, and the days you haven't scanned yourself come from its price database."],
         function() FT.Fire("FT_SOURCES_CHANGED") end)
 
     -- prices
@@ -263,7 +263,7 @@ function T.Build(p)
     -- exchange
     local ex = Section(right, L["Exchange"], 3)
     Check(ex, "shareAuto", L["Ask guild and group for fresh prices"],
-        L["When your prices of the whole market are more than an hour old, Wolf of Booty Bay asks its users in your guild (then your group) who has fresher ones; the freshest sends its last full scan in the background. At most once an hour."])
+        L["When your prices of the whole market are more than an hour old, Wolf asks its users in your guild (then your group) who has fresher ones; the freshest sends its last full scan in the background. At most once an hour."])
     Check(ex, "shareSend", L["Share my scans"],
         L["When someone in your guild or group asks, your full scan (less than 3 days old and fresher than theirs) goes to them in the background: hidden addon messages, one a second, paused in a fight."])
     T.shareText = UI.Text(ex, 11, "dim")
@@ -287,7 +287,7 @@ function T.Build(p)
     local clear = UI.Button(dt, L["Clear history"], 10, 24, "down", function()
         UI.Confirm({
             title = L["Clear history"],
-            text = string.format(L["Clear Wolf of Booty Bay's price history (day candles, intraday, order books) of this server's auction house: %s? The other auction house's, Auctionator's and Mastercraft's data stay."],
+            text = string.format(L["Clear Wolf's price history (day candles, intraday, order books) of this server's auction house: %s? The other auction house's, Auctionator's and Mastercraft's data stay."],
                 FT.House.Name()),
             ok = L["Clear history"],
             okStyle = "down",
@@ -447,7 +447,7 @@ function T.Refresh()
         T.shareText:SetText(L["Nothing received yet"])
     end
     local lines = {
-        "Wolf of Booty Bay  ||  " .. string.format(L["version %s"], FT.C("text", FT.VERSION_TEXT)),
+        "Wolf  ||  " .. string.format(L["version %s"], FT.C("text", FT.VERSION_TEXT)),
         "Auctionator: " .. (FT.Atr.Loaded() and FT.C("up", L["connected"]) or FT.C("down", L["not loaded"])),
         L["Prices: Blizzard's hourly API, and your auction house scans (scan in Auctionator: it's taken right away). Recipes: every one in WoW Forever, from Blizzard."],
         "/wolf  ||  /wolf tour  ||  /wolf reset",

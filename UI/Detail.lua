@@ -1,4 +1,4 @@
--- Wolf of Booty Bay: an item in a window of its own ("More" on the charts) - several at once, to look at two items
+-- Wolf: an item in a window of its own ("More" on the charts) - several at once, to look at two items
 -- side by side: large price and profit charts, the numbers that matter, its order book and what buying costs
 -- (compact: the charts alone, half as wide). With the auction house open its price and order book stay live
 -- (searched again every few seconds).

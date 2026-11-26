@@ -53,14 +53,14 @@ namespace WolfPrices
                 if (File.Exists(App.InstalledExe)) File.Replace(tmp, App.InstalledExe, null);
                 else File.Move(tmp, App.InstalledExe);
             }
-            try { Shortcut(StartMenuLink, App.InstalledExe, "", "Wolf prices: fresh auction prices for The Wolf of Booty Bay"); }
+            try { Shortcut(StartMenuLink, App.InstalledExe, "", "Wolf prices: fresh auction prices for Wolf"); }
             catch (Exception e) { Log.Write("start menu shortcut: " + e.Message); }
             StartsWithWindows = startWithWindows;
             using (var k = Registry.CurrentUser.CreateSubKey(UninstallKey))
             {
-                k.SetValue("DisplayName", "Wolf prices (The Wolf of Booty Bay)");
+                k.SetValue("DisplayName", "Wolf prices");
                 k.SetValue("DisplayVersion", App.Version);
-                k.SetValue("Publisher", "The Wolf of Booty Bay");
+                k.SetValue("Publisher", "Wolf");
                 k.SetValue("DisplayIcon", App.InstalledExe);
                 k.SetValue("InstallLocation", App.InstallDir);
                 k.SetValue("UninstallString", "\"" + App.InstalledExe + "\" --uninstall");

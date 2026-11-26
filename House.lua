@@ -1,16 +1,16 @@
--- Wolf of Booty Bay: which auction house. Your faction's (Alliance or Horde) and Blackwater - the neutral one, shared by
+-- Wolf: which auction house. Your faction's (Alliance or Horde) and Blackwater - the neutral one, shared by
 -- both factions - have lots and prices of their own: each keeps its own history, order books, sales, deals, your
 -- auctions there and its cut. Two things are told apart:
 --  * the house you stand at (FT.atHouse, while FT.ahHere): talking to an auctioneer tells it (an auctioneer of
 --    neither faction: the neutral one); a wrong guess is put right with the pencil on the chip in the header -
 --    remembered for that auctioneer and the other auctioneers of that place;
 --  * the house whose prices you see (FT.house, FT.houseKey: the data read and written) - the chip switches it,
---    anywhere. Standing at one house and looking at the other's prices, Wolf of Booty Bay is offline here (FT.ahOpen
+--    anywhere. Standing at one house and looking at the other's prices, Wolf is offline here (FT.ahOpen
 --    false: nothing is read from this auction house, nothing bought or posted) until you switch back.
 -- The Black Market is another window: not counted here.
 -- Auctionator and Mastercraft know one house per faction: their prices count for your faction's house only, and
 -- Mastercraft's scans made while you were at Blackwater are left out (told by their time).
--- What is yours whichever the house (the deals journal, the craft queue, Wolf of Booty Bay users met) is kept per server
+-- What is yours whichever the house (the deals journal, the craft queue, Wolf users met) is kept per server
 -- and side (FT.Side).
 local ADDON, FT = ...
 local L = FT.L
@@ -97,7 +97,7 @@ local function Other(house)
     return (house == "neutral") and "faction" or "neutral"
 end
 
--- the auction house you stand at is the one whose prices are on: Wolf of Booty Bay is online there
+-- the auction house you stand at is the one whose prices are on: Wolf is online there
 function Ho.Online()
     return FT.ahHere == true and FT.atHouse == FT.house
 end
@@ -106,7 +106,7 @@ end
 -- else `text` (talk to an auctioneer...)
 function Ho.Why(text)
     if FT.ahHere and not FT.ahOpen and FT.atHouse ~= FT.house then
-        return string.format(L["You stand at %s, which isn't tracked: Wolf of Booty Bay follows your faction's auction house."],
+        return string.format(L["You stand at %s, which isn't tracked: Wolf follows your faction's auction house."],
             Ho.Name(FT.atHouse))
     end
     return text
@@ -202,7 +202,7 @@ end
 -- the chip in the header: whose prices you see (at an auctioneer too: the other house is offline here)
 function Ho.Toggle()
     -- nothing to switch to: your faction's house is the only one followed
-    FT.Print(L["Wolf of Booty Bay follows your faction's auction house. Blackwater, the neutral one, isn't tracked: its prices come too late to act on."])
+    FT.Print(L["Wolf follows your faction's auction house. Blackwater, the neutral one, isn't tracked: its prices come too late to act on."])
 end
 
 -- the pencil on the chip, at an auctioneer: this auction house is the other one (asked first; remembered for the
@@ -213,7 +213,7 @@ function Ho.Fix()
     FT.UI.Confirm({
         owner = "houseFix",
         title = string.format(L["This is %s?"], Ho.Name(to)),
-        text = string.format(L["The prices seen at this auctioneer go to %s from now on, and Wolf of Booty Bay remembers it for the auctioneers here."], Ho.Name(to)),
+        text = string.format(L["The prices seen at this auctioneer go to %s from now on, and Wolf remembers it for the auctioneers here."], Ho.Name(to)),
         ok = Ho.Name(to),
         cancel = L["Cancel"],
         onOK = function()
@@ -259,7 +259,7 @@ FT.On("AUCTION_HOUSE_SHOW", function()
         -- offline here (its prices aren't ours): said once a session
         if not Ho.toldNeutral then
             Ho.toldNeutral = true
-            FT.Print(L["Blackwater, the neutral auction house, isn't tracked: Wolf of Booty Bay stays offline here and follows your faction's."])
+            FT.Print(L["Blackwater, the neutral auction house, isn't tracked: Wolf stays offline here and follows your faction's."])
         end
     end
     opening = true
