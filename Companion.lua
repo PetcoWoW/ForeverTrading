@@ -11,7 +11,7 @@ local L = FT.L
 local C = {}
 FT.Companion = C
 
-C.URL = "https://github.com/sain221b-sketch/ForeverTrading/releases/latest/download/WolfPricesSetup.exe"
+C.URL = "https://github.com/sain221b-sketch/ForeverTrading/releases/download/companion/WolfPricesSetup.exe"
 local CHECK = 15 * 60       -- the companion's check
 local HOURLY = 60 * 60      -- the price robot
 local loadedAt = time()
