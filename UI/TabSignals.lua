@@ -576,6 +576,22 @@ local function FarmKindOf(r)
     return nil
 end
 
+-- What one farmer could make of it a day: you sell a share of what sells (a fifth), and no more than you'd
+-- gather in an hour or so (40). The whole market's trade (price x everyone's sales: "12,821g a day") told a new
+-- player nothing about what they would make.
+-- Something that sells under 20 a day is rare (a gem, a rare drop): no one farms three of those a day, so it
+-- ranks after the ones you can go and gather.
+local FARM_SHARE, FARM_MAX, FARM_COMMON = 0.2, 40, 20
+local function FarmYours(price, perDay)
+    return price * math.min((perDay or 0) * FARM_SHARE, FARM_MAX)
+end
+local function FarmRank(price, perDay)
+    local v = FarmYours(price, perDay)
+    if (perDay or 0) < FARM_COMMON then return v / 1000 end
+    return v
+end
+T.FarmYours = FarmYours
+
 local function FarmRows()
     local out = {}
     for _, r in ipairs(FT.Market.Rows() or {}) do
@@ -583,14 +599,15 @@ local function FarmRows()
         if kind and (farmKind == "all" or farmKind == kind) and not r.gone then
             local rate = FT.Sales.Rate(r.id)
             local perDay = rate and rate.perDay or 0
-            local flow = r.price * perDay
+            local yours = FarmYours(r.price, perDay)
             local bits = {}
-            bits[#bits + 1] = string.format(L["%s each"], FT.Money(r.price, "short"))
-            if rate then bits[#bits + 1] = FT.Sales.PerDayText(rate) end
+            if rate then bits[#bits + 1] = FT.Sales.PerDayText(rate) else bits[#bits + 1] = L["sales not seen yet"] end
             if r.ch7 then bits[#bits + 1] = FT.Pct(r.ch7) .. " " .. L["this week"] end
+            if yours > 0 then bits[#bits + 1] = string.format(L["you could sell ~%s a day"], FT.Money(math.floor(yours), "short")) end
             out[#out + 1] = {
-                id = r.id, reason = table.concat(bits, FT.C("dim", "  ·  ")), sortV = flow,
-                value = flow > 0 and (FT.C("up", FT.Money(math.floor(flow), "short")) .. FT.C("dim", L["/day"])) or FT.C("dim", "—"),
+                id = r.id, reason = table.concat(bits, FT.C("dim", "  ·  ")), sortV = FarmRank(r.price, perDay), yours = yours,
+                price = r.price, perDay = perDay,
+                value = FT.C("up", FT.Money(r.price, "short")) .. FT.C("dim", " " .. L["each"]),
                 signal = (r.ch7 or 0) >= 0.1 and "SELL" or ((r.ch7 or 0) <= -0.1 and "BUY" or "HOLD"),
                 label = ((r.ch7 or 0) >= 0.1 and L["HOT"]) or ((r.ch7 or 0) <= -0.1 and L["COOLING"]) or L["STEADY"],
             }
@@ -719,7 +736,7 @@ local function BuildFarmView(p)
     end, 22)
     f.kind:SetPoint("TOPLEFT", 0, -1)
     f.kind:SetValue(farmKind)
-    f.hint:SetText(L["What the market pays for each a day: price x how many sell a day. Click for its best use; right-click for where to get it."])
+    f.hint:SetText(L["What each sells for and how many sell a day, best first for one farmer (a share of the day's sales). Click for its best use; right-click for where to get it."])
     f.list:SetEmptyText(L["No sales seen yet: the price feed fills this over a few hours."])
     return f
 end

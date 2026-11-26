@@ -12,6 +12,11 @@ FT.News = N
 -- start, after the files are read (a table made with them would keep the English)
 local function News()
     return {
+        ["v0.24"] = {
+            { L["Smarter search"], L["Type parts of words in any order: \"thor ore\" finds Thorium Ore."], function() FT.Show("market") end },
+            { L["Tidier Terminal"], L["Category, subcategory and sort live in the Filter popup now; what's set shows as chips you can clear."], function() FT.Show("market") end },
+            { L["Smoother"], L["No lag while crafting; the ticker keeps its place and stops under the mouse."], nil },
+        },
         ["v0.23"] = {
             { L["The classic auction house look"], L["The game's own style everywhere: stone-and-gold edges, red buttons, gold labels, the game's tabs. Prefer the dark terminal? Settings > Look."],
                 function() FT.Show("settings") end },

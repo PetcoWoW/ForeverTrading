@@ -658,13 +658,15 @@ function UI.Dropdown(parent, w, options, onSelect)
             blocker:SetFrameStrata("FULLSCREEN_DIALOG")
             blocker:SetScript("OnClick", CloseMenu)
         end
+        -- over every popup of ours (the Filter popup holds dropdowns)
+        blocker:SetFrameLevel(120)
         blocker:Show()
         local m = self.menu
         if not m then
             m = CreateFrame("Frame", nil, UIParent)
             m:SetClampedToScreen(true)
             m:SetFrameStrata("FULLSCREEN_DIALOG")
-            m:SetFrameLevel(blocker:GetFrameLevel() + 5)
+            m:SetFrameLevel(125)
             UI.Skin(m, "popup", "bg2")
             m.items = {}
             self.menu = m

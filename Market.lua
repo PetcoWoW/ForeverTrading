@@ -329,9 +329,13 @@ local function Candidates(field, descending)
     return list
 end
 
-local preparing
+local preparing, again
+local retries = 0
 function M.PrepareMovers()
-    if not rows or preparing then return end
+    if not rows then return end
+    -- asked again while working (the market was rebuilt): once more when this one ends
+    if preparing then again = true return end
+    again = false
     local forRows = rows
     local sets = {}
     for _, spec in ipairs({ { "ch1", true }, { "ch1", false }, { "ch7", true }, { "ch7", false } }) do
@@ -363,7 +367,18 @@ function M.PrepareMovers()
             if #set.top < MOVERS_KEPT and set.i <= #set.list then return C_Timer.After(0.2, Finish) end
         end
         preparing = false
-        if rows ~= forRows then return end
+        if rows ~= forRows or again then return M.PrepareMovers() end
+        -- none passed though some moved: most likely the sales weren't known yet (just after login), and a
+        -- market with no known sales isn't counted - look again in a while (three times at most), the checks afresh
+        local found, could = 0, 0
+        for _, set in ipairs(sets) do found = found + #set.top; could = could + #set.list end
+        if found == 0 and could > 0 and retries < 3 then
+            retries = retries + 1
+            for _, set in ipairs(sets) do for _, r in ipairs(set.list) do r.perDay, r.sane = nil, nil end end
+            C_Timer.After(30, function() if rows == forRows then M.PrepareMovers() end end)
+        elseif found > 0 then
+            retries = 0
+        end
         local byRows = {}
         for _, set in ipairs(sets) do byRows[set.key] = set.top end
         moversCache[forRows] = byRows
@@ -377,11 +392,12 @@ function M.Movers(n, field, descending)
     local byRows = rows and moversCache[rows]
     local top = byRows and byRows[field .. (descending and "+" or "-")]
     local out = {}
-    if top then
+    if top and #top > 0 then
         for i = 1, math.min(n, #top) do out[i] = top[i] end
         return out
     end
-    -- not worked out yet: the cheap tests only (a moment after login)
+    -- not worked out yet (a moment after login), or nothing passed the strict checks: the cheap tests only, so
+    -- the lists are never empty while something moved
     for _, r in ipairs(Candidates(field, descending)) do
         if #out >= n then break end
         out[#out + 1] = r

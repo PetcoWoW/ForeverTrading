@@ -501,7 +501,7 @@ function UI.TitleBanner(f, text, size)
     local b = CreateFrame("Frame", nil, f)
     b:SetFrameLevel((f:GetFrameLevel() or 1) + 20)
     b.text = UI.Text(b, size or 13, "accent", "CENTER")
-    b.text:SetPoint("CENTER", 0, 5)
+    b.text:SetPoint("CENTER", 0, -1)
     local left = b:CreateTexture(nil, "ARTWORK")
     left:SetTexture(HEADER)
     left:SetTexCoord(0.2265625, 0.31640625, 0, 0.640625)
@@ -577,6 +577,37 @@ function UI.CheckArt(box)
     end
     lit:Hide()
     return true
+end
+
+-- construction tape: gold and black blocks across its width (redrawn when it changes size)
+function UI.HazardTape(parent, h)
+    local f = CreateFrame("Frame", nil, parent)
+    f:SetHeight(h or 8)
+    f.blocks = {}
+    local function Draw(self)
+        local w = math.max(0, self:GetWidth() or 0)
+        local bw, n = 14, 0
+        local x = 0
+        while x < w do
+            n = n + 1
+            local t = self.blocks[n]
+            if not t then
+                t = self:CreateTexture(nil, "ARTWORK")
+                self.blocks[n] = t
+            end
+            t:ClearAllPoints()
+            t:SetPoint("TOPLEFT", x, 0)
+            t:SetPoint("BOTTOMLEFT", x, 0)
+            t:SetWidth(math.min(bw, w - x))
+            if n % 2 == 1 then t:SetColorTexture(1, 0.78, 0.05, 1) else t:SetColorTexture(0.06, 0.05, 0.04, 1) end
+            t:Show()
+            x = x + bw
+        end
+        for i = n + 1, #self.blocks do self.blocks[i]:Hide() end
+    end
+    f:SetScript("OnSizeChanged", Draw)
+    f:SetScript("OnShow", Draw)
+    return f
 end
 
 -- a round portrait (the game's portrait mask) with the gold ring the minimap buttons have

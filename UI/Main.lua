@@ -5,7 +5,8 @@ local L = FT.L
 
 FT.Tabs = {}
 
-local TAB_ORDER = { "market", "craft", "signals", "radar", "portfolio", "sessions", "settings" }
+-- the Radar last: it's still being built (its tab says so)
+local TAB_ORDER = { "market", "craft", "signals", "portfolio", "sessions", "radar", "settings" }
 local TAB_LABELS = { market = "Terminal", craft = "Craft", signals = "Money", radar = "Radar", portfolio = "Portfolio", sell = "Sell",
     sessions = "Sessions", settings = "Settings" }
 
@@ -190,11 +191,13 @@ local function BuildTicker(parent)
         e:SetScript("OnClick", function(self)
             if self.itemID then FT.OpenItem(self.itemID) end
         end)
-        -- the tape keeps moving under the mouse (the hover follows the item)
+        -- the tape stops under the mouse, so the item is easy to click (Settings: keep it moving)
         e:SetScript("OnEnter", function(self)
+            if not FT.S.tickerMove then t.paused = true end
             if self.itemID then UI.TipItem(self, self.itemID, "ANCHOR_BOTTOM") end
         end)
         e:SetScript("OnLeave", function()
+            t.paused = false
             GameTooltip:Hide()
         end)
         t.entries[i] = e
@@ -215,11 +218,39 @@ local function BuildTicker(parent)
         e:SetPoint("LEFT", self.strip, "LEFT", e.x, 0)
     end
 
+    -- New entries keep the tape where it is: they start where the leftmost one on screen stands, from that same
+    -- item when it's still in the list (a refresh used to send the tape back to the start)
     function t:SetEntries(list)
-        self.list = list
-        self.offset = 0
-        PlaceStrip(self)
         local x = 12
+        local old = self.list
+        if old and #old > 0 and #list > 0 then
+            local leftX, leftID
+            for i = 1, #old do
+                local e = self.entries[i]
+                if e and e.x and e.w and e.x + e.w + self.offset >= 0 and (not leftX or e.x < leftX) then
+                    leftX, leftID = e.x, e.itemID
+                end
+            end
+            if leftX then
+                x = leftX
+                for k, item in ipairs(list) do
+                    if item.id == leftID and k > 1 then
+                        local turned = {}
+                        for i = k, #list do turned[#turned + 1] = list[i] end
+                        for i = 1, k - 1 do turned[#turned + 1] = list[i] end
+                        list = turned
+                        break
+                    end
+                end
+            else
+                self.offset = 0
+            end
+        else
+            self.offset = 0
+        end
+        self.list = list
+        PlaceStrip(self)
+        local start = x
         for i, item in ipairs(list) do
             local e = Entry(i)
             e.itemID = item.id
@@ -231,7 +262,7 @@ local function BuildTicker(parent)
             e:Show()
         end
         for i = #list + 1, #self.entries do self.entries[i]:Hide() end
-        self.total = x
+        self.total = x - start + 12 -- how long the whole tape is (all of it fits: it stands still)
         self.right = x - 34 -- the right edge of the last entry, on the strip
     end
 
@@ -478,7 +509,11 @@ local function Build()
     local items = {}
     for _, key in ipairs(TAB_ORDER) do
         -- the Craft tab only when it's on (Settings > General)
-        if key ~= "settings" and (key ~= "craft" or FT.S.showCraft) then items[#items + 1] = { key, L[TAB_LABELS[key]] } end
+        if key ~= "settings" and (key ~= "craft" or FT.S.showCraft) then
+            local label = L[TAB_LABELS[key]]
+            if key == "radar" then label = label .. FT.C("accent", " " .. L["(wip)"]) end
+            items[#items + 1] = { key, label }
+        end
     end
     local pill = FT.BuildAHPill(header)
     brand = { logo = logo, words = { brand1, brand2 }, pill = pill }
