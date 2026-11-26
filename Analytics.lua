@@ -249,6 +249,8 @@ end
 ---------------------------------------------------------------------------
 local PRIOR = { stick = 0.35, rebound = 0.5, weight = 2 }
 local MIN_CASES = 3
+local FLIP_BACK = 0.9   -- a flip worked when the price came back to 90% of its average (listed there: it sells)
+local KIND_FLIPS = 20   -- a kind's flip record counts from this many cases
 An.MIN_CASES = MIN_CASES
 
 local function Weekday(day)
@@ -274,10 +276,13 @@ local function KindRecord(itemID)
 end
 
 function An.Behavior(daily, itemID)
-    local b = { highs = 0, held = 0, lows = 0, back = 0 }
+    local b = { highs = 0, held = 0, lows = 0, back = 0, flips = 0, flipped = 0 }
     local close = {}
     for _, c in ipairs(daily or {}) do close[c.day] = c.c end
-    local lastHigh, lastLow = -99, -99
+    local lastHigh, lastLow, lastFlip = -99, -99, -99
+    -- a flip, replayed: a day its cheapest was a deal (FLIP_BELOW under the average of the 14 days before) - did
+    -- the price come back to FLIP_BACK of that average within 3 days, so the cheap ones bought could be sold again?
+    local flipBelow = (FT.S and FT.S.dealBelow or 30) / 100
     local wkSum, wkN = {}, {}
     for _, c in ipairs(daily or {}) do
         local d = c.day
@@ -288,6 +293,19 @@ function An.Behavior(daily, itemID)
         end
         if n >= 5 then
             local avg = sum / n
+            local low = c.l or c.c
+            if low <= avg * (1 - flipBelow) and d - lastFlip > 4 then
+                local known, back = false, false
+                for k = 1, 3 do
+                    local v = close[d + k]
+                    if v then known = true; if v >= avg * FLIP_BACK then back = true end end
+                end
+                if known then
+                    lastFlip = d
+                    b.flips = b.flips + 1
+                    if back then b.flipped = b.flipped + 1 end
+                end
+            end
             local later
             for k = 5, 9 do
                 if close[d + k] then later = close[d + k]; break end
@@ -321,6 +339,7 @@ function An.Behavior(daily, itemID)
     local pStick, pRebound, wStick, wRebound = PRIOR.stick, PRIOR.rebound, PRIOR.weight, PRIOR.weight
     if kind and kind.highs >= KIND_MIN then pStick, wStick, b.kindHighs, b.kindHeld = kind.held / kind.highs, 3, kind.highs, kind.held end
     if kind and kind.lows >= KIND_MIN then pRebound, wRebound, b.kindLows, b.kindBack = kind.back / kind.lows, 3, kind.lows, kind.back end
+    if kind and (kind.flips or 0) >= KIND_FLIPS then b.kindFlips, b.kindFlipped = kind.flips, kind.flipped end
     b.kindName = kind and kind.name
     b.stick = (b.held + pStick * wStick) / (b.highs + wStick)
     b.rebound = (b.back + pRebound * wRebound) / (b.lows + wRebound)
@@ -356,12 +375,30 @@ function An.LowRecord(b)
     end
 end
 
--- Once a day, in the background: every item's cases added up by kind, for this auction house
+-- How flipping it went before, replayed on its history: worked, cases, its own (true) or its kind's; nil: no cases
+function An.FlipRecord(b)
+    if not b then return nil end
+    if (b.flips or 0) >= MIN_CASES then return b.flipped, b.flips, true end
+    if b.kindFlips then return b.kindFlipped, b.kindFlips, false end
+    return nil
+end
+
+-- "flips worked 9 of 11 times" / "Ore flips worked 72% of the time"
+function An.FlipText(b)
+    local ok, n, own = An.FlipRecord(b)
+    if not ok then return nil end
+    if own then return string.format(L["flips worked %d of %d times"], ok, n) end
+    return string.format(L["%s flips worked %d%% of the time"], b.kindName or L["its kind's"], math.floor(ok / n * 100 + 0.5))
+end
+
+-- Once a day, in the background: every item's cases added up by kind, for this auction house (again at once when
+-- what is learned changes: LEARN_V)
+local LEARN_V = 2 -- 2: flips
 function An.LearnKinds(force)
     local key = FT.houseKey or "?"
     FT.db.learned = FT.db.learned or {}
     local l = FT.db.learned[key]
-    if l and l.day == FT.Day() and not force then return end
+    if l and l.day == FT.Day() and l.v == LEARN_V and not force then return end
     local ids, seen = {}, {}
     local function Add(id)
         id = tonumber(id)
@@ -376,13 +413,14 @@ function An.LearnKinds(force)
         local kind, name = KindOf(id)
         if not kind then return end
         local b = An.Behavior(FT.Hist.Daily(id, 60))
-        if b.highs + b.lows == 0 then return end
+        if b.highs + b.lows + b.flips == 0 then return end
         local r = kinds[kind]
         if not r then
-            r = { highs = 0, held = 0, lows = 0, back = 0, name = name }
+            r = { highs = 0, held = 0, lows = 0, back = 0, flips = 0, flipped = 0, name = name }
             kinds[kind] = r
         end
         r.highs, r.held, r.lows, r.back = r.highs + b.highs, r.held + b.held, r.lows + b.lows, r.back + b.back
+        r.flips, r.flipped = r.flips + b.flips, r.flipped + b.flipped
         -- the week: the day this item usually sells highest, for the kind's calendar - real markets only (3+ sold
         -- a day), and no one item's odd week counted as more than +30%
         local rate = b.bestDay and FT.Sales.Rate(id)
@@ -405,7 +443,7 @@ function An.LearnKinds(force)
         end
         table.sort(week, function(a, b) return a.n * a.up > b.n * b.up end)
         for i = #week, 4, -1 do week[i] = nil end
-        FT.db.learned[key] = { day = FT.Day(), kinds = kinds, week = week }
+        FT.db.learned[key] = { day = FT.Day(), v = LEARN_V, kinds = kinds, week = week }
         pcall(An.SeedScore, kinds)
         wipe(cache)
         FT.Fire("FT_LEARNED")
@@ -534,6 +572,26 @@ function An.Stats(itemID)
     s.slow = (s.sales and s.sales.hours >= SLOW_HOURS and s.sales.perDay < math.max(1, usual * 0.05)) and true or false
     -- the price fell since the last check (one of the last day)
     s.dropped = (s.sinceP and s.sinceP <= -DROP and time() - s.prev.t <= 86400) and true or false
+    -- Pushed up: a jump (or a price far over its usual) while what's listed thinned out - someone bought the
+    -- cheap ones to sell them again higher (a reset). The price may not hold; don't buy into it.
+    local thinned = s.listed and s.typicalQ and s.typicalQ > 0 and s.listed <= s.typicalQ * 0.6
+    s.pumped = (s.spike or ((s.dev or 0) >= 0.3 and ((s.ch1 or 0) >= 0.2 or thinned))) and true or false
+    -- Dumped: far more listed than usual (or a lot more since the last check) and the price going down with it -
+    -- a falling knife: wait for it to settle
+    local piled = s.flood or (s.sinceQ and s.typicalQ and s.typicalQ > 0 and s.sinceQ >= s.typicalQ * 0.5)
+    s.dumping = (piled and (s.falling or s.dropped or (s.ch1 or 0) <= -0.08)) and true or false
+    -- The price to list yours at: the real wall of supply, not bait. A lone lot or two far under the next price
+    -- up (with a fresh order book) is someone fishing for undercuts - list a copper under the next one instead.
+    s.listAt = s.sale
+    if book and book.levels and #book.levels >= 2 and s.t and (book.t or 0) >= s.t - 600 and book.source ~= "mastercraft" then
+        local first, second = book.levels[1], book.levels[2]
+        local few = math.max(2, (s.listed or book.qty or 0) * 0.05)
+        if first[2] <= few and second[1] >= first[1] * 1.15 then
+            s.bait = true
+            s.listAt = math.max(s.listAt or 0, second[1] - 1)
+            if s.fair then s.listAt = math.min(s.listAt, math.max(s.fair, first[1])) end
+        end
+    end
     cache[itemID] = s
     return s
 end
@@ -629,6 +687,71 @@ function An.Liquidity(s)
 end
 
 ---------------------------------------------------------------------------
+-- The item page in three answers: is the market healthy, where is the price going, and what to do
+---------------------------------------------------------------------------
+-- The market's health: key, label, colour, and a line of why
+--   new (too little history), pumped, dumping, flooded, stagnant (hardly sells), thin (little trade), healthy
+function An.Health(s)
+    if not (s and s.price) then return "new", L["No price yet"], "dim", "" end
+    local sales = s.sales
+    local perDay = sales and sales.hours >= 12 and sales.perDay or nil
+    local listed = s.listed
+    local clear = (perDay and perDay > 0 and listed) and listed / perDay or nil
+    local why = {}
+    if perDay then why[#why + 1] = string.format(L["sells %s a day"], perDay >= 10 and FT.Num(math.floor(perDay + 0.5)) or string.format("%.1f", perDay)) end
+    if listed then why[#why + 1] = string.format(L["%s listed"], FT.Num(listed)) end
+    if clear then why[#why + 1] = clear < 1 and L["gone in a day"] or string.format(L["%s days to sell out"], FT.Num(math.floor(clear + 0.5))) end
+    local line = table.concat(why, ", ")
+    if s.pumped then return "pumped", L["Being pushed up"], "down", L["Someone bought the cheap ones to sell them higher: the price may not hold."] end
+    if s.dumping then return "dumping", L["Being dumped"], "down", L["A lot more listed and the price dropping: wait for it to settle."] end
+    if (s.span or 0) < 3 and not perDay then return "new", L["Too new to tell"], "dim", line end
+    if s.flood then return "flooded", L["Flooded"], "accent", line end
+    if s.slow or (perDay and perDay < 1) then return "stagnant", L["Stagnant"], "accent", line end
+    local liq = An.Liquidity(s)
+    if liq == "low" or (perDay and perDay < 3) or (clear and clear > 14) then return "thin", L["Thin market"], "accent", line end
+    if not perDay and liq == "unknown" then return "new", L["Too new to tell"], "dim", line end
+    return "healthy", L["Healthy"], "up", line
+end
+
+-- where the price is going: a word and its colour
+function An.TrendWord(s)
+    if not (s and s.price) then return L["No price yet"], "dim" end
+    if s.pumped or (s.ch1 or 0) >= 0.2 then return L["Spiking"], "accent" end
+    if (s.ch1 or 0) <= -0.2 or s.falling then return L["Crashing"], "down" end
+    if s.rising then return L["Climbing for weeks"], "up" end
+    if (s.ch7 or 0) >= 0.05 then return L["Rising"], "up" end
+    if (s.ch7 or 0) <= -0.05 then return L["Falling"], "down" end
+    if not s.ch7 then return L["Too new to tell"], "dim" end
+    return L["Steady"], "muted"
+end
+
+-- The engine's call, for this item and you: what to do (a signal kind and strength), the reason, and a second line
+-- (the other side: if you have it, buying more; if not, nothing). Health comes first: a market being pushed up,
+-- dumped or that hardly sells is no place to buy, whatever the price says.
+function An.Call(s, own)
+    local health = An.Health(s)
+    local sell, sStr, sWhy, sDetail = An.SellSignal(s)
+    local sConf, sRule = s.conf, s.rule
+    local buy, bStr, bWhy, bDetail = An.BuySignal(s)
+    local bConf, bRule = s.conf, s.rule
+    local guard
+    if health == "pumped" then guard = L["Don't buy: the price is being pushed up and may not hold."]
+    elseif health == "dumping" then guard = L["Don't buy yet: it's being dumped, wait for it to settle."]
+    elseif health == "stagnant" then guard = L["Don't buy to resell: it hardly sells."] end
+    local call = {}
+    if own and own > 0 then
+        call.kind, call.strength, call.text, call.detail, call.conf, call.rule = sell, sStr, sWhy, sDetail, sConf, sRule
+        call.other = guard or ((buy == "BUY") and (L["Buying more"] .. ": " .. bWhy) or nil)
+    elseif guard then
+        call.kind, call.strength, call.text, call.conf = "AVOID", 2, guard, "likely"
+    else
+        call.kind, call.strength, call.text, call.detail, call.conf, call.rule = buy, bStr, bWhy, bDetail, bConf, bRule
+    end
+    call.record = call.rule and An.RecordText(call.rule) or nil
+    return call
+end
+
+---------------------------------------------------------------------------
 -- Signals: kind, strength (1-3), reason
 ---------------------------------------------------------------------------
 -- an average of 3 days or more (fewer while the market has been watched fewer days; its first day: the fair price
@@ -701,7 +824,8 @@ local function Right(rule, p, later)
     if rule == "comeback" or rule == "waitdip" then return later >= p * 1.05 end
     if rule == "nowait" then return later <= p * 1.02 end
     if rule == "buy" or rule == "buyback" then return later >= p * 1.03 end
-    if rule == "buyfalls" then return later < p * 1.03 end
+    -- waiting was right when buying then wouldn't have paid (it didn't come back 3%)
+    if rule == "buyfalls" or rule == "buyslide" then return later < p * 1.03 end
     return nil
 end
 An.Right = Right
@@ -939,9 +1063,15 @@ function An.BuySignal(s)
                 s.conf, s.rule = RuleConf("buyback") or s.conf, "buyback"
                 return "BUY", 3, string.format(L["Cheaper than usual (%s), and dips like this come back: good buy"], Pc(dev)), An.LowRecord(b)
             elseif b.rebound <= 0.3 then
+                -- most dips like this kept falling: cheap isn't a buy here (the market's own record says so)
                 s.rule = "buyfalls"
-                return "BUY", 1, string.format(L["Cheaper than usual (%s), but dips here keep falling: careful"], Pc(dev)), An.LowRecord(b)
+                return "WATCH", 1, string.format(L["Cheaper than usual (%s), but dips like this kept falling: wait"], Pc(dev)), An.LowRecord(b)
             end
+        end
+        -- still sliding for a week, with no record that dips come back: a falling knife - wait for it to settle
+        if (s.ch7 or 0) <= -0.10 and not (b.knowsLows and b.rebound >= 0.6) then
+            s.conf, s.rule = Conf(s, false, false), "buyslide"
+            return "WATCH", 1, string.format(L["Cheaper than usual, but still falling (%s this week): wait for it to settle"], Pc(s.ch7)), nil
         end
         s.conf, s.rule = RuleConf("buy") or Conf(s, false, false), "buy"
         if dev <= -th then

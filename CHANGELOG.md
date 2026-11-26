@@ -1,5 +1,35 @@
 # The Wolf of Booty Bay
 
+## v0.19 - a pickier engine, a calmer item page
+
+Engine (the broker's checks):
+- Every flip is replayed on the item's price history (its own, else its kind's): did a dip this deep come back
+  within 3 days? Across the market only 30% did (3,146 of 10,450), so flips of kinds where it mostly didn't are
+  no longer shown. Flips also need 2+ sales a day seen for a day or more, sell at the lower of the fair price and
+  the recent average, and no more than two days of sales are suggested.
+- New checks: pushed up (a jump with the cheap ones bought out: a reset) and dumped (a pile of new listings with
+  the price falling). Neither is shown as a deal or a buy.
+- Carries need sales seen at the other house; disenchant deals value the materials at their average when that's
+  lower (a spike doesn't count), skip materials that hardly sell and need 20% over the price.
+- Every deal shows its worst case (what you'd lose if it doesn't sell and goes at its 30-day low, or to a vendor)
+  and its record ("worked 9/11").
+- Buying: a cheap price on an item whose dips kept falling, or that is still sliding, says WAIT (was BUY): on the
+  test prices, 1,726 of 3,000 buy calls became 47.
+- Sell yours: a lone lot or two far under the next price is treated as bait: list at the real wall instead.
+
+Screens:
+- Item page: under the chart, Market (healthy / thin / stagnant / flooded / pushed up / dumped, sales a day, days
+  to sell out), Price (where it's going, 7 and 30 days, its record) and The call (what to do, how sure, its
+  record), with Long hold, Share and Recipe on it. Price alerts and the order book are gone; the materials of a
+  craft stay on the right.
+- Portfolio: holdings in groups (Materials, Crafted, BoE gear, Other) with count, worth and share; click to open
+  or close (remembered).
+- Sessions: click a past session for what you found: how many, worth each then and now, gold looted. Prices when
+  found are kept from this update on.
+- Money: the empty Cash out now / Worth crafting columns (left over from an old view) are gone.
+- Craft for profit: no "recipe needed" on every line; the ones you know say so.
+- Signal badges shrink their text to fit (DIAMOND HANDS no longer spills out).
+
 ## v0.18 - fresher Blizzard prices, honest messages
 
 - The price robot kept the newest 12 releases by a date that is the same for every hourly build, so it deleted

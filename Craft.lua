@@ -580,30 +580,60 @@ end
 
 -- what disenchanting one is worth, its materials sold at the auction house after the cut, and the skill it needs
 -- (nil: can't be disenchanted, or its likely materials have no price)
-local valueCache = {}
-FT.On("FT_SCAN_DONE", function() wipe(valueCache) end)
+local valueCache, matCache = {}, {}
+FT.On("FT_SCAN_DONE", function() wipe(valueCache); wipe(matCache) end)
+
+-- a material's price to count on: today's, or its average when that is lower (a spike doesn't last), and its
+-- 30-day low (the worst case); nil when it hardly sells (seen a day: under one a day) - it can't be counted on
+local function MatPrice(id)
+    local c = matCache[id]
+    if c == nil then
+        c = false
+        -- the light numbers (the market row's last days, the sale rate), not the whole stats: a Best use can value
+        -- a hundred crafts at once
+        local p = FT.Price(id)
+        local row = FT.Market.Row(id)
+        local spark = row and row.spark
+        local lo = p
+        if p and spark and #spark >= 3 then
+            local days = {}
+            for i = 1, #spark - 1 do days[#days + 1] = spark[i] end -- the last one may be today's
+            table.sort(days)
+            p = math.min(p, days[math.ceil(#days / 2)])
+            lo = math.min(p, days[1])
+        end
+        -- the price feed's sale rate (quick; the full one reads your scans' history and is slow the first time)
+        local sales = FT.Feed and FT.Feed.Rate and FT.Feed.Rate(id)
+        if p and not (sales and sales.hours >= 24 and sales.perDay < 1) then c = { p = p, lo = lo or p } end
+        matCache[id] = c
+    end
+    if not c then return nil end
+    return c.p, c.lo
+end
+
 function E.Value(itemID)
     local c = valueCache[itemID]
     if c == nil then
         c = false
         local out, skill = E.Outcome(itemID)
         if out then
-            local total, known = 0, 0
+            local total, low, known = 0, 0, 0
             for _, o in ipairs(out) do
-                local p = FT.Price(o[1])
+                local p, lo = MatPrice(o[1])
                 if p then
                     total = total + p * (1 - FT.Cut()) * o[2] * o[3]
+                    low = low + lo * (1 - FT.Cut()) * o[2] * o[3]
                     known = known + o[2]
                 end
             end
-            if known >= 0.9 then c = { v = total, skill = skill } end
+            if known >= 0.9 then c = { v = total, low = low, skill = skill } end
         end
         -- an item the game hasn't loaded yet isn't remembered as "can't"
         local cached = not (C_Item and C_Item.IsItemDataCachedByID) or C_Item.IsItemDataCachedByID(itemID)
         if c or cached then valueCache[itemID] = c end
     end
     if not c then return nil end
-    return c.v, c.skill
+    return c.v, c.skill, c.low
 end
 
 -- the best enchanting skill among your characters on this side (seen when each logs in), nil: no enchanter
@@ -665,12 +695,15 @@ function E.Deals()
     local out = {}
     local minProfit = FT.S.dealMin or 0
     for _, r in ipairs(FT.Market.Rows() or {}) do
-        local v, need = E.Value(r.id)
-        if v and need and need <= skill and r.price and r.price > 0 then
+        local v, need, low = E.Value(r.id)
+        if v and need and need <= skill and r.price and r.price > 0 and not r.gone then
             local profit = v - r.price
-            if profit > math.max(minProfit, r.price * 0.15) then
+            -- a fifth over what it costs at the materials' prices to count on: the odds are Classic's, and a
+            -- disenchant can roll low
+            if profit > math.max(minProfit, r.price * 0.2) then
                 out[#out + 1] = { id = r.id, kind = "DE", unit = r.price, target = math.floor(v), perUnit = profit,
-                    qty = 1, cost = r.price, profit = profit, t = r.t or time(), noBook = true }
+                    qty = 1, cost = r.price, profit = profit, t = r.t or time(), noBook = true,
+                    worst = math.max(0, math.floor(r.price - (low or 0))) }
             end
         end
     end

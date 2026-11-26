@@ -1004,9 +1004,17 @@ function UI.Badge(parent, w, h)
             if kind == "BUY" then label = L["APE IN"] elseif kind == "HOLD" then label = L["DIAMOND HANDS"] end
         end
         self.text:SetText(label or FT.SignalText(kind))
-        -- a longer word (Plain English) widens the badge rather than spilling out of it
-        local need = math.ceil(self.text:GetStringWidth()) + 10
-        if need > (self.baseW or 0) then self:SetWidth(need) else self:SetWidth(self.baseW) end
+        -- a longer word (DIAMOND HANDS, Plain English) gets smaller type to fit, never a wider badge: a wider
+        -- one spilled out of its column and past the window's edge
+        self:SetWidth(self.baseW)
+        local room = (self.baseW or 64) - 8
+        local size = UI.Size(10)
+        self.text:SetFont(UI.FONT, size, "")
+        while size > UI.Size(10) - 3 and (self.text:GetStringWidth() or 0) > room do
+            size = size - 1
+            self.text:SetFont(UI.FONT, size, "")
+        end
+        self.text:SetWidth(room) -- still too long: the end is cut with "..."
     end
     return f
 end

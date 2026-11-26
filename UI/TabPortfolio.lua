@@ -86,6 +86,30 @@ function T.Build(p)
     list = UI.List(panel, {
         rowHeight = 28, cols = cols,
         update = function(row, x)
+            local c = row.cells
+            if not row.groupBg then
+                row.groupBg = UI.Tex(row, "BACKGROUND", "bg2", 1)
+                row.groupBg:SetAllPoints()
+            end
+            row.groupBg:SetShown(x.header == true)
+            c.name.icon:ClearAllPoints()
+            if x.header then
+                -- a group: open or closed, how many, what they're worth, how many to sell
+                c.name.icon:SetPoint("LEFT", 0, 0)
+                c.name.icon:SetIcon(x.closed and "Interface\\Buttons\\UI-PlusButton-Up" or "Interface\\Buttons\\UI-MinusButton-Up")
+                c.name.text:SetText(x.name .. FT.C("dim", "  ·  " .. string.format(x.n == 1 and L["%d item"] or L["%d items"], x.n)))
+                c.qty:SetText("")
+                c.price:SetText("")
+                c.value:SetText(FT.Money(x.value, "short"))
+                c.ch7:SetText("")
+                c.spark:SetValues(nil)
+                c.share:SetText(T.total and T.total > 0 and string.format("%.0f%%", x.value / T.total * 100) or "")
+                c.signal:SetShown(x.toSell > 0)
+                if x.toSell > 0 then c.signal:Set("SELL", string.format(L["%d to sell"], x.toSell)) end
+                return
+            end
+            c.signal:Show()
+            c.name.icon:SetPoint("LEFT", 14, 0)
             row.cells.name.icon:SetItem(x.id)
             row.cells.name.text:SetText(FT.ItemText(x.id, 40))
             row.cells.qty:SetText(FT.Num(x.qty))
@@ -99,9 +123,23 @@ function T.Build(p)
             row.cells.signal:Set(x.signal, nil, x.strength)
         end,
         onClick = function(x)
+            if x.header then
+                local closed = Closed()
+                closed[x.key] = (not closed[x.key]) or nil
+                T.RefreshList()
+                return
+            end
             if not UI.ItemClick(x.id) then FT.OpenItem(x.id) end
         end,
         onEnter = function(row, x)
+            if x.header then
+                GameTooltip:SetOwner(row, "ANCHOR_RIGHT")
+                GameTooltip:AddLine(x.name, 1, 1, 1)
+                GameTooltip:AddLine(string.format(L["%s items worth %s"], FT.Num(x.n), FT.Money(x.value)), 0.85, 0.87, 0.9)
+                GameTooltip:AddLine(x.closed and L["Click: open"] or L["Click: close"], 0.6, 0.64, 0.7)
+                GameTooltip:Show()
+                return
+            end
             UI.TipItem(row, x.id)
             GameTooltip:AddLine(" ")
             local names = {}
@@ -388,6 +426,13 @@ function T.DrawChart()
     })
 end
 
+-- the groups of the list, the most valuable first; a closed one shows its header only (remembered)
+local GROUPS = { mat = "Materials", crafted = "Crafted", gear = "BoE gear", other = "Other" }
+local function Closed()
+    FT.db.portClosed = FT.db.portClosed or { other = true }
+    return FT.db.portClosed
+end
+
 function T.RefreshList()
     local rows = T.rows or {}
     local get = SORT_GET[state.sort] or SORT_GET.value
@@ -400,7 +445,29 @@ function T.RefreshList()
         end
         return a.id < b.id
     end)
-    list:SetItems(rows, true)
+    local byGroup, heads = {}, {}
+    for _, x in ipairs(rows) do
+        local g = FT.Port.Group(x.id)
+        local h = byGroup[g]
+        if not h then
+            h = { header = true, key = g, name = L[GROUPS[g]], n = 0, value = 0, toSell = 0, items = {} }
+            byGroup[g] = h
+            heads[#heads + 1] = h
+        end
+        h.n, h.value = h.n + 1, h.value + (x.value or 0)
+        if x.signal == "SELL" or x.signal == "TRIM" then h.toSell = h.toSell + 1 end
+        h.items[#h.items + 1] = x
+    end
+    table.sort(heads, function(a, b) return a.value > b.value end)
+    local out, closed = {}, Closed()
+    for _, h in ipairs(heads) do
+        h.closed = closed[h.key] and true or false
+        out[#out + 1] = h
+        if not h.closed then
+            for _, x in ipairs(h.items) do out[#out + 1] = x end
+        end
+    end
+    list:SetItems(out, true)
 end
 
 ---------------------------------------------------------------------------
@@ -469,6 +536,7 @@ end
 -- The Sessions page (FT.Session): start and stop a session, your runs by gold an hour
 ---------------------------------------------------------------------------
 local ST = {}
+local openSess = {} -- the sessions opened, by their start time
 FT.Tabs.sessions = ST
 local sessView
 
@@ -506,31 +574,72 @@ function ST.Build(p)
     f.header:SetPoint("TOPLEFT", 1, -1)
     f.header:SetPoint("TOPRIGHT", -1, -1)
     f.list = UI.List(panel, {
-        rowHeight = 28, cols = cols,
-        update = function(row, s)
-            local rate = (s.secs or 0) >= 60 and (s.worth or 0) / s.secs * 3600 or nil
-            row.cells.name:SetText(s.name or s.zone or "?")
-            row.cells.when:SetText(FT.C("dim", s.stop and FT.Ago(s.stop) or ""))
-            row.cells.time:SetText(FT.Duration(s.secs))
-            row.cells.worth:SetText(FT.Money(s.worth or 0, "short"))
-            row.cells.rate:SetText(rate and FT.C("up", FT.Money(math.floor(rate), "short")) or "")
-        end,
-        onEnter = function(row, s)
-            GameTooltip:SetOwner(row, "ANCHOR_RIGHT")
-            GameTooltip:AddLine(s.name or s.zone or "?", 1, 1, 1)
-            local sum = FT.Session.Summary(s)
-            GameTooltip:AddLine(string.format(L["Worth now: %s (then: %s)"], FT.Money(math.floor(sum.worth), "short"), FT.Money(s.worth or 0, "short")), 0.8, 0.82, 0.86)
-            if (s.money or 0) > 0 then GameTooltip:AddDoubleLine(L["Gold looted"], FT.Money(s.money, "short"), 0.8, 0.82, 0.86, 1, 1, 1) end
-            for i, it in ipairs(sum.items) do
-                if i > 12 then break end
-                GameTooltip:AddDoubleLine(FT.ItemText(it.id, 30) .. " x" .. FT.Num(it.qty), FT.Money(math.floor(it.value), "short"), 0.8, 0.82, 0.86, 1, 1, 1)
+        rowHeight = 24, cols = cols,
+        update = function(row, x)
+            local c = row.cells
+            if not row.openBg then
+                row.openBg = UI.Tex(row, "BACKGROUND", "bg2", 1)
+                row.openBg:SetAllPoints()
             end
+            row.openBg:SetShown(x.session ~= nil and openSess[x.session.start] == true)
+            if x.session then
+                local s = x.session
+                local rate = (s.secs or 0) >= 60 and (s.worth or 0) / s.secs * 3600 or nil
+                local mark = openSess[s.start] and "Interface\\Buttons\\UI-MinusButton-Up" or "Interface\\Buttons\\UI-PlusButton-Up"
+                c.name:SetText("|T" .. mark .. ":14|t  " .. (s.name or s.zone or "?"))
+                c.when:SetText(FT.C("dim", FT.TimeOfDay(s.start or s.stop)))
+                c.time:SetText(FT.Duration(s.secs))
+                c.worth:SetText(FT.Money(s.worth or 0, "short"))
+                c.rate:SetText(rate and FT.C("up", FT.Money(math.floor(rate), "short")) or "")
+            elseif x.head then
+                -- the columns of what was found
+                c.name:SetText(FT.C("dim", "      " .. L["Found"]))
+                c.when:SetText(FT.C("dim", L["Qty"]))
+                c.time:SetText(FT.C("dim", L["Then"]))
+                c.worth:SetText(FT.C("dim", L["Now"]))
+                c.rate:SetText(FT.C("dim", L["Worth then"]))
+            elseif x.id then
+                local _, _, icon = FT.Item(x.id)
+                c.name:SetText("      |T" .. (icon or 134400) .. ":14|t " .. FT.ItemText(x.id, 30))
+                c.when:SetText(FT.Num(x.qty))
+                c.time:SetText(x.thenUnit and FT.Money(math.floor(x.thenUnit), "short") or FT.C("dim", "—"))
+                local ch = (x.thenUnit and x.thenUnit > 0) and (x.nowUnit / x.thenUnit - 1) or nil
+                c.worth:SetText(FT.Money(math.floor(x.nowUnit), "short") .. (ch and ("  " .. FT.Pct(ch)) or ""))
+                c.rate:SetText(x.thenTotal and FT.Money(x.thenTotal, "short") or FT.C("dim", FT.Money(math.floor(x.nowUnit * x.qty), "short")))
+            else
+                -- a line of text: gold looted, more items, its worth today
+                c.name:SetText(FT.C("dim", "      " .. (x.text or "")))
+                c.when:SetText("")
+                c.time:SetText("")
+                c.worth:SetText("")
+                c.rate:SetText(x.value and FT.Money(x.value, "short") or "")
+            end
+        end,
+        onClick = function(x)
+            if x.session then
+                ST.Toggle(x.session)
+            elseif x.id and not UI.ItemClick(x.id) then
+                FT.OpenItem(x.id)
+            end
+        end,
+        onEnter = function(row, x)
+            if x.id then UI.TipItem(row, x.id) return end
+            if not x.session then return end
+            GameTooltip:SetOwner(row, "ANCHOR_RIGHT")
+            GameTooltip:AddLine(x.session.name or x.session.zone or "?", 1, 1, 1)
+            GameTooltip:AddLine(openSess[x.session.start] and L["Click: close"] or L["Click: what you found"], 0.6, 0.64, 0.7)
             GameTooltip:Show()
         end,
     })
     f.list:SetPoint("TOPLEFT", f.header, "BOTTOMLEFT", 0, -2)
     f.list:SetPoint("BOTTOMRIGHT", -1, 4)
     f.list:SetEmptyText(L["No sessions yet. Start one before a farming run (here, or right-click the minimap button): everything you loot counts."])
+end
+
+-- a session opened or closed: what was found in it under its row
+function ST.Toggle(s)
+    openSess[s.start] = (not openSess[s.start]) or nil
+    ST.Refresh()
 end
 
 function ST.Refresh()
@@ -547,7 +656,32 @@ function ST.Refresh()
         sessView.note:SetText(usual and string.format(L["Your usual: %s an hour."], FT.Money(math.floor(usual), "short")) or "")
     end
     local list = {}
-    for _, s in ipairs(FT.Session.List()) do list[#list + 1] = s end
+    for _, s in ipairs(FT.Session.List()) do
+        list[#list + 1] = { session = s }
+        if openSess[s.start] then
+            -- what was found: how many, worth each then (new sessions) and now, the most valuable first
+            local found = {}
+            for id, qty in pairs(s.items or {}) do
+                local nowUnit = FT.Session.UnitValue(id)
+                local thenTotal = s.found and s.found[id]
+                found[#found + 1] = { id = id, qty = qty, nowUnit = nowUnit, thenTotal = thenTotal,
+                    thenUnit = thenTotal and qty > 0 and thenTotal / qty or nil, sortV = thenTotal or nowUnit * qty }
+            end
+            table.sort(found, function(a, b) return a.sortV > b.sortV end)
+            if #found > 0 then list[#list + 1] = { head = true } end
+            for i, it in ipairs(found) do
+                if i > 15 then
+                    list[#list + 1] = { text = string.format(L["%d more"], #found - 15) }
+                    break
+                end
+                list[#list + 1] = it
+            end
+            if (s.money or 0) > 0 then list[#list + 1] = { text = L["Gold looted"], value = s.money } end
+            local sum = FT.Session.Summary(s)
+            list[#list + 1] = { text = string.format(L["Worth %s at today's prices"], FT.Money(math.floor(sum.worth), "short"))
+                .. ((s.found == nil) and ("  ·  " .. L["prices when found are kept from this update on"]) or "") }
+        end
+    end
     sessView.list:SetItems(list, true)
 end
 FT.On("FT_SESSION_CHANGED", function() if sessView and sessView:IsVisible() then ST.Refresh() end end)
