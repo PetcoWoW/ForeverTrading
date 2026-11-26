@@ -58,7 +58,7 @@ function T.Build(p)
     local titles = { L["Total worth"], L["Items"], L["Gold"], L["Positions"] }
     for i, t in ipairs(titles) do
         cards[i] = UI.Stat(p, t)
-        cards[i]:SetHeight(64)
+        cards[i]:SetHeight(UI.RowH(64))
     end
 
     local chartTitle = UI.Text(p, 12, "text")
@@ -217,7 +217,7 @@ function T.BuildJournal(p)
     f.cards = {}
     for i, t in ipairs({ L["Sold"], L["Bought"], L["Deposits lost"], L["Result"] }) do
         f.cards[i] = UI.Stat(f, t)
-        f.cards[i]:SetHeight(64)
+        f.cards[i]:SetHeight(UI.RowH(64))
     end
     f.period = UI.Segmented(f, { { 1, L["Today"] }, { 7, L["7d"] }, { 30, L["30d"] }, { 90, L["90d"] } }, function(v)
         state.period = v

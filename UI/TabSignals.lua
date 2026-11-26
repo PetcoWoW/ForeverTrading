@@ -13,10 +13,10 @@ local function RowSetup(row)
     row.icon = UI.Icon(row, 26)
     row.icon:SetPoint("LEFT", 10, 0)
     row.name = UI.Text(row, 12, "text")
-    row.name:SetPoint("TOPLEFT", row.icon, "TOPRIGHT", 8, 1)
+    row.name:SetPoint("TOPLEFT", row, "TOPLEFT", 44, -6)
     row.name:SetPoint("RIGHT", row, "RIGHT", -100, 0)
     row.reason = UI.Text(row, 11, "dim")
-    row.reason:SetPoint("BOTTOMLEFT", row.icon, "BOTTOMRIGHT", 8, -1)
+    row.reason:SetPoint("BOTTOMLEFT", row, "BOTTOMLEFT", 44, 6)
     row.reason:SetPoint("RIGHT", row, "RIGHT", -100, 0)
     row.value = UI.Text(row, 12, "text", "RIGHT")
     row.value:SetPoint("TOPRIGHT", -10, -6)
@@ -245,7 +245,7 @@ local function BuildDeals(p)
     box:SetPoint("TOPLEFT", 0, -50)
     box:SetPoint("BOTTOMRIGHT", 0, 0)
     f.list = UI.List(box, {
-        rowHeight = 42,
+        rowHeight = UI.RowH(46),
         setup = RowSetup,
         update = function(row, d)
             row.icon:SetItem(d.id)
@@ -488,7 +488,7 @@ local function ListView(p, onClick, onEnter)
     box:SetPoint("TOPLEFT", 0, -50)
     box:SetPoint("BOTTOMRIGHT", 0, 0)
     f.list = UI.List(box, {
-        rowHeight = 42,
+        rowHeight = UI.RowH(46),
         setup = RowSetup,
         update = function(row, x)
             row.icon:SetItem(x.id)

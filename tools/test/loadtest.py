@@ -387,6 +387,28 @@ step("companion", function()
   FT.FEED.built, FT.Feed.Time, FT.COMPANION = realBuilt, realTime, nil
   FT.UpdateAHPill()
 end)
+step("wolf notes", function()
+  -- a big position and a watched item; their prices "last time" lower: the note says what moved
+  local inv = FT.db.inv[FT.charKey]
+  local keep = inv.bags[12360]
+  inv.bags[12360] = 200
+  FT.db.watch[13468] = FT.db.watch[13468] or { added = time() }
+  FT.Fire("FT_INVENTORY_CHANGED"); FT.Port.Holdings()
+  FT.db.eyePrices = nil
+  FT.Eye.Remember()
+  for id, b in pairs(FT.db.eyePrices) do b.p = math.floor(b.p * 0.8) end
+  FT.db.eyeSaid = nil
+  FT.Eye.LoginNote()
+  local after = 0
+  for _ in pairs(FT.db.eyePrices) do after = after + 1 end
+  assert(after > 0, "prices remembered")
+  -- nothing moved since: the steady line
+  FT.Eye.LoginNote()
+  FT.Eye.AfterScan()
+  inv.bags[12360] = keep
+  FT.db.watch[13468] = nil
+  FT.Fire("FT_INVENTORY_CHANGED")
+end)
 step("layout", function()
   -- every page with things in it (a gatherer holding the key materials), and texts that draw over each other
   local inv = FT.db.inv[FT.charKey]
@@ -426,6 +448,11 @@ step("layout", function()
     mock.layout.Settle(WolfOfBootyBayFrame)
     local found, texts = mock.layout.Overlaps(WolfOfBootyBayFrame)
     for _, t in ipairs(texts) do
+      if t.spill and not seen["spill|" .. t.text] then
+        seen["spill|" .. t.text] = true
+        cuts = cuts + 1
+        print(string.format("SPILL [%s] %q hangs out of its row  in %s", key, t.text:sub(1, 60), mock.layout.Where(t.f)))
+      end
       if t.cut and not seen["cut|" .. t.text] then
         seen["cut|" .. t.text] = true
         cuts = cuts + 1
@@ -442,6 +469,9 @@ step("layout", function()
         total = total + 1
         if total <= 60 then
           print(string.format("OVERLAP [%s] %q x %q  (%dx%d px)  in %s", key, o[1].text:sub(1, 50), o[2].text:sub(1, 50), o[3], o[4], mock.layout.Where(o[1].f)))
+          if os.getenv and os.getenv("WOLF_DEBUG") then
+            for z = 1, 2 do local r = o[z].ink; print(string.format("    %q ink l%d r%d t%d b%d size %s", o[z].text:sub(1, 30), r[1], r[2], r[3], r[4], tostring(o[z].f.__fsize))) end
+          end
         end
       end
     end

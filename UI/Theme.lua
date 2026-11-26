@@ -673,6 +673,11 @@ function UI.Size(size)
     return (size or 12) + bump
 end
 
+-- a two-line row's height: a little more with the larger text sizes
+function UI.RowH(base)
+    return base + 3 * (FT.S and tonumber(FT.S.textSize) or 0)
+end
+
 function UI.Text(parent, size, color, justify, layer)
     local fs = parent:CreateFontString(nil, layer or "OVERLAY")
     fs:SetFont(UI.FONT, UI.Size(size), "")

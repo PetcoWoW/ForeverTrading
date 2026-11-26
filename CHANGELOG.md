@@ -1,5 +1,17 @@
 # Wolf
 
+## v0.33 - the notes follow what's yours
+
+- At login and /reload, chat starts with your portfolio and its change since last time (no more "The wolf"
+  in front), then what moved in what you hold most and what you watch since you were last told: "Dreamfoil
+  +12% · you hold 400 (+1,020g)", "Black Lotus -9% · on your watchlist, now 48g". Then the moves. Five lines at
+  most. Nothing moved: your three biggest positions, steady, on the same line.
+- After a scan of yours: "Fresh AH prices", what moved in yours - only if something did.
+- A position is followed when it's one of your 8 biggest (50g or more); it's said when it moves 5% and 20g or
+  more. Watched items: 8% or more.
+- Futures > Key materials, Money lists, Snipe: the two lines of each row have more room (and grow with bigger
+  text); stat cards stack their lines; the item page's price age sits clear of the price.
+
 ## v0.32 - tidy-up
 
 - Futures > Key materials: "you hold" no longer runs into the 7-day change; the rows give bigger text room.

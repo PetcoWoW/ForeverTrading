@@ -76,6 +76,7 @@ M.SetFont = function(self, _, size) self.__fsize = size; return true end
 M.SetFontObject = function(self) end
 M.SetJustifyH = function(self, j) self.__justify = j end
 M.SetWordWrap = function(self, v) self.__wrap = v and true or false end
+M.SetMaxLines = function(self, n) self.__maxLines = n end
 M.GetStringWidth = function(self) return M.TextWidth(self) end
 M.GetUnboundedStringWidth = function(self) return M.TextWidth(self) end
 
@@ -89,6 +90,12 @@ local function Visible(t)
     return t, icons
 end
 M.Visible = Visible
+
+-- a line's height: the letters, or the coin icons in it, which the game draws taller and a little low
+function M.LineHeight(f)
+    local size = f.__fsize or 12
+    return tostring(f.__text or ""):find("|T") and size * 1.4 or size * 1.2
+end
 
 function M.TextWidth(self)
     local widest = 0
@@ -136,7 +143,7 @@ function M.Rect(f)
     local w, hgt
     if f.__kind == "FontString" then
         w = f.__wSet and f.__w or M.TextWidth(f)
-        hgt = f.__hSet and f.__h or (f.__fsize or 12) * 1.2
+        hgt = f.__hSet and f.__h or M.LineHeight(f)
     else
         w, hgt = f.__w or 100, f.__h or 20
     end
@@ -205,11 +212,11 @@ function M.Ink(f)
     if f.__kind ~= "FontString" then j = "CENTER" end
     local l
     if j == "RIGHT" then l = box[2] - w elseif j == "CENTER" then l = (box[1] + box[2]) / 2 - w / 2 else l = box[1] end
-    local lh = (f.__fsize or 12) * 1.15
+    local lh = M.LineHeight(f)
     local mid = (box[3] + box[4]) / 2
     if f.__wrap and tw > bw + 1 and bw > 0 then
         -- wrapped: lines down from the top of the box
-        local lines = math.ceil(tw / bw)
+        local lines = math.min(math.ceil(tw / bw), f.__maxLines or 99)
         return { box[1], box[2], box[3], box[3] - lines * lh }, false
     end
     return { l, l + w, mid + lh / 2, mid - lh / 2 }, tw > bw + 1 and bw > 0
@@ -236,7 +243,14 @@ function M.Texts(root)
                     ink = { math.max(ink[1], clip[1]), math.min(ink[2], clip[2]), math.min(ink[3], clip[3]), math.max(ink[4], clip[4]) }
                 end
                 if ink[2] - ink[1] > 1 and ink[3] - ink[4] > 1 then
-                    out[#out + 1] = { f = f, text = vis, ink = ink, cut = cut }
+                    -- a list row's text that hangs out of its row (into the next one)
+                    local spill = false
+                    local p = f.__parent
+                    if p and p.__kind == "Button" and f.__kind == "FontString" and p.__h and p.__h <= 80 then
+                        local pr = M.Rect(p)
+                        spill = ink[4] < pr[4] - 2 or ink[3] > pr[3] + 2
+                    end
+                    out[#out + 1] = { f = f, text = vis, ink = ink, cut = cut, spill = spill }
                 end
             end
         end

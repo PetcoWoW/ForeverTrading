@@ -32,10 +32,10 @@ local function RowSetup(row)
     row.icon = UI.Icon(row, 26)
     row.icon:SetPoint("LEFT", 8, 0)
     row.name = UI.Text(row, 12, "text")
-    row.name:SetPoint("TOPLEFT", row.icon, "TOPRIGHT", 8, 1)
+    row.name:SetPoint("TOPLEFT", row, "TOPLEFT", 42, -6)
     row.name:SetPoint("RIGHT", row, "RIGHT", -140, 0)
     row.line = UI.Text(row, 11, "dim")
-    row.line:SetPoint("BOTTOMLEFT", row.icon, "BOTTOMRIGHT", 8, -1)
+    row.line:SetPoint("BOTTOMLEFT", row, "BOTTOMLEFT", 42, 6)
     row.line:SetPoint("RIGHT", row, "RIGHT", -140, 0)
     row.chip = Chip(row)
     row.chip:SetPoint("RIGHT", row, "RIGHT", -64, 0)
@@ -87,7 +87,7 @@ local function Build(parent)
     f.now = Box(f, L["Underpriced now"])
     f.often = Box(f, L["Often underpriced"])
     f.now.list = UI.List(f.now, {
-        rowHeight = 40, setup = RowSetup,
+        rowHeight = UI.RowH(44), setup = RowSetup,
         update = function(row, x)
             row.icon:SetItem(x.id)
             row.name:SetText(FT.ItemText(x.id, 40))
@@ -113,7 +113,7 @@ local function Build(parent)
         end,
     })
     f.often.list = UI.List(f.often, {
-        rowHeight = 40, setup = RowSetup,
+        rowHeight = UI.RowH(44), setup = RowSetup,
         update = function(row, x)
             row.icon:SetItem(x.id)
             row.name:SetText(FT.ItemText(x.id, 30))

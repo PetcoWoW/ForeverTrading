@@ -291,7 +291,7 @@ local function FromHoldings(out, p)
                 local loss = h.value * math.min(-s.ch7, 0.3)
                 out[#out + 1] = {
                     id = h.id, kind = "SLIDING", label = L["DROPPING"], gold = loss * 0.6,
-                    text = string.format(L["Your %s %s is down %s this week and still falling"], Thousand(qty), Link(h.id),
+                    text = string.format(L["Your %s %s: %s this week and still falling"], Thousand(qty), Link(h.id),
                         FT.Pct(s.ch7)),
                     why = L["Selling now keeps what it's worth today; another week like this one costs about"] .. " "
                         .. FT.Money(math.floor(loss), "short") .. ".",
@@ -303,8 +303,7 @@ local function FromHoldings(out, p)
                 out[#out + 1] = {
                     id = h.id, kind = up and "UP" or "DOWN", label = up and L["UP TODAY"] or L["DOWN TODAY"],
                     gold = math.abs(moved) * 0.4,
-                    text = string.format(up and L["Your %s %s jumped %s today"] or L["Your %s %s fell %s today"],
-                        Thousand(qty), Link(h.id), FT.Pct(s.ch1)),
+                    text = string.format(L["Your %s %s: %s today"], Thousand(qty), Link(h.id), FT.Pct(s.ch1)),
                     why = (h.reason and h.reason ~= "") and (L["The call"] .. ": " .. h.reason) or nil,
                     value = (up and "+" or "-") .. FT.Money(math.floor(math.abs(moved)), "short"),
                 }
@@ -532,26 +531,128 @@ local function Fresh(moves)
     return out
 end
 
-local function Tell(moves, intro)
+local function Tell(moves, intro, max)
     local said = Said()
     if intro then FT.Print(intro) end
     for i, m in ipairs(moves) do
-        if i > 3 then break end
+        if i > (max or 3) then break end
         said[m.kind .. ":" .. m.id] = m.gold
         FT.Print("  " .. FT.C("accent", m.label) .. "  " .. m.text)
     end
 end
 
--- after login: the portfolio since last time, what it sees of you (once a day), and up to three moves
+---------------------------------------------------------------------------
+-- What you care about: your biggest positions and your watchlist. The price of each when you were last told is
+-- kept; at login, /reload and after a scan of yours, what moved since then is said - most gold first, only what
+-- matters (a position: 5% and 20g or more; a watched item: 8% or more). Nothing moved: your biggest, steady.
+---------------------------------------------------------------------------
+local TOP_POSITIONS = 8
+local POSITION_MIN = 500000    -- 50g: smaller positions aren't followed
+local WATCH_MOVE = 0.08
+local HOLD_MOVE = 0.05
+
+local function Cared()
+    local out, seen = {}, {}
+    local rows = {}
+    for _, h in ipairs(FT.Port.Rows()) do rows[#rows + 1] = h end
+    table.sort(rows, function(a, b) return a.value > b.value end)
+    for i, h in ipairs(rows) do
+        if i > TOP_POSITIONS or h.value < POSITION_MIN then break end
+        out[#out + 1] = { id = h.id, qty = h.qty, value = h.value, price = h.stats.price }
+        seen[h.id] = true
+    end
+    for id in pairs(FT.db.watch or {}) do
+        if not seen[id] then
+            local st = FT.An.Stats(id)
+            if st.price then out[#out + 1] = { id = id, watch = true, price = st.price } end
+        end
+    end
+    return out
+end
+E.Cared = Cared
+
+local function Seen()
+    FT.db.eyePrices = FT.db.eyePrices or {}
+    return FT.db.eyePrices
+end
+
+-- what moved since you were last told (skip: items a move already speaks of)
+function E.Changes(skip)
+    local base, out = Seen(), {}
+    for _, c in ipairs(Cared()) do
+        local b = base[c.id]
+        if b and (b.p or 0) > 0 and c.price and not (skip and skip[c.id]) then
+            local ch = c.price / b.p - 1
+            local gold = c.qty and c.qty * (c.price - b.p) or nil
+            local matters
+            if c.qty then matters = math.abs(ch) >= HOLD_MOVE and math.abs(gold) >= CHAT_GOLD
+            else matters = math.abs(ch) >= WATCH_MOVE end
+            if matters then
+                out[#out + 1] = { c = c, ch = ch, gold = gold, weight = gold and math.abs(gold) or math.abs(ch) * 10000000 }
+            end
+        end
+    end
+    table.sort(out, function(a, b) return a.weight > b.weight end)
+    return out
+end
+
+-- told: today's prices are the new "last time" (and what isn't followed any more is forgotten after a month)
+function E.Remember()
+    local base, now = Seen(), time()
+    for _, c in ipairs(Cared()) do
+        if c.price then base[c.id] = { p = c.price, t = now } end
+    end
+    for id, b in pairs(base) do
+        if now - (b.t or 0) > 30 * 86400 then base[id] = nil end
+    end
+end
+
+local function Signed(copper)
+    return (copper >= 0 and "+" or "-") .. FT.Money(math.floor(math.abs(copper) + 0.5), "short")
+end
+
+local function ChangeLine(x)
+    local c = x.c
+    local pct = FT.Pct(x.ch)
+    if c.qty then
+        return string.format(L["%s %s  ·  you hold %s (%s)"], Link(c.id), pct, Thousand(c.qty),
+            FT.C(x.gold >= 0 and "up" or "down", Signed(x.gold)))
+    end
+    return string.format(L["%s %s  ·  on your watchlist, now %s"], Link(c.id), pct, FT.Money(c.price, "short"))
+end
+
+local function TellChanges(changes, max)
+    for i, x in ipairs(changes) do
+        if i > max then break end
+        FT.Print("  " .. ChangeLine(x))
+    end
+end
+
+-- nothing moved: your three biggest, so you still see where your gold sits
+local function Steady()
+    local bits = {}
+    for _, c in ipairs(Cared()) do
+        if c.qty then
+            bits[#bits + 1] = Link(c.id) .. " " .. FT.Money(math.floor(c.value), "short")
+            if #bits >= 3 then break end
+        end
+    end
+    if #bits == 0 then return nil end
+    return FT.C("dim", L["steady:"] .. " ") .. table.concat(bits, FT.C("dim", "  ·  "))
+end
+
+-- after login and /reload: the portfolio since last time, what it sees of you (once a day), what moved in what you
+-- hold and watch, and up to three moves
 function E.LoginNote()
     if FT.S.eyeChat == false then return end
     local p = E.Profile()
     local r = FT.db.recap or {}
     FT.db.recap = r
     local worth = p.worth + p.gold
-    local head = FT.C("accent", L["The wolf"]) .. "  " .. string.format(L["Portfolio %s"], FT.Money(math.floor(worth), "short"))
+    local head = string.format(L["Portfolio %s"], FT.Money(math.floor(worth), "short"))
     if r.worth and r.worth > 0 and math.abs(worth / r.worth - 1) >= 0.001 then
-        head = head .. " " .. FT.Pct(worth / r.worth - 1) .. FT.C("dim", " " .. L["since last time"])
+        local ch = worth / r.worth - 1
+        head = head .. " " .. FT.Pct(ch) .. FT.C("dim", " " .. L["since last time"])
     end
     r.worth, r.t = worth, time()
     local said = Said()
@@ -560,19 +661,40 @@ function E.LoginNote()
         head = head .. FT.C("dim", "  ·  ") .. E.ProfileText()
     end
     local moves = Fresh(E.Moves(6))
-    if #moves == 0 then
-        FT.Print(head .. FT.C("dim", "  ·  " .. L["nothing needs you right now"]))
-        return
+    local skip = {}
+    for i, m in ipairs(moves) do if i <= 3 then skip[m.id] = true end end
+    local changes = E.Changes(skip)
+    if #moves == 0 and #changes == 0 then
+        local steady = Steady()
+        FT.Print(steady and (head .. FT.C("dim", "  ·  ") .. steady) or head)
+    else
+        -- five lines at most: what moved first (up to three), then the moves
+        FT.Print(head)
+        local shown = math.min(#changes, 3)
+        TellChanges(changes, shown)
+        if #moves > 0 then Tell(moves, nil, math.max(2, 5 - shown)) end
     end
-    Tell(moves, head)
+    E.Remember()
 end
+
+-- after a scan of yours (fresh auction house prices): what moved in what you hold and watch, if anything did
+function E.AfterScan()
+    if FT.S.eyeChat == false then return end
+    local changes = E.Changes()
+    if #changes > 0 then
+        FT.Print(FT.C("accent", L["Fresh AH prices"]) .. FT.C("dim", "  " .. L["what moved in yours:"]))
+        TellChanges(changes, 4)
+    end
+    E.Remember()
+end
+FT.On("FT_SCAN_DONE", function() C_Timer.After(3, function() pcall(E.AfterScan) end) end)
 
 -- after the auction house: only what's new since
 function E.AfterAH()
     if FT.S.eyeChat == false then return end
     local moves = Fresh(E.Moves(6))
     if #moves == 0 then return end
-    Tell(moves, FT.C("accent", L["The wolf"]) .. "  " .. L["after that visit:"])
+    Tell(moves, FT.C("accent", L["After that visit"]))
 end
 
 -- it waits for what it needs: the prices (the market built), your bags read, the crafts worked out - or a

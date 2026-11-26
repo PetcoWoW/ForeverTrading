@@ -232,7 +232,7 @@ function T.Build(p)
 
     -- alerts
     local al = Section(left, L["Alerts"], 4)
-    Check(al, "eyeChat", L["The wolf's notes in chat"], L["After you log in and after you leave the auction house: up to three moves about what you hold, watch, can craft or gather - each once a day, only when it matters. Never anything on screen."])
+    Check(al, "eyeChat", L["The wolf's notes in chat"], L["At login and /reload: your portfolio, what moved in what you hold most and watch since you were last told, and up to three moves (sell, buy, craft, gather). After a scan of yours: what moved. Only what matters; never anything on screen."])
     Check(al, "sessionPanel", L["Session panel"], L["The small panel on screen while a session runs: time, worth, gold an hour, your best loot."],
         function() FT.UpdateHUD() end)
     Check(al, "meme", L["Meme mode"],

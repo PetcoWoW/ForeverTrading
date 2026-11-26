@@ -12,6 +12,9 @@ FT.News = N
 -- start, after the files are read (a table made with them would keep the English)
 local function News()
     return {
+        ["v0.33"] = {
+            { L["The notes follow what's yours"], L["At login and /reload: your portfolio, then what moved in what you hold most and watch since last time. After a scan of yours: what moved."], nil },
+        },
         ["v0.31"] = {
             { L["Wolf, with a new face"], L["The addon is now just Wolf, with its own logo. Everything of yours carries over."], nil },
         },

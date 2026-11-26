@@ -48,10 +48,10 @@ local function RowSetup(row)
     row.icon = UI.Icon(row, 28)
     row.icon:SetPoint("LEFT", 38, 0)
     row.name = UI.Text(row, 12, "text")
-    row.name:SetPoint("TOPLEFT", row.icon, "TOPRIGHT", 8, 1)
+    row.name:SetPoint("TOPLEFT", row, "TOPLEFT", 74, -7)
     row.name:SetPoint("RIGHT", row, "RIGHT", -190, 0)
     row.line = UI.Text(row, 11, "muted")
-    row.line:SetPoint("BOTTOMLEFT", row.icon, "BOTTOMRIGHT", 8, -1)
+    row.line:SetPoint("BOTTOMLEFT", row, "BOTTOMLEFT", 74, 7)
     row.line:SetPoint("RIGHT", row, "RIGHT", -190, 0)
     for _, t in ipairs({ row.name, row.line }) do if t.SetWordWrap then t:SetWordWrap(false) end end
     row.price = UI.Text(row, 12, "text", "RIGHT")
@@ -69,16 +69,16 @@ local function MatSetup(row)
     row.icon = UI.Icon(row, 24)
     row.icon:SetPoint("LEFT", 10, 0)
     row.name = UI.Text(row, 12, "text")
-    row.name:SetPoint("TOPLEFT", row, "TOPLEFT", 42, -5)
+    row.name:SetPoint("TOPLEFT", row, "TOPLEFT", 42, -7)
     row.name:SetPoint("RIGHT", row, "RIGHT", -150, 0)
     row.line = UI.Text(row, 10, "dim")
-    row.line:SetPoint("BOTTOMLEFT", row, "BOTTOMLEFT", 42, 5)
+    row.line:SetPoint("BOTTOMLEFT", row, "BOTTOMLEFT", 42, 7)
     row.line:SetPoint("RIGHT", row, "RIGHT", -150, 0)
     for _, t in ipairs({ row.name, row.line }) do if t.SetWordWrap then t:SetWordWrap(false) end end
     row.price = UI.Text(row, 11, "text", "RIGHT")
-    row.price:SetPoint("TOPRIGHT", row, "TOPRIGHT", -88, -6)
+    row.price:SetPoint("TOPRIGHT", row, "TOPRIGHT", -88, -7)
     row.ch = UI.Text(row, 10, "muted", "RIGHT")
-    row.ch:SetPoint("BOTTOMRIGHT", row, "BOTTOMRIGHT", -88, 6)
+    row.ch:SetPoint("BOTTOMRIGHT", row, "BOTTOMRIGHT", -88, 7)
     row.chip = Chip(row)
     row.chip:SetSize(70, 16)
     row.chip:SetPoint("RIGHT", row, "RIGHT", -10, 0)
@@ -150,7 +150,7 @@ function T.Build(p)
 
     box = UI.Panel(p, "bg1", "line")
     list = UI.List(box, {
-        rowHeight = 46, setup = RowSetup,
+        rowHeight = UI.RowH(48), setup = RowSetup,
         update = function(row, x)
             row.icon:SetItem(x.id)
             local m = x.market
@@ -203,7 +203,7 @@ function T.Build(p)
     matSub:SetPoint("RIGHT", matBox, "RIGHT", -10, 0)
     matSub:SetText(L["What most of the raid consumables are made of"])
     matList = UI.List(matBox, {
-        rowHeight = 40 + 2 * (tonumber(FT.S.textSize) or 0), setup = MatSetup,
+        rowHeight = UI.RowH(46), setup = MatSetup,
         update = function(row, x)
             row.icon:SetItem(x.id)
             row.name:SetText(FT.ItemText(x.id, 26))

@@ -9,7 +9,7 @@ FT.Tabs.market = T
 
 -- open: under "My recipes", the item whose materials are shown under it
 -- the height of a move card: two lines of its sentence, at the chosen text size
-local function MOVE_H() return 60 + 6 * (tonumber(FT.S and FT.S.textSize) or 0) end
+local function MOVE_H() return 60 + 9 * (tonumber(FT.S and FT.S.textSize) or 0) end
 local state = { filter = "all", cls = "all", sub = "all", sort = "cap", desc = true, search = "", selected = nil, open = nil }
 -- the auction house's own filters: required level, usable, not collected, quality
 local QUALITIES = { 0, 1, 2, 3, 4, 5 }
@@ -634,7 +634,7 @@ local function BuildOverview(parent)
     local titles = { L["Items on the market"], L["Listed value"], L["Market mood"], L["Your portfolio"] }
     for i, t in ipairs(titles) do
         local c = UI.Stat(v, t)
-        c:SetHeight(70)
+        c:SetHeight(UI.RowH(70))
         v.cards[i] = c
     end
     v.moodBar = CreateFrame("Frame", nil, v.cards[3])
@@ -722,18 +722,19 @@ local function BuildOverview(parent)
             c:SetWidth(cw)
         end
         self.movesTitle:ClearAllPoints()
-        self.movesTitle:SetPoint("TOPLEFT", 4, -114)
+        local movesY = 34 + UI.RowH(70) + 28
+        self.movesTitle:SetPoint("TOPLEFT", 4, -(movesY - 18))
         self.sees:ClearAllPoints()
         self.sees:SetPoint("LEFT", self.movesTitle, "RIGHT", 16, 0)
         self.sees:SetPoint("RIGHT", self, "RIGHT", -4, 0)
         local mw = (w - 2 * 8) / 3
         for i, c in ipairs(self.moves) do
             c:ClearAllPoints()
-            c:SetPoint("TOPLEFT", (i - 1) * (mw + 8), -132)
+            c:SetPoint("TOPLEFT", (i - 1) * (mw + 8), -movesY)
             c:SetWidth(mw)
         end
         self.chartTitle:ClearAllPoints()
-        local below = 132 + MOVE_H() + 10
+        local below = movesY + MOVE_H() + 10
         self.chartTitle:SetPoint("TOPLEFT", 4, -below)
         self.chart:ClearAllPoints()
         self.chart:SetPoint("TOPLEFT", 0, -below - 18)
@@ -930,7 +931,7 @@ local function BuildItemView(parent)
     v.price = UI.Text(v, 22, "text", "RIGHT")
     v.price:SetPoint("RIGHT", v.change, "LEFT", -12, -1)
     v.priceAge = UI.Text(v, 10, "dim", "RIGHT")
-    v.priceAge:SetPoint("TOPRIGHT", -30, -28)
+    v.priceAge:SetPoint("TOPRIGHT", -30, -32)
     -- the countdown to its next live search
     v.ring = UI.LiveRingFor(v, 9, function() return state.selected end)
     v.ring:SetPoint("RIGHT", v.priceAge, "LEFT", -5, 0)
