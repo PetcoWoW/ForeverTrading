@@ -1,34 +1,64 @@
--- Wolf of Booty Bay: the look and the basic pieces every window uses. Three styles (Settings > General):
--- dark (an exchange terminal at night, the default), light (the same by day) and classic (the game's own look).
+-- Wolf of Booty Bay: the look and the basic pieces every window uses. Two looks (Settings > General > Look, after a
+-- reload): classic (the game's own auction house: its stone-and-gold dialog edges, red buttons, gold labels; the
+-- default) and dark (an exchange terminal at night).
 local ADDON, FT = ...
 
 local UI = {}
 FT.UI = UI
 
-UI.C = {
-    bg0 = { 0.043, 0.051, 0.063 },   -- window
-    bg1 = { 0.071, 0.082, 0.102 },   -- panels
-    bg2 = { 0.098, 0.114, 0.141 },   -- raised: inputs, rows on hover
-    bg3 = { 0.137, 0.157, 0.192 },   -- pressed, selected
-    line = { 0.157, 0.180, 0.220 },  -- borders and grid
-    text = { 0.918, 0.925, 0.937 },
-    muted = { 0.600, 0.635, 0.690 },
-    dim = { 0.455, 0.490, 0.545 },
-    up = { 0.055, 0.796, 0.506 },
-    down = { 0.965, 0.275, 0.365 },
-    accent = { 0.941, 0.725, 0.043 },
-    blue = { 0.231, 0.510, 0.965 },
-    purple = { 0.655, 0.545, 0.980 },
-    black = { 0, 0, 0 },
-    -- a row under the mouse, a chosen row (with its alpha: UI.SEL_A)
-    hl = { 0.098, 0.114, 0.141 },
-    sel = { 0.941, 0.725, 0.043 },
+-- the colours of each look; UI.C holds the chosen one (filled in place: everything keeps its reference to it)
+UI.LOOKS = {
+    dark = {
+        bg0 = { 0.043, 0.051, 0.063 },   -- window
+        bg1 = { 0.071, 0.082, 0.102 },   -- panels
+        bg2 = { 0.098, 0.114, 0.141 },   -- raised: inputs, rows on hover
+        bg3 = { 0.137, 0.157, 0.192 },   -- pressed, selected
+        line = { 0.157, 0.180, 0.220 },  -- borders and grid
+        text = { 0.918, 0.925, 0.937 },
+        muted = { 0.600, 0.635, 0.690 },
+        dim = { 0.455, 0.490, 0.545 },
+        up = { 0.055, 0.796, 0.506 },
+        down = { 0.965, 0.275, 0.365 },
+        accent = { 0.941, 0.725, 0.043 },
+        blue = { 0.231, 0.510, 0.965 },
+        purple = { 0.655, 0.545, 0.980 },
+        black = { 0, 0, 0 },
+        -- a row under the mouse, a chosen row (with its alpha: UI.SEL_A)
+        hl = { 0.098, 0.114, 0.141 },
+        sel = { 0.941, 0.725, 0.043 },
+    },
+    -- the game's own: white values, gold labels (GameFontNormal), its green and red, dark leather behind
+    classic = {
+        bg0 = { 0.055, 0.043, 0.031 },
+        bg1 = { 0.078, 0.060, 0.040 },
+        bg2 = { 0.130, 0.100, 0.064 },
+        bg3 = { 0.215, 0.165, 0.098 },
+        line = { 0.470, 0.385, 0.215 },
+        text = { 1, 1, 1 },
+        muted = { 0.875, 0.745, 0.420 },
+        dim = { 0.580, 0.550, 0.500 },
+        up = { 0.120, 1, 0.120 },
+        down = { 1, 0.240, 0.240 },
+        accent = { 1, 0.820, 0 },
+        blue = { 0.300, 0.620, 1 },
+        purple = { 0.640, 0.210, 0.930 },
+        black = { 0, 0, 0 },
+        hl = { 0.300, 0.235, 0.110 },
+        sel = { 1, 0.820, 0 },
+    },
 }
+UI.C = {}
+for k, v in pairs(UI.LOOKS.dark) do UI.C[k] = { v[1], v[2], v[3] } end
 local C = UI.C
 UI.SEL_A = 0.07
 
 UI.theme = "dark"
 UI.INSET = 1 -- how far the window's content keeps from its edge
+
+-- the game's own look (Settings > General > Look)
+function UI.Classic()
+    return UI.theme == "classic"
+end
 
 -- the height of a control when none is given
 UI.H, UI.HS = 24, 20
@@ -49,10 +79,18 @@ end
 
 -- once, when the saved settings are known, before any window is built
 function UI.ApplyTheme()
-    -- one style: the dark terminal (the old light and classic styles are gone)
-    UI.theme = "dark"
-    UI.INSET = 1
-    UI.SEL_A = 0.07
+    UI.theme = (FT.S and FT.S.look == "dark") and "dark" or "classic"
+    local look = UI.LOOKS[UI.theme]
+    for k, v in pairs(look) do
+        local c = C[k] or {}
+        c[1], c[2], c[3] = v[1], v[2], v[3]
+        C[k] = c
+    end
+    local classic = UI.Classic()
+    -- the dialog edge is wider than a 1px line; the game's corners are square
+    UI.INSET = classic and 8 or 1
+    UI.RADIUS = classic and 0 or 3
+    UI.SEL_A = classic and 0.14 or 0.07
     -- the colours of coloured text follow
     for k in pairs(FT.HEX) do
         if C[k] then FT.HEX[k] = Hex(C[k]) end
@@ -303,7 +341,11 @@ function UI.Gradient(tex, orientation, color, a1, a2, color2)
     tex:SetColorTexture(c1[1], c1[2], c1[3], (a1 + a2) / 2)
 end
 
+-- the classic look: the window's stone shows through the page (bg0) and, darkened, through its panels (bg1)
+local CLASSIC_FILL = { bg0 = 0.2, bg1 = 0.6 }
+
 function UI.Fill(frame, color, alpha, corners, radius)
+    if UI.Classic() and CLASSIC_FILL[color or "bg1"] then alpha = (alpha or 1) * CLASSIC_FILL[color or "bg1"] end
     local t = UI.RoundTex(frame, "BACKGROUND", color, alpha, -8, corners, radius)
     t:SetAllPoints()
     frame.bg = t
@@ -375,26 +417,193 @@ function UI.Border(frame, color, alpha, corners, radius)
     return b
 end
 
--- the edge of the game's tooltips, for the classic style
-local CLASSIC_EDGE = { edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border", edgeSize = 12,
-    insets = { left = 3, right = 3, top = 3, bottom = 3 } }
+---------------------------------------------------------------------------
+-- The classic look's edges: the game's own dialog (stone and gold) and tooltip edges, drawn with a backdrop
+---------------------------------------------------------------------------
+local TIP_EDGE = "Interface\\Tooltips\\UI-Tooltip-Border"
+local CLASSIC_EDGE = { edgeFile = TIP_EDGE, edgeSize = 12, insets = { left = 3, right = 3, top = 3, bottom = 3 } }
+local DIALOG = { bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background", edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border",
+    tile = true, tileSize = 32, edgeSize = 24, insets = { left = 6, right = 6, top = 6, bottom = 6 } }
+local POPUP = { bgFile = "Interface\\Tooltips\\UI-Tooltip-Background", edgeFile = TIP_EDGE,
+    tile = true, tileSize = 16, edgeSize = 14, insets = { left = 3, right = 3, top = 3, bottom = 3 } }
+-- the edges' tint: the dialog's own colours; the tooltip edge goes gold, like the auction house's inner frames
+local EDGE_GOLD = { 0.85, 0.70, 0.40 }
+UI.EDGE_GOLD = EDGE_GOLD
 
--- frame with the classic style's edge; false when the style or the client doesn't do it
-function UI.ClassicEdge(f, color, edge)
-    if UI.theme ~= "classic" or not f.SetBackdrop then return false end
-    f:SetBackdrop(edge or CLASSIC_EDGE)
-    local c = type(color) == "table" and color or C[color or "line"]
-    f:SetBackdropBorderColor(c[1], c[2], c[3], 1)
+-- a backdrop on any frame (newer clients: through BackdropTemplateMixin); false when the client can't
+local function Backdrop(f, def)
+    if not f.SetBackdrop then
+        if not (BackdropTemplateMixin and Mixin) then return false end
+        Mixin(f, BackdropTemplateMixin)
+        if f.OnBackdropSizeChanged and f.HookScript then f:HookScript("OnSizeChanged", f.OnBackdropSizeChanged) end
+    end
+    return (pcall(f.SetBackdrop, f, def))
+end
+UI.Backdrop = Backdrop
+
+local function EdgeColorFn(f)
     function f:SetBorderColor(col, a)
-        local cc = type(col) == "table" and col or C[col] or C.line
+        local cc = type(col) == "table" and col or C[col] or EDGE_GOLD
+        if col == "line" then cc = EDGE_GOLD end
         self:SetBackdropBorderColor(cc[1], cc[2], cc[3], a or 1)
+    end
+end
+
+-- frame with the classic look's thin gold edge; false when the look or the client doesn't do it
+function UI.ClassicEdge(f, color, edge)
+    if not UI.Classic() then return false end
+    if not Backdrop(f, edge or CLASSIC_EDGE) then return false end
+    EdgeColorFn(f)
+    f:SetBorderColor(color or "line", 1)
+    return true
+end
+
+-- a template that can carry the classic look's edge
+function UI.EdgeTemplate()
+    return (UI.Classic() and BackdropTemplateMixin) and "BackdropTemplate" or nil
+end
+
+-- The outside of a frame of its own (not inside another window). kind: "window" (the game's dialog: stone inside,
+-- the stone-and-gold edge) or "popup" (a menu, a toast, a small panel: the tooltip's dark inside and edge).
+-- The dark look: a fill (color, alpha) and a 1px border (border). Returns the inset of its content.
+function UI.Skin(f, kind, color, alpha, border)
+    if UI.Classic() then
+        local def = kind == "window" and DIALOG or POPUP
+        if Backdrop(f, def) then
+            EdgeColorFn(f)
+            if kind == "window" then
+                -- warm, like the auction house's leather; the gold edge as the game draws it
+                f:SetBackdropColor(0.92, 0.82, 0.68, 1)
+                f:SetBackdropBorderColor(1, 1, 1, 1)
+                function f:SetBorderColor() end
+            else
+                f:SetBackdropColor(0.045, 0.035, 0.025, math.max(0.9, alpha or 1))
+                f:SetBorderColor("line", 1)
+            end
+            -- the fill some code repaints: under the edge, nearly clear
+            local inset = def.insets.left
+            f.bg = UI.Tex(f, "BACKGROUND", "bg0", kind == "window" and 0.15 or 0, -8)
+            f.bg:SetPoint("TOPLEFT", inset, -inset)
+            f.bg:SetPoint("BOTTOMRIGHT", -inset, inset)
+            f.skinned = kind
+            return inset
+        end
+    end
+    UI.Fill(f, color or "bg1", alpha)
+    if border ~= false then UI.Border(f, border or "line") end
+    return 1
+end
+
+-- the classic look: the game's dialog title banner over the top edge, with a gold title; nil in the dark look
+local HEADER = "Interface\\DialogFrame\\UI-DialogBox-Header"
+function UI.TitleBanner(f, text, size)
+    if not UI.Classic() then return nil end
+    local b = CreateFrame("Frame", nil, f)
+    b:SetFrameLevel((f:GetFrameLevel() or 1) + 20)
+    b.text = UI.Text(b, size or 13, "accent", "CENTER")
+    b.text:SetPoint("CENTER", 0, 5)
+    local left = b:CreateTexture(nil, "ARTWORK")
+    left:SetTexture(HEADER)
+    left:SetTexCoord(0.2265625, 0.31640625, 0, 0.640625)
+    left:SetSize(23, 41)
+    local right = b:CreateTexture(nil, "ARTWORK")
+    right:SetTexture(HEADER)
+    right:SetTexCoord(0.68359375, 0.7734375, 0, 0.640625)
+    right:SetSize(23, 41)
+    local mid = b:CreateTexture(nil, "ARTWORK")
+    mid:SetTexture(HEADER)
+    mid:SetTexCoord(0.31640625, 0.68359375, 0, 0.640625)
+    mid:SetHeight(41)
+    mid:SetPoint("TOPLEFT", left, "TOPRIGHT")
+    mid:SetPoint("BOTTOMRIGHT", right, "BOTTOMLEFT")
+    left:SetPoint("TOPLEFT")
+    right:SetPoint("TOPRIGHT")
+    function b:SetTitle(t)
+        self.text:SetText(t or "")
+        self:SetSize(math.max(120, math.ceil(self.text:GetStringWidth()) + 70), 41)
+    end
+    b:SetPoint("BOTTOM", f, "TOP", 0, -16)
+    b:SetTitle(text)
+    return b
+end
+
+-- the classic look: the game's input box edge (InputBoxTemplate's three pieces) on an edit box; false otherwise
+local INPUT = "Interface\\Common\\Common-Input-Border"
+function UI.InputEdge(e)
+    if not UI.Classic() then return false end
+    local l = e:CreateTexture(nil, "BACKGROUND")
+    local r = e:CreateTexture(nil, "BACKGROUND")
+    local m = e:CreateTexture(nil, "BACKGROUND")
+    for _, t in ipairs({ l, r, m }) do t:SetTexture(INPUT) end
+    l:SetTexCoord(0, 0.0625, 0, 0.625)
+    r:SetTexCoord(0.9375, 1, 0, 0.625)
+    m:SetTexCoord(0.0625, 0.9375, 0, 0.625)
+    l:SetPoint("TOPLEFT"); l:SetPoint("BOTTOMLEFT"); l:SetWidth(8)
+    r:SetPoint("TOPRIGHT"); r:SetPoint("BOTTOMRIGHT"); r:SetWidth(8)
+    m:SetPoint("TOPLEFT", l, "TOPRIGHT"); m:SetPoint("BOTTOMRIGHT", r, "BOTTOMLEFT")
+    -- a dark inside under the edge: the text reads on any page
+    e.bg = UI.Tex(e, "BACKGROUND", "black", 0.55, -8)
+    e.bg:SetPoint("TOPLEFT", 3, -3)
+    e.bg:SetPoint("BOTTOMRIGHT", -3, 3)
+    local parts = { l, r, m }
+    function e:SetBorderColor(col)
+        local lit = col == "accent"
+        for _, t in ipairs(parts) do
+            if lit then t:SetVertexColor(1, 0.9, 0.6, 1) else t:SetVertexColor(1, 1, 1, 1) end
+        end
     end
     return true
 end
 
--- a template that can carry the classic style's edge
-function UI.EdgeTemplate()
-    return (UI.theme == "classic" and BackdropTemplateMixin) and "BackdropTemplate" or nil
+-- the classic look: the game's check box (its box and gold tick); false otherwise
+function UI.CheckArt(box)
+    if not UI.Classic() then return false end
+    local t = box:CreateTexture(nil, "ARTWORK")
+    t:SetTexture("Interface\\Buttons\\UI-CheckBox-Up")
+    t:SetSize(24, 24)
+    t:SetPoint("CENTER")
+    local tick = box:CreateTexture(nil, "OVERLAY")
+    tick:SetTexture("Interface\\Buttons\\UI-CheckBox-Check")
+    tick:SetSize(24, 24)
+    tick:SetPoint("CENTER")
+    local lit = box:CreateTexture(nil, "OVERLAY")
+    lit:SetTexture("Interface\\Buttons\\UI-CheckBox-Highlight")
+    lit:SetBlendMode("ADD")
+    lit:SetSize(24, 24)
+    lit:SetPoint("CENTER")
+    box.art, box.tick, box.lit = t, tick, lit
+    function box:SetBorderColor(col)
+        if col == "muted" then self.lit:Show() else self.lit:Hide() end
+    end
+    lit:Hide()
+    return true
+end
+
+-- a round portrait (the game's portrait mask) with the gold ring the minimap buttons have
+function UI.Portrait(parent, size, icon)
+    local f = CreateFrame("Frame", nil, parent)
+    f:SetSize(size, size)
+    f.tex = f:CreateTexture(nil, "ARTWORK")
+    f.tex:SetAllPoints()
+    f.tex:SetTexture(icon)
+    f.tex:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+    if f.CreateMaskTexture then
+        local mask = f:CreateMaskTexture()
+        mask:SetTexture("Interface\\CHARACTERFRAME\\TempPortraitAlphaMask", "CLAMPTOBLACKADDITIVE", "CLAMPTOBLACKADDITIVE")
+        mask:SetAllPoints(f.tex)
+        if f.tex.AddMaskTexture then f.tex:AddMaskTexture(mask) end
+    end
+    local ring = f:CreateTexture(nil, "OVERLAY")
+    ring:SetTexture("Interface\\Minimap\\MiniMap-TrackingBorder")
+    -- as on a minimap button: a 20px icon in a 31px button, the ring 53px from the button's top left
+    ring:SetSize(size * 2.65, size * 2.65)
+    ring:SetPoint("TOPLEFT", -size * 0.275, size * 0.275)
+    function f:SetIcon(i) self.tex:SetTexture(i) end
+    f.SetItem = function(self, itemID)
+        local _, _, ic = FT.Item(itemID)
+        self.tex:SetTexture(ic or 134400)
+    end
+    return f
 end
 
 -- a filled frame with a border (border false: none), slightly rounded
@@ -440,7 +649,7 @@ function UI.Text(parent, size, color, justify, layer)
     fs:SetTextColor(c[1], c[2], c[3], 1)
     fs:SetJustifyH(justify or "LEFT")
     fs:SetJustifyV("MIDDLE")
-    fs:SetShadowColor(0, 0, 0, 0.6)
+    fs:SetShadowColor(0, 0, 0, UI.Classic() and 1 or 0.6)
     -- a dark shadow only reads well on a dark background
     if UI.theme == "light" then fs:SetShadowOffset(0, 0) else fs:SetShadowOffset(1, -1) end
     if fs.SetWordWrap then fs:SetWordWrap(false) end

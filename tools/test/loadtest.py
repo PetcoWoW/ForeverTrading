@@ -31,11 +31,15 @@ Auctionator = {
   Search = { GroupResultsForDB = function() end },
 }
 ''')
+# WOLF_LOOK=dark: the dark look (the default is classic)
+if os.environ.get('WOLF_LOOK'):
+    lua.execute('WolfOfBootyBayDB = { settings = { look = "%s" } }' % os.environ['WOLF_LOOK'])
 load_all()
 lua.execute('''
 mock.fire("ADDON_LOADED", "WolfOfBootyBay")
 mock.fire("PLAYER_LOGIN")
 mock.fire("PLAYER_ENTERING_WORLD", true, false)
+
 mock.run(200, 0.25)
 ''')
 FT = ns
@@ -217,6 +221,9 @@ step("tooltip under auctionator", function()
     out[#out + 1] = (l:GetText() or "") .. ((r:IsShown() and r:GetText() ~= "") and (" | " .. r:GetText()) or "")
   end
   print("tooltip order: " .. table.concat(out, " // "):gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", ""):gsub("|T[^|]*|t", ""))
+end)
+step("look", function()
+  print("look: " .. FT.UI.theme .. ", nav tabs: " .. tostring(FT.MainRefs and FT.MainRefs.nav and #FT.MainRefs.nav.tabs))
 end)
 step("open item", function() FT.OpenItem(12363) end)
 mock.run(1)

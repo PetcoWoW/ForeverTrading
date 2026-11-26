@@ -4,7 +4,7 @@ local L = FT.L
 
 -- The version being released: a copy straight from the repository (not packaged) has no version in its TOC yet
 -- (the packager puts the tag there) and shows this one. Set it with every release.
-local RELEASE = "v0.22"
+local RELEASE = "v0.23"
 local GetMeta = (C_AddOns and C_AddOns.GetAddOnMetadata) or GetAddOnMetadata
 FT.VERSION = (GetMeta and GetMeta(ADDON, "Version")) or RELEASE
 if FT.VERSION == "" or FT.VERSION:find("@", 1, true) then FT.VERSION = RELEASE end
@@ -127,6 +127,7 @@ end
 -- Saved data
 ---------------------------------------------------------------------------
 FT.DEFAULTS = {
+    look = "classic",       -- classic (the game's own auction house look) / dark (the exchange terminal), after a reload
     words = "plain",        -- plain (Plain English) / trader (the trader terms), after a reload
     useFeed = true,         -- the price feed shipped with the addon (Sources/Feed.lua)
     scanWithAuctionator = true, -- Full scan runs Auctionator's scan when it's installed (one scan feeds both)

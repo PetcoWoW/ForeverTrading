@@ -83,11 +83,14 @@ end
 function FT.LayoutBrand()
     if not brand then return end
     local roomy = FT.WindowMaximized()
+    -- the classic look's banner carries the name, but it's off the screen when the window fills it
+    if win and win.banner then win.banner:SetShown(not roomy) end
     for _, w in ipairs(brand.words) do w:SetShown(roomy) end
     FT.UpdateAHPill()
     brand.pill:ClearAllPoints()
     if not roomy then
-        brand.pill:SetPoint("LEFT", brand.logo, "RIGHT", 10, 0)
+        -- the classic portrait's gold ring reaches past the picture
+        brand.pill:SetPoint("LEFT", brand.logo, "RIGHT", UI.Classic() and 18 or 10, 0)
     else
         brand.pill:SetPoint("LEFT", brand.words[2], "RIGHT", 16, 0)
     end
@@ -156,7 +159,13 @@ end
 local function BuildTicker(parent)
     local t = CreateFrame("Frame", nil, parent)
     t:SetHeight(26)
-    UI.Fill(t, "bg1", nil, "none")
+    -- solid in both looks: the fades at its ends are the same colour
+    if UI.Classic() then
+        t.bg = UI.Tex(t, "BACKGROUND", "bg1", 1, -8)
+        t.bg:SetAllPoints()
+    else
+        UI.Fill(t, "bg1", nil, "none")
+    end
     if t.SetClipsChildren then pcall(t.SetClipsChildren, t, true) end
     t.entries = {}
     t.speed = 28
@@ -429,11 +438,9 @@ local function Build()
     win:EnableMouse(true)
     win:SetScale(FT.S.scale or 1)
     PlaceWindow()
-    UI.Fill(win, "bg0")
-    if not UI.ClassicEdge(win, "line", { edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border", edgeSize = 16,
-        insets = { left = 4, right = 4, top = 4, bottom = 4 } }) then
-        UI.Border(win, "line")
-    end
+    UI.Skin(win, "window", "bg0")
+    -- the classic look: the game's title banner over the top edge
+    win.banner = UI.TitleBanner(win, "The Wolf of Booty Bay")
     table.insert(UISpecialFrames, "WolfOfBootyBayFrame")
 
     -- header
@@ -456,11 +463,12 @@ local function Build()
     hl:SetPoint("BOTTOMLEFT")
     hl:SetPoint("BOTTOMRIGHT")
 
-    local logo = UI.Icon(header, 24)
+    -- the classic look: a round portrait with the gold ring
+    local logo = UI.Classic() and UI.Portrait(header, 22, "Interface\\Icons\\Ability_Hunter_Pet_Wolf") or UI.Icon(header, 24)
     logo:SetIcon("Interface\\Icons\\Ability_Hunter_Pet_Wolf")
-    logo:SetPoint("LEFT", 14, 0)
+    logo:SetPoint("LEFT", UI.Classic() and 10 or 14, 0)
     local brand1 = UI.Text(header, 15, "accent")
-    brand1:SetPoint("LEFT", logo, "RIGHT", 10, 0)
+    brand1:SetPoint("LEFT", logo, "RIGHT", UI.Classic() and 18 or 10, 0)
     brand1:SetText("WOLF OF")
     local brand2 = UI.Text(header, 15, "text")
     brand2:SetPoint("LEFT", brand1, "RIGHT", 1, 0)
@@ -480,9 +488,8 @@ local function Build()
     nav = UI.NavTabs(header, items, function(key) FT.SelectTab(key) end)
     nav:SetPoint("LEFT", houseChip, "RIGHT", 14, 0)
 
-    local close = UI.Button(header, "×", 30, 30, "ghost", function() win:Hide() end)
-    close.label:SetFont(UI.FONT, UI.Size(18), "")
-    close:SetPoint("RIGHT", -8, 0)
+    local close = UI.CloseButton(header, function() win:Hide() end)
+    close:SetPoint("RIGHT", UI.Classic() and -4 or -8, 0)
 
     local sizes = BuildSizeButtons(header, close)
 
