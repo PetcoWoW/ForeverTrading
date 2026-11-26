@@ -4,7 +4,7 @@ local L = FT.L
 
 -- The version being released: a copy straight from the repository (not packaged) has no version in its TOC yet
 -- (the packager puts the tag there) and shows this one. Set it with every release.
-local RELEASE = "v0.20.1"
+local RELEASE = "v0.21"
 local GetMeta = (C_AddOns and C_AddOns.GetAddOnMetadata) or GetAddOnMetadata
 FT.VERSION = (GetMeta and GetMeta(ADDON, "Version")) or RELEASE
 if FT.VERSION == "" or FT.VERSION:find("@", 1, true) then FT.VERSION = RELEASE end
@@ -117,6 +117,8 @@ function FT.Job(name, n, step, done)
         end
     end)
     function job.Cancel() ticker:Cancel() end
+    -- how far it is: done, of
+    function job.Progress() return math.min(i - 1, n), n end
     return job
 end
 
@@ -315,6 +317,18 @@ function FT.SourceName(source)
     local names = { full = L["your AH scan"], mine = L["My items"], auctionator = L["Auctionator scan"], feed = L["Blizzard API"],
         history = L["saved prices"], live = L["live search"], peer = L["exchange"] }
     return names[source] or L["scan"]
+end
+
+-- the same, short, for a tooltip's price: "API 1h", "your scan 12m", "Auctionator 2d" (so ours can't be taken
+-- for Auctionator's own line under it)
+local SHORT_SOURCE = { feed = "API", full = "your scan", mine = "your scan", live = "your scan", auctionator = "Auctionator",
+    history = "saved", peer = "shared" }
+function FT.PriceTag(source, t)
+    local name = L[SHORT_SOURCE[source] or "scan"]
+    if not t then return name end
+    local d = math.max(0, time() - t)
+    local age = (d < 3600 and math.floor(d / 60) .. "m") or (d < 86400 and math.floor(d / 3600) .. "h") or (math.floor(d / 86400) .. "d")
+    return name .. " " .. age
 end
 
 -- where an item's price is from and when, the same words everywhere: "Blizzard API, 3:05 pm (1h ago)"

@@ -383,7 +383,11 @@ function T.RefreshDeals()
     local f = dealsView
     if not (f and f:IsShown()) then return end
     local shown, total, noBook, building, older = ShownDeals()
-    f.list:SetEmptyText((building and #shown == 0) and L["Looking for deals..."] or WhyNoDeals(older))
+    -- still looking: how far (the page updates itself until done)
+    local pct = FT.Deals.Progress and FT.Deals.Progress()
+    local looking = pct and string.format(L["Finding deals... %d%%"], math.floor(pct * 100)) or L["Looking for deals..."]
+    if building then FT.Debounce("dealsProgress", 0.5, function() if dealsView and dealsView:IsVisible() then T.RefreshDeals() end end) end
+    f.list:SetEmptyText((building and #shown == 0) and looking or WhyNoDeals(older))
     -- vendor prices still coming: said in place of the hint
     local left = FT.Deals.Loading()
     f.hint:SetText(left > 0 and string.format(L["Loading vendor prices: %s items left - deals to a vendor follow as they come."],
@@ -392,7 +396,7 @@ function T.RefreshDeals()
     if #shown > 0 then
         f.count:SetText(string.format(L["%d deals, +%s in all"], #shown, Money(total)))
     else
-        f.count:SetText(building and L["Looking for deals..."] or "")
+        f.count:SetText(building and looking or "")
     end
     f.check:SetUsable(#noBook > 0 and FT.ahOpen == true)
     f.check:SetLabel(#noBook > 0 and string.format(L["Check order books (%d)"], math.min(#noBook, MAX_CHECK)) or L["Check order books"])

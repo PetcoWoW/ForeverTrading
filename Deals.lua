@@ -372,11 +372,30 @@ local function BuildAll()
     local out, unknown = {}, {}
     local today = FT.Day()
     counted = {}
-    FT.Job("deals", #ids, function(k) Look(ids[k], mine, below, minProfit, look, out, unknown) end, function()
+    D.job = FT.Job("deals", #ids, function(k) Look(ids[k], mine, below, minProfit, look, out, unknown) end, function()
         info, fullAt, builtDay = look, time(), today
+        D.job = nil
         Finished(out, unknown)
     end)
 end
+
+-- while looking through every item: how far, 0-1 (nil: not looking)
+function D.Progress()
+    if not (building and D.job and D.job.Progress) then return nil end
+    local done, n = D.job.Progress()
+    return n > 0 and done / n or nil
+end
+
+-- Ready before the Money page is opened: looked for once a minute after login (never in a fight), and the disenchant
+-- deals with them; after that, only what changed when the page is opened
+FT.On("FT_READY", function()
+    local function Go()
+        if InCombatLockdown and InCombatLockdown() then C_Timer.After(30, Go) return end
+        if not builtAt and not building then D.Build() end
+        if FT.Enchant and FT.Enchant.Deals then FT.Enchant.Deals() end
+    end
+    C_Timer.After(60, Go)
+end)
 
 -- only the items whose prices changed (or your auctions of them): the rest stay as they were
 local function BuildChanged(set)

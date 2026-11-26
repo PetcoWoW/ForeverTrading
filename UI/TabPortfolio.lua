@@ -597,7 +597,7 @@ function ST.Build(p)
                 c.when:SetText(FT.C("dim", L["Qty"]))
                 c.time:SetText(FT.C("dim", L["Then"]))
                 c.worth:SetText(FT.C("dim", L["Now"]))
-                c.rate:SetText(FT.C("dim", L["Worth then"]))
+                c.rate:SetText(FT.C("dim", L["Change"]))
             elseif x.id then
                 local _, _, icon = FT.Item(x.id)
                 c.name:SetText("      |T" .. (icon or 134400) .. ":14|t " .. FT.ItemText(x.id, 30))
@@ -605,7 +605,13 @@ function ST.Build(p)
                 c.time:SetText(x.thenUnit and FT.Money(math.floor(x.thenUnit), "short") or FT.C("dim", "—"))
                 local ch = (x.thenUnit and x.thenUnit > 0) and (x.nowUnit / x.thenUnit - 1) or nil
                 c.worth:SetText(FT.Money(math.floor(x.nowUnit), "short") .. (ch and ("  " .. FT.Pct(ch)) or ""))
-                c.rate:SetText(x.thenTotal and FT.Money(x.thenTotal, "short") or FT.C("dim", FT.Money(math.floor(x.nowUnit * x.qty), "short")))
+                -- what the stack gained or lost since it was found (no price then: nothing to compare)
+                if x.thenTotal then
+                    local diff = math.floor(x.nowUnit * x.qty - x.thenTotal)
+                    c.rate:SetText(diff == 0 and FT.C("dim", "0") or FT.C(diff > 0 and "up" or "down", (diff > 0 and "+" or "-") .. FT.Money(math.abs(diff), "short")))
+                else
+                    c.rate:SetText(FT.C("dim", "—"))
+                end
             else
                 -- a line of text: gold looted, more items, its worth today
                 c.name:SetText(FT.C("dim", "      " .. (x.text or "")))
@@ -615,8 +621,10 @@ function ST.Build(p)
                 c.rate:SetText(x.value and FT.Money(x.value, "short") or "")
             end
         end,
-        onClick = function(x)
-            if x.session then
+        onClick = function(x, button)
+            if x.session and button == "RightButton" then
+                ST.Menu(x.session)
+            elseif x.session then
                 ST.Toggle(x.session)
             elseif x.id and not UI.ItemClick(x.id) then
                 FT.OpenItem(x.id)
@@ -627,13 +635,28 @@ function ST.Build(p)
             if not x.session then return end
             GameTooltip:SetOwner(row, "ANCHOR_RIGHT")
             GameTooltip:AddLine(x.session.name or x.session.zone or "?", 1, 1, 1)
-            GameTooltip:AddLine(openSess[x.session.start] and L["Click: close"] or L["Click: what you found"], 0.6, 0.64, 0.7)
+            GameTooltip:AddLine((openSess[x.session.start] and L["Click: close"] or L["Click: what you found"]) .. "  ·  " .. L["Right-click: rename or delete"], 0.6, 0.64, 0.7)
             GameTooltip:Show()
         end,
     })
     f.list:SetPoint("TOPLEFT", f.header, "BOTTOMLEFT", 0, -2)
     f.list:SetPoint("BOTTOMRIGHT", -1, 4)
     f.list:SetEmptyText(L["No sessions yet. Start one before a farming run (here, or right-click the minimap button): everything you loot counts."])
+end
+
+-- right-click on a session: rename it, or delete it (asked first)
+function ST.Menu(s)
+    FT.ShowMenu(nil, {
+        { s.name or s.zone or "?", nil, "dim" },
+        { L["Rename"], function()
+            UI.Confirm({ title = L["Rename the session"], text = L["Its new name (empty: its zone and length):"], input = s.name or "",
+                ok = L["Rename"], onOK = function(name) FT.Session.Rename(s, name) end })
+        end },
+        { L["Delete"], function()
+            UI.Confirm({ title = L["Delete this session?"], text = string.format(L["%s, %s. It can't be brought back."], s.name or s.zone or "?",
+                FT.Money(s.worth or 0, "short")), ok = L["Delete"], okStyle = "down", onOK = function() FT.Session.Delete(s) end })
+        end, "down" },
+    })
 end
 
 -- a session opened or closed: what was found in it under its row

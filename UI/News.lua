@@ -12,6 +12,12 @@ FT.News = N
 -- start, after the files are read (a table made with them would keep the English)
 local function News()
     return {
+        ["v0.21"] = {
+            { L["Fresh prices, by the clock"], L["The Wolf prices companion (Windows): every 15 minutes it puts the newest prices in your addon folder and tells you to /reload. Settings > About > Prices companion."],
+                function() FT.Show("settings") end },
+            { L["Sessions you can tidy"], L["Right-click a session to rename or delete it. Opened, each find shows its price then and now, and what the stack gained or lost since."],
+                function() FT.Show("sessions") end },
+        },
         ["v0.20"] = {
             { L["One price everywhere"], L["The session panel, sessions, tooltips and the Portfolio now all use the same market price (it was after the 5% cut on the panel). Always the newest of your scan, the Blizzard API and Auctionator; Shift on a tooltip says which and when."] },
             { L["A bigger session panel"], L["Scroll it with the mouse wheel, drag its corner for more rows, hover a row for what it was worth when you found it and now. What you just looted shows on top for a moment."] },

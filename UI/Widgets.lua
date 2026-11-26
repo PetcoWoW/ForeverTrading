@@ -241,7 +241,8 @@ function UI.Input(parent, w, h, placeholder, onChange, onEnter)
 end
 
 -- A question in the addon's style (dark, light or classic):
--- opts = { title, text, ok, cancel, okStyle, onOK, onCancel (Cancel, Esc or closed any other way),
+-- opts = { title, text, ok, cancel, okStyle, onOK, onCancel (Cancel, Esc or closed any other way), input (a box
+--          to type in, with this text: onOK(typed)),
 --          owner (the same owner may change its question in place; another one's open question is cancelled
 --          first), okDelay (seconds the OK button waits: a price that just changed) }.
 -- The game's own popups look like the game and can't show our language on their buttons.
@@ -330,7 +331,25 @@ function UI.Confirm(opts)
     end
     d.cancel:SetLabel(opts.cancel or L["Cancel"])
     d.cancel:FitText(32)
-    d:SetHeight(54 + math.ceil(d.text:GetStringHeight()) + 20 + 26 + 16)
+    -- a text to type (opts.input = its starting text): Enter is OK, and onOK gets what was typed
+    local extra = 0
+    if opts.input then
+        if not d.input then
+            d.input = UI.Input(d, 420 - 36, 26, "", nil, function() d.ok:Click() end)
+        end
+        d.input:ClearAllPoints()
+        d.input:SetPoint("TOPLEFT", d.text, "BOTTOMLEFT", 0, -12)
+        d.input:SetValue(opts.input)
+        d.input:Show()
+        d.input:SetFocus()
+        d.input:HighlightText()
+        local onOK = opts.onOK
+        d.onOK = function() if onOK then onOK(d.input:GetText()) end end
+        extra = 38
+    elseif d.input then
+        d.input:Hide()
+    end
+    d:SetHeight(54 + math.ceil(d.text:GetStringHeight()) + extra + 20 + 26 + 16)
     d:ClearAllPoints()
     d:SetPoint("CENTER", UIParent, "CENTER", 0, 120)
     d:Show()

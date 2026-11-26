@@ -686,15 +686,20 @@ FT.On("SKILL_LINES_CHANGED", function() FT.Debounce("enchSkill", 2, ReadSkill) e
 
 -- Buy it to disenchant: armor and weapons listed under what they break into, for your enchanter's skill.
 -- Shaped like FT.Deals' entries (kind "DE") so Make gold lists them with the rest.
-local dealsCache, dealsAt
-FT.On("FT_SCAN_DONE", function() dealsCache = nil end)
+-- Worked out a little each frame (thousands of items), kept a minute: the list there is returned meanwhile (empty
+-- the first time), and FT_DEALS_READY says when the new one is done.
+local dealsCache, dealsAt, dealsJob
+FT.On("FT_SCAN_DONE", function() dealsAt = nil end)
 function E.Deals()
-    if dealsCache and GetTime() - dealsAt < 60 then return dealsCache end
+    if dealsCache and dealsAt and GetTime() - dealsAt < 60 then return dealsCache end
+    if dealsJob then return dealsCache or {} end
     local skill = E.Skill()
     if not skill then return {} end
     local out = {}
     local minProfit = FT.S.dealMin or 0
-    for _, r in ipairs(FT.Market.Rows() or {}) do
+    local rows = FT.Market.Rows() or {}
+    dealsJob = FT.Job("de-deals", #rows, function(k)
+        local r = rows[k]
         local v, need, low = E.Value(r.id)
         if v and need and need <= skill and r.price and r.price > 0 and not r.gone then
             local profit = v - r.price
@@ -706,8 +711,10 @@ function E.Deals()
                     worst = math.max(0, math.floor(r.price - (low or 0))) }
             end
         end
-    end
-    table.sort(out, function(a, b) return a.profit > b.profit end)
-    dealsCache, dealsAt = out, GetTime()
-    return out
+    end, function()
+        table.sort(out, function(a, b) return a.profit > b.profit end)
+        dealsCache, dealsAt, dealsJob = out, GetTime(), nil
+        FT.Fire("FT_DEALS_READY")
+    end)
+    return dealsCache or {}
 end

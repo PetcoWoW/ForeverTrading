@@ -120,9 +120,22 @@ jobs:
           git archive HEAD | tar -x -C dist/WolfOfBootyBay
           cp Data/Feed.lua dist/WolfOfBootyBay/Data/Feed.lua
           ( cd dist/WolfOfBootyBay \
-            && rm -rf .github tools .gitattributes .gitignore .pkgmeta \
+            && rm -rf .github tools companion .gitattributes .gitignore .pkgmeta \
             && sed -i "s/^## Version: .*/## Version: $VERSION/" WolfOfBootyBay.toc )
           ( cd dist && zip -qr "WolfOfBootyBay-$VERSION.zip" WolfOfBootyBay )
+          # for the companion app (companion/): the price file on its own, a small note of when its prices are
+          # from (it reads only this every 15 minutes), and the app itself - always at releases/latest/download/
+          cp Data/Feed.lua dist/Feed.lua
+          node -e '
+            const fs = require("fs");
+            const lua = fs.readFileSync("Data/Feed.lua", "utf8");
+            const built = Number((lua.match(/built = (\d+)/) || [])[1] || 0);
+            const ts = [...lua.matchAll(/\[(\d+)\] = \{ t = (\d+),/g)].map(m => [m[1], Number(m[2])]);
+            const houses = Object.fromEntries(ts);
+            const t = Math.max(0, ...ts.map(x => x[1]));
+            fs.writeFileSync("dist/latest.json", JSON.stringify({ built, t, houses, version: process.argv[1], bytes: lua.length }));
+          ' "$VERSION"
+          ( cd companion && zip -qr ../dist/WolfPrices.zip . )
           echo "VERSION=$VERSION" >> "$GITHUB_ENV"
 
       - name: Publish the release
@@ -130,7 +143,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "v$VERSION" "dist/WolfOfBootyBay-$VERSION.zip" \
+          gh release create "v$VERSION" "dist/WolfOfBootyBay-$VERSION.zip" dist/Feed.lua dist/latest.json dist/WolfPrices.zip \
             --title "v$VERSION" \
             --notes "The Wolf of Booty Bay with prices as of $(date -u '+%Y-%m-%d %H:%M') UTC." \
             --latest

@@ -951,6 +951,11 @@ function FT.Price(itemID)
         if ap and (not p or (at and t and at > t + 3600)) then return ap, at, "auctionator", aq end
     end
     if not p then return nil end
+    -- a saved price taken at the Blizzard snapshot's time is the Blizzard API's (read back after a /reload)
+    if source == "history" and t and FT.Feed and FT.Feed.On and FT.Feed.On() then
+        local ft = FT.Feed.Time()
+        if ft and math.abs(ft - t) <= 120 then source = "feed" end
+    end
     return p, t, source, q, gone
 end
 
