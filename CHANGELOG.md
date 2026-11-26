@@ -1,5 +1,17 @@
 # The Wolf of Booty Bay
 
+## v0.30 - mail to your bank alt, and the new prices companion
+
+- Portfolio: what you mail to one of your own characters (a bank alt) stays in your net worth on the way, counted
+  in that character's mail until it opens its mailbox. Gold in mailboxes and on the way counts too. Mail to anyone
+  else leaves, as before.
+- The prices companion is now a real Windows app: WolfPricesSetup.exe, a setup window, installs without admin
+  rights, starts with Windows, uninstalls from Settings > Apps, updates itself. It never shows a notification
+  (safe on stream). Installing it stops and removes the old script version.
+- In game: when you open the auction house and the companion has newer prices waiting, chat says so with a
+  [Load them] link. The API chip reads "API: new" then (click: load them). No companion yet: one line, once, on
+  where to get it.
+
 ## v0.29 - on CurseForge
 
 - The addon is on CurseForge: search "Wolf of Booty Bay" in the CurseForge app. Each new version goes there by

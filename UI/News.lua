@@ -12,6 +12,10 @@ FT.News = N
 -- start, after the files are read (a table made with them would keep the English)
 local function News()
     return {
+        ["v0.30"] = {
+            { L["Mail to your bank alt"], L["What you mail to your own characters stays in your portfolio until they open the mailbox."], function() FT.Show("portfolio") end },
+            { L["The new prices companion"], L["A real Windows app now: silent, starts with Windows, updates itself. Chat says when newer prices are ready to load."], function() FT.Show("settings") end },
+        },
         ["v0.29"] = {
             { L["On CurseForge"], L["Search Wolf of Booty Bay in the CurseForge app for new versions. Hourly prices: the prices companion (Windows)."], function() FT.Show("settings") end },
         },

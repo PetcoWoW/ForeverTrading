@@ -23,7 +23,7 @@ function P.Holdings()
         h.total = h.total + n
         local c = h.chars[name]
         if not c then
-            c = { bags = 0, bank = 0, mail = 0 }
+            c = { bags = 0, bank = 0, mail = 0, post = 0 }
             h.chars[name] = c
         end
         c[where] = c[where] + n
@@ -42,8 +42,24 @@ function P.Holdings()
             end
         end
     end
+    -- sent to one of your characters and not in its mailbox reading yet: still yours
+    for _, x in ipairs(FT.db.transit or {}) do
+        if x.side == FT.sideKey then
+            for id, n in pairs(x.items or {}) do Add(x.toName or "?", id, n, "post") end
+        end
+    end
     holdings = out
     return out
+end
+
+-- gold in a character's mailbox (its last reading) and on its way there from your other characters
+function P.MailGold(guid)
+    local inv = FT.db.inv[guid]
+    local g = inv and inv.mailT and inv.mailGold or 0
+    for _, x in ipairs(FT.db.transit or {}) do
+        if x.to == guid then g = g + (x.gold or 0) end
+    end
+    return g
 end
 
 function P.EachHolding(fn)
@@ -67,6 +83,10 @@ function P.Gold()
             total = total + c.money
             seen[guid] = true
         end
+    end
+    -- in mailboxes and on the way between your characters (a bank alt's gold before it opens the mailbox)
+    for guid, c in pairs(FT.db.chars) do
+        if c.side == FT.sideKey then total = total + P.MailGold(guid) end
     end
     return total
 end
@@ -145,7 +165,7 @@ function P.Characters()
     local worth = {}
     for _, h in ipairs((P.Rows())) do
         for name, c in pairs(h.chars or {}) do
-            worth[name] = (worth[name] or 0) + h.price * (c.bags + c.bank + c.mail)
+            worth[name] = (worth[name] or 0) + h.price * (c.bags + c.bank + c.mail + (c.post or 0))
         end
     end
     local out = {}
@@ -153,7 +173,7 @@ function P.Characters()
         if c.side == FT.sideKey then
             local inv = FT.db.inv[guid] or {}
             local current = guid == FT.charKey
-            local gold = current and GetMoney() or (type(c.money) == "number" and c.money or 0)
+            local gold = (current and GetMoney() or (type(c.money) == "number" and c.money or 0)) + P.MailGold(guid)
             out[#out + 1] = {
                 guid = guid, name = c.name or "?", classFile = c.classFile, current = current,
                 gold = gold, worth = worth[c.name or "?"] or 0, seenT = current and time() or c.seenT,

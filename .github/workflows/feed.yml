@@ -131,7 +131,7 @@ jobs:
           VERSION="$MAJMIN.$(date -u +%Y%m%d%H%M)"
           # a new version (the release before was of another MAJ.MIN): CurseForge gets it (the hourly price builds
           # of one version don't go there: its rules don't allow a stream of data-only files)
-          PREV=$(gh release list --limit 1 --json tagName --jq '.[0].tagName // ""' 2>/dev/null || echo "")
+          PREV=$(gh release list --limit 30 --json tagName --jq '[.[] | select(.tagName | startswith("v"))][0].tagName // ""' 2>/dev/null || echo "")
           PREVMAJMIN=$(echo "${PREV#v}" | cut -d. -f1,2)
           if [ "$PREVMAJMIN" != "$MAJMIN" ]; then echo "NEW_VERSION=1" >> "$GITHUB_ENV"; fi
           echo "MAJMIN=$MAJMIN" >> "$GITHUB_ENV"
@@ -142,8 +142,8 @@ jobs:
             && rm -rf .github tools companion .gitattributes .gitignore .pkgmeta \
             && sed -i "s/^## Version: .*/## Version: $VERSION/" WolfOfBootyBay.toc )
           ( cd dist && zip -qr "WolfOfBootyBay-$VERSION.zip" WolfOfBootyBay )
-          # for the companion app (companion/): the price file on its own, a small note of when its prices are
-          # from (it reads only this every 15 minutes), and the app itself - always at releases/latest/download/
+          # for the companion app (companion/, released on its own by companion.yml): the price file on its own and
+          # a small note of when its prices are from (it reads only this every 15 minutes), at releases/latest/download/
           cp Data/Feed.lua dist/Feed.lua
           node -e '
             const fs = require("fs");
@@ -154,7 +154,6 @@ jobs:
             const t = Math.max(0, ...ts.map(x => x[1]));
             fs.writeFileSync("dist/latest.json", JSON.stringify({ built, t, houses, version: process.argv[1], bytes: lua.length }));
           ' "$VERSION"
-          ( cd companion && zip -qr ../dist/WolfPrices.zip . )
           echo "VERSION=$VERSION" >> "$GITHUB_ENV"
 
       - name: Publish the release
@@ -162,15 +161,16 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "v$VERSION" "dist/WolfOfBootyBay-$VERSION.zip" dist/Feed.lua dist/latest.json dist/WolfPrices.zip \
+          gh release create "v$VERSION" "dist/WolfOfBootyBay-$VERSION.zip" dist/Feed.lua dist/latest.json \
             --title "v$VERSION" \
             --notes "The Wolf of Booty Bay with prices as of $(date -u '+%Y-%m-%d %H:%M') UTC." \
             --latest
           # keep the newest 12 releases, by when they were published: createdAt is the commit's date, the same for
           # every hourly build of one commit, so sorting on it threw away new releases at random (often the one
           # just made). The release just made is never deleted.
+          # (only the v... price builds: the companion's own releases stay)
           gh release list --limit 100 --json tagName,publishedAt \
-            --jq 'sort_by(.publishedAt) | reverse | .[12:] | .[].tagName' |
+            --jq '[.[] | select(.tagName | startswith("v"))] | sort_by(.publishedAt) | reverse | .[12:] | .[].tagName' |
           while read -r tag; do
             [ "$tag" = "v$VERSION" ] && continue
             gh release delete "$tag" --yes --cleanup-tag

@@ -12,11 +12,30 @@ and the words and adds its own features. See `NOTICE`.
 1. **The addon:** search "Wolf of Booty Bay" in the CurseForge app (or on curseforge.com) and install it. New
    versions arrive through CurseForge. Or take the newest zip from this repository's **Releases** page and put the
    `WolfOfBootyBay` folder into `World of Warcraft/<your Forever client>/Interface/AddOns/`.
-2. **Hourly prices (Windows):** the prices companion, a small app by the clock that puts the newest prices in your
-   addon folder every 15 minutes: [WolfPrices.zip](https://github.com/sain221b-sketch/ForeverTrading/releases/latest/download/WolfPrices.zip).
+2. **Hourly prices (Windows):** [WolfPricesSetup.exe](https://github.com/sain221b-sketch/ForeverTrading/releases/download/companion/WolfPricesSetup.exe), the Wolf prices companion. Run it, click Install.
    In game: Settings > About > Prices companion.
 
 Restart the game fully the first time (new addon files load at launch, not on `/reload`), then type `/wolf`.
+
+## The Wolf prices companion (Windows)
+
+A small program by the clock that keeps the prices fresh: every 15 minutes it asks the price robot (this
+repository's releases) whether there are newer prices, and if so puts them in the addon folder. It never shows a
+notification, a window or a sound on its own - safe on stream. In game, when you open the auction house and newer
+prices are waiting, chat says so with a **[Load them]** link (the game reads files only at login or `/reload`).
+
+- **Download:** [WolfPricesSetup.exe](https://github.com/sain221b-sketch/ForeverTrading/releases/download/companion/WolfPricesSetup.exe). Setup finds World of Warcraft and the addon, installs for your
+  Windows user only (no admin rights) and starts with Windows if you leave that ticked.
+- **What it touches:** the addon's price file (`Interface/AddOns/WolfOfBootyBay/Data/Feed.lua`), a one-line note
+  beside it (`Data/Companion.lua`: when it last checked), its settings and log in `%APPDATA%\WolfPrices`, and
+  itself in `%LOCALAPPDATA%\Programs\WolfPrices`. Nothing else: no accounts, no game memory, no data sent anywhere.
+- **Updates itself** quietly from its own release, only when the download matches its published SHA-256.
+- **Remove it:** Windows Settings > Apps > Wolf prices > Uninstall.
+- **Source:** [`companion/`](companion/) (C#, .NET Framework 4.8, part of Windows). It's built from that source by
+  [`.github/workflows/companion.yml`](.github/workflows/companion.yml) on GitHub's own Windows machines, which
+  also test it against a pretend game folder.
+- Windows shows "Windows protected your PC" the first time for programs it hasn't seen much yet: More info >
+  Run anyway.
 
 ## The price feed
 

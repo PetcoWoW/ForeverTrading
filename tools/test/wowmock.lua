@@ -276,6 +276,10 @@ end
 function geterrorhandler() return function(e) err("errorhandler", e) end end
 function PlaySound() return true end
 function ReloadUI() end
+EventRegistry = { cb = {} }
+function EventRegistry:RegisterCallback(ev, fn, owner) self.cb[ev] = self.cb[ev] or {}; table.insert(self.cb[ev], { fn, owner }) end
+function SetItemRef(link, ...) for _, c in ipairs(EventRegistry.cb["SetItemRef"] or {}) do c[1](c[2], link, ...) end end
+function IsInInstance() return false end
 function HideUIPanel(f) if f then f:Hide() end end
 function ShowUIPanel(f) if f then f:Show() end end
 function UpdateUIPanelPositions() end
@@ -348,7 +352,14 @@ C_TradeSkillUI = {}
 function GetNumTradeSkills() return 0 end
 function GetNumCrafts() return 0 end
 function GetNumSkillLines() return 0 end
-function GetInboxNumItems() return 0, 0 end
+function GetInboxNumItems() return #(mock.inbox or {}), #(mock.inbox or {}) end
+function GetInboxHeaderInfo(i) local m = (mock.inbox or {})[i]; if m then return nil, nil, m.sender, "", m.money or 0, 0, 30 end end
+function GetInboxItem(i, j) local m = (mock.inbox or {})[i]; local it = m and m.items and m.items[j]; if it then return "x", it[1], nil, it[2] end end
+mock.sendItems, mock.sendMoney = {}, 0
+function GetSendMailItem(i) local it = mock.sendItems[i]; if it then return "x", it[1], nil, it[2] end end
+function GetSendMailMoney() return mock.sendMoney end
+function GetSendMailCOD() return 0 end
+function SendMail() end
 function GetMerchantNumItems() return 0 end
 
 -- the modern auction house: answers nothing unless told

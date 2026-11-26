@@ -863,7 +863,8 @@ function FT.UpdateAHPill()
     local scanOld = scanT and time() - scanT > 12 * 3600
     local useScan = (scanT or 0) >= (apiT or 0) and scanT ~= nil
     PaintChip(pill.ah, L["AH"], scanT, useScan, scanOld)
-    PaintChip(pill.api, L["API"], apiT, not useScan and apiT ~= nil, apiOld)
+    local fresh = FT.Companion and FT.Companion.FreshReady()
+    PaintChip(pill.api, fresh and L["API: new"] or L["API"], apiT, not useScan and apiT ~= nil, apiOld or fresh)
     pill:SetWidth(pill.ah:GetWidth() + pill.api:GetWidth() + 4)
 end
 
@@ -921,12 +922,19 @@ function FT.BuildAHPill(header)
             text = FT.C("accent", FT.Feed.WhyOff() or L["Not loaded."]) .. "\n\n" .. L["Click: Settings."]
         else
             text = string.format(L["Blizzard's prices of every item.\n\nThese: %s (%s)."], FT.C(FT.Feed.Stale() and "accent" or "text", FT.TimeOfDay(t)), FT.Ago(t))
-            text = text .. "\n\n" .. FT.C("dim", L["New ones come about every hour. The prices companion puts them in your addon folder (Settings > About > Prices companion), then /reload loads them. The game can't see a download until you reload."])
+            if FT.Companion.FreshReady() then
+                text = text .. "\n\n" .. FT.C("accent", L["Newer ones should be in your addon folder by now (the prices companion fetched them). Click: load them (reloads the interface)."])
+            elseif FT.Companion.Running() then
+                text = text .. "\n\n" .. FT.C("dim", L["New ones come about every hour; the prices companion fetches them, and chat says when there are newer ones to load."])
+            else
+                text = text .. "\n\n" .. FT.C("dim", L["New ones come about every hour. The prices companion puts them in your addon folder (Settings > About > Prices companion), then /reload loads them. The game can't see a download until you reload."])
+            end
         end
         UI.TipText(self, L["API: Blizzard's hourly prices"], text)
     end)
     pill.api:SetScript("OnClick", function()
-        if not (FT.Feed.On() and FT.Feed.Time()) then FT.Show("settings") end
+        if not (FT.Feed.On() and FT.Feed.Time()) then FT.Show("settings")
+        elseif FT.Companion.FreshReady() then ReloadUI() end
     end)
     FT.UpdateAHPill()
     C_Timer.NewTicker(30, function() if pill:IsVisible() then FT.UpdateAHPill() end end)
