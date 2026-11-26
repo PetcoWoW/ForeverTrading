@@ -658,10 +658,13 @@ local function BuildOverview(parent)
         UI.Border(c, "line")
         c.icon = UI.Icon(c, 30)
         c.icon:SetPoint("LEFT", 10, 0)
-        c.kind = UI.Text(c, 10, "accent")
-        c.kind:SetPoint("TOPLEFT", c.icon, "TOPRIGHT", 8, 1)
         c.gold = UI.Text(c, 12, "up", "RIGHT")
         c.gold:SetPoint("TOPRIGHT", -10, -9)
+        -- the label stops short of the gold (a long one used to run into it)
+        c.kind = UI.Text(c, 10, "accent")
+        c.kind:SetPoint("TOPLEFT", c.icon, "TOPRIGHT", 8, 1)
+        c.kind:SetPoint("RIGHT", c.gold, "LEFT", -6, 0)
+        if c.kind.SetWordWrap then c.kind:SetWordWrap(false) end
         c.what = UI.Text(c, 11, "text")
         c.what:SetPoint("BOTTOMLEFT", c.icon, "BOTTOMRIGHT", 8, 0)
         c.what:SetPoint("RIGHT", c, "RIGHT", -10, 0)
@@ -826,7 +829,7 @@ function T.FillMoves()
     if carry and shown[carry.id] then carry = nil end
     if flip and shown[flip.id] then flip = nil end
     if carry then
-        cards[#cards + 1] = { id = carry.id, kind = L["CARRY IT"], gold = "+" .. FT.Money(math.floor(carry.profit), "short"),
+        cards[#cards + 1] = { id = carry.id, kind = L["AH TO AH"], gold = "+" .. FT.Money(math.floor(carry.profit), "short"),
             what = string.format(L["%s: buy here, sell at %s"], FT.ItemText(carry.id, 24), H.Name(carry.sellHouse)) }
     end
     if flip then

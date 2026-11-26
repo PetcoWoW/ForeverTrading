@@ -164,29 +164,56 @@ function E.Profile()
         if v >= 1.5 then roles[#roles + 1] = role end
     end
     table.sort(roles, function(a, b) return p.scores[a] > p.scores[b] end)
+    -- no clear role yet: the best guess from what's there - the strongest evidence, else what you hold
+    if #roles == 0 then
+        local top, best = nil, 0
+        for role, v in pairs(p.scores) do if v > best then top, best = role, v end end
+        if top then
+            roles = { top }
+        elseif (p.held.mat or 0) > (p.held.gear or 0) and (p.held.mat or 0) > 0 then
+            roles = { "collector" }
+        elseif p.worth > 0 or p.gold > 0 then
+            roles = { "saver" }
+        else
+            roles = { "newcomer" }
+        end
+    end
     p.roles = roles
+    -- what you're into: the kind (herbs, ore, leather...) most of what you hold and watch is
+    local kinds = {}
+    for _, h in ipairs(rows) do
+        local k = KindOf(h.id)
+        if k then kinds[k] = (kinds[k] or 0) + h.value end
+    end
+    for id in pairs(FT.db.watch or {}) do
+        local k = KindOf(id)
+        if k then kinds[k] = (kinds[k] or 0) + (FT.Price(id) or 0) * 20 end
+    end
+    local into, intoV = nil, 0
+    for k, v in pairs(kinds) do if v > intoV then into, intoV = k, v end end
+    p.into = into
     p.isGatherer = p.scores.gatherer >= 1.5
     p.isCrafter = p.scores.crafter >= 1.5 and known > 0
     p.isTrader = p.scores.trader >= 1.5
+    -- the best guess counts too: some evidence of one thing, and nothing of the others
+    if roles[1] == "gatherer" then p.isGatherer = true end
+    if roles[1] == "crafter" and known > 0 then p.isCrafter = true end
+    if roles[1] == "trader" then p.isTrader = true end
     profile, profileAt = p, GetTime()
     return p
 end
 
-local ROLE_WORD = { gatherer = "Gatherer", crafter = "Crafter", trader = "Trader" }
+local ROLE_WORD = { gatherer = "Gatherer", crafter = "Crafter", trader = "Trader", collector = "Collector",
+    saver = "Saver", newcomer = "New to the market" }
 
 -- "Gatherer: Herbalism 300, Mining 285 (Raja) · 1,240 herbs and ore this week · no crafters · 3,200g in materials ·
 -- watching 6" - what it sees, in one line
 function E.ProfileText()
     local p = E.Profile()
     local bits = {}
-    local who
-    if #p.roles == 0 then
-        who = L["Still getting to know you"]
-    else
-        local names = {}
-        for i = 1, math.min(2, #p.roles) do names[i] = L[ROLE_WORD[p.roles[i]]] end
-        who = table.concat(names, " & ")
-    end
+    local names = {}
+    for i = 1, math.min(2, #p.roles) do names[i] = L[ROLE_WORD[p.roles[i]] or p.roles[i]] end
+    local who = table.concat(names, " & ")
     local profs = {}
     local function AddProfs(set)
         for prof, x in pairs(set) do
@@ -219,6 +246,7 @@ function E.ProfileText()
     if (p.held.mat or 0) >= 10000 then
         bits[#bits + 1] = string.format(L["%s in materials"], FT.Money(math.floor(p.held.mat), "short"))
     end
+    if p.into and not (p.lootedN >= 20) then bits[#bits + 1] = string.format(L["into %s"], L[KIND_WORD[p.into] or p.into]) end
     if p.watching > 0 then bits[#bits + 1] = string.format(L["watching %d"], p.watching) end
     return table.concat(bits, FT.C("dim", "  ·  "))
 end
@@ -257,17 +285,17 @@ local function FromHoldings(out, p)
                     text = string.format(L["Sell %s of your %s %s at ~%s"], Thousand(n), Thousand(qty), Link(h.id),
                         FT.Money(s.sale or s.price, "short")),
                     why = h.reason,
-                    value = string.format(L["+%s over usual"], FT.Money(math.floor(math.max(gain, 0)), "short")),
+                    value = "+" .. FT.Money(math.floor(math.max(gain, 0)), "short"),
                 }
             elseif s.ch7 and s.ch7 <= -0.15 and (s.falling or (s.ch1 or 0) < 0) then
                 local loss = h.value * math.min(-s.ch7, 0.3)
                 out[#out + 1] = {
-                    id = h.id, kind = "SLIDING", label = L["SLIDING"], gold = loss * 0.6,
+                    id = h.id, kind = "SLIDING", label = L["DROPPING"], gold = loss * 0.6,
                     text = string.format(L["Your %s %s is down %s this week and still falling"], Thousand(qty), Link(h.id),
                         FT.Pct(s.ch7)),
                     why = L["Selling now keeps what it's worth today; another week like this one costs about"] .. " "
                         .. FT.Money(math.floor(loss), "short") .. ".",
-                    value = FT.Money(math.floor(h.value), "short") .. " " .. L["held"],
+                    value = FT.Money(math.floor(h.value), "short"),
                 }
             elseif s.ch1 and math.abs(s.ch1) >= 0.15 and h.value * math.abs(s.ch1) >= CHAT_GOLD then
                 local moved = h.value - h.value / (1 + s.ch1)
@@ -298,7 +326,7 @@ local function FromWatch(out)
                     text = string.format(L["%s, on your watchlist, is %s under usual"], Link(id), FT.Pct(s.price / s.avg - 1)),
                     why = string.format(L["~%s now against ~%s usually; it sells about %s a day."],
                         FT.Money(s.price, "short"), FT.Money(math.floor(s.avg), "short"), Thousand(rate.perDay)),
-                    value = FT.Money(s.price, "short") .. " " .. L["each"],
+                    value = FT.Money(s.price, "short"),
                 }
             end
         end
@@ -366,7 +394,7 @@ local function FromGathering(out, p)
                 Link(best.r.id), FT.Money(best.r.price, "short"), Thousand(best.perDay)),
             why = (best.did and string.format(L["You gathered %s of it in two weeks. "], Thousand(best.did)) or "")
                 .. string.format(L["Selling a share of each day's sales, about %s a day."], FT.Money(math.floor(best.v / (best.did and 1.5 or 1)), "short")),
-            value = FT.Money(best.r.price, "short") .. " " .. L["each"],
+            value = FT.Money(best.r.price, "short"),
         }
     end
 end
@@ -382,7 +410,7 @@ local function FromDeals(out, p)
     end
     if best then
         out[#out + 1] = {
-            id = best.id, kind = "FLIP", label = best.kind == "HOUSES" and L["CARRY IT"] or L["FLIP IT"], gold = best.profit,
+            id = best.id, kind = "FLIP", label = best.kind == "HOUSES" and L["AH TO AH"] or L["FLIP IT"], gold = best.profit,
             text = string.format(L["Buy %s %s for %s, sell for +%s"], Thousand(best.qty or 1), Link(best.id),
                 FT.Money(math.floor(best.cost or 0), "short"), FT.Money(math.floor(best.profit), "short")),
             why = string.format(L["Your gold covers it. You flipped %d items in two weeks."], p.flips),
@@ -416,7 +444,7 @@ local function FromFutures(out, p)
                     or string.format(L["Hold your %s %s: it goes into %d raid consumables, the raids open in %s days"], Thousand(x.held),
                         Link(x.id), #x.into, days and tostring(days) or "?"),
                 why = string.format(L["%s this week. Consumables and their herbs usually climb toward raid night."], FT.Pct(x.market.ch7 or 0)),
-                value = FT.Money(math.floor(best.value), "short") .. " " .. L["held"],
+                value = FT.Money(math.floor(best.value), "short"),
             }
         end
     end
@@ -560,6 +588,8 @@ local function MaybeLogin()
 end
 FT.On("FT_MARKET_READY", function()
     marketReady = true
+    -- what it sees of you, worked out in the background once the prices are known (before anything asks)
+    C_Timer.After(2, function() pcall(E.Profile) end)
     -- the crafts list: asked for now (it's worked out in the background)
     if FT.Craft.ProfitCrafts then FT.Craft.ProfitCrafts() end
     MaybeLogin()

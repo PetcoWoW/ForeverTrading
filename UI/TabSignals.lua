@@ -238,7 +238,7 @@ local function BuildDeals(p)
     f.hint:SetPoint("TOPLEFT", 0, -32)
     f.hint:SetPoint("RIGHT", 0, 0)
     if f.hint.SetWordWrap then f.hint:SetWordWrap(false) end
-    DEALS_HINT = L["Buy it, then: CARRY IT to the other auction house, FLIP IT (list it again near its normal price) or VENDOR IT. Best first."]
+    DEALS_HINT = L["Buy it, then: AH TO AH (sell it at the other auction house), FLIP IT (list it again near its normal price) or VENDOR IT. Best first."]
     f.hint:SetText(DEALS_HINT)
     local box = UI.Panel(f, "bg1", "line")
     box:SetPoint("TOPLEFT", 0, -50)
@@ -252,7 +252,7 @@ local function BuildDeals(p)
             row.name:SetText(FT.ItemText(d.id, 40) .. (listed and FT.C("accent", "  [" .. L["in your list"] .. "]") or ""))
             row.reason:SetText(DealText(d))
             row.value:SetText(FT.C("up", "+" .. Money(d.profit)))
-            local label = (d.kind == "HOUSES" and L["CARRY IT"]) or (d.kind == "RESELL" and L["FLIP IT"]) or (d.kind == "VENDOR" and L["VENDOR IT"])
+            local label = (d.kind == "HOUSES" and L["AH TO AH"]) or (d.kind == "RESELL" and L["FLIP IT"]) or (d.kind == "VENDOR" and L["VENDOR IT"])
                 or (d.kind == "DE" and L["DE IT"]) or nil
             row.badge:Set(d.kind, label, d.noBook and 1 or 3)
         end,
@@ -528,7 +528,7 @@ local function SellYours()
             x.signal, unit = "VENDOR", vendor
             x.reason = L["A vendor pays more than the auction house"]
         elseif netOther > netHere * 1.1 then
-            x.signal, x.label, unit, house = "HOUSES", L["CARRY IT"], netOther, other
+            x.signal, x.label, unit, house = "HOUSES", L["AH TO AH"], netOther, other
             x.reason = string.format(L["%s pays %s (here %s)"], H.Name(other), FT.Money(pOther, "short"),
                 FT.Money(h.price, "short"))
         else

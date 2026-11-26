@@ -14,8 +14,9 @@ local list, matList, head, sub, seg, box, matBox, matTitle
 -- each move's colour, and its word on the chip
 local MOVES = {
     CRAFT = { "CRAFT IT", "up" }, HOLD = { "HOLD", "accent" }, SELL = { "SELL", "up" }, BUY = { "BUY NOW", "blue" },
-    STOCK = { "STOCK UP", "blue" }, GATHER = { "GATHER", "accent" }, LATE = { "CLIMBING", "down" },
-    WATCH = { "WATCH", "muted" }, FAIR = { "FAIR", "muted" },
+    DIP = { "BUY THE DIP", "blue" }, STOCK = { "STOCK UP", "blue" }, GATHER = { "GATHER", "accent" },
+    LATE = { "CLIMBING", "down" }, NORECIPE = { "NO RECIPE", "muted" }, NONE = { "NONE LISTED", "muted" },
+    STEADY = { "STEADY", "muted" },
 }
 local CONF_WORD = { confirmed = "confirmed", likely = "likely", unknown = "unknown" }
 
@@ -27,7 +28,7 @@ local function Chip(parent)
     c.text = UI.Text(c, 10, "muted", "CENTER")
     c.text:SetPoint("CENTER")
     function c:SetMove(move)
-        local m = MOVES[move] or MOVES.FAIR
+        local m = MOVES[move] or MOVES.STEADY
         UI.SetTexColor(self.bg, m[2], 0.22)
         UI.SetTextColor(self.text, m[2])
         self.text:SetText(L[m[1]])
@@ -98,34 +99,44 @@ local function AddMaterials(r)
     end
 end
 
--- the construction sign: still being built (a strip, not a wall)
-local SIGN_H = 40
-local function BuildSign(p)
-    local s = UI.Panel(p, "bg1", "accent")
-    s:SetPoint("TOPLEFT", 8, -8)
-    s:SetPoint("TOPRIGHT", -8, -8)
-    s:SetHeight(SIGN_H - 6)
-    local top = UI.HazardTape(s, 5)
-    top:SetPoint("TOPLEFT", 3, -3)
-    top:SetPoint("TOPRIGHT", -3, -3)
-    local bottom = UI.HazardTape(s, 5)
-    bottom:SetPoint("BOTTOMLEFT", 3, 3)
-    bottom:SetPoint("BOTTOMRIGHT", -3, 3)
-    local text = UI.Text(s, 11, "muted", "CENTER")
+-- the header's own caution tape: gold with black words, striped edges, beside the title (still being built)
+local SIGN_H = 0
+local function Tape(parent)
+    local t = CreateFrame("Frame", nil, parent)
+    t:SetSize(150, 16)
+    local bg = t:CreateTexture(nil, "BACKGROUND")
+    bg:SetAllPoints()
+    bg:SetColorTexture(1, 0.78, 0.05, 1)
+    local top = UI.HazardTape(t, 3)
+    top:SetPoint("TOPLEFT")
+    top:SetPoint("TOPRIGHT")
+    local bottom = UI.HazardTape(t, 3)
+    bottom:SetPoint("BOTTOMLEFT")
+    bottom:SetPoint("BOTTOMRIGHT")
+    local text = UI.Text(t, 9, "black", "CENTER")
+    text:SetShadowOffset(0, 0)
     text:SetPoint("CENTER", 0, 0)
-    text:SetPoint("LEFT", 14, 0)
-    text:SetPoint("RIGHT", -14, 0)
-    text:SetText(FT.C("accent", L["UNDER CONSTRUCTION"]) .. "  " .. L["Built from the pre-raid study and today's market; the wolves are still learning. The raids will teach it more."])
-    return s
+    text:SetText(L["UNDER CONSTRUCTION"])
+    t:SetWidth(math.ceil(text:GetStringWidth()) + 18)
+    t:EnableMouse(true)
+    t:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
+        GameTooltip:AddLine(L["Futures is still being built"], 1, 0.82, 0)
+        GameTooltip:AddLine(L["Built from the pre-raid study and today's market; the raids will teach it more."], 0.85, 0.87, 0.9, true)
+        GameTooltip:Show()
+    end)
+    t:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    return t
 end
 
 function T.Build(p)
-    T.sign = BuildSign(p)
     head = UI.Text(p, 16, "text")
     head:SetPoint("TOPLEFT", 12, -10 - SIGN_H)
     head:SetText(L["Futures"])
+    T.sign = Tape(p)
+    T.sign:SetPoint("LEFT", head, "RIGHT", 10, 0)
     sub = UI.Text(p, 11, "dim")
-    sub:SetPoint("LEFT", head, "RIGHT", 12, -1)
+    sub:SetPoint("LEFT", T.sign, "RIGHT", 12, -1)
     sub:SetPoint("RIGHT", p, "RIGHT", -230, 0)
     if sub.SetWordWrap then sub:SetWordWrap(false) end
     seg = UI.Segmented(p, { { "consumables", L["Consumables"] }, { "gear", L["Gear"] } }, function(v)
@@ -150,7 +161,7 @@ function T.Build(p)
                 row.name:SetText(FT.ItemText(x.id, 34) .. FT.C("dim", "  " .. L[x.g.slot] .. ": " .. x.g.who))
             end
             row.line:SetText(x.moveText or "")
-            UI.SetTextColor(row.line, (MOVES[x.move] or MOVES.FAIR)[2] == "muted" and "muted" or (MOVES[x.move] or MOVES.FAIR)[2])
+            UI.SetTextColor(row.line, (MOVES[x.move] or MOVES.STEADY)[2])
             row.price:SetText(m.price and FT.Money(m.price, "short") or FT.C("dim", L["none listed"]))
             row.ch:SetText(Change(m.ch7))
             row.chip:SetMove(x.move)

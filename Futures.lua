@@ -11,6 +11,7 @@ FT.Futures = F
 
 local CONF = { confirmed = 1.5, likely = 1, unknown = 0.7 }
 local RAID_WEEK = 3 -- days before the raids open: sell what you held
+local DIP = -0.1    -- down this much this week, with raid demand ahead: a dip worth buying
 
 -- the recipe that makes an item: one of yours if a character knows it, else the game's
 local byOutput
@@ -61,7 +62,7 @@ local function ItemMove(c, m, r, p, days)
             return "CRAFT", string.format(L["You know it and no one sells it: the market is yours (materials ~%s)"],
                 FT.Money(math.floor(e and e.cost or 0), "short"))
         end
-        return "WATCH", L["No one makes it yet: where its recipe drops isn't known. Watch its materials."]
+        return "NORECIPE", L["No one makes it yet: where its recipe drops isn't known. Its materials are the play."]
     end
     if Known(r) and e and e.cost and e.revenue then
         local margin = e.revenue > 0 and (e.revenue - e.cost) / e.revenue or 0
@@ -79,12 +80,16 @@ local function ItemMove(c, m, r, p, days)
         return "HOLD", string.format(L["You hold %s: keep them for raid week"], FT.Num(held))
     end
     if m.ch7 and m.ch7 >= 0.3 then
-        return "LATE", string.format(L["Already climbing: %s this week"], FT.Pct(m.ch7))
+        return "LATE", string.format(L["Already climbing: %s this week, late to buy"], FT.Pct(m.ch7))
+    end
+    -- a dip with raid demand ahead: on the list, sure enough, and the raids not here yet
+    if m.ch7 and m.ch7 <= DIP and not raidWeek and (c.conf ~= "unknown") and (c.rank or 99) <= 24 then
+        return "DIP", string.format(L["Down %d%% this week with the raids ahead: buy the dip"], math.floor(-m.ch7 * 100 + 0.5))
     end
     if m.ch30 and m.ch30 <= -0.3 and not raidWeek then
         return "BUY", string.format(L["%d%% cheaper than in its first weeks: buy before the raids"], math.floor(-m.ch30 * 100 + 0.5))
     end
-    return "FAIR", L["About its usual price"]
+    return "STEADY", L["About its usual price"]
 end
 
 -- the consumables, best first: { c, id, rank, market, recipe, move, moveText }
@@ -115,10 +120,10 @@ function F.Gear()
             text = string.format(L["%s can make it: ~%s in materials%s"], FT.Craft.KnownByText(r), FT.Money(math.floor(e.cost), "short"),
                 m.price and string.format(L[", sells ~%s"], FT.Money(m.price, "short")) or L[", none listed: name your price"])
         elseif not m.price then
-            move, text = "WATCH", e and e.complete and string.format(L["None listed. Materials ~%s"], FT.Money(math.floor(e.cost), "short"))
+            move, text = "NONE", e and e.complete and string.format(L["None listed. Materials ~%s"], FT.Money(math.floor(e.cost), "short"))
                 or L["None listed, and some of its materials aren't on the market"]
         else
-            move, text = "FAIR", string.format(L["%s listed, ~%s sold a day"], FT.Num(m.listed or 0), FT.Num(math.floor((m.perDay or 0) + 0.5)))
+            move, text = "STEADY", string.format(L["%s listed, ~%s sold a day"], FT.Num(m.listed or 0), FT.Num(math.floor((m.perDay or 0) + 0.5)))
         end
         out[#out + 1] = { g = g, id = g.id, market = m, recipe = r, cost = e and e.cost, move = move, moveText = text,
             prof = r and r.prof }
@@ -180,15 +185,23 @@ function F.Materials(n)
                 x.move, x.moveText = "HOLD", string.format(L["You hold %s: hold it, the raids open in %s days"], FT.Num(x.held), days and tostring(days) or "?")
             end
         elseif x.known then
-            if not raidWeek and ch7 < 0.5 then
+            if not raidWeek and ch7 <= DIP then
+                x.move, x.moveText = "DIP", string.format(L["You craft with it and it's down %d%% this week: buy the dip"], math.floor(-ch7 * 100 + 0.5))
+            elseif not raidWeek and ch7 < 0.5 then
                 x.move, x.moveText = "STOCK", L["You craft with it: stock up while it's cheap"]
             else
                 x.move, x.moveText = "BUY", L["You craft with it: buy what you need, it's moving"]
             end
         elseif x.yours then
             x.move, x.moveText = "GATHER", L["Your profession picks it: worth gathering now"]
+        elseif not raidWeek and ch7 <= DIP and #x.into >= 2 then
+            -- in several raid consumables and cheaper than last week, the raids still ahead: worth buying
+            x.move, x.moveText = "DIP", string.format(L["Down %d%% this week, in %d raid consumables: buy the dip before raid week"],
+                math.floor(-ch7 * 100 + 0.5), #x.into)
+        elseif ch7 >= 0.2 then
+            x.move, x.moveText = "LATE", string.format(L["Up %d%% this week: late to buy, good to sell"], math.floor(ch7 * 100 + 0.5))
         else
-            x.move, x.moveText = "WATCH", ch7 >= 0.2 and string.format(L["Climbing: %s this week"], FT.Pct(ch7)) or L["Steady"]
+            x.move, x.moveText = "STEADY", L["About its usual price"]
         end
         out[#out + 1] = x
     end

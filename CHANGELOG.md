@@ -1,5 +1,15 @@
 # The Wolf of Booty Bay
 
+## v0.27 - clearer words, buy the dip
+
+- Terminal cards: the label no longer runs into the gold; the gold is just the number.
+- SLIDING is now DROPPING, CARRY IT is now AH TO AH (buy at one auction house, sell at the other).
+- The wolf always says what it sees: no more "Still getting to know you" - its best guess from whatever is there
+  (gatherer, crafter, trader, collector, saver), worked out in the background after login, plus what you're into.
+- Futures: the construction tape sits on the title now, not across the page. WAIT is gone: moves read STEADY,
+  NO RECIPE, NONE LISTED - and BUY THE DIP when something on the raid list (or a key material in several of its
+  consumables) fell this week with the raids still ahead. HOLD (HODL) stays for what you hold.
+
 ## v0.26 - Futures: what raiders will need
 
 - The Radar becomes Futures (still under construction): the pre-raid study as a ranked list of what raiders across

@@ -12,6 +12,9 @@ FT.News = N
 -- start, after the files are read (a table made with them would keep the English)
 local function News()
     return {
+        ["v0.27"] = {
+            { L["Buy the dip"], L["Futures now says BUY THE DIP when a raid consumable or its herbs fell this week with the raids ahead."], function() FT.Show("radar") end },
+        },
         ["v0.26"] = {
             { L["Futures: what raiders will need"], L["The Radar became Futures: the consumables every class will burn, ranked, with the herbs behind them and your move on each."], function() FT.Show("radar") end },
         },
