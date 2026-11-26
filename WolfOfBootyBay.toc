@@ -1,7 +1,7 @@
 ## Interface: 16001
 ## Title: |cfff0b90bThe Wolf of Booty Bay|r
 ## Notes: The auction house as a stock market for WoW Forever: a ticker tape, 7-day trend lines, what to buy, sell and craft, your portfolio and farming sessions. Works with Auctionator.
-## Version: 0.25
+## Version: 0.26
 ## Author: sain221b-sketch
 ## X-Website: https://github.com/sain221b-sketch/forevertrading
 ## X-License: Apache-2.0
@@ -18,6 +18,7 @@ House.lua
 Data\Vendor.lua
 Data\Feed.lua
 Data\Recipes.lua
+Data\Futures.lua
 Sources\Scanner.lua
 Sources\Auctionator.lua
 Sources\Feed.lua
@@ -33,6 +34,7 @@ Snipe.lua
 Radar.lua
 Journal.lua
 Eye.lua
+Futures.lua
 Queue.lua
 Sources\Share.lua
 Sources\Buy.lua

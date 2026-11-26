@@ -306,6 +306,34 @@ step("the eye", function()
   for _, d in ipairs(dbg) do if d:find("eye:") then print("EYE ERROR " .. d) end end
   me.profs = nil
 end)
+step("futures", function()
+  local function plain(t) return (tostring(t):gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", ""):gsub("|T.-|t", "g"):gsub("|H.-|h", ""):gsub("|h", "")) end
+  local me = FT.db.chars[FT.charKey]
+  me.profs = { Herbalism = 300 }
+  -- a gatherer with a bank of the top material
+  local mats = FT.Futures.Materials(10)
+  assert(#mats > 0, "key materials")
+  FT.db.inv[FT.charKey].bags[mats[1].id] = 400
+  FT.Fire("FT_INVENTORY_CHANGED"); FT.Port.Holdings()
+  print("futures: " .. plain(FT.Futures.Headline()))
+  for i, x in ipairs(FT.Futures.Consumables()) do
+    if i > 6 then break end
+    print(string.format("  #%d %s [%s] %s", x.rank, tostring(FT.Name(x.id)), x.move, plain(x.moveText)))
+  end
+  for i, x in ipairs(FT.Futures.Materials(6)) do
+    print(string.format("  mat %s in %d [%s] %s", tostring(FT.Name(x.id)), #x.into, x.move, plain(x.moveText)))
+  end
+  for i, x in ipairs(FT.Futures.Gear()) do
+    if i > 3 then break end
+    print(string.format("  gear %s %d specs [%s] %s", tostring(FT.Name(x.id)), x.g.specs, x.move, plain(x.moveText)))
+  end
+  for i, m in ipairs(FT.Eye.Moves(4)) do print(string.format("  eye %s %s", m.label, plain(m.text))) end
+  FT.Show("radar")
+  FT.Tabs.radar.Refresh()
+  FT.db.inv[FT.charKey].bags[mats[1].id] = nil
+  me.profs = nil
+  FT.Fire("FT_INVENTORY_CHANGED")
+end)
 step("open item", function() FT.OpenItem(12363) end)
 mock.run(1)
 step("best use", function() FT.ShowBestUse(12359) end)
