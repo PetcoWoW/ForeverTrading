@@ -154,6 +154,17 @@ jobs:
             const t = Math.max(0, ...ts.map(x => x[1]));
             fs.writeFileSync("dist/latest.json", JSON.stringify({ built, t, houses, version: process.argv[1], bytes: lua.length }));
           ' "$VERSION"
+          # for WowUp (it reads GitHub releases): which zip is the addon, for every game type it may call WoW Forever
+          # by. Without it WowUp guesses from the newest release only, and the companion's own release (no zip) can
+          # be the newest.
+          node -e '
+            const [file, version, iface] = process.argv.slice(1);
+            const flavors = ["mainline", "classic", "bcc", "wrath", "cata", "mists"];
+            const release = { name: "The Wolf of Booty Bay", version, filename: file, nolib: false,
+              metadata: flavors.map(flavor => ({ flavor, interface: Number(iface) })) };
+            require("fs").writeFileSync("dist/release.json", JSON.stringify({ releases: [release] }));
+          ' "WolfOfBootyBay-$VERSION.zip" "$VERSION" "$(grep -m1 '^## Interface:' WolfOfBootyBay.toc | sed 's/^## Interface: *//; s/\r//')"
+          cat dist/release.json; echo
           echo "VERSION=$VERSION" >> "$GITHUB_ENV"
 
       - name: Publish the release
@@ -161,7 +172,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "v$VERSION" "dist/WolfOfBootyBay-$VERSION.zip" dist/Feed.lua dist/latest.json \
+          gh release create "v$VERSION" "dist/WolfOfBootyBay-$VERSION.zip" dist/Feed.lua dist/latest.json dist/release.json \
             --title "v$VERSION" \
             --notes "The Wolf of Booty Bay with prices as of $(date -u '+%Y-%m-%d %H:%M') UTC." \
             --latest
