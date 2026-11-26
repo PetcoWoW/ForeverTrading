@@ -125,7 +125,12 @@ jobs:
             --title "v$VERSION" \
             --notes "The Wolf of Booty Bay with prices as of $(date -u '+%Y-%m-%d %H:%M') UTC." \
             --latest
-          # keep the newest 12 releases
-          gh release list --limit 100 --json tagName,createdAt \
-            --jq 'sort_by(.createdAt) | reverse | .[12:] | .[].tagName' |
-          while read -r tag; do gh release delete "$tag" --yes --cleanup-tag; done
+          # keep the newest 12 releases, by when they were published: createdAt is the commit's date, the same for
+          # every hourly build of one commit, so sorting on it threw away new releases at random (often the one
+          # just made). The release just made is never deleted.
+          gh release list --limit 100 --json tagName,publishedAt \
+            --jq 'sort_by(.publishedAt) | reverse | .[12:] | .[].tagName' |
+          while read -r tag; do
+            [ "$tag" = "v$VERSION" ] && continue
+            gh release delete "$tag" --yes --cleanup-tag
+          done
