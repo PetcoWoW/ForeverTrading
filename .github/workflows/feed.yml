@@ -18,6 +18,10 @@ on:
         description: "Publish only when Blizzard has new prices"
         required: false
         default: "false"
+      curseforge:
+        description: "Also upload this build to CurseForge"
+        required: false
+        default: "false"
   # a merged change goes out at once (with the prices as they are, new or not)
   push:
     branches: [main]
@@ -119,10 +123,18 @@ jobs:
 
       - name: Package the addon with the feed
         if: steps.feed.outputs.changed != 'false'
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           BASE=$(grep -m1 '^## Version:' WolfOfBootyBay.toc | sed 's/^## Version: *//; s/\r//')
           MAJMIN=$(echo "$BASE" | cut -d. -f1,2)
           VERSION="$MAJMIN.$(date -u +%Y%m%d%H%M)"
+          # a new version (the release before was of another MAJ.MIN): CurseForge gets it (the hourly price builds
+          # of one version don't go there: its rules don't allow a stream of data-only files)
+          PREV=$(gh release list --limit 1 --json tagName --jq '.[0].tagName // ""' 2>/dev/null || echo "")
+          PREVMAJMIN=$(echo "${PREV#v}" | cut -d. -f1,2)
+          if [ "$PREVMAJMIN" != "$MAJMIN" ]; then echo "NEW_VERSION=1" >> "$GITHUB_ENV"; fi
+          echo "MAJMIN=$MAJMIN" >> "$GITHUB_ENV"
           mkdir -p dist/WolfOfBootyBay
           git archive HEAD | tar -x -C dist/WolfOfBootyBay
           cp Data/Feed.lua dist/WolfOfBootyBay/Data/Feed.lua
@@ -163,3 +175,54 @@ jobs:
             [ "$tag" = "v$VERSION" ] && continue
             gh release delete "$tag" --yes --cleanup-tag
           done
+
+      # CurseForge (project 1831462): each new version once, with that hour's prices inside - never the hourly price
+      # builds. Needs the repository secret CF_API_TOKEN (an author upload token: CurseForge > account > API tokens;
+      # not the Core API key). The game version: the repository variable CF_GAME_VERSIONS (ids, comma-separated), else
+      # the newest version of CurseForge's WoW Forever version type. A failure here never stops the GitHub release.
+      - name: Upload to CurseForge
+        if: steps.feed.outputs.changed != 'false' && ((github.event_name == 'push' && env.NEW_VERSION == '1') || inputs.curseforge == 'true')
+        continue-on-error: true
+        env:
+          CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
+          CF_PROJECT_ID: ${{ vars.CF_PROJECT_ID || '1831462' }}
+          CF_GAME_VERSIONS: ${{ vars.CF_GAME_VERSIONS || '' }}
+        run: |
+          if [ -z "$CF_API_TOKEN" ]; then echo "::notice::No CF_API_TOKEN secret yet: CurseForge skipped"; exit 0; fi
+          API=https://wow.curseforge.com/api
+          if [ -z "$CF_GAME_VERSIONS" ]; then
+            curl -sSf -H "X-Api-Token: $CF_API_TOKEN" "$API/game/version-types" > /tmp/cf-types.json
+            curl -sSf -H "X-Api-Token: $CF_API_TOKEN" "$API/game/versions" > /tmp/cf-versions.json
+            CF_GAME_VERSIONS=$(node -e '
+              const types = JSON.parse(require("fs").readFileSync("/tmp/cf-types.json", "utf8"));
+              const versions = JSON.parse(require("fs").readFileSync("/tmp/cf-versions.json", "utf8"));
+              const forever = types.filter(t => /forever/i.test(t.name || "") || /forever/i.test(t.slug || "")).map(t => t.id);
+              console.error("CurseForge version types:", types.map(t => t.id + "=" + t.name).join(", "));
+              const pick = versions.filter(v => forever.includes(v.gameVersionTypeID)).sort((a, b) => b.id - a.id)[0];
+              if (pick) { console.error("picked", pick.id, pick.name); console.log(String(pick.id)); }
+            ')
+          fi
+          if [ -z "$CF_GAME_VERSIONS" ]; then
+            echo "::warning::No WoW Forever game version found on CurseForge: set the repository variable CF_GAME_VERSIONS"
+            exit 1
+          fi
+          # this version's part of the changelog
+          awk -v v="## v$MAJMIN " 'index($0, v) == 1 { on = 1; next } on && /^## v/ { exit } on { print }' CHANGELOG.md > /tmp/cf-changelog.md
+          [ -s /tmp/cf-changelog.md ] || echo "The Wolf of Booty Bay $VERSION" > /tmp/cf-changelog.md
+          node -e '
+            const fs = require("fs");
+            const meta = {
+              changelog: fs.readFileSync("/tmp/cf-changelog.md", "utf8"),
+              changelogType: "markdown",
+              displayName: "The Wolf of Booty Bay v" + process.argv[1],
+              releaseType: "release",
+              gameVersions: process.argv[2].split(",").map(Number).filter(Boolean),
+            };
+            fs.writeFileSync("/tmp/cf-meta.json", JSON.stringify(meta));
+          ' "$VERSION" "$CF_GAME_VERSIONS"
+          code=$(curl -sS -o /tmp/cf-response.txt -w "%{http_code}" -H "X-Api-Token: $CF_API_TOKEN" \
+            -F "metadata=</tmp/cf-meta.json" -F "file=@dist/WolfOfBootyBay-$VERSION.zip" \
+            "$API/projects/$CF_PROJECT_ID/upload-file")
+          cat /tmp/cf-response.txt; echo
+          if [ "$code" != "200" ]; then echo "::warning::CurseForge upload failed (HTTP $code)"; exit 1; fi
+          echo "::notice::Uploaded v$VERSION to CurseForge (it shows once their review passes it)"
