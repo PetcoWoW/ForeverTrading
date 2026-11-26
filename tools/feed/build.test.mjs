@@ -72,3 +72,21 @@ test("fills older days from a backfill, never over the robot's own", () => {
   assert.equal(lows[day - 1 - first], 4500);
   assert.notEqual(lows[day - first], 1, "today stays the robot's own");
 });
+
+test("the frequent checks skip a download Blizzard hasn't refreshed", () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "feed-"));
+  const cache = path.join(dir, "cache"), out = path.join(dir, "Feed.lua"), gho = path.join(dir, "gh-out");
+  const check = (fixture, now) => {
+    fs.writeFileSync(gho, "");
+    execFileSync("node", [path.join(here, "build.mjs")], {
+      env: { ...process.env, FEED_FIXTURE: path.join(here, "test", fixture), FEED_OUT: out, FEED_CACHE: cache,
+        FEED_NOW: String(now), FEED_HOUSES: "", FEED_ONLY_NEW: "1", GITHUB_OUTPUT: gho },
+    });
+    return fs.readFileSync(gho, "utf8").trim();
+  };
+  assert.equal(check("run1", 1795500100), "changed=true"); // nothing built before
+  const first = fs.readFileSync(out, "utf8");
+  assert.equal(check("run1", 1795500100 + 900), "changed=false"); // same snapshot 15 minutes later
+  assert.equal(fs.readFileSync(out, "utf8"), first, "nothing rewritten");
+  assert.equal(check("run2", 1795503700), "changed=true"); // Blizzard refreshed
+});

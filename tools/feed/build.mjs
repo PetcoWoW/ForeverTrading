@@ -298,16 +298,36 @@ function writeLua(results) {
 async function main() {
   fs.mkdirSync(CACHE, { recursive: true });
   const auth = FIXTURE ? null : await token();
-  const results = {};
-  let total = 0;
+  // download every house first: with FEED_ONLY_NEW set (the robot's frequent checks), stop here when Blizzard
+  // hasn't refreshed any of them since the last build - no new release for the same prices
+  const fetched = {};
+  let fresh = 0, houses = 0;
   for (const region of REGIONS) {
     if (!REGION_IDS[region]) throw new Error(`unknown region ${region}`);
-    const histFile = path.join(CACHE, `history-${region}.json`);
-    const hist = readJSON(histFile, {});
-    results[region] = {};
+    fetched[region] = [];
     for (const houseId of Object.keys(HOUSES).map(Number).filter((id) => !ONLY || ONLY.has(id))) {
       const got = await fetchHouse(region, houseId, auth);
       if (!got || got.listings.length === 0) continue;
+      fetched[region].push([houseId, got]);
+      houses += 1;
+      const prev = readJSON(path.join(CACHE, `prev-${region}-${houseId}.json`), null);
+      if (!prev || prev.t < got.modified) fresh += 1;
+    }
+  }
+  const changed = fresh > 0 || houses === 0 || !process.env.FEED_ONLY_NEW;
+  if (process.env.GITHUB_OUTPUT) fs.appendFileSync(process.env.GITHUB_OUTPUT, `changed=${changed}\n`);
+  if (!changed) {
+    log(`Blizzard hasn't refreshed any of the ${houses} houses since the last build: nothing new to publish`);
+    return;
+  }
+  log(`${fresh} of ${houses} houses refreshed by Blizzard since the last build`);
+  const results = {};
+  let total = 0;
+  for (const region of REGIONS) {
+    const histFile = path.join(CACHE, `history-${region}.json`);
+    const hist = readJSON(histFile, {});
+    results[region] = {};
+    for (const [houseId, got] of fetched[region]) {
       const res = processHouse(region, houseId, got, hist);
       const filled = mergeBackfill(houseId, res.h, res.day);
       if (filled > 0) log(`${region} ${houseId}: ${filled} daily prices filled in from the backfill`);

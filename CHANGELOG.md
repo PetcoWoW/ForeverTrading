@@ -1,5 +1,16 @@
 # The Wolf of Booty Bay
 
+## v0.18 - fresher Blizzard prices, honest messages
+
+- The price robot kept the newest 12 releases by a date that is the same for every hourly build, so it deleted
+  new releases at random, often the one it had just made: WowUp never saw those prices. Fixed (by publish time).
+- The robot looks at Blizzard every 15 minutes and publishes only when Blizzard has refreshed its data (about
+  hourly). GitHub often ran the hourly check 1-2 hours late; now a late run costs minutes.
+- No more reload reminder: the addon can't see what's been downloaded until a reload, so it was guessing.
+  After a login or /reload, one chat line: "New prices loaded: Blizzard, 3:05 pm", or, when newer ones could
+  exist, "Same prices as last time". The API chip shows the time of your prices (yellow past two hours).
+- The prices last loaded are kept in the saved data (for the coming companion app).
+
 ## v0.17.4 - right-click menu
 
 - Right-clicking the minimap button only offers Start a session, or Stop the session while one runs. The page
