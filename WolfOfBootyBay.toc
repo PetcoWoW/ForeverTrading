@@ -19,6 +19,7 @@ Data\Vendor.lua
 Data\Feed.lua
 Data\Recipes.lua
 Data\Futures.lua
+Data\Companion.lua
 Sources\Scanner.lua
 Sources\Auctionator.lua
 Sources\Feed.lua
@@ -35,6 +36,7 @@ Radar.lua
 Journal.lua
 Eye.lua
 Futures.lua
+Companion.lua
 Queue.lua
 Sources\Share.lua
 Sources\Buy.lua

@@ -158,6 +158,7 @@ function T.Build(p)
                 if c.bags > 0 then where[#where + 1] = L["bags"] .. " " .. c.bags end
                 if c.bank > 0 then where[#where + 1] = L["bank"] .. " " .. c.bank end
                 if c.mail > 0 then where[#where + 1] = L["mail"] .. " " .. c.mail end
+                if (c.post or 0) > 0 then where[#where + 1] = L["mailed, on the way"] .. " " .. c.post end
                 GameTooltip:AddDoubleLine(name, table.concat(where, ", "), 0.9, 0.9, 0.9, 0.6, 0.65, 0.7)
             end
             if x.reason then

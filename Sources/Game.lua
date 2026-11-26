@@ -438,9 +438,14 @@ FT.On("PLAYERBANKSLOTS_CHANGED", function() FT.Debounce("bankScan", 0.5, G.ScanB
 local mailOpen = false
 function G.ScanMail()
     if not (FT.charKey and mailOpen and GetInboxNumItems and GetInboxItem) then return end
-    local counts = {}
+    local counts, gold, from = {}, 0, {}
     local slots = ATTACHMENTS_MAX_RECEIVE or 12
     for i = 1, GetInboxNumItems() do
+        if GetInboxHeaderInfo then
+            local _, _, sender, _, money, cod = GetInboxHeaderInfo(i)
+            if sender then from[sender:gsub("%-.*$", "")] = true end
+            if type(money) == "number" and money > 0 and not (cod and cod > 0) then gold = gold + money end
+        end
         for j = 1, slots do
             local _, itemID, _, count = GetInboxItem(i, j)
             if not itemID and GetInboxItemLink then itemID = ItemID(GetInboxItemLink(i, j)) end
@@ -450,8 +455,74 @@ function G.ScanMail()
         end
     end
     local inv = MyInv()
-    inv.mail, inv.mailT = counts, time()
+    inv.mail, inv.mailT, inv.mailGold = counts, time(), gold
+    G.Arrived(from)
     InvChanged()
+end
+
+-- Mail you send to one of your own characters (a bank alt) stays yours on the way: it counts in that character's
+-- mail until it opens its mailbox and the letter is there - from then its own reading has it. Mail with items can
+-- take up to an hour, so a mailbox opened before that keeps it on the way; after 30 days (it would have come back)
+-- it's dropped. Mail to anyone else leaves what you own, as before. FT.db.transit = { { to, toName, from, fromName,
+-- side, items = { [itemID] = n }, gold, t } }
+local function OwnChar(name)
+    if not name or name == "" then return nil end
+    local short = name:gsub("%-.*$", ""):lower()
+    for guid, c in pairs(FT.db.chars) do
+        if guid ~= FT.charKey and c.side == FT.sideKey and c.name and c.name:lower() == short then return guid, c end
+    end
+end
+G.OwnChar = OwnChar
+
+local sending
+local function ReadSend(to)
+    sending = nil
+    local guid, c = OwnChar(to)
+    if not guid then return end
+    if GetSendMailCOD and (GetSendMailCOD() or 0) > 0 then return end -- cash on delivery: a sale, not a move
+    local items, any = {}, false
+    for i = 1, (ATTACHMENTS_MAX_SEND or 12) do
+        local id, count
+        if GetSendMailItem then
+            local _, itemID, _, n = GetSendMailItem(i)
+            id, count = itemID, n
+        end
+        if not id and GetSendMailItemLink then id = ItemID(GetSendMailItemLink(i)) end
+        if type(id) == "number" and type(count) == "number" and count > 0 then
+            items[id] = (items[id] or 0) + count
+            any = true
+        end
+    end
+    local gold = GetSendMailMoney and GetSendMailMoney() or 0
+    if not any and gold <= 0 then return end
+    local me = FT.db.chars[FT.charKey] or {}
+    sending = { to = guid, toName = c.name, from = FT.charKey, fromName = me.name, side = FT.sideKey,
+        items = items, gold = gold, t = time() }
+end
+if hooksecurefunc then pcall(hooksecurefunc, "SendMail", function(to) pcall(ReadSend, to) end) end
+FT.On("MAIL_SEND_SUCCESS", function()
+    if not sending then return end
+    FT.db.transit = FT.db.transit or {}
+    local last = FT.db.transit[#FT.db.transit]
+    if not (last and last.t == sending.t and last.to == sending.to and last.from == sending.from) then -- one letter once
+        table.insert(FT.db.transit, sending)
+    end
+    sending = nil
+    InvChanged()
+end)
+FT.On("MAIL_FAILED", function() sending = nil end)
+
+-- this character's mailbox was just read: letters from your characters that are there now are counted by it
+function G.Arrived(from)
+    local list, now = FT.db.transit, time()
+    if not list then return end
+    for i = #list, 1, -1 do
+        local x = list[i]
+        if now - (x.t or 0) > 30 * 86400
+            or (x.to == FT.charKey and ((x.fromName and from[x.fromName]) or now - (x.t or 0) > 3700)) then
+            table.remove(list, i)
+        end
+    end
 end
 
 FT.On("MAIL_SHOW", function() mailOpen = true end)

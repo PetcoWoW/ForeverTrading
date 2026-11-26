@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Wolf prices: the companion of The Wolf of Booty Bay. One small Windows program (.NET Framework 4.8, part of
+       Windows 10 and 11: nothing else to install). Built by .github/workflows/companion.yml. -->
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net48</TargetFramework>
+    <LangVersion>7.3</LangVersion>
+    <AssemblyName>WolfPrices</AssemblyName>
+    <RootNamespace>WolfPrices</RootNamespace>
+    <ApplicationIcon>wolf.ico</ApplicationIcon>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <Version>$([System.IO.File]::ReadAllText('$(MSBuildProjectDirectory)/VERSION').Trim())</Version>
+    <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
+    <Product>Wolf prices</Product>
+    <AssemblyTitle>Wolf prices - fresh auction prices for The Wolf of Booty Bay</AssemblyTitle>
+    <Description>Fresh auction prices for The Wolf of Booty Bay</Description>
+    <Company>The Wolf of Booty Bay</Company>
+    <Copyright>The Wolf of Booty Bay - Apache License 2.0</Copyright>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <DebugType>none</DebugType>
+    <Nullable>disable</Nullable>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="System.Windows.Forms" />
+    <Reference Include="System.Drawing" />
+    <Reference Include="System.Management" />
+    <EmbeddedResource Include="wolf.ico" LogicalName="wolf.ico" />
+    <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.3" PrivateAssets="all" />
+  </ItemGroup>
+</Project>

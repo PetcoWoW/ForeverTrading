@@ -334,6 +334,57 @@ step("futures", function()
   me.profs = nil
   FT.Fire("FT_INVENTORY_CHANGED")
 end)
+step("mail to a bank alt", function()
+  -- a bank alt on this side; 200 Thorium Ore and 50g mailed to it
+  local altGuid = "Player-1-BANKALT"
+  FT.db.chars[altGuid] = { name = "Bankalt", side = FT.sideKey, money = 0 }
+  local before, goldBefore = FT.Port.Count(10620), FT.Port.Gold()
+  mock.sendItems, mock.sendMoney = { { 10620, 200 } }, 500000
+  SendMail("Bankalt", "stuff", "")
+  mock.sendItems, mock.sendMoney = {}, 0
+  mock.fire("MAIL_SEND_SUCCESS")
+  FT.Fire("FT_INVENTORY_CHANGED")
+  assert(FT.Port.Count(10620) == before + 200, "mailed ore still counted: " .. FT.Port.Count(10620) .. " before " .. before .. " transit " .. #FT.db.transit)
+  assert(FT.Port.Gold() == goldBefore + 500000, "mailed gold still counted")
+  -- someone else: leaves
+  SendMail("Stranger", "sold", ""); mock.fire("MAIL_SEND_SUCCESS")
+  assert(#FT.db.transit == 1, "mail to a stranger isn't on the way")
+  -- the alt opens its mailbox: the letter is there, its own reading counts it, the on-the-way entry goes
+  local me = FT.charKey
+  FT.charKey = altGuid
+  mock.inbox = { { sender = FT.db.chars[me].name, money = 500000, items = { { 10620, 200 } } } }
+  mock.fire("MAIL_SHOW"); FT.Game.ScanMail()
+  FT.charKey = me
+  mock.inbox = nil
+  FT.Fire("FT_INVENTORY_CHANGED")
+  assert(#FT.db.transit == 0, "arrived letter cleared")
+  assert(FT.Port.Count(10620) == before + 200, "ore in the alt's mailbox counted once: " .. FT.Port.Count(10620))
+  assert(FT.Port.Gold() == goldBefore + 500000, "gold in the alt's mailbox counted once")
+  print("mail: ore " .. FT.Port.Count(10620) .. ", gold ok")
+  FT.db.chars[altGuid], FT.db.inv[altGuid] = nil, nil
+  FT.Fire("FT_INVENTORY_CHANGED")
+end)
+step("companion", function()
+  local C = FT.Companion
+  assert(not C.Running(), "no note: not running")
+  -- no companion: one pointer after a real visit, once
+  FT.db.companionHint, FT.db.companionSeen = nil, nil
+  mock.fire("AUCTION_HOUSE_SHOW"); mock.run(60); mock.fire("AUCTION_HOUSE_CLOSED"); mock.run(12)
+  assert(FT.db.companionHint, "pointer said")
+  -- the note: checked just now; the prices loaded were published 2 hours ago
+  local realBuilt, realTime = FT.FEED.built, FT.Feed.Time
+  FT.COMPANION = { version = "1.0.0", checked = time() }
+  FT.FEED.built = time() - 7200
+  FT.Feed.Time = function() return time() - 7300 end
+  print("companion: running", tostring(C.Running()), "fresh now", tostring(C.FreshReady()))
+  mock.run(17 * 60)
+  assert(C.FreshReady(), "fresh after a check")
+  mock.fire("AUCTION_HOUSE_SHOW"); mock.run(3)
+  FT.UpdateAHPill()
+  SetItemRef("addon:WolfOfBootyBay:get", "[Get it]", "LeftButton")
+  FT.FEED.built, FT.Feed.Time, FT.COMPANION = realBuilt, realTime, nil
+  FT.UpdateAHPill()
+end)
 step("open item", function() FT.OpenItem(12363) end)
 mock.run(1)
 step("best use", function() FT.ShowBestUse(12359) end)
