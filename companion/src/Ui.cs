@@ -209,6 +209,7 @@ namespace WolfPrices
             g.PixelOffsetMode = PixelOffsetMode.HighQuality;
             var W = ClientSize.Width;
             var H = ClientSize.Height;
+            g.Clear(Theme.Bg);
             using (var top = new LinearGradientBrush(new Rectangle(0, 0, W, (int)S(170)), Theme.BgTop, Theme.Bg, 90f))
                 g.FillRectangle(top, 0, 0, W, S(170));
             using (var edge = new Pen(Theme.Edge, 1)) g.DrawRectangle(edge, 0, 0, W - 1, H - 1);
