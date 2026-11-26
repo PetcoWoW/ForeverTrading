@@ -1,5 +1,21 @@
 # The Wolf of Booty Bay
 
+## v0.20 - one price everywhere
+
+- The session panel valued loot after the auction house's 5% cut (or at a vendor's price when that was higher),
+  while tooltips and the Portfolio show the market price: the same item read two ways. Now every place uses the
+  market price; a vendor's only when the auction house has none, and an item with no price anywhere says so
+  ("2 items have no price yet") instead of counting as nothing.
+- The price is the newest one known: your scans and the Blizzard API, and now Auctionator's too when its day is
+  newer than ours (it used to count only when we had nothing).
+- Where a price is from, in the same words everywhere: Shift on a tooltip and a hover on a session row say
+  "Blizzard API, 3:05 pm (1h ago)", "your AH scan", "Auctionator scan" or "saved prices".
+- Session panel: scroll with the mouse wheel (a thin bar shows there's more), drag the corner for 3 to 14 rows
+  (remembered), hover a row for worth each when found and now, click it for the item; the newest loot shows
+  as "+3 Thorium Ore" for a few seconds and lights up in the list.
+- Settings > Chat commands: every /wolf command and what it does (the rare way: all have a button somewhere).
+  /wolf help prints the same list.
+
 ## v0.19 - a pickier engine, a calmer item page
 
 Engine (the broker's checks):

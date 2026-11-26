@@ -414,6 +414,7 @@ local function TipLines(itemID, detail)
         if s.ch7 then bits[#bits + 1] = L["7d"] .. " " .. FT.Pct(s.ch7) end
         if s.rsi then bits[#bits + 1] = L["Hype"] .. " " .. string.format("%.0f", s.rsi) end
         if #bits > 0 then out[#out + 1] = { FT.C("dim", table.concat(bits, "  ·  ")) } end
+        out[#out + 1] = { FT.C("dim", L["Price from"] .. ": " .. FT.PriceFrom(itemID)) }
     elseif FT.S.tooltipHint ~= false then
         -- (the hint fits on line 2 when there's room)
     end
@@ -921,12 +922,41 @@ end
 -- The session panel: small, movable, on screen only while a session runs
 ---------------------------------------------------------------------------
 local hud
-local HUD_ROWS = 4
+-- The session panel: worth, gold an hour, what you just looted, and everything found - scroll it with the mouse
+-- wheel, drag its bottom-right corner for more or fewer rows (remembered), hover a row for then and now.
+local HUD_MIN, HUD_MAX, HUD_DEFAULT, ROW_H = 3, 14, 6, 16
+local JUST_LOOTED = 6 -- seconds the "+3 Thorium Ore" line stays
+
+local function HudRows()
+    local n = FT.db.ui and FT.db.ui.hudRows
+    return math.max(HUD_MIN, math.min(HUD_MAX, tonumber(n) or HUD_DEFAULT))
+end
+
+local function HudHeight(rows) return 92 + rows * ROW_H end
+
+local function HudRowTip(self)
+    local it = self.item
+    if not it then return end
+    GameTooltip:SetOwner(self, "ANCHOR_LEFT")
+    if GameTooltip.SetItemByID then GameTooltip:SetItemByID(it.id) end
+    GameTooltip:AddLine(" ")
+    GameTooltip:AddDoubleLine(L["Found"], "x" .. FT.Num(it.qty), 0.8, 0.82, 0.86, 1, 1, 1)
+    if it.thenUnit then
+        GameTooltip:AddDoubleLine(L["Worth each when found"], FT.Money(math.floor(it.thenUnit), "short"), 0.8, 0.82, 0.86, 1, 1, 1)
+    end
+    if it.unit then
+        local ch = it.thenUnit and it.thenUnit > 0 and (it.unit / it.thenUnit - 1) or nil
+        GameTooltip:AddDoubleLine(L["Worth each now"], FT.Money(math.floor(it.unit), "short") .. (ch and ("  " .. FT.Pct(ch)) or ""), 0.8, 0.82, 0.86, 1, 1, 1)
+        GameTooltip:AddDoubleLine(L["All of them"], FT.Money(math.floor(it.value), "short"), 0.8, 0.82, 0.86, 1, 1, 1)
+    end
+    GameTooltip:AddLine(L["Price from"] .. ": " .. FT.PriceFrom(it.id), 0.6, 0.64, 0.7, true)
+    GameTooltip:Show()
+end
 
 local function BuildHUD()
     UI.ResolveFont()
     local h = CreateFrame("Frame", "WolfOfBootyBaySession", UIParent)
-    h:SetSize(250, 74 + HUD_ROWS * 16)
+    h:SetSize(260, HudHeight(HudRows()))
     h:SetFrameStrata("MEDIUM")
     h:SetClampedToScreen(true)
     h:EnableMouse(true)
@@ -956,16 +986,43 @@ local function BuildHUD()
     h.worth:SetPoint("TOPLEFT", 10, -24)
     h.rate = UI.Text(h, 12, "up", "RIGHT")
     h.rate:SetPoint("TOPRIGHT", -10, -27)
+    -- what you just looted (a few seconds), or how many have no price yet
+    h.just = UI.Text(h, 11, "up")
+    h.just:SetPoint("TOPLEFT", 10, -44)
+    h.just:SetPoint("RIGHT", h, "RIGHT", -10, 0)
+    -- the rows: a frame each, so a hover shows the item, then and now
     h.rows = {}
-    for i = 1, HUD_ROWS do
-        local l = UI.Text(h, 11, "muted")
-        l:SetPoint("TOPLEFT", 10, -46 - (i - 1) * 16)
-        l:SetPoint("RIGHT", h, "RIGHT", -70, 0)
-        if l.SetWordWrap then l:SetWordWrap(false) end
-        local r = UI.Text(h, 11, "text", "RIGHT")
-        r:SetPoint("TOPRIGHT", -10, -46 - (i - 1) * 16)
-        h.rows[i] = { l, r }
+    for i = 1, HUD_MAX do
+        local r = CreateFrame("Button", nil, h)
+        r:SetHeight(ROW_H)
+        r:SetPoint("TOPLEFT", 6, -60 - (i - 1) * ROW_H)
+        r:SetPoint("RIGHT", h, "RIGHT", -12, 0)
+        r.hl = UI.Tex(r, "BACKGROUND", "text", 0.06)
+        r.hl:SetAllPoints()
+        r.hl:Hide()
+        r.l = UI.Text(r, 11, "muted")
+        r.l:SetPoint("LEFT", 4, 0)
+        r.l:SetPoint("RIGHT", r, "RIGHT", -64, 0)
+        r.r = UI.Text(r, 11, "text", "RIGHT")
+        r.r:SetPoint("RIGHT", -2, 0)
+        r:SetScript("OnEnter", function(self) self.hl:Show(); HudRowTip(self) end)
+        r:SetScript("OnLeave", function(self) self.hl:Hide(); GameTooltip:Hide() end)
+        r:SetScript("OnClick", function(self) if self.item and not UI.ItemClick(self.item.id) then FT.OpenItem(self.item.id) end end)
+        r:SetScript("OnMouseWheel", function(_, d) h:GetScript("OnMouseWheel")(h, d) end)
+        h.rows[i] = r
     end
+    -- the scrollbar: a thin track and a thumb, only when there is more than fits
+    h.track = UI.Tex(h, "ARTWORK", "line", 0.8)
+    h.track:SetWidth(2)
+    h.track:SetPoint("TOPRIGHT", -5, -60)
+    h.thumb = UI.Tex(h, "OVERLAY", "muted", 0.9)
+    h.thumb:SetWidth(2)
+    h.offset = 0
+    h:EnableMouseWheel(true)
+    h:SetScript("OnMouseWheel", function(self, d)
+        self.offset = math.max(0, math.min((self.total or 0) - HudRows(), self.offset - d))
+        FT.UpdateHUD()
+    end)
     h.pause = UI.Button(h, L["Pause"], 10, 20, "default", function() FT.Session.Pause() end)
     h.pause:FitText(16)
     h.pause:SetPoint("BOTTOMLEFT", 8, 6)
@@ -974,7 +1031,33 @@ local function BuildHUD()
     h.stop:SetPoint("LEFT", h.pause, "RIGHT", 6, 0)
     h.open = UI.Button(h, L["Details"], 10, 20, "default", function() FT.Show("sessions") end)
     h.open:FitText(16)
-    h.open:SetPoint("BOTTOMRIGHT", -8, 6)
+    h.open:SetPoint("BOTTOMRIGHT", -18, 6)
+    -- the corner to drag: more or fewer rows
+    h.grip = CreateFrame("Button", nil, h)
+    h.grip:SetSize(12, 12)
+    h.grip:SetPoint("BOTTOMRIGHT", -2, 2)
+    h.grip.tex = h.grip:CreateTexture(nil, "OVERLAY")
+    h.grip.tex:SetAllPoints()
+    h.grip.tex:SetTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Up")
+    h.grip:SetScript("OnEnter", function(self) UI.TipText(self, L["More rows"], L["Drag down for more rows, up for fewer."]) end)
+    h.grip:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    h.grip:SetScript("OnMouseDown", function(self)
+        local _, y = GetCursorPosition()
+        self.startY, self.startRows = y / UIParent:GetEffectiveScale(), HudRows()
+    end)
+    h.grip:SetScript("OnMouseUp", function(self) self.startY = nil end)
+    h.grip:SetScript("OnUpdate", function(self)
+        if not self.startY then return end
+        local _, y = GetCursorPosition()
+        y = y / UIParent:GetEffectiveScale()
+        local rows = math.max(HUD_MIN, math.min(HUD_MAX, self.startRows + math.floor((self.startY - y) / ROW_H + 0.5)))
+        if rows ~= HudRows() then
+            FT.db.ui = FT.db.ui or {}
+            FT.db.ui.hudRows = rows
+            h:SetHeight(HudHeight(rows))
+            FT.UpdateHUD()
+        end
+    end)
     h.elapsed = 0
     h:SetScript("OnUpdate", function(self, e)
         self.elapsed = self.elapsed + e
@@ -1003,16 +1086,43 @@ function FT.UpdateHUD()
     h.time:SetText(string.format("%d:%02d:%02d", math.floor(secs / 3600), math.floor(secs % 3600 / 60), secs % 60))
     h.worth:SetText(FT.Money(math.floor(sum.worth), "short"))
     h.rate:SetText(sum.perHour and (FT.Money(math.floor(sum.perHour), "short") .. FT.C("dim", " " .. L["/ hour"])) or FT.C("dim", L["counting..."]))
-    local lines = {}
-    if (sum.money or 0) > 0 then lines[#lines + 1] = { L["Gold looted"], FT.Money(sum.money, "short") } end
-    for _, it in ipairs(sum.items) do
-        if #lines >= HUD_ROWS then break end
-        lines[#lines + 1] = { FT.ItemText(it.id, 22) .. FT.C("dim", " x" .. FT.Num(it.qty)), FT.Money(math.floor(it.value), "short") }
+    if s.lastT and time() - s.lastT <= JUST_LOOTED and s.lastLoot then
+        h.just:SetText("+" .. FT.Num(s.lastN or 1) .. " " .. FT.ItemText(s.lastLoot, 26))
+    elseif (sum.unpriced or 0) > 0 then
+        h.just:SetText(FT.C("dim", string.format(sum.unpriced == 1 and L["%d item has no price yet"] or L["%d items have no price yet"], sum.unpriced)))
+    else
+        h.just:SetText("")
     end
-    if #lines == 0 then lines[1] = { FT.C("dim", L["Loot something: it shows here."]), "" } end
+    local lines = {}
+    if (sum.money or 0) > 0 then lines[#lines + 1] = { text = L["Gold looted"], value = FT.Money(sum.money, "short") } end
+    for _, it in ipairs(sum.items) do
+        lines[#lines + 1] = { item = it, text = FT.ItemText(it.id, 22) .. FT.C("dim", " x" .. FT.Num(it.qty)),
+            value = it.unit and FT.Money(math.floor(it.value), "short") or FT.C("dim", L["no price"]) }
+    end
+    if #lines == 0 then lines[1] = { text = FT.C("dim", L["Loot something: it shows here."]), value = "" } end
+    local rows = HudRows()
+    if math.floor(h:GetHeight() + 0.5) ~= HudHeight(rows) then h:SetHeight(HudHeight(rows)) end
+    h.total = #lines
+    h.offset = math.max(0, math.min(h.offset or 0, #lines - rows))
     for i, r in ipairs(h.rows) do
-        r[1]:SetText(lines[i] and lines[i][1] or "")
-        r[2]:SetText(lines[i] and lines[i][2] or "")
+        local x = i <= rows and lines[i + h.offset] or nil
+        r:SetShown(i <= rows)
+        r.item = x and x.item or nil
+        -- the newest loot lights up for a few seconds
+        local fresh = x and x.item and x.item.last and s.lastT and time() - s.lastT <= JUST_LOOTED
+        r.l:SetText(x and (fresh and FT.C("up", x.text) or x.text) or "")
+        r.r:SetText(x and x.value or "")
+    end
+    local more = #lines > rows
+    h.track:SetShown(more)
+    h.thumb:SetShown(more)
+    if more then
+        local trackH = rows * ROW_H
+        h.track:SetHeight(trackH)
+        local thumbH = math.max(8, trackH * rows / #lines)
+        h.thumb:SetHeight(thumbH)
+        h.thumb:ClearAllPoints()
+        h.thumb:SetPoint("TOPRIGHT", -5, -60 - (trackH - thumbH) * (h.offset / math.max(1, #lines - rows)))
     end
     h.pause:SetLabel(s.paused and L["Resume"] or L["Pause"])
     h.pause:FitText(16)

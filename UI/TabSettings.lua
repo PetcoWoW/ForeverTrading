@@ -353,6 +353,25 @@ function T.Build(p)
     tour:FitText(28)
     tour:SetPoint("LEFT", news, "RIGHT", 8, 0)
 
+    -- every chat command, for reference (all of them have a button somewhere: these are the rare way)
+    local cm = Section(right, L["Chat commands"], #FT.COMMANDS + 1)
+    local cy = -40
+    local hint = UI.Text(cm, 11, "dim")
+    hint:SetPoint("TOPLEFT", 14, cy)
+    hint:SetPoint("RIGHT", cm, "RIGHT", -14, 0)
+    hint:SetText(L["Rarely needed: the window and the minimap button do all of it. Type them in chat."])
+    cy = cy - ROW
+    for _, c in ipairs(FT.COMMANDS) do
+        local k = UI.Text(cm, 11, "accent")
+        k:SetPoint("TOPLEFT", 14, cy)
+        k:SetText(c[1])
+        local d = UI.Text(cm, 11, "muted")
+        d:SetPoint("TOPLEFT", k, "BOTTOMLEFT", 0, -1)
+        d:SetPoint("RIGHT", cm, "RIGHT", -14, 0)
+        d:SetText(L[c[2]])
+        cy = cy - ROW
+    end
+
     local function Stack(col, sections)
         local y = 0
         for _, s in ipairs(sections) do
@@ -380,7 +399,7 @@ function T.Build(p)
         local all = FT.S.showAdvanced
         for _, s in ipairs({ g, sc, so, pr, sg, ex, dt }) do s:SetShown(all and true or false) end
         local h1 = Stack(left, all and { bs, g, sc, so, pr, al } or { bs, al })
-        local h2 = Stack(right, all and { sg, ex, dt, ab } or { ab })
+        local h2 = Stack(right, all and { sg, ex, dt, ab, cm } or { ab, cm })
         left:SetHeight(h1)
         right:SetHeight(h2)
         content:SetHeight(math.max(h1, h2))
