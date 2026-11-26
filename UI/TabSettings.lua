@@ -140,7 +140,7 @@ function T.Build(p)
     local right = CreateFrame("Frame", nil, content)
 
     -- the basics: what most people ever change; the rest behind "Show all settings"
-    local bs = Section(left, L["Basics"], 8)
+    local bs = Section(left, L["Basics"], 9)
     Choice(bs, "look", L["Look"], { { "classic", L["Classic auction house"] }, { "dark", L["Dark terminal"] } },
         L["Classic: the game's own look, stone-and-gold edges, red buttons, gold labels, like the auction house. Dark: the exchange terminal at night. Takes effect after a reload."],
         function() FT.AskReload(L["The new look shows after the interface reloads. Reload now?"]) end)
@@ -159,11 +159,12 @@ function T.Build(p)
     Check(bs, "tooltip", L["Lines in item tooltips"], L["Two lines on every item: what to do and its price, then its best use or craft profit. Hold Shift for more."])
     Check(bs, "ticker", L["Ticker tape under the header"], L["Your watchlist and the day's biggest movers, scrolling. Takes effect after /reload."],
         function() FT.AskReload() end)
+    Check(bs, "tickerMove", L["Keep the ticker moving under the mouse"], L["Off: the tape stops while you point at it, so an item is easy to click."])
     Check(bs, "showAdvanced", L["Show all settings"], L["Thresholds, sources, scanning, your data and more."],
         function() if T.Layout then T.Layout() end end)
 
     -- general
-    local g = Section(left, L["General"], 13)
+    local g = Section(left, L["General"], 14)
     Choice(g, "look", L["Look"], { { "classic", L["Classic auction house"] }, { "dark", L["Dark terminal"] } },
         L["Classic: the game's own look, stone-and-gold edges, red buttons, gold labels, like the auction house. Dark: the exchange terminal at night. Takes effect after a reload."],
         function() FT.AskReload(L["The new look shows after the interface reloads. Reload now?"]) end)
@@ -193,6 +194,7 @@ function T.Build(p)
         function() FT.AskReload() end)
     Check(g, "ticker", L["Ticker tape under the header"], L["Your watchlist and the day's biggest movers, scrolling. Takes effect after /reload."],
         function() FT.AskReload() end)
+    Check(g, "tickerMove", L["Keep the ticker moving under the mouse"], L["Off: the tape stops while you point at it, so an item is easy to click."])
     Check(g, "minimap", L["Minimap button"], nil, function() if FT.UpdateMinimap then FT.UpdateMinimap() end end)
     Check(g, "ahButton", L["Snipe tab at the auction house"], L["A Snipe tab in the auction house window: after a scan, what's listed under its price, with how sure and a Buy button."])
     Check(g, "replaceAH", L["Open Wolf of Booty Bay instead of the auction house window"],

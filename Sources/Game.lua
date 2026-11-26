@@ -53,6 +53,23 @@ end
 -- complete: the list is every recipe learned (the newer API gives them all, whatever the window shows).
 -- The older one reads what the window shows: with a search or "have materials" on that is a part, so the
 -- recipes read before stay (a recipe once learned isn't lost) - the poisons vanished that way.
+-- what a recipe list is, for telling whether a scan changed anything: every craft makes the game send its
+-- "recipes updated" (the counts you can make changed), and re-working every craft profit each time was the lag
+-- while crafting. Cooldowns and the counts don't count; a new recipe, a reagent or a colour (skill-ups) does.
+local function Signature(list)
+    local parts = {}
+    for _, r in ipairs(list or {}) do
+        if type(r) == "table" then
+            local rs = {}
+            for _, g in ipairs(r.reagents or {}) do rs[#rs + 1] = tostring(g.itemID) .. "x" .. tostring(g.qty) end
+            parts[#parts + 1] = table.concat({ tostring(r.output), tostring(r.name), tostring(r.outputQty),
+                tostring(r.diff), table.concat(rs, ",") }, ":")
+        end
+    end
+    table.sort(parts)
+    return table.concat(parts, ";")
+end
+
 local function Store(prof, list, complete)
     if not (FT.charKey and prof and list and #list > 0) then return end
     FT.db.recipes[FT.charKey] = FT.db.recipes[FT.charKey] or {}
@@ -69,9 +86,10 @@ local function Store(prof, list, complete)
             end
         end
     end
+    local same = type(old) == "table" and Signature(old.list) == Signature(list)
     FT.db.recipes[FT.charKey][key] = { scanned = time(), list = list, name = prof }
-    FT.Debug("recipes:", prof, #list - kept, "read,", kept, "kept from before")
-    FT.Debounce("recipesChanged", 0.5, function() FT.Fire("FT_RECIPES_CHANGED") end)
+    FT.Debug("recipes:", prof, #list - kept, "read,", kept, "kept from before", same and "(unchanged)" or "")
+    if not same then FT.Debounce("recipesChanged", 0.5, function() FT.Fire("FT_RECIPES_CHANGED") end) end
 end
 
 local function ScanTradeClassic()
@@ -379,13 +397,22 @@ function FT.BagItems()
     return out
 end
 
+-- bags change with every craft: while a profession window is open, what's held is worked out again only once
+-- crafting stops for a few seconds (each craft used to rebuild deals, holdings and the open page)
+local function InvChanged()
+    local crafting = (TradeSkillFrame and TradeSkillFrame:IsShown()) or (CraftFrame and CraftFrame:IsShown())
+        or (ProfessionsFrame and ProfessionsFrame:IsShown())
+    FT.Debounce("invChanged", crafting and 5 or 1, function() FT.Fire("FT_INVENTORY_CHANGED") end)
+end
+G.InvChanged = InvChanged
+
 local bankOpen = false
 function G.ScanBags()
     if not FT.charKey then return end
     local inv = MyInv()
     inv.bags, inv.bagsBound = ReadBags(BagList())
     inv.t = time()
-    FT.Debounce("invChanged", 1, function() FT.Fire("FT_INVENTORY_CHANGED") end)
+    InvChanged()
 end
 
 function G.ScanBank()
@@ -393,7 +420,7 @@ function G.ScanBank()
     local inv = MyInv()
     inv.bank, inv.bankBound = ReadBags(BankList())
     inv.bankT = time()
-    FT.Debounce("invChanged", 1, function() FT.Fire("FT_INVENTORY_CHANGED") end)
+    InvChanged()
 end
 
 FT.On("PLAYER_ENTERING_WORLD", function() C_Timer.After(3, G.ScanBags) end)
@@ -424,7 +451,7 @@ function G.ScanMail()
     end
     local inv = MyInv()
     inv.mail, inv.mailT = counts, time()
-    FT.Debounce("invChanged", 1, function() FT.Fire("FT_INVENTORY_CHANGED") end)
+    InvChanged()
 end
 
 FT.On("MAIL_SHOW", function() mailOpen = true end)

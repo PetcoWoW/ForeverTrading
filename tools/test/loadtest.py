@@ -225,6 +225,34 @@ end)
 step("look", function()
   print("look: " .. FT.UI.theme .. ", nav tabs: " .. tostring(FT.MainRefs and FT.MainRefs.nav and #FT.MainRefs.nav.tabs))
 end)
+step("v0.24 pieces", function()
+  local m = FT.NameMatcher("thor ore")
+  local hits, named = {}, 0
+  for _, r in ipairs(FT.Market.Rows() or {}) do
+    if FT.Name(r.id) then named = named + 1 end
+    if m(r.id) and #hits < 4 then hits[#hits + 1] = FT.Name(r.id) end
+  end
+  print("search 'thor ore': " .. table.concat(hits, ", ") .. " (of " .. named .. " named)")
+  local realName = FT.Name
+  local function Try(name, q) FT.Name = function() return name end; local ok = FT.NameMatcher(q)(1); FT.Name = realName; return ok end
+  assert(Try("Thorium Ore", "thor ore") and Try("Thorium Ore", "ore thor") and Try("Thorium Bar", "thor"), "word search")
+  assert(not Try("Thorium Bar", "thor ore") and Try("Black Lotus", "lotus bl") and not Try("Thorium Ore", '"thor ore"'), "word search 2")
+  print("word search ok")
+  FT.Show("market")
+  local T = FT.Tabs.market
+  T.ToggleFilters(T.filterBtn)
+  assert(T.clsDD and T.subDD and T.sortDD, "filter popup dropdowns")
+  T.ToggleFilters(T.filterBtn)
+  T.RefreshList()
+  local farm = FT.Tabs.signals.FarmRows()
+  print(string.format("farm: %d rows, top %s: %s each, %.0f a day, you ~%s", #farm, tostring(farm[1] and FT.Name(farm[1].id)),
+    tostring(farm[1] and farm[1].price), farm[1] and farm[1].perDay or 0, tostring(farm[1] and math.floor(farm[1].yours))))
+  FT.UpdateTicker(); FT.UpdateTicker()
+  print("movers up/down: " .. #FT.Market.Movers(20, "ch1", true) .. "/" .. #FT.Market.Movers(20, "ch1", false))
+  FT.Show("radar")
+  assert(FT.Tabs.radar.sign, "radar sign")
+  FT.Show("market")
+end)
 step("open item", function() FT.OpenItem(12363) end)
 mock.run(1)
 step("best use", function() FT.ShowBestUse(12359) end)

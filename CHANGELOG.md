@@ -1,5 +1,22 @@
 # The Wolf of Booty Bay
 
+## v0.24 - smoother, cleaner Terminal
+
+- Search: every word you type is matched as a part of the name, in any order ("thor ore" finds Thorium Ore).
+  Item names load quietly in the background after login and are kept, so a search finds them the first time.
+- The Terminal list: category, subcategory and sort moved into the Filter popup; what's set shows as chips
+  under the list's top row (× clears it), and the Filter button counts them. Column titles still sort.
+- Ticker: no longer jumps back to the start when prices refresh; it stops under the mouse so an item is easy to
+  click (Settings: "Keep the ticker moving under the mouse").
+- Crafting no longer lags the window: a craft used to re-read every recipe and rebuild every profit; now only a
+  real recipe change does, and bag changes wait until you stop crafting.
+- To the moon / Rug pulls never come up empty: checked again once sales are known, and the looser list shows
+  meanwhile.
+- Farm it: what each sells for and how many sell a day, ranked by what one farmer could make (not the whole
+  market's trade).
+- Radar moved to the last tab, marked work in progress, with a construction sign.
+- Classic look: the title banner's text sits in the middle of the banner.
+
 ## v0.23 - the classic auction house look
 
 - New look, the default: the game's own auction house style everywhere. Windows and dialogs get the game's

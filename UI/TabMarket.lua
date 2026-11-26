@@ -185,26 +185,45 @@ local function Filtered()
     return out, count
 end
 
--- names the game hasn't loaded yet, asked for a few at a time while you search (no flood of requests)
-local loader
-function T.LoadMissingNames()
-    if loader then return end
+-- Names the game hasn't loaded yet: a search can only find a name it knows. While you search, 80 every quarter
+-- second; in the background after login (background), 20 a second until every item on the market has its name -
+-- they're kept between sessions, so a search finds "thor" the first time after that.
+local loader, loaderQuiet
+function T.LoadMissingNames(background)
+    if loader then
+        -- a search while the quiet one runs: faster from now on
+        if not background and loaderQuiet then loader:Cancel(); loader = nil else return end
+    end
+    if not background then FT.LoudItems() end
     local missing = {}
     for _, r in ipairs(FT.Market.Rows() or {}) do
         if not FT.Name(r.id) then missing[#missing + 1] = r.id end
     end
     if #missing == 0 then return end
     local i = 1
-    loader = C_Timer.NewTicker(0.5, function()
-        if (state.search == "" and not FiltersOn()) or i > #missing then
+    local per, every = background and 10 or 80, background and 0.5 or 0.25
+    loaderQuiet = background
+    loader = C_Timer.NewTicker(every, function()
+        local stop = i > #missing or (not background and state.search == "" and not FiltersOn())
+        if stop then
             loader:Cancel()
             loader = nil
+            -- a search stopped early: the rest quietly
+            if i <= #missing and not background then C_Timer.After(5, function() T.LoadMissingNames(true) end) end
             return
         end
-        for k = i, math.min(i + 39, #missing) do FT.RequestItem(missing[k]) end
-        i = i + 40
+        if background and InCombatLockdown and InCombatLockdown() then return end
+        for k = i, math.min(i + per - 1, #missing) do FT.RequestItem(missing[k], background) end
+        i = i + per
     end)
 end
+-- once the market is known after login, the names it lacks, quietly
+local namesAsked = false
+FT.On("FT_MARKET_READY", function()
+    if namesAsked then return end
+    namesAsked = true
+    C_Timer.After(90, function() T.LoadMissingNames(true) end)
+end)
 
 -- names arrived: the rows on screen show them; a search takes the new matches in now and then
 function T.OnItems()
@@ -253,9 +272,55 @@ local function UpdateSubs()
     UI.SetTextColor(dd.label, real and "text" or "dim")
 end
 
+-- the chips of what the Filter popup has set: the category (or its subcategory) and "Filters" (level, usable,
+-- quality); each × clears its part. The Filter button counts them.
+local activeChips = {}
+local function UpdateActive()
+    local row = T.activeRow
+    if not row then return end
+    local parts = {}
+    if state.cls ~= "all" then
+        local name = state.cls == "other" and L["Other"] or ClassName(state.cls)
+        if state.sub ~= "all" and GetSubClassInfo then
+            local sn = GetSubClassInfo(state.cls, state.sub)
+            if sn and sn ~= "" then name = sn end
+        end
+        parts[#parts + 1] = { name, function()
+            state.cls, state.sub = "all", "all"
+            if T.clsDD then T.clsDD:SetValue("all") end
+            T.RefreshList()
+        end }
+    end
+    if FiltersOn() then
+        parts[#parts + 1] = { L["Filters"], function()
+            T.ResetFilters()
+            T.SyncFilters()
+        end }
+    end
+    local x = 0
+    for i, part in ipairs(parts) do
+        local c = activeChips[i]
+        if not c then
+            c = UI.Button(row, "", 10, row:GetHeight(), "ghost", function(self) if self.clear then self.clear() end end)
+            c:SetTip(L["Clear"], L["Shows everything of this kind again."])
+            activeChips[i] = c
+        end
+        c.clear = part[2]
+        c:SetLabel(FT.C("accent", part[1]) .. FT.C("dim", "  ×"))
+        c:FitText(14)
+        c:ClearAllPoints()
+        c:SetPoint("LEFT", x, 0)
+        c:Show()
+        x = x + c:GetWidth() + 4
+    end
+    for i = #parts + 1, #activeChips do activeChips[i]:Hide() end
+    if T.filterBtn then T.filterBtn:SetLabel(#parts > 0 and (L["Filter"] .. " (" .. #parts .. ")") or L["Filter"]) end
+end
+
 function T.RefreshList(keepOffset)
     if not list then return end
     UpdateSubs()
+    UpdateActive()
     local items, count = Filtered()
     if not items then
         list:SetEmptyText(FT.Market.Building() and L["Reading the market..."] or
@@ -354,7 +419,7 @@ local function BuildList(parent)
     local row1 = { Chip("all", L["All"]), Chip("fav", L["Watchlist"]), Chip("mine", L["My recipes"]),
         Chip("bags", L["I own"]) }
     local row2 = { Chip("up", L["Rising"]), Chip("down", L["Falling"]) }
-    local Y1, Y2, Y3 = -42, -42 - RH - GAP, -42 - 2 * (RH + GAP)
+    local Y1, Y2 = -42, -42 - RH - GAP
     for i, c in ipairs(row1) do
         local x, w = Cell(i, 1)
         c:SetSize(w, RH)
@@ -370,44 +435,11 @@ local function BuildList(parent)
     for _, c in ipairs(chips) do c:SetOn(c.key == state.filter) end
     T.chips = chips
 
-    local clsOptions = { { "all", L["All categories"] } }
-    for _, c in ipairs(CLASSES) do clsOptions[#clsOptions + 1] = { c, ClassName(c) } end
-    clsOptions[#clsOptions + 1] = { "other", L["Other"] }
-    -- what kind: the category and its subcategory side by side (the row under the chips)
-    local half = select(2, Cell(1, 2))
-    local cls = UI.Dropdown(panel, half, clsOptions, function(v)
-        state.cls, state.sub = v, "all"
-        T.RefreshList()
-    end)
-    cls:SetHeight(RH)
-    cls:SetPoint("TOPLEFT", Cell(1, 2), Y3)
-    cls:SetValue("all")
-    T.clsDD = cls
-
-    local sortOptions = {
-        { "cap", L["Sort: market value"] }, { "ch1", L["Sort: 24h change"] }, { "ch7", L["Sort: 7d change"] },
-        { "price", L["Sort: price"] }, { "qty", L["Sort: listed"] }, { "name", L["Sort: name"] },
-    }
-    local sortDD = UI.Dropdown(panel, half, sortOptions, function(v)
-        state.sort = v
-        state.desc = v ~= "name"
-        T.header:SetSort(v, state.desc)
-        T.RefreshList()
-    end)
-    -- the order: on the right of the rising / falling chips
-    sortDD:SetHeight(RH)
-    sortDD:SetPoint("TOPLEFT", Cell(3, 2), Y2)
-    sortDD:SetValue(state.sort)
-    T.sortDD = sortDD
-    -- the subcategory of the chosen category (armor: cloth, leather...; trade goods: cloth, metal...)
-    local subDD = UI.Dropdown(panel, half, { { "all", L["All subcategories"] } }, function(v)
-        state.sub = v
-        T.RefreshList()
-    end)
-    subDD:SetHeight(RH)
-    subDD:SetPoint("TOPLEFT", Cell(3, 2), Y3)
-    subDD:SetValue("all")
-    T.subDD = subDD
+    -- what's chosen in the Filter popup (category, subcategory, a filter on): chips under the Rising / Falling
+    -- ones, each × clears it
+    T.activeRow = CreateFrame("Frame", nil, panel)
+    T.activeRow:SetPoint("TOPLEFT", select(1, Cell(3, 1)), Y2)
+    T.activeRow:SetSize(select(2, Cell(3, 2)), RH)
     countText = UI.Text(panel, 11, "dim", "RIGHT")
     countText:SetPoint("BOTTOMRIGHT", -12, 6)
 
@@ -424,11 +456,11 @@ local function BuildList(parent)
             state.sort, state.desc = key, key ~= "name"
         end
         T.header:SetSort(state.sort, state.desc)
-        T.sortDD:SetValue(state.sort)
+        if T.sortDD then T.sortDD:SetValue(state.sort) end
         T.RefreshList()
     end)
-    T.header:SetPoint("TOPLEFT", 1, Y3 - RH - 8)
-    T.header:SetPoint("TOPRIGHT", -1, Y3 - RH - 8)
+    T.header:SetPoint("TOPLEFT", 1, Y2 - RH - 8)
+    T.header:SetPoint("TOPRIGHT", -1, Y2 - RH - 8)
     T.header:SetSort(state.sort, state.desc)
 
     list = UI.List(panel, {
@@ -783,9 +815,9 @@ function T.FillMoves()
     local farm = FT.Tabs.signals and FT.Tabs.signals.FarmRows and FT.Tabs.signals.FarmRows()
     local f1 = farm and farm[1]
     if f1 then
-        cards[#cards + 1] = { id = f1.id, kind = L["FARM IT"], gold = FT.Money(math.floor(f1.sortV or 0), "short") .. FT.C("dim", " " .. L["a day"]),
-            what = string.format(L["%s: the market buys the most of it"], FT.ItemText(f1.id, 24)),
-            tip = L["What the market pays for it a day, all sellers together: price x how many sell a day."] }
+        cards[#cards + 1] = { id = f1.id, kind = L["FARM IT"], gold = FT.Money(f1.price or 0, "short") .. FT.C("dim", " " .. L["each"]),
+            what = string.format(L["%s: sells ~%s a day"], FT.ItemText(f1.id, 24), FT.Num(math.floor((f1.perDay or 0) + 0.5))),
+            tip = string.format(L["One farmer selling a share of each day's sales makes about %s a day from it."], FT.Money(math.floor(f1.yours or 0), "short")) }
     end
     -- fewer than three: the best craft, buy-to-disenchant and vendor deals fill in
     if #cards < 3 then
@@ -1372,9 +1404,54 @@ local function BuildFilters()
     end
     y = y - 8
 
+    -- what kind: the category, then its subcategory (armor: cloth, leather...; trade goods: cloth, metal...)
+    Title(L["Category"])
+    local clsOptions = { { "all", L["All categories"] } }
+    for _, c in ipairs(CLASSES) do clsOptions[#clsOptions + 1] = { c, ClassName(c) } end
+    clsOptions[#clsOptions + 1] = { "other", L["Other"] }
+    local cls = UI.Dropdown(p, 192, clsOptions, function(v)
+        state.cls, state.sub = v, "all"
+        T.RefreshList()
+    end)
+    cls:SetHeight(22)
+    cls:SetPoint("TOPLEFT", 14, y)
+    cls:SetValue(state.cls)
+    T.clsDD = cls
+    y = y - 28
+    local subDD = UI.Dropdown(p, 192, { { "all", L["All subcategories"] } }, function(v)
+        state.sub = v
+        T.RefreshList()
+    end)
+    subDD:SetHeight(22)
+    subDD:SetPoint("TOPLEFT", 14, y)
+    subDD:SetValue(state.sub)
+    T.subDD = subDD
+    y = y - 34
+
+    -- the order (clicking a column title in the list sorts too)
+    Title(L["Sort"])
+    local sortOptions = {
+        { "cap", L["Market value"] }, { "ch1", L["24h change"] }, { "ch7", L["7d change"] },
+        { "price", L["Price"] }, { "qty", L["Listed"] }, { "name", L["Name"] },
+    }
+    local sortDD = UI.Dropdown(p, 192, sortOptions, function(v)
+        state.sort = v
+        state.desc = v ~= "name"
+        T.header:SetSort(v, state.desc)
+        T.RefreshList()
+    end)
+    sortDD:SetHeight(22)
+    sortDD:SetPoint("TOPLEFT", 14, y)
+    sortDD:SetValue(state.sort)
+    T.sortDD = sortDD
+    y = y - 34
+
     p.reset = UI.Button(p, L["Reset"], 10, 22, "default", function()
         T.ResetFilters()
+        state.cls, state.sub = "all", "all"
+        T.clsDD:SetValue("all")
         T.SyncFilters()
+        T.RefreshList()
     end)
     p.reset:FitText(24)
     p.reset:SetPoint("TOPLEFT", 14, y)
@@ -1394,6 +1471,8 @@ function T.SyncFilters()
     p.usable:SetChecked(filt.usable)
     if p.uncollected then p.uncollected:SetChecked(filt.uncollected) end
     for q, c in pairs(p.quality) do c:SetChecked(filt.quality[q]) end
+    if T.clsDD then T.clsDD:SetValue(state.cls) end
+    if T.sortDD then T.sortDD:SetValue(state.sort) end
 end
 
 function T.ResetFilters()

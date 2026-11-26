@@ -4,7 +4,7 @@ local L = FT.L
 
 -- The version being released: a copy straight from the repository (not packaged) has no version in its TOC yet
 -- (the packager puts the tag there) and shows this one. Set it with every release.
-local RELEASE = "v0.23"
+local RELEASE = "v0.24"
 local GetMeta = (C_AddOns and C_AddOns.GetAddOnMetadata) or GetAddOnMetadata
 FT.VERSION = (GetMeta and GetMeta(ADDON, "Version")) or RELEASE
 if FT.VERSION == "" or FT.VERSION:find("@", 1, true) then FT.VERSION = RELEASE end
@@ -127,6 +127,7 @@ end
 -- Saved data
 ---------------------------------------------------------------------------
 FT.DEFAULTS = {
+    tickerMove = false,     -- the ticker keeps moving under the mouse (off: it stops so the item is easy to click)
     look = "classic",       -- classic (the game's own auction house look) / dark (the exchange terminal), after a reload
     words = "plain",        -- plain (Plain English) / trader (the trader terms), after a reload
     useFeed = true,         -- the price feed shipped with the addon (Sources/Feed.lua)
@@ -509,20 +510,27 @@ function FT.Fold(s)
     return (s:lower():gsub("\208[\128-\175]", CYRILLIC))
 end
 
--- A search as typed: "name" in quotes is that name exactly, anything else a part of the name.
+-- A search as typed: "name" in quotes is that name exactly; anything else, word by word, each word a part of the
+-- name in any order ("thor ore" finds Thorium Ore, "ore thor" too; "lotus bl" Black Lotus).
 -- Returns a test fn(itemID) -> true when the item's name matches (nil: an empty search, everything matches).
 function FT.NameMatcher(text)
     local q = FT.Fold(text or ""):gsub("^%s+", ""):gsub("%s+$", "")
     if q == "" then return nil end
     local exact = q:match('^"(.+)"$')
-    local part = not exact and q:gsub('^"', ""):gsub('"$', "") or nil
-    if part == "" then return nil end
+    local words = {}
+    if not exact then
+        for w in q:gsub('"', ""):gmatch("%S+") do words[#words + 1] = w end
+        if #words == 0 then return nil end
+    end
     return function(itemID)
         local name = FT.Name(itemID)
         if not name then return false end
         name = FT.Fold(name)
         if exact then return name == exact end
-        return name:find(part, 1, true) ~= nil
+        for _, w in ipairs(words) do
+            if not name:find(w, 1, true) then return false end
+        end
+        return true
     end
 end
 
@@ -616,15 +624,25 @@ function FT.ItemClass(itemID)
 end
 
 local requested = {}
-function FT.RequestItem(itemID)
+-- quiet: only its name is wanted (kept for searching); nothing on screen redraws when it arrives
+local quietAsk = {}
+-- a search is on: what was asked quietly redraws the list when it arrives after all
+function FT.LoudItems() wipe(quietAsk) end
+function FT.RequestItem(itemID, quiet)
     if requested[itemID] then return end
     requested[itemID] = true
+    if quiet then quietAsk[itemID] = true end
     if C_Item and C_Item.RequestLoadItemDataByID then
         pcall(C_Item.RequestLoadItemDataByID, itemID)
     end
 end
 
-FT.On("GET_ITEM_INFO_RECEIVED", function()
+FT.On("GET_ITEM_INFO_RECEIVED", function(itemID, ok)
+    if itemID and quietAsk[itemID] then
+        quietAsk[itemID] = nil
+        if ok then FT.Name(itemID) end -- kept in the name book
+        return
+    end
     FT.Debounce("itemsLoaded", 0.4, function() FT.Fire("FT_ITEMS_LOADED") end)
 end)
 
