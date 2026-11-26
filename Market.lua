@@ -466,12 +466,12 @@ function M.SetAlert(id, kind, value)
 end
 
 local function Alert(id, text)
-    if FT.S.alertPopup and FT.Toast then FT.Toast(id, text) end
+    if false and FT.Toast then FT.Toast(id, text) end
     if FT.S.alertChat then
         local _, _, _, _, link = FT.Item(id)
         FT.Print((link or FT.ItemText(id)) .. " " .. text)
     end
-    if FT.S.alertSound and FT.S.alertPopup then
+    if false then
         pcall(PlaySound, (SOUNDKIT and SOUNDKIT.RAID_WARNING) or 8959)
     end
 end
@@ -534,7 +534,7 @@ local function Flush()
         end
         local _, _, _, _, link = FT.Item(b.id)
         table.insert(byTitle[b.title], (link or FT.ItemText(b.id)) .. " " .. b.text)
-        if FT.S.alertPopup and FT.Toast then FT.Toast(b.id, b.text, b.title, b.color) end
+        if false and FT.Toast then FT.Toast(b.id, b.text, b.title, b.color) end
     end
     if FT.S.alertChat then
         for _, title in ipairs(order) do
@@ -542,7 +542,7 @@ local function Flush()
             FT.Print(FT.C(g.color, title) .. "  " .. table.concat(g, FT.C("dim", "  ·  ")))
         end
     end
-    if #pending > 0 and FT.S.alertPopup and FT.S.alertSound then
+    if false then
         pcall(PlaySound, (SOUNDKIT and SOUNDKIT.RAID_WARNING) or 8959)
     end
     wipe(pending)
@@ -599,7 +599,7 @@ function M.CheckBanners()
     end
 end
 
-FT.On("FT_MOVERS_READY", function() FT.Debounce("meme", 1, M.CheckBanners) end)
+-- (v0.25: no market banners in chat: the Eye speaks about what's yours, M.CheckBanners is unused)
 
 -- Whales and Market Makers, from your own deep scans (Full scan): the Blizzard feed has no seller names.
 -- R().whales = { t, items = { [itemID] = { n = seller, s = share, q = how many } } }

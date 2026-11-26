@@ -647,6 +647,9 @@ local function BuildOverview(parent)
     -- Today's 3 moves: the best carry, flip and farm right now, with the gold each should make
     v.movesTitle = UI.Text(v, 12, "text")
     v.movesTitle:SetText(L["Today's 3 moves"])
+    -- what the wolf sees of you, on the title's line (FT.Eye)
+    v.sees = UI.Text(v, 11, "muted", "RIGHT")
+    if v.sees.SetWordWrap then v.sees:SetWordWrap(false) end
     v.moves = {}
     for i = 1, 3 do
         local c = CreateFrame("Button", nil, v)
@@ -712,6 +715,9 @@ local function BuildOverview(parent)
         end
         self.movesTitle:ClearAllPoints()
         self.movesTitle:SetPoint("TOPLEFT", 4, -114)
+        self.sees:ClearAllPoints()
+        self.sees:SetPoint("LEFT", self.movesTitle, "RIGHT", 16, 0)
+        self.sees:SetPoint("RIGHT", self, "RIGHT", -4, 0)
         local mw = (w - 2 * 8) / 3
         for i, c in ipairs(self.moves) do
             c:ClearAllPoints()
@@ -793,17 +799,32 @@ function T.ShowOverview()
     overview.losers.list:SetItems(FT.Market.Movers(20, "ch1", false))
 end
 
--- Today's 3 moves: the best carry and flip right now, and the best thing to farm (else the best vendor deal)
+-- Your top 3: the wolf's moves for you (what you hold, watch, can craft or gather - FT.Eye); short of three,
+-- today's market moves fill in: the best carry and flip, the best thing to farm (else a craft or vendor deal)
 function T.FillMoves()
     if not overview then return end
+    local personal = {}
+    local okEye, moves = pcall(FT.Eye.Moves, 3)
+    if okEye then
+        for _, m in ipairs(moves) do
+            personal[#personal + 1] = { id = m.id, kind = m.label, gold = m.value or "", what = m.text, tip = m.why }
+        end
+    end
+    overview.movesTitle:SetText(#personal > 0 and L["Your top 3"] or L["Today's 3 moves"])
+    local okSees, sees = pcall(FT.Eye.ProfileText)
+    overview.sees:SetText(okSees and sees and (FT.C("dim", L["The wolf sees"] .. ":  ") .. sees) or "")
     local best = {}
     for _, d in ipairs(FT.Deals.List() or {}) do
         local k = d.kind
         if not best[k] or d.profit > best[k].profit then best[k] = d end
     end
     local H = FT.House
-    local cards = {}
+    local cards = personal
+    local shown = {}
+    for _, c in ipairs(cards) do shown[c.id] = true end
     local carry, flip = best.HOUSES, best.RESELL
+    if carry and shown[carry.id] then carry = nil end
+    if flip and shown[flip.id] then flip = nil end
     if carry then
         cards[#cards + 1] = { id = carry.id, kind = L["CARRY IT"], gold = "+" .. FT.Money(math.floor(carry.profit), "short"),
             what = string.format(L["%s: buy here, sell at %s"], FT.ItemText(carry.id, 24), H.Name(carry.sellHouse)) }
@@ -814,7 +835,7 @@ function T.FillMoves()
     end
     local farm = FT.Tabs.signals and FT.Tabs.signals.FarmRows and FT.Tabs.signals.FarmRows()
     local f1 = farm and farm[1]
-    if f1 then
+    if f1 and not shown[f1.id] then
         cards[#cards + 1] = { id = f1.id, kind = L["FARM IT"], gold = FT.Money(f1.price or 0, "short") .. FT.C("dim", " " .. L["each"]),
             what = string.format(L["%s: sells ~%s a day"], FT.ItemText(f1.id, 24), FT.Num(math.floor((f1.perDay or 0) + 0.5))),
             tip = string.format(L["One farmer selling a share of each day's sales makes about %s a day from it."], FT.Money(math.floor(f1.yours or 0), "short")) }

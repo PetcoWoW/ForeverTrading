@@ -253,6 +253,59 @@ step("v0.24 pieces", function()
   assert(FT.Tabs.radar.sign, "radar sign")
   FT.Show("market")
 end)
+step("the eye", function()
+  LOOT_ITEM_SELF = LOOT_ITEM_SELF or "You receive loot: %s."
+  LOOT_ITEM_SELF_MULTIPLE = LOOT_ITEM_SELF_MULTIPLE or "You receive loot: %sx%d."
+  local printed = {}
+  local realPrint = FT.Print
+  FT.Print = function(m) printed[#printed + 1] = (tostring(m):gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", ""):gsub("|H.-|h", ""):gsub("|h", "")) end
+  local function Show(title)
+    print("-- " .. title)
+    print("sees: " .. (FT.Eye.ProfileText():gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "")))
+    for i, m in ipairs(FT.Eye.Moves(5)) do
+      print(string.format("  %d %s %s  (%s)  why: %s", i, m.label, (m.text:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", ""):gsub("|H.-|h", ""):gsub("|h", "")),
+        tostring(m.value):gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", ""), tostring(m.why)))
+    end
+  end
+  -- a gatherer: herbalism and mining, herbs looted, no recipes
+  local me = FT.db.chars[FT.charKey]
+  me.profs = { Herbalism = 300, Mining = 285 }
+  local herb
+  for _, r in ipairs(FT.Market.Rows()) do if r.cls == 7 and r.sub == 9 and r.price then herb = r.id break end end
+  if herb then
+    for i = 1, 30 do mock.fire("CHAT_MSG_LOOT", string.format(LOOT_ITEM_SELF_MULTIPLE, "|cffffffff|Hitem:" .. herb .. "::::::::|h[Herb]|h|r", 10)) end
+  end
+  FT.Eye.Profile(); FT.Fire("FT_INVENTORY_CHANGED")
+  Show("gatherer")
+  -- the login note and the one after the auction house
+  FT.db.eyeSaid = nil
+  FT.Eye.LoginNote()
+  FT.Eye.AfterAH()
+  FT.Print = realPrint
+  print("chat:"); for _, l in ipairs(printed) do print("  > " .. l) end
+  -- the Terminal's cards
+  FT.Show("market")
+  FT.Tabs.market.ShowOverview()
+  -- a crafter: every recipe known by this character, materials for the first profitable one in the bags
+  local dbg = {}
+  local realDebug = FT.Debug
+  FT.Debug = function(...) local t = {} for i = 1, select("#", ...) do t[#t + 1] = tostring(select(i, ...)) end dbg[#dbg + 1] = table.concat(t, " ") end
+  me.profs = { Alchemy = 300 }
+  local list = FT.Craft.ProfitCrafts()
+  local pick
+  for _, c in ipairs(list or {}) do if c.mode == "sell" and (c.perDay or 0) >= 1 then pick = c break end end
+  if pick then
+    pick.known = true
+    local inv = FT.db.inv[FT.charKey]
+    for _, rg in ipairs(pick.recipe.reagents) do inv.bags[rg.itemID] = (inv.bags[rg.itemID] or 0) + (rg.qty or 1) * 12 end
+    FT.Fire("FT_INVENTORY_CHANGED"); FT.Port.Holdings()
+  end
+  FT.Eye.Profile()
+  Show("crafter (" .. tostring(pick and FT.Name(pick.id)) .. ")")
+  FT.Debug = realDebug
+  for _, d in ipairs(dbg) do if d:find("eye:") then print("EYE ERROR " .. d) end end
+  me.profs = nil
+end)
 step("open item", function() FT.OpenItem(12363) end)
 mock.run(1)
 step("best use", function() FT.ShowBestUse(12359) end)

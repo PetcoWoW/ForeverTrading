@@ -140,7 +140,7 @@ function T.Build(p)
     local right = CreateFrame("Frame", nil, content)
 
     -- the basics: what most people ever change; the rest behind "Show all settings"
-    local bs = Section(left, L["Basics"], 9)
+    local bs = Section(left, L["Basics"], 8)
     Choice(bs, "look", L["Look"], { { "classic", L["Classic auction house"] }, { "dark", L["Dark terminal"] } },
         L["Classic: the game's own look, stone-and-gold edges, red buttons, gold labels, like the auction house. Dark: the exchange terminal at night. Takes effect after a reload."],
         function() FT.AskReload(L["The new look shows after the interface reloads. Reload now?"]) end)
@@ -155,7 +155,6 @@ function T.Build(p)
         L["Makes every text bigger without making the window bigger. Takes effect after a reload."],
         function() FT.AskReload(L["The new text size shows after the interface reloads. Reload now?"]) end)
     Check(bs, "meme", L["Meme mode"], L["TO THE MOON / RUG PULL, WHALE ALERT, APE IN, DIAMOND HANDS."])
-    Check(bs, "alertPopup", L["Pop-up alerts"], L["Alerts as pop-ups on your screen, with a sound. Off: one line in chat, nothing to click away."])
     Check(bs, "tooltip", L["Lines in item tooltips"], L["Two lines on every item: what to do and its price, then its best use or craft profit. Hold Shift for more."])
     Check(bs, "ticker", L["Ticker tape under the header"], L["Your watchlist and the day's biggest movers, scrolling. Takes effect after /reload."],
         function() FT.AskReload() end)
@@ -232,16 +231,12 @@ function T.Build(p)
         L["Bars from ore, cloth bolts from cloth...: when one of your characters knows the recipe and it costs less than buying."])
 
     -- alerts
-    local al = Section(left, L["Alerts"], 8)
-    Check(al, "recap", L["Market recap at login"], L["One line in chat when you log in: your portfolio since last time, what's worth selling, the best move."])
-    Check(al, "sellPing", L["Good day to sell"], L["One line when something you own is on a good day to sell. Once a day per item, three at most."])
+    local al = Section(left, L["Alerts"], 4)
+    Check(al, "eyeChat", L["The wolf's notes in chat"], L["After you log in and after you leave the auction house: up to three moves about what you hold, watch, can craft or gather - each once a day, only when it matters. Never anything on screen."])
     Check(al, "sessionPanel", L["Session panel"], L["The small panel on screen while a session runs: time, worth, gold an hour, your best loot."],
         function() FT.UpdateHUD() end)
-    Check(al, "alertPopup", L["Pop-up alerts"], L["Alerts as pop-ups on your screen, with a sound. Off: one line in chat, nothing to click away."])
     Check(al, "meme", L["Meme mode"],
-        L["TO THE MOON and RUG PULL banners for what you own or watch, WHALE ALERT when one seller holds most of an item, APE IN on the strongest buys."])
-    Check(al, "alertSound", L["Sound with pop-up alerts"])
-    Check(al, "alertChat", L["Message in chat on a price alert"])
+        L["TO THE MOON and RUG PULL names on the Terminal, WHALE ALERT when one seller holds most of an item, APE IN on the strongest buys."])
     Check(al, "undercutAlert", L["Say in chat when you are undercut"],
         L["At the auction house: when an auction of yours is no longer the cheapest (your own other lots aside) - once per auction and price. Sell > My auctions tells whether to wait or post it again."])
 
