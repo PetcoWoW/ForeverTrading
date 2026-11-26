@@ -391,15 +391,73 @@ local function FromDeals(out, p)
     end
 end
 
+-- the raids ahead (FT.Futures): a gatherer holding a key material - hold it, or sell it in raid week; a crafter
+-- who knows a recipe on the raid list - the best of those to craft
+local function FromFutures(out, p)
+    local Fu = FT.Futures
+    if not (Fu and FT.FUTURES) then return end
+    local days = Fu.Days()
+    if p.isGatherer then
+        local best
+        for _, x in ipairs(Fu.Materials(10)) do
+            local price = x.market.price
+            if x.held >= 20 and price and (x.move == "HOLD" or x.move == "SELL") then
+                local value = price * x.held
+                if not best or value > best.value then best = { x = x, value = value } end
+            end
+        end
+        if best then
+            local x = best.x
+            local sell = x.move == "SELL"
+            out[#out + 1] = {
+                id = x.id, kind = sell and "RAIDSELL" or "RAIDHOLD", label = sell and L["SELL FOR RAID"] or L["HOLD FOR RAID"],
+                gold = best.value * (sell and 0.3 or 0.15),
+                text = sell and string.format(L["Raid week: sell your %s %s, it goes into %d raid consumables"], Thousand(x.held), Link(x.id), #x.into)
+                    or string.format(L["Hold your %s %s: it goes into %d raid consumables, the raids open in %s days"], Thousand(x.held),
+                        Link(x.id), #x.into, days and tostring(days) or "?"),
+                why = string.format(L["%s this week. Consumables and their herbs usually climb toward raid night."], FT.Pct(x.market.ch7 or 0)),
+                value = FT.Money(math.floor(best.value), "short") .. " " .. L["held"],
+            }
+        end
+    end
+    local bestCraft
+    for _, c in ipairs(Fu.Consumables()) do
+        if c.move == "CRAFT" and c.recipe and next(c.recipe.knownBy or {}) then
+            local e = FT.Craft.Eval(c.recipe)
+            local profit = e and e.revenue and e.cost and (e.revenue - e.cost) or 0
+            local n = math.min((c.market.perDay or 0) * 0.2, 20)
+            if profit > 0 and n >= 1 and (not bestCraft or profit * n > bestCraft.gain) then
+                bestCraft = { c = c, gain = profit * n, profit = profit }
+            end
+        end
+    end
+    if bestCraft then
+        local c = bestCraft.c
+        out[#out + 1] = {
+            id = c.id, kind = "RAIDCRAFT", label = L["CRAFT FOR RAID"], gold = bestCraft.gain,
+            text = string.format(L["#%d on the raid list: craft %s, +%s a craft"], c.rank, Link(c.id), FT.Money(math.floor(bestCraft.profit), "short")),
+            why = string.format(L["%s knows it. Used by %s; it sells about %s a day."], FT.Craft.KnownByText(c.recipe), c.c.roles,
+                Thousand(c.market.perDay or 0)),
+            value = "+" .. FT.Money(math.floor(bestCraft.gain), "short"),
+        }
+    end
+end
+
 -- the moves, the most gold to you first, one per item
 function E.Moves(n)
     local p = E.Profile()
     local out = {}
-    for _, f in ipairs({ FromHoldings, FromWatch, FromCrafts, FromGathering, FromDeals }) do
+    for _, f in ipairs({ FromHoldings, FromWatch, FromCrafts, FromGathering, FromDeals, FromFutures }) do
         local ok, err = pcall(f, out, p)
         if not ok then FT.Debug("eye:", err) end
     end
     table.sort(out, function(a, b) return a.gold > b.gold end)
+    -- the raids ahead: one raid move always makes the top three (holding herbs is worth less gold today than a
+    -- sale, but it's the move that matters before raid week)
+    local raid
+    for _, m in ipairs(out) do
+        if m.kind:find("^RAID") and m.gold >= MIN_GOLD then raid = m break end
+    end
     local kept, seen = {}, {}
     for _, m in ipairs(out) do
         local key = m.from or m.id
@@ -407,6 +465,17 @@ function E.Moves(n)
             seen[key], seen[m.id] = true, true
             kept[#kept + 1] = m
             if n and #kept >= n then break end
+        end
+    end
+    if raid and n and n >= 3 then
+        local has = false
+        for _, m in ipairs(kept) do if m == raid then has = true end end
+        if not has then
+            -- in the last place (another move for the same item goes)
+            for i = #kept, 1, -1 do
+                if kept[i].id == raid.id or (kept[i].from and kept[i].from == raid.id) then table.remove(kept, i) end
+            end
+            if #kept >= n then kept[n] = raid else kept[#kept + 1] = raid end
         end
     end
     return kept

@@ -7,7 +7,7 @@ FT.Tabs = {}
 
 -- the Radar last: it's still being built (its tab says so)
 local TAB_ORDER = { "market", "craft", "signals", "portfolio", "sessions", "radar", "settings" }
-local TAB_LABELS = { market = "Terminal", craft = "Craft", signals = "Money", radar = "Radar", portfolio = "Portfolio", sell = "Sell",
+local TAB_LABELS = { market = "Terminal", craft = "Craft", signals = "Money", radar = "Futures", portfolio = "Portfolio", sell = "Sell",
     sessions = "Sessions", settings = "Settings" }
 
 local win, nav, content, ticker, statusLeft, statusRight, scanDot, scanText, sizeBox, gearBtn, brand

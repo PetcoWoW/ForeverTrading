@@ -1,5 +1,18 @@
 # The Wolf of Booty Bay
 
+## v0.26 - Futures: what raiders will need
+
+- The Radar becomes Futures (still under construction): the pre-raid study as a ranked list of what raiders across
+  every class are expected to use before the 9 December raids, against today's market.
+- Consumables: 34 items ranked by how many raiders use how much (Major Mana first, Greater Fire Protection for
+  Onyxia, the role elixirs, the new Natural flasks...), each with who uses it, how sure the study is, price and
+  7-day change, what it's made of, and your move: craft it (a character of yours knows it), hold what you have
+  for raid week, buy it while it's cheap, or watch it (no one makes the Natural flasks yet).
+- Key materials beside it: what most of the list is made of (Dreamfoil goes into 12), with your move - hold what
+  you gathered, sell in raid week, stock up if you craft with it, gather it if your profession picks it.
+- Gear: the crafted pre-raid BiS pieces by how many specs want them (Dawn Armor: 8), and whether you can make them.
+- The wolf's top 3 always keeps one raid move before the raids: hold your herbs, or the best raid craft you know.
+
 ## v0.25 - the Eye: the wolf knows what you've got
 
 - The wolf works out what kind of player you are, with no questions: every character's professions and skill,
