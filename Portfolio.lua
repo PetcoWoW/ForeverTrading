@@ -115,6 +115,29 @@ function P.History(days)
     return out
 end
 
+-- The group a holding goes in, for the Portfolio list: "gear" (armor and weapons that bind when equipped: can be
+-- sold), "mat" (trade goods, reagents, gems, anything a recipe uses), "crafted" (what professions make, potions and
+-- other consumables) or "other"
+local groupOf = {}
+function P.Group(id)
+    local g = groupOf[id]
+    if g then return g end
+    local _, _, _, equipLoc, _, classID = FT.GetItemInfoInstant(id)
+    local bind = select(14, FT.GetItemInfo(id))
+    if (classID == 2 or classID == 4) and equipLoc and equipLoc ~= "" and equipLoc ~= "INVTYPE_NON_EQUIP_IGNORE" then
+        g = (bind == 2 or bind == nil) and "gear" or "other"
+        if bind == nil then return g end -- not loaded yet: asked again next time
+    elseif classID == 7 or classID == 5 or classID == 3 or (FT.Craft and FT.Craft.UsedIn and FT.Craft.UsedIn(id)) then
+        g = "mat"
+    elseif classID == 0 or (FT.Craft and FT.Craft.ByOutput and FT.Craft.ByOutput(id)) then
+        g = "crafted"
+    else
+        g = "other"
+    end
+    if classID then groupOf[id] = g end
+    return g
+end
+
 -- Every character of this side (your bank alt too): gold, what its bags, bank and mail are worth, and when each
 -- was last seen - a character counts only from its own logins, so an old "last seen" means old numbers.
 -- { guid, name, classFile, current, gold, worth, seenT, bankT, mailT, moneyT }, the richest first
@@ -317,6 +340,9 @@ FT.On("CHAT_MSG_LOOT", function(msg)
     local id, n = Ses.ParseLoot(msg)
     if id then
         s.items[id] = (s.items[id] or 0) + n
+        -- what it was worth when found (the session's page shows then against now)
+        s.found = s.found or {}
+        s.found[id] = (s.found[id] or 0) + math.floor(Ses.UnitValue(id) * n)
         FT.Fire("FT_SESSION_LOOT", id, n)
     end
 end)

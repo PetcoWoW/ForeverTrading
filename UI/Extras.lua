@@ -891,8 +891,7 @@ function FT.ShowCraft(r)
     local known = next(r.knownBy or {}) ~= nil
     local who = {}
     for name in pairs(r.knownBy or {}) do who[#who + 1] = name end
-    d.sub:SetText(L[r.prof or "?"] .. "  ·  " .. (known and FT.C("up", L["Known by"] .. " " .. table.concat(who, ", "))
-        or FT.C("accent", L["Recipe needed"])))
+    d.sub:SetText(L[r.prof or "?"] .. (known and ("  ·  " .. FT.C("up", L["Known by"] .. " " .. table.concat(who, ", "))) or ""))
     d.parts = e.parts
     d.list:SetItems(e.parts or {})
     local qty = r.outputQty or 1

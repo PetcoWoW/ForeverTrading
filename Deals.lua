@@ -80,7 +80,7 @@ end
 local function ToVendor(id, p, t, mine)
     local v = FT.SellPriceKnown(id)
     if not (v and v > p) then return nil end
-    local d = { id = id, kind = "VENDOR", unit = p, target = v, t = t, perUnit = v - p }
+    local d = { id = id, kind = "VENDOR", unit = p, target = v, t = t, perUnit = v - p, worst = 0 }
     local book = FreshBook(id, t)
     if book then
         local qty, cost = LotsUnder(book, v, mine)
@@ -114,20 +114,58 @@ local function LooksCheap(id, p, below)
     return mid ~= nil and p <= mid * (1 - below * 0.6)
 end
 
+-- The broker's checks before a flip is shown (a new player may buy on its word):
+--  * it really sells: seen for a day or more, 2+ a day - a cheap price nobody pays is no deal;
+--  * the price to sell at is its real one: the lower of its fair price and its average of the last days (a spike
+--    doesn't count), and the cheap ones are well under it after the cut;
+--  * the market isn't being pushed up, dumped, flooded or crowded with new sellers;
+--  * flipping it worked before, replayed on its price history (its own, else its kind's): not shown when it
+--    mostly didn't;
+--  * no more than sells in RESELL_DAYS days, and what you'd get back if it doesn't sell (the worst case) is shown.
+local RESELL_DAYS = 2
+local MIN_PER_DAY = 2
+local OWN_FLIP_MIN, KIND_FLIP_MIN = 0.6, 0.5 -- the share of replayed flips that must have worked
+
+-- what's left if it doesn't sell: what a vendor pays, or the 30-day low after the cut (whichever is more)
+local function Floor(id, s, cut)
+    local v = FT.SellPriceKnown(id) or 0
+    local lo = s and s.lo30 and s.lo30 * (1 - cut) or 0
+    return math.max(v, lo)
+end
+
 -- buy the cheap lots, list them again near the fair price
 local function ToResell(id, p, t, mine, below)
     local s = FT.An.Stats(id)
     local fair = s.fair
+    if fair and s.avg and s.avg > 0 and s.avg < fair then fair = s.avg end
     if not (fair and fair > 0 and p <= fair * (1 - below)) then return nil end
     local liq = FT.An.Liquidity(s)
     if liq ~= "high" and liq ~= "medium" then return nil end
-    -- flooded, more sellers, or hardly bought (seen from the listings): listed again, it may not sell
-    if s.flood or s.crowd or s.slow then return nil end
-    local d = { id = id, kind = "RESELL", unit = p, t = t, fair = fair, liquidity = liq, sales = s.sales }
+    -- flooded, more sellers, hardly bought, pushed up or dumped: listed again, it may not sell
+    if s.flood or s.crowd or s.slow or s.pumped or s.dumping then return nil end
+    local sales = s.sales
+    if not (sales and sales.hours >= 24 and sales.perDay >= MIN_PER_DAY) then return nil end
+    local ok, n, own = FT.An.FlipRecord(s.behavior)
+    if ok and ok / n < (own and OWN_FLIP_MIN or KIND_FLIP_MIN) then return nil end
+    local cap = math.max(1, math.floor(sales.perDay * RESELL_DAYS + 0.5))
+    local d = { id = id, kind = "RESELL", unit = p, t = t, fair = fair, liquidity = liq, sales = sales, cap = cap,
+        record = ok and { ok, n, own } or nil }
     local book = FreshBook(id, t)
     if book then
-        local qty, cost, above = LotsUnder(book, math.floor(fair * (1 - below)) + 1, mine)
+        local qty, cost, above = 0, 0, nil
+        local limit = math.floor(fair * (1 - below)) + 1
+        local cheap = 0
+        for _, lv in ipairs(book.levels) do
+            if lv[1] >= limit then above = lv[1]; break end
+            local q = lv[2] - (mine and mine[lv[1]] or 0)
+            if q > 0 then
+                cheap = cheap + q
+                local take = math.min(q, cap - qty)
+                if take > 0 then qty, cost = qty + take, cost + take * lv[1] end
+            end
+        end
         if qty <= 0 then return nil end
+        d.cheap = cheap
         -- most of what is listed is down there: the market itself is lower now - no bargain
         local listed = s.listed or book.qty
         if listed and listed > 0 and qty > listed * 0.5 then return nil end
@@ -143,6 +181,7 @@ local function ToResell(id, p, t, mine, below)
     end
     d.perUnit = d.target * (1 - FT.Cut()) - p
     if d.profit <= 0 then return nil end
+    d.worst = math.max(0, d.cost - Floor(id, s, FT.Cut()) * d.qty)
     return d
 end
 
@@ -181,8 +220,8 @@ local function Between(id, mine)
     local net = sell * (1 - cut)
     if net <= pb then return nil end
     local rate = FT.Sales.RateIn(sellH, id)
-    -- watched there half a day and more, and nothing was bought: it wouldn't sell
-    if rate and rate.hours >= 12 and rate.sold == 0 then return nil end
+    -- it must be seen selling there (half a day and more, one a day or more): carried over, it has to sell
+    if not (rate and rate.hours >= 12 and rate.perDay >= 1) then return nil end
     local cap = rate and math.max(1, math.floor(rate.perDay * THERE_DAYS + 0.5))
         or math.max(1, math.floor((qs or 2) / 2))
     local d = { id = id, kind = "HOUSES", buyHouse = buyH, sellHouse = sellH, unit = pb, target = sell, t = tb,
@@ -211,6 +250,9 @@ local function Between(id, mine)
     d.perUnit = net - pb
     d.profit = net * d.qty - d.cost
     if d.profit <= 0 then return nil end
+    -- what's left if it doesn't sell there: its lowest of the last week there after the cut, or a vendor
+    local lowThere = #closes > 0 and math.min(unpack(closes)) or pb
+    d.worst = math.max(0, d.cost - math.max(FT.SellPriceKnown(id) or 0, lowThere * (1 - cut)) * d.qty)
     return d
 end
 

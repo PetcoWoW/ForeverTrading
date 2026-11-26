@@ -121,6 +121,13 @@ step("session", function()
   print("saved sessions:", #FT.Session.List(), FT.Session.List()[1].name)
   FT.Tabs.portfolio.SetView("sessions")
 end)
+-- a saved session opened: what was found, then and now
+step("session details", function()
+  FT.Show("sessions")
+  local list = FT.Session.List()
+  if list[1] then FT.Tabs.sessions.Toggle(list[1]) end
+  print("session found:", list[1] and list[1].found and next(list[1].found) and "prices kept" or "none")
+end)
 step("recap and pings", function()
   FT.Port.Recap()
   FT.Port.SellPings()
@@ -140,6 +147,24 @@ step("score", function()
   print("score logged:", pcall(FT.An.ScoreDay))
   local n = 0; for _ in pairs((FT.db.score.pending or {})[FT.houseKey] or {}) do n = n + 1 end
   print("calls written down today:", n)
+end)
+-- the Portfolio list in groups, with made-up holdings (the fake game has no bags): every row drawn, a group closed
+step("portfolio groups", function()
+  FT.Show("portfolio"); FT.Tabs.portfolio.SetView("portfolio")
+  local P = FT.Tabs.portfolio
+  P.rows = {
+    { id = 12363, qty = 12, price = 5000, value = 60000, ch7 = 0.1, chars = {}, signal = "SELL", strength = 2 },
+    { id = 2770, qty = 120, price = 100, value = 12000, ch7 = -0.05, chars = {}, signal = "HOLD", strength = 3 },
+    { id = 13444, qty = 4, price = 3000, value = 12000, ch7 = 0, chars = {}, signal = "FAIR", strength = 1 },
+  }
+  P.total = 84000
+  P.RefreshList()
+  FT.db.portClosed = { mat = true }
+  P.RefreshList()
+  local groups = {}
+  for id in pairs({ [12363] = 1, [2770] = 1, [13444] = 1 }) do groups[#groups + 1] = id .. "=" .. FT.Port.Group(id) end
+  table.sort(groups)
+  print("portfolio groups:", table.concat(groups, " "))
 end)
 step("open item", function() FT.OpenItem(12363) end)
 mock.run(1)
@@ -270,6 +295,29 @@ step("learned", function()
   local l = FT.db.learned and FT.db.learned[FT.houseKey]
   local n = 0; for _ in pairs(l and l.kinds or {}) do n = n + 1 end
   print("kinds learned:", n)
+  local flips, worked = 0, 0
+  for _, k in pairs(l and l.kinds or {}) do flips, worked = flips + (k.flips or 0), worked + (k.flipped or 0) end
+  print("replayed flips:", flips, "worked:", worked)
+end)
+-- the deals after learning (the broker checks), by kind, with their risk and record
+step("deals checked", function() FT.Deals.Build() end)
+mock.run(40)
+step("deals by kind", function()
+  local by, risky, rec = {}, 0, 0
+  for _, d in ipairs((FT.Deals.List())) do
+    by[d.kind] = (by[d.kind] or 0) + 1
+    if (d.worst or 0) > 0 then risky = risky + 1 end
+    if d.record then rec = rec + 1 end
+  end
+  local parts = {}
+  for k, n in pairs(by) do parts[#parts + 1] = k .. "=" .. n end
+  table.sort(parts)
+  print("deals:", table.concat(parts, " "), "with a risk:", risky, "with a record:", rec)
+  local id = 12363
+  local s = FT.An.Stats(id)
+  local h, label = FT.An.Health(s)
+  local c = FT.An.Call(s, 0)
+  print("item 12363:", label, "|", FT.An.TrendWord(s), "|", c.kind, c.text)
 end)
 step("logout", function() mock.fire("PLAYER_LOGOUT") end)
 '''

@@ -458,7 +458,9 @@ local function Alert(id, text)
     end
 end
 
+-- Price alerts are gone from the item page (v0.19): alerts set before stay quiet, nothing to turn them off with
 function M.CheckAlerts()
+    do return end
     for id, w in pairs(FT.db.watch) do
         if w.above or w.below then
             local price = FT.Price(id)

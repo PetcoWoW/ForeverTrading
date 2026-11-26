@@ -12,6 +12,14 @@ FT.News = N
 -- start, after the files are read (a table made with them would keep the English)
 local function News()
     return {
+        ["v0.19"] = {
+            { L["A pickier engine"], L["Deals are checked like a broker would: it really sells, the price is its real one, no one is pushing or dumping it, and flipping it worked before on its own history. Each deal shows its risk and record. A cheap price on a falling market now says WAIT, not BUY."],
+                function() FT.Show("signals"); FT.Tabs.signals.SetView("make") end },
+            { L["Item page in three answers"], L["Market (healthy, thin, stagnant, being pushed up or dumped), Price (where it's going) and The call (what to do, how sure, its record). No more price alerts or order book."],
+                function() FT.Show("market") end },
+            { L["Portfolio groups and session details"], L["Holdings in Materials, Crafted, BoE gear and Other. Click a past session to see what you found, worth then and now."],
+                function() FT.Show("portfolio") end },
+        },
         ["v0.18"] = {
             { L["Fresher Blizzard prices"], L["New prices go out within about 15 minutes of Blizzard's own update, instead of up to a few hours later. No more \"likely out, /reload\" guesses: after a login or /reload, one line says whether you got new prices. The API chip says when yours are from."] },
         },

@@ -1,5 +1,5 @@
--- Wolf of Booty Bay: Market page - every item with its price and moves, the chart of one item, its order
--- book, indicators, signals and price alerts. With no item chosen: the market overview.
+-- Wolf of Booty Bay: Market page - every item with its price and moves, the chart of one item, and three answers
+-- under it: the market's health, the price's trend, the call. With no item chosen: the market overview.
 local ADDON, FT = ...
 local UI = FT.UI
 local L = FT.L
@@ -63,9 +63,9 @@ local function PassFilters(id)
     if filt.uncollected and Collected(id) ~= false then return false end
     return true
 end
-local page, list, countText, overview, itemView, book, center, mats
+local page, list, countText, overview, itemView, center, mats
 local LEFT_W, RIGHT_W = 372, 232
-local CARDS_H = 132 -- the indicator, signal and alert cards under the charts (124 high, 8 above them)
+local CARDS_H = 132 -- the market, price and call cards under the charts (124 high, 8 above them)
 
 local GetClassInfo = (C_Item and C_Item.GetItemClassInfo) or GetItemClassInfo
 local GetSubClassInfo = (C_Item and C_Item.GetItemSubClassInfo) or GetItemSubClassInfo
@@ -708,7 +708,6 @@ function T.ShowOverview()
     if not overview then return end
     itemView:Hide()
     overview:Show()
-    book:SetItem(nil)
     T.LayoutRight()
     local rows = FT.Market.Rows()
     overview.cards[1]:Set(rows and FT.Num(#rows) or "—", rows and L["seen in scans"] or L["no data"])
@@ -939,22 +938,6 @@ local function BuildItemView(parent)
     end)
     v.bestUse:FitText(20)
     v.bestUse:SetPoint("RIGHT", v.watch, "LEFT", -6, 0)
-    v.longHold = UI.Button(v, L["Long hold"], 10, 22, "default", function()
-        local id = state.selected
-        if not id then return end
-        FT.db.longHold = FT.db.longHold or {}
-        FT.db.longHold[id] = (not FT.db.longHold[id]) or nil
-        FT.Fire("FT_SETTINGS_CHANGED")
-        T.UpdateWatchButton()
-        T.ShowItem(id, true)
-    end)
-    v.longHold:FitText(20)
-    v.share = UI.Button(v, L["Share"], 10, 22, "default", function()
-        if state.selected then FT.ShareTip(state.selected) end
-    end)
-    v.share:FitText(20)
-    v.share:SetTip(L["Share"], L["A line about this item for guild chat: its price today against usual. You send it yourself (Enter)."])
-    v.longHold:SetTip(L["Long hold"], L["You know it'll be worth more later (a raid or phase coming): it never says CASH OUT until you unmark it."])
     v.bestUse:SetTip(L["Best use"], L["Every recipe this goes into, ranked by what one of it brings made into each."])
 
     -- charts: the price on top, the profitability under it (zero in the middle)
@@ -969,137 +952,101 @@ local function BuildItemView(parent)
     v.pchart:SetPoint("BOTTOMRIGHT", 0, CARDS_H)
     UI.Border(v.pchart, "line")
 
-    -- bottom cards
-    v.ind = Card(v, L["Indicators"])
-    v.sig = Card(v, L["Signal"])
-    v.alert = Card(v, L["Price alert"])
-    for _, c in ipairs({ v.ind, v.sig, v.alert }) do c:SetHeight(124) end
+    -- the three answers under the chart: is the market healthy, where is the price going, what to do
+    v.health = Card(v, L["Market"])
+    v.trend = Card(v, L["Price"])
+    v.call = Card(v, L["The call"])
+    for _, c in ipairs({ v.health, v.trend, v.call }) do c:SetHeight(124) end
+    local function Big(card)
+        local t = UI.Text(card, 15, "text")
+        t:SetPoint("TOPLEFT", 10, -26)
+        t:SetPoint("RIGHT", card, "RIGHT", -10, 0)
+        return t
+    end
+    -- a line that wraps (up to `lines` lines) under `anchor`
+    local function Lines(card, anchor, gap, size, color, lines)
+        local t = UI.Text(card, size or 11, color or "muted")
+        t:SetPoint("TOPLEFT", anchor, "BOTTOMLEFT", 0, -(gap or 6))
+        t:SetPoint("RIGHT", card, "RIGHT", -10, 0)
+        if t.SetWordWrap then t:SetWordWrap(true) end
+        if t.SetMaxLines then t:SetMaxLines(lines or 2) end
+        t:SetJustifyV("TOP")
+        return t
+    end
+    v.healthWord = Big(v.health)
+    v.healthLine = Lines(v.health, v.healthWord, 8, 11, "muted", 2)
+    v.healthNote = Lines(v.health, v.healthLine, 6, 11, "dim", 2)
+    v.trendWord = Big(v.trend)
+    v.trendLine = Lines(v.trend, v.trendWord, 8, 11, "muted", 1)
+    v.trendNote = Lines(v.trend, v.trendLine, 6, 11, "dim", 3)
+
+    -- the call: its badge, the reason, how sure and its record, the other side; your buttons at the bottom
+    v.callBadge = UI.Badge(v.call, 104, 20)
+    v.callBadge:SetPoint("TOPLEFT", 10, -24)
+    v.callBadge:EnableMouse(true)
+    v.callBadge:SetScript("OnEnter", function(self)
+        if not v.callWhy then return end
+        GameTooltip:SetOwner(self, "ANCHOR_TOP")
+        GameTooltip:AddLine(L["The call"], 1, 1, 1)
+        GameTooltip:AddLine(v.callWhy, 0.85, 0.87, 0.9, true)
+        GameTooltip:AddLine(L["Sure: this item did it before. Likely: items like it did. Guess: little to go by yet."], 0.6, 0.64, 0.7, true)
+        GameTooltip:Show()
+    end)
+    v.callBadge:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    v.callSure = UI.Text(v.call, 11, "dim")
+    v.callSure:SetPoint("LEFT", v.callBadge, "RIGHT", 10, 0)
+    v.callSure:SetPoint("RIGHT", v.call, "RIGHT", -10, 0)
+    v.callText = UI.Text(v.call, 12, "text")
+    v.callText:SetPoint("TOPLEFT", v.callBadge, "BOTTOMLEFT", 0, -8)
+    v.callText:SetPoint("RIGHT", v.call, "RIGHT", -10, 0)
+    if v.callText.SetWordWrap then v.callText:SetWordWrap(true) end
+    if v.callText.SetMaxLines then v.callText:SetMaxLines(2) end
+    v.callText:SetJustifyV("TOP")
+    v.callOther = Lines(v.call, v.callText, 4, 11, "muted", 1)
+
+    v.longHold = UI.Button(v.call, L["Long hold"], 10, 20, "default", function()
+        local id = state.selected
+        if not id then return end
+        FT.db.longHold = FT.db.longHold or {}
+        FT.db.longHold[id] = (not FT.db.longHold[id]) or nil
+        FT.Fire("FT_SETTINGS_CHANGED")
+        T.UpdateWatchButton()
+        T.ShowItem(id, true)
+    end)
+    v.longHold:FitText(18)
+    v.longHold:SetPoint("BOTTOMLEFT", 10, 8)
+    v.longHold:SetTip(L["Long hold"], L["You know it'll be worth more later (a raid or phase coming): it never says CASH OUT until you unmark it."])
+    v.share = UI.Button(v.call, L["Share"], 10, 20, "default", function()
+        if state.selected then FT.ShareTip(state.selected) end
+    end)
+    v.share:FitText(18)
+    v.share:SetPoint("LEFT", v.longHold, "RIGHT", 6, 0)
+    v.share:SetTip(L["Share"], L["A line about this item for guild chat: its price today against usual. You send it yourself (Enter)."])
+    v.craft = UI.Button(v.call, L["Recipe"], 10, 20, "default", function()
+        local rs = FT.Craft.ByOutput(state.selected)
+        if rs and rs[1] then FT.OpenRecipe(rs[1].key) end
+    end)
+    v.craft:FitText(18)
+    v.craft:SetPoint("LEFT", v.share, "RIGHT", 6, 0)
+
     UI.OnSize(v, function(self, w, h)
         T.FitHeader()
         local cards = self.compact and 0 or CARDS_H
         -- the simple chart has the room of both charts
         local share = UI.ProChart() and 0.56 or 1
         self.chart:SetHeight(math.max(80, math.floor((h - 128 - cards - 6) * share)))
-        local cw = (w - 16) / 3
-        self.ind:ClearAllPoints()
-        self.ind:SetPoint("BOTTOMLEFT", 0, 0)
-        self.ind:SetWidth(cw)
-        self.sig:ClearAllPoints()
-        self.alert:ClearAllPoints()
-        if FT.S.simple ~= false then
-            -- Simple view: no indicators card; what to do gets two thirds
-            self.sig:SetPoint("BOTTOMLEFT", 0, 0)
-            self.sig:SetWidth(2 * cw + 8)
-        else
-            self.sig:SetPoint("BOTTOMLEFT", cw + 8, 0)
-            self.sig:SetWidth(cw)
-        end
-        self.alert:SetPoint("BOTTOMLEFT", 2 * (cw + 8), 0)
-        self.alert:SetWidth(cw)
+        -- market and price a quarter each, the call the rest
+        local small = math.floor((w - 16) * 0.28)
+        self.health:ClearAllPoints()
+        self.health:SetPoint("BOTTOMLEFT", 0, 0)
+        self.health:SetWidth(small)
+        self.trend:ClearAllPoints()
+        self.trend:SetPoint("BOTTOMLEFT", small + 8, 0)
+        self.trend:SetWidth(small)
+        self.call:ClearAllPoints()
+        self.call:SetPoint("BOTTOMLEFT", 2 * (small + 8), 0)
+        self.call:SetPoint("BOTTOMRIGHT", 0, 0)
     end)
-
-    -- indicators
-    local function IndLine(y, label)
-        local l = UI.Text(v.ind, 11, "muted")
-        l:SetPoint("TOPLEFT", 10, y)
-        l:SetText(label)
-        local r = UI.Text(v.ind, 12, "text", "RIGHT")
-        r:SetPoint("TOPRIGHT", -10, y)
-        return r
-    end
-    v.rsi = IndLine(-28, L["RSI (14)"])
-    v.rsiBar = CreateFrame("Frame", nil, v.ind)
-    v.rsiBar:SetHeight(3)
-    v.rsiBar:SetPoint("TOPLEFT", 10, -44)
-    v.rsiBar:SetPoint("TOPRIGHT", -10, -44)
-    UI.Fill(v.rsiBar, "bg3", nil, "none")
-    v.rsiZoneL = UI.Tex(v.rsiBar, "ARTWORK", "up", 0.35)
-    v.rsiZoneL:SetPoint("TOPLEFT")
-    v.rsiZoneL:SetPoint("BOTTOMLEFT")
-    v.rsiZoneH = UI.Tex(v.rsiBar, "ARTWORK", "down", 0.35)
-    v.rsiZoneH:SetPoint("TOPRIGHT")
-    v.rsiZoneH:SetPoint("BOTTOMRIGHT")
-    v.rsiMark = UI.Tex(v.rsiBar, "OVERLAY", "text", 1)
-    v.rsiMark:SetSize(3, 9)
-    v.dev = IndLine(-54, L["vs average"])
-    v.vol = IndLine(-72, L["Daily volatility"])
-    v.liq = IndLine(-90, L["Liquidity"])
-
-    -- signal: what to do with it if you sell, if you buy
-    local function SigRow(y, label)
-        local l = UI.Text(v.sig, 11, "muted")
-        l:SetPoint("TOPLEFT", 10, y)
-        l:SetText(label)
-        local b = UI.Badge(v.sig, 84, 17)
-        b:SetPoint("TOPRIGHT", -10, y + 2)
-        local r = UI.Text(v.sig, 11, "dim")
-        r:SetPoint("TOPLEFT", 10, y - 17)
-        r:SetPoint("RIGHT", v.sig, "RIGHT", -10, 0)
-        return b, r
-    end
-    v.sellBadge, v.sellText = SigRow(-28, L["If you sell"])
-    v.buyBadge, v.buyText = SigRow(-64, L["If you buy"])
-    -- the numbers behind a reason, on a hover of its badge
-    for _, pair in ipairs({ { v.sellBadge, "sellWhy", L["If you sell"] }, { v.buyBadge, "buyWhy", L["If you buy"] } }) do
-        local badge, key, title = pair[1], pair[2], pair[3]
-        badge:EnableMouse(true)
-        badge:SetScript("OnEnter", function(self)
-            local why = v[key]
-            if not why then return end
-            GameTooltip:SetOwner(self, "ANCHOR_TOP")
-            GameTooltip:AddLine(title, 1, 1, 1)
-            GameTooltip:AddLine(why, 0.85, 0.87, 0.9, true)
-            GameTooltip:AddLine(L["Sure: this item did it before. Likely: items like it did. Guess: little to go by yet."], 0.6, 0.64, 0.7, true)
-            GameTooltip:Show()
-        end)
-        badge:SetScript("OnLeave", function() GameTooltip:Hide() end)
-    end
-    v.glance = UI.Text(v.sig, 11, "muted")
-    v.glance:SetPoint("TOPLEFT", 10, -104)
-    v.glance:SetPoint("RIGHT", v.sig, "RIGHT", -10, 0)
-    v.craft = UI.Button(v.sig, L["Recipe"], 10, 18, "default", function()
-        local rs = FT.Craft.ByOutput(state.selected)
-        if rs and rs[1] then FT.OpenRecipe(rs[1].key) end
-    end)
-    v.craft.label:SetFont(UI.FONT, UI.Size(11), "")
-    v.craft:FitText(16)
-    v.craft:SetPoint("TOPRIGHT", -6, -4)
-
-    -- alert: below / above, each in gold, silver and copper
-    local function AlertRow(y, label)
-        local l = UI.Text(v.alert, 11, "muted")
-        l:SetPoint("TOPLEFT", 10, y - 5)
-        l:SetText(label)
-        local m = UI.MoneyInput(v.alert, nil, true)
-        m:SetPoint("TOPRIGHT", -10, y)
-        return m
-    end
-    v.below = AlertRow(-26, L["Below"])
-    v.above = AlertRow(-52, L["Above"])
-    v.save = UI.Button(v.alert, L["Save"], 10, 20, "primary", function()
-        local id = state.selected
-        if not id then return end
-        local below, above = v.below:GetValue(), v.above:GetValue()
-        if below == 0 then below = nil end
-        if above == 0 then above = nil end
-        -- nothing to save and nothing saved: the item doesn't go on the watchlist for it
-        if below or above or FT.db.watch[id] then
-            FT.Market.SetAlert(id, "below", below)
-            FT.Market.SetAlert(id, "above", above)
-        end
-        for _, m in ipairs({ v.below, v.above }) do
-            for _, e in ipairs(m.boxes) do e:ClearFocus() end
-        end
-        v.alertFor = nil
-        T.UpdateAlert()
-        FT.Market.CheckAlerts()
-    end)
-    v.save:FitText(24)
-    v.save:SetPoint("TOPLEFT", 10, -80)
-    v.save:SetTip(L["Price alert"], L["Checked after every scan. Empty = no alert."])
-    v.alertText = UI.Text(v.alert, 11, "muted")
-    v.alertText:SetPoint("LEFT", v.save, "RIGHT", 10, 0)
-    v.alertText:SetPoint("RIGHT", v.alert, "RIGHT", -10, 0)
     return v
 end
 
@@ -1122,27 +1069,13 @@ function T.UpdateWatchButton()
     if v.longHold then
         local on = FT.db.longHold and FT.db.longHold[state.selected]
         v.longHold:SetLabel(on and L["Long hold: on"] or L["Long hold"])
-        v.longHold:FitText(20)
-        v.longHold:ClearAllPoints()
-        v.longHold:SetPoint("RIGHT", v.bestUse:IsShown() and v.bestUse or v.watch, "LEFT", -6, 0)
-        if v.share then
-            v.share:ClearAllPoints()
-            v.share:SetPoint("RIGHT", v.longHold, "LEFT", -6, 0)
-        end
+        v.longHold:SetActive(on and true or false)
+        v.longHold:FitText(18)
     end
     local on = FT.Market.IsWatched(state.selected)
     v.watch:SetLabel(on and L["In watchlist"] or L["Watch"])
     v.watch:SetActive(on)
     v.watch:FitText(20)
-end
-
-function T.UpdateAlert()
-    local v = itemView
-    local w = FT.db.watch[state.selected]
-    local parts = {}
-    if w and w.below then parts[#parts + 1] = L["below"] .. " " .. FT.Money(w.below) end
-    if w and w.above then parts[#parts + 1] = L["above"] .. " " .. FT.Money(w.above) end
-    v.alertText:SetText(#parts > 0 and (L["Alert when"] .. ": " .. table.concat(parts, ", ")) or FT.C("dim", L["No alert set"]))
 end
 
 -- Simple chart: one chart (the price) with the room of two, no averages box; Pro: both charts
@@ -1193,8 +1126,6 @@ function T.ShowItem(id, keepView)
     local head = UI.RiskHead(s)
     for i = #head, 1, -1 do table.insert(parts, 1, head[i]) end
     v.sub:SetText(table.concat(parts, FT.C("dim", "  ||  ")))
-    v.craft:SetShown(rs ~= nil and rs[1] ~= nil)
-
     v.price:SetText(s.price and FT.Money(s.price) or "—")
     v.change:SetText(FT.Pct(s.ch1) .. FT.C("dim", " " .. L["24h"]))
     v.priceAge:SetText(UI.PriceAgeText(id, s))
@@ -1217,72 +1148,56 @@ function T.ShowItem(id, keepView)
     T.ApplyChartStyle()
     T.DrawChart(keepView)
 
-    -- indicators
-    if s.rsi then
-        local color = (s.rsi >= 70 and "down") or (s.rsi <= 30 and "up") or "text"
-        v.rsi:SetText(FT.C(color, string.format("%.0f", s.rsi)))
-        local w = v.rsiBar:GetWidth()
-        v.rsiZoneL:SetWidth(w * 0.3)
-        v.rsiZoneH:SetWidth(w * 0.3)
-        v.rsiMark:ClearAllPoints()
-        v.rsiMark:SetPoint("CENTER", v.rsiBar, "LEFT", w * s.rsi / 100, 0)
-        v.rsiMark:Show()
-    else
-        v.rsi:SetText(FT.C("dim", "—"))
-        v.rsiMark:Hide()
+    -- the market: healthy or not, and why
+    local _, healthLabel, healthColor, healthWhy = FT.An.Health(s)
+    v.healthWord:SetText(FT.C(healthColor, healthLabel))
+    local hBits = {}
+    local perDay = s.sales and s.sales.hours >= 12 and s.sales.perDay
+    if perDay then hBits[#hBits + 1] = string.format(L["Sells %s a day"], perDay >= 10 and FT.Num(math.floor(perDay + 0.5)) or string.format("%.1f", perDay)) end
+    if s.listed then hBits[#hBits + 1] = string.format(L["%s listed"], FT.Num(s.listed)) end
+    if perDay and perDay > 0 and s.listed then
+        local clear = s.listed / perDay
+        hBits[#hBits + 1] = clear < 1 and L["gone in a day"] or string.format(L["%s days to sell out"], FT.Num(math.floor(clear + 0.5)))
     end
-    v.dev:SetText(FT.Pct(s.dev))
-    v.vol:SetText(s.vol and string.format("%.1f%%", s.vol * 100) or FT.C("dim", "—"))
-    local liq = FT.An.Liquidity(s)
-    local liqNames = { high = L["liq:high"], medium = L["liq:medium"], low = L["liq:low"], unknown = L["no data"] }
-    local liqColors = { high = "up", medium = "accent", low = "down", unknown = "dim" }
-    -- and how much really sells, when seen (FT.Sales)
-    v.liq:SetText(FT.C(liqColors[liq], liqNames[liq])
-        .. (s.sales and (FT.C("dim", "  ||  ") .. FT.C(s.slow and "down" or "text", FT.Sales.PerDayText(s.sales))) or ""))
+    v.healthLine:SetText(#hBits > 0 and table.concat(hBits, ", ") or FT.C("dim", L["Sales show after a day of prices."]))
+    local healthKey = FT.An.Health(s)
+    local notes = {}
+    if healthKey == "pumped" or healthKey == "dumping" then notes[#notes + 1] = healthWhy end
+    if s.crowd then notes[#notes + 1] = string.format(L["%d sellers (usually ~%d)"], s.sellersNow, math.floor(s.typicalS + 0.5)) end
+    if s.bait then notes[#notes + 1] = L["The cheapest one looks like bait: don't price off it."] end
+    local whale = FT.Whales.Of(id)
+    if whale then notes[#notes + 1] = string.format(L["Whale: %s has %s"], whale.n, FT.Whales.Whole(whale.s)) end
+    v.healthNote:SetText(table.concat(notes, " "))
 
-    -- signals
-    -- the reason in plain words, how sure it is after it; the numbers behind it in the hover
-    -- how sure, and the rule's record ("right 7 of 10") once its calls have been graded
-    local function Sure(conf, rule)
-        local rec = rule and FT.An.RecordText(rule)
-        return conf and FT.C("dim", "  ·  " .. FT.An.ConfText(conf) .. (rec and (", " .. rec) or "")) or ""
-    end
-    local sell, sellStrength, sellReason, sellWhy = FT.An.SellSignal(s)
-    local sellConf, sellRule = s.conf, s.rule
-    v.sellBadge:Set(sell, nil, sellStrength)
-    v.sellText:SetText((sellReason or "") .. Sure(sellConf, sellRule))
-    v.sellWhy = sellWhy
-    local buy, buyStrength, buyReason, buyWhy = FT.An.BuySignal(s)
-    v.buyBadge:Set(buy, nil, buyStrength)
-    v.buyText:SetText((buyReason or "") .. Sure(s.conf, s.rule))
-    v.buyWhy = buyWhy
-    -- Simple view: the indicators in one line under what to do
-    if FT.S.simple ~= false then
-        local bits = {}
-        if s.dev then bits[#bits + 1] = L["vs usual"] .. " " .. FT.Pct(s.dev) end
-        bits[#bits + 1] = L["Sells"] .. ": " .. FT.C(liqColors[liq], liqNames[liq])
-        if s.rsi then bits[#bits + 1] = L["Hype"] .. " " .. string.format("%.0f", s.rsi) end
-        local b = s.behavior
-        if b and b.highs >= FT.An.MIN_CASES then bits[#bits + 1] = string.format(L["Jumps held %d/%d"], b.held, b.highs)
-        elseif b and b.kindHighs then bits[#bits + 1] = string.format(L["Its kind: jumps hold %d%%"], math.floor(b.kindHeld / b.kindHighs * 100 + 0.5)) end
-        if b and b.bestDay and (b.bestUp or 0) >= 0.03 then bits[#bits + 1] = string.format(L["Best day %s"], FT.An.DayName(b.bestDay)) end
-        local whale = FT.Whales.Of(id)
-        if whale then bits[#bits + 1] = FT.C("accent", string.format(L["Whale: %s has %s"], whale.n, FT.Whales.Whole(whale.s))) end
-        v.glance:SetText(table.concat(bits, FT.C("dim", "   ·   ")))
-    else
-        v.glance:SetText("")
-    end
+    -- the price: where it's going, against its weeks, and what it did before
+    local word, wordColor = FT.An.TrendWord(s)
+    v.trendWord:SetText(FT.C(wordColor, word))
+    local tBits = {}
+    if s.ch7 then tBits[#tBits + 1] = L["7 days"] .. " " .. FT.Pct(s.ch7) end
+    if s.ch30 then tBits[#tBits + 1] = L["30 days"] .. " " .. FT.Pct(s.ch30) end
+    if s.dev then tBits[#tBits + 1] = L["vs usual"] .. " " .. FT.Pct(s.dev) end
+    v.trendLine:SetText(table.concat(tBits, FT.C("dim", "  ·  ")))
+    local b = s.behavior or {}
+    local past = {}
+    local hi = b.knowsHighs and FT.An.HighRecord(b)
+    if hi then past[#past + 1] = hi:sub(1, 1):upper() .. hi:sub(2) .. "." end
+    local lo = b.knowsLows and FT.An.LowRecord(b)
+    if lo then past[#past + 1] = lo:sub(1, 1):upper() .. lo:sub(2) .. "." end
+    if b.bestDay and (b.bestUp or 0) >= 0.03 then past[#past + 1] = string.format(L["Best day: %s (%s)."], FT.An.DayName(b.bestDay), FT.An.Pc(b.bestUp)) end
+    v.trendNote:SetText(#past > 0 and table.concat(past, " ") or FT.C("dim", L["Its record shows after a few weeks of prices."]))
 
-    -- alert: the boxes are filled when another item is opened (and after Save), never while you type in them
-    if v.alertFor ~= id and not (v.below:HasFocus() or v.above:HasFocus()) then
-        v.alertFor = id
-        local w = FT.db.watch[id]
-        v.below:SetValue(w and w.below or nil)
-        v.above:SetValue(w and w.above or nil)
-    end
-    T.UpdateAlert()
+    -- the call: for you - selling if you have it, else buying - with how sure it is and its record
+    local call = FT.An.Call(s, own)
+    v.callBadge:Set(call.kind, nil, call.strength)
+    local sure = call.conf and FT.An.ConfText(call.conf) or ""
+    if call.record then sure = sure .. ", " .. call.record end
+    v.callSure:SetText(sure)
+    v.callText:SetText(call.text or "")
+    v.callOther:SetText(call.other and FT.C("dim", call.other) or "")
+    v.callWhy = call.detail
+    v.craft:SetShown(rs ~= nil and rs[1] ~= nil)
+
     T.UpdateWatchButton()
-    book:SetItem(id)
     T.LayoutRight()
     T.FitHeader()
 end
@@ -1297,11 +1212,6 @@ function T.Build(p)
     overview = BuildOverview(center)
     itemView = BuildItemView(center)
     itemView:Hide()
-    book = UI.OrderBook(p)
-    T.book = book
-    book:SetPoint("TOPRIGHT", -8, -8)
-    book:SetPoint("BOTTOMRIGHT", -8, 8)
-    book:SetWidth(RIGHT_W)
     -- a material clicked opens it here (the list stays as it is)
     mats = UI.Materials(p, function(id) T.Select(id) end)
     mats:SetPoint("BOTTOMRIGHT", -8, 8)
@@ -1310,37 +1220,32 @@ function T.Build(p)
     T.OnLayout()
 end
 
--- the right side: the order book, and under it the materials of one craft when you can make the item
+-- the right side: the materials of one craft when you can make the item (the chart takes the room otherwise)
 function T.LayoutRight()
-    if not (book and mats) then return end
+    if not (mats and center) then return end
     local show, h = false, 0
     if not FT.Compact() and itemView:IsShown() and state.selected then
         show, h = mats:SetItem(state.selected)
     end
     mats:SetShown(show)
-    book:ClearAllPoints()
-    book:SetPoint("TOPRIGHT", -8, -8)
-    book:SetWidth(RIGHT_W)
     if show then
-        mats:SetHeight(h)
-        book:SetPoint("BOTTOMRIGHT", mats, "TOPRIGHT", 0, 8)
-    else
-        book:SetPoint("BOTTOMRIGHT", -8, 8)
+        mats:ClearAllPoints()
+        mats:SetPoint("TOPRIGHT", -8, -8)
+        mats:SetWidth(RIGHT_W)
+        mats:SetHeight(math.min(h, (page:GetHeight() or 400) - 16))
     end
+    center:ClearAllPoints()
+    center:SetPoint("TOPLEFT", LEFT_W + 18, -8)
+    center:SetPoint("BOTTOMRIGHT", show and -(RIGHT_W + 18) or -8, 8)
 end
 
--- the compact window: charts only - no order book on the side, no cards under the charts ("More" has them)
+-- the compact window: charts only - no cards under the charts ("More" has them)
 function T.OnLayout()
     if not page then return end
     local compact = FT.Compact()
-    book:SetShown(not compact)
-    center:ClearAllPoints()
-    center:SetPoint("TOPLEFT", LEFT_W + 18, -8)
-    center:SetPoint("BOTTOMRIGHT", compact and -8 or -(RIGHT_W + 18), 8)
     local v = itemView
     v.compact = compact
-    for _, c in ipairs({ v.ind, v.sig, v.alert }) do c:SetShown(not compact) end
-    if FT.S.simple ~= false then v.ind:Hide() end
+    for _, c in ipairs({ v.health, v.trend, v.call }) do c:SetShown(not compact) end
     v.pchart:ClearAllPoints()
     v.pchart:SetPoint("TOPLEFT", v.chart, "BOTTOMLEFT", 0, -6)
     v.pchart:SetPoint("BOTTOMRIGHT", 0, compact and 0 or CARDS_H)
