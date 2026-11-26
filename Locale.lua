@@ -102,4 +102,4 @@ plain["From the auction house's letters, read when you open your mailbox; deposi
     "From your auction house mail. The cut is already taken off."
 plain["Average"] = "Average price"
 plain["TO VENDOR"] = "VENDOR IT"
-plain["CARRY OVER"] = "CARRY IT"
+plain["CARRY OVER"] = "AH TO AH"
