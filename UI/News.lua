@@ -12,6 +12,9 @@ FT.News = N
 -- start, after the files are read (a table made with them would keep the English)
 local function News()
     return {
+        ["v0.18"] = {
+            { L["Fresher Blizzard prices"], L["New prices go out within about 15 minutes of Blizzard's own update, instead of up to a few hours later. No more \"likely out, /reload\" guesses: after a login or /reload, one line says whether you got new prices. The API chip says when yours are from."] },
+        },
         ["v0.17"] = {
             { L["Smoother"], L["Loading in no longer stutters: the price data is read item by item as it's needed, the heavy work at login is spread thinner and later, and nothing heavy runs in a fight. About 15% less memory."] },
         },
@@ -97,7 +100,7 @@ local function News()
                 function() FT.Show("market") end },
         },
         ["v0.2"] = {
-            { L["Where your prices come from"], L["The status bar shows Blizzard's time and your scan's: the newer one in green. Yellow means newer prices are likely out: /reload."],
+            { L["Where your prices come from"], L["The status bar shows Blizzard's time and your scan's: the newer one in green. Yellow means they are over two hours old."],
                 nil },
             { L["One scan for both"], L["Full scan runs Auctionator's scan when it's installed, and its scans come into this addon too: no need to scan twice."],
                 function() FT.Show("settings") end },

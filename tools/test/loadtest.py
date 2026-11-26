@@ -274,7 +274,9 @@ end)
 step("logout", function() mock.fire("PLAYER_LOGOUT") end)
 '''
 lua.execute('return function(...) ' + script + ' end')(FT)
-# a /reload: the same saved data, every file again
+# a /reload: the same saved data, every file again - as if the prices loaded last time were an hour older,
+# so the reload must say "New prices loaded"
+lua.eval('function(FT) for k, v in pairs(FT.db.feedLoaded or {}) do FT.db.feedLoaded[k] = v - 3600 end end')(FT)
 print("=== reload with saved data ===")
 ns = lua.eval('{}')
 load_all()
@@ -285,6 +287,7 @@ mock.fire("PLAYER_ENTERING_WORLD", false, true)
 mock.run(200, 0.25)
 ''')
 lua.execute('return function(...) ' + script + ' end')(ns)
+print("feed loaded record:", lua.eval('(function(ns) local s = {}; for k, v in pairs((ns.db and ns.db.feedLoaded) or {}) do s[#s+1] = k .. "=" .. tostring(v) end; return table.concat(s, ",") end)')(ns), "house t:", lua.eval('function(ns) local h = ns.Feed.House(); return h and h.t, ns.Feed.On(), ns.house end')(ns))
 errs = list(lua.eval('mock.errors').values())
 seen = set()
 for e in errs:
@@ -295,4 +298,4 @@ for e in errs:
 print(len(errs), 'errors,', len(seen), 'distinct')
 prints = list(lua.eval('mock.prints').values())
 print('chat lines:', len(prints))
-for p in prints[:25]: print('  chat:', re.sub(r'\|c\w{8}|\|r|\|H[^|]*\|h|\|h', '', p)[:200])
+for p in prints[:60]: print('  chat:', re.sub(r'\|c\w{8}|\|r|\|H[^|]*\|h|\|h', '', p)[:200])

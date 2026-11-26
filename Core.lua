@@ -4,7 +4,7 @@ local L = FT.L
 
 -- The version being released: a copy straight from the repository (not packaged) has no version in its TOC yet
 -- (the packager puts the tag there) and shows this one. Set it with every release.
-local RELEASE = "v0.17.4"
+local RELEASE = "v0.18"
 local GetMeta = (C_AddOns and C_AddOns.GetAddOnMetadata) or GetAddOnMetadata
 FT.VERSION = (GetMeta and GetMeta(ADDON, "Version")) or RELEASE
 if FT.VERSION == "" or FT.VERSION:find("@", 1, true) then FT.VERSION = RELEASE end
@@ -126,7 +126,6 @@ end
 FT.DEFAULTS = {
     words = "plain",        -- plain (Plain English) / trader (the trader terms), after a reload
     useFeed = true,         -- the price feed shipped with the addon (Sources/Feed.lua)
-    reloadReminder = true,  -- a chat line, at most hourly, when newer feed prices are likely out
     scanWithAuctionator = true, -- Full scan runs Auctionator's scan when it's installed (one scan feeds both)
     tooltipBestUse = true,  -- a material's tooltip: its best use (Data/Recipes.lua)
     holdTrends = true,      -- a steady climb is held (HODL / sell half) rather than sold the day it's above average
@@ -403,6 +402,14 @@ end
 function FT.Num(n)
     if not n then return "—" end
     return FT.Thousands(n)
+end
+
+-- a clock time: "3:05 pm" today, "Tue 3:05 pm" before
+function FT.TimeOfDay(t)
+    if not t then return "" end
+    local s = date("%I:%M %p", t):gsub("^0", ""):lower()
+    if date("%Y%m%d", t) ~= date("%Y%m%d") then s = date("%a", t) .. " " .. s end
+    return s
 end
 
 function FT.Ago(t)

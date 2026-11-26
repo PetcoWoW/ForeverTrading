@@ -293,31 +293,39 @@ FT.On("FT_READY", function()
 end)
 
 ---------------------------------------------------------------------------
--- Fresh prices are out: the reminder to /reload
+-- What the login or /reload brought: new prices, or the same ones
 ---------------------------------------------------------------------------
--- A new feed is published every hour (WowUp puts it in place); the game reads it only at login or /reload. So
--- once the feed we loaded is older than STALE, newer prices are likely waiting on disk.
-local STALE = 70 * 60
-local lastNudge
+-- The game reads the price file only at login or /reload, and the addon can't see the disk in between: it can't
+-- know when newer prices have been downloaded (by WowUp or the companion app), so it doesn't guess. It says, once
+-- after loading, whether these are newer than the ones it had last time - and remembers them (the saved data is
+-- written at every reload: the companion app reads it to tell what the game has).
+local OLD = 2 * 3600
 
--- the feed we loaded was built long enough ago for a newer one to be out
+-- the prices are over two hours old (Blizzard's own time): shown in yellow
 function F.Stale()
-    if not F.On() then return false end
-    local built = FT.FEED.built
-    return built ~= nil and time() - built > STALE
+    local t = F.On() and F.Time()
+    return t ~= nil and time() - t > OLD
 end
 
-local function Nudge()
-    if not (F.Stale() and FT.S and FT.S.reloadReminder ~= false) then return end
-    if InCombatLockdown and InCombatLockdown() then return end
-    if lastNudge and GetTime() - lastNudge < 3600 then return end
-    lastNudge = GetTime()
-    FT.Print(L["Newer AH prices are likely out: type /reload to load them."])
+local function Report()
+    if not F.On() or not FT.db then return end
+    local h = F.House()
+    if not h or not h.t then return end
+    local key = tostring(F.HouseID(FT.house) or "?")
+    local seen = FT.db.feedLoaded
+    if type(seen) ~= "table" then seen = {}; FT.db.feedLoaded = seen end
+    local last = tonumber(seen[key])
+    seen[key] = h.t
+    FT.db.feedBuilt = FT.FEED.built
+    if last and h.t > last then
+        FT.Print(string.format(L["New prices loaded: Blizzard, %s (%s items)."], FT.TimeOfDay(h.t), FT.Num(h.count)))
+    elseif last and h.t == last and time() - h.t > 75 * 60 then
+        -- only when newer ones could exist: a reload for anything else says nothing
+        FT.Print(FT.C("dim", string.format(L["Same prices as last time (%s): nothing newer had downloaded yet."], FT.TimeOfDay(h.t))))
+    end
 end
 
-FT.On("FT_READY", function()
-    C_Timer.NewTicker(300, Nudge)
-end)
+FT.On("FT_READY", function() C_Timer.After(4, Report) end)
 
 -- for the status bar and /wolf debug
 function F.Describe()
