@@ -12,7 +12,7 @@ and the words and adds its own features. See `NOTICE`.
 1. **The addon:** search "Wolf of Booty Bay" in the CurseForge app (or on curseforge.com) and install it. New
    versions arrive through CurseForge. Or take the newest zip from this repository's **Releases** page and put the
    `WolfOfBootyBay` folder into `World of Warcraft/<your Forever client>/Interface/AddOns/`.
-2. **Hourly prices (Windows):** [WolfPricesSetup.exe](https://github.com/sain221b-sketch/ForeverTrading/releases/download/companion/WolfPricesSetup.exe), the Wolf prices companion. Run it, click Install.
+2. **Hourly prices (Windows):** [WolfPricesSetup.exe](https://github.com/PetcoWoW/ForeverTrading/releases/download/companion/WolfPricesSetup.exe), the Wolf prices companion. Run it, click Install.
    In game: Settings > About > Prices companion.
 
 Restart the game fully the first time (new addon files load at launch, not on `/reload`), then type `/wolf`.
@@ -24,7 +24,7 @@ repository's releases) whether there are newer prices, and if so puts them in th
 notification, a window or a sound on its own - safe on stream. In game, when you open the auction house and newer
 prices are waiting, chat says so with a **[Load them]** link (the game reads files only at login or `/reload`).
 
-- **Download:** [WolfPricesSetup.exe](https://github.com/sain221b-sketch/ForeverTrading/releases/download/companion/WolfPricesSetup.exe). Setup finds World of Warcraft and the addon, installs for your
+- **Download:** [WolfPricesSetup.exe](https://github.com/PetcoWoW/ForeverTrading/releases/download/companion/WolfPricesSetup.exe). Setup finds World of Warcraft and the addon, installs for your
   Windows user only (no admin rights) and starts with Windows if you leave that ticked.
 - **What it touches:** the addon's price file (`Interface/AddOns/WolfOfBootyBay/Data/Feed.lua`), a one-line note
   beside it (`Data/Companion.lua`: when it last checked), its settings and log in `%APPDATA%\WolfPrices`, and

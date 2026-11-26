@@ -11,7 +11,7 @@ if FT.VERSION == "" or FT.VERSION:find("@", 1, true) then FT.VERSION = RELEASE e
 FT.VERSION_TEXT = FT.VERSION:match("^%d") and ("v" .. FT.VERSION) or FT.VERSION
 FT.MEDIA = "Interface\\AddOns\\" .. ADDON .. "\\media\\"
 FT.URL_SUPPORT = "https://github.com/thewoolfi/ForeverTrading"
-FT.URL_GITHUB = "https://github.com/sain221b-sketch/forevertrading"
+FT.URL_GITHUB = "https://github.com/PetcoWoW/ForeverTrading"
 
 ---------------------------------------------------------------------------
 -- Events: game events and our own ("FT_*") share one dispatcher

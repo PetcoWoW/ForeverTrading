@@ -4,7 +4,7 @@
 //   --uninstall:               removes itself (Settings > Apps > Uninstall runs this)
 //   --check <World of Warcraft folder>, --pictures <folder>: for the build's own test (no window)
 // What it touches: the addon's price file (Interface\AddOns\WolfOfBootyBay\Data\Feed.lua) and its note
-// (Data\Companion.lua), its settings and log (%APPDATA%\WolfPrices), and itself. Source: github.com/sain221b-sketch/ForeverTrading
+// (Data\Companion.lua), its settings and log (%APPDATA%\WolfPrices), and itself. Source: github.com/PetcoWoW/ForeverTrading
 using System;
 using System.IO;
 using System.Net;

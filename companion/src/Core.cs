@@ -10,7 +10,7 @@ namespace WolfPrices
 {
     static class App
     {
-        public const string Repo = "sain221b-sketch/ForeverTrading";
+        public const string Repo = "PetcoWoW/ForeverTrading";
         public const string InfoUrl = "https://github.com/" + Repo + "/releases/latest/download/latest.json";
         public const string FeedUrl = "https://github.com/" + Repo + "/releases/latest/download/Feed.lua";
         // the companion itself, for its own updates: a release of its own (tag "companion")
