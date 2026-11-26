@@ -1,5 +1,19 @@
 # The Wolf of Booty Bay
 
+## v0.25 - the Eye: the wolf knows what you've got
+
+- The wolf works out what kind of player you are, with no questions: every character's professions and skill,
+  what you hold everywhere, what you gather (all the time now, not only in sessions), what you bought and sold at
+  the auction house, your watchlist. "The wolf sees" on the Terminal says it in one line.
+- Your top 3 on the Terminal: moves about you, each with its reason in the hover - sell what's high (how many, at
+  what), what's sliding, a big move on something you hold, a watched item under its usual price, what your own
+  characters can craft from what you hold (a miner's ore into bars too), the best thing to gather for your
+  professions, a flip your gold covers if you trade. Nothing you can't do: no craft no character of yours knows.
+  Short of three, today's market moves fill in.
+- In chat, rarely: once after login (when prices, bags and crafts are known) and after a real auction house visit,
+  up to three moves, each once a day. Replaces the old recap, sell pings and market banners.
+- No more pop-up alerts on screen, ever (the setting is gone).
+
 ## v0.24 - smoother, cleaner Terminal
 
 - Search: every word you type is matched as a part of the name, in any order ("thor ore" finds Thorium Ore).

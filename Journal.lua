@@ -55,6 +55,9 @@ local function Save()
     R().journal = table.concat(parts)
 end
 
+-- every event kept, oldest first (read-only: { t, k, id, q, v, f })
+function J.Events() return Load() end
+
 -- one event (kind as above); said to the pages
 function J.Add(k, itemID, qty, value, fee, t)
     Load()

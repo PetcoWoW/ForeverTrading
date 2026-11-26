@@ -452,13 +452,7 @@ function P.Recap()
     r.worth, r.t = worth, time()
 end
 
-local recapDone = false
-FT.On("FT_MARKET_READY", function()
-    if recapDone or FT.S.recap == false then return end
-    recapDone = true
-    -- a moment for the deals and the portfolio to be worked out
-    C_Timer.After(12, function() pcall(P.Recap) end)
-end)
+-- (v0.25: the Eye says this at login, with your moves - P.Recap stays for /wolf recap)
 
 function P.SellPings()
     if FT.S.sellPing == false then return end
@@ -481,7 +475,7 @@ function P.SellPings()
         FT.Print(FT.C("up", L["Good day to sell"]) .. "  " .. table.concat(lines, FT.C("dim", "  ·  ")))
     end
 end
-FT.On("FT_MARKET_READY", function() FT.Debounce("sellPing", 30, function() pcall(P.SellPings) end) end)
+-- (v0.25: what to sell is the Eye's, once it knows enough - FT.Eye)
 
 ---------------------------------------------------------------------------
 -- Auctionator shopping lists: a list of ours (deals to buy, a craft's materials) as one of Auctionator's, so
