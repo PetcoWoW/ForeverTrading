@@ -1,5 +1,29 @@
 # The Wolf of Booty Bay
 
+## v0.22 - Radar, Snipe, a cleaner chart
+
+- Radar (new page, between Money and Portfolio): demand forming, from the market itself. Sales speeding up (the
+  last 3 days against the week before) while the price holds and supply doesn't pile up - Early before the price
+  moves, Moving, Late; Chains: what a rising craft is made of (every recipe of the game) while its own price
+  hasn't moved; Cooling: what's slowing down. The next announced event on top (raids open 12/9: consumables
+  usually climb before). Early calls are written down and graded 5-9 days later (its record in the header).
+  The price robot now ships what sold each day for the last two weeks (a day's worth each, days watched under
+  6 hours left out) - the Radar needs a few days of them.
+- Snipe: the auction house tab is Snipe now (inside the auction house with Auctionator's tab library, beside it
+  without). After a scan: Underpriced now (fresh prices under their real price less the deal margin, not being
+  dumped or pushed up, gear and what hardly sells left out unless a vendor pays more; over 80% off says "check the
+  listing"), each Safe / Good / Gamble with why, and Buy (the cheap ones of a fresh order book, up to two days of
+  sales; the server's price, your click). Often underpriced: items whose deep dips came back most times (from the
+  daily learning). Re-check searches both lists again without a full scan; To Auctionator.
+- Chart (simple): 7D / 30D / 90D, one smooth line with a soft glow and finer fill, its high and low marked, a dot
+  following the mouse, no vertical lines or dashed last-price line. Pro chart unchanged.
+- Dates the American way everywhere: 11/25/26, 11/25 3 pm.
+- Price card: 7 days, 30 days and vs usual on their own lines (no more "..."), one record under them.
+- Money and Craft for profit: the lists made ahead (Craft for profit now too) take half the frame time (2 ms);
+  only a page waiting for its list gets the full share.
+- Session gold an hour: from 10 minutes in (a lucky first minute made it huge); its hover shows the rate without
+  your single best find.
+
 ## v0.21.1 - tooltip under Auctionator's
 
 - Our tooltip lines sit right under Auctionator's (Vendor / Auction / Disenchant), above other addons' lines (bag

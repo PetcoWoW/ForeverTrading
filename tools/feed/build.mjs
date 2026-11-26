@@ -44,6 +44,7 @@ const ONLY = process.env.FEED_HOUSES
 const KEEP_DAYS = Number(process.env.FEED_KEEP_DAYS) || 90;  // daily lows and sales kept in the history
 const SHIP_DAYS = Math.min(KEEP_DAYS, Number(process.env.FEED_SHIP_DAYS) || 30); // daily lows shipped
 const SALES_DAYS = 7;         // what sold: over the last week
+const DAILY_SALES = 14;       // what sold day by day: the last two weeks (the Radar)
 const MAX_GAP = 3 * 3600;     // two downloads further apart than this: no sales are counted between them
 // A listing gone by the next download: with more than 2 hours left it was bought (or taken off by its seller,
 // which looks the same from outside); with under 30 minutes left it ran out. 30 min - 2 h: can't tell, not counted.
@@ -246,7 +247,8 @@ function encodeHouse(res) {
   const seen = days.filter((d) => h.seen && h.seen[d]);
   let watchedSec = 0;
   for (const d of days.slice(-SALES_DAYS)) watchedSec += h.watched[d] || 0;
-  const parts = [];
+  const parts = [], soldParts = [];
+  const salesDays = days.slice(-DAILY_SALES);
   const ids = Object.keys(h.items).map(Number).sort((x, y) => x - y);
   for (const item of ids) {
     const r = h.items[item];
@@ -259,8 +261,18 @@ function encodeHouse(res) {
     const lows = days.map((d) => b36(r.l[d]));
     parts.push(`${item}=${[e ? b36(e.p) : "", e ? b36(e.q) : "", e ? b36(e.n) : "", b36(sold), b36(value),
       b36(watchedSec / 3600), b36(expired), ...lows].join(",")};`);
+    // what sold each day, as a day's worth (sold / hours watched x 24, in tenths), for the last DAILY_SALES days:
+    // the addon's Radar sees sales speeding up. Days watched under 6 hours are left empty (too little to tell).
+    const rates = salesDays.map((d) => {
+      const w = (h.watched[d] || 0) / 3600;
+      if (w < 6) return "";
+      const x = r.s[d];
+      return b36(((x ? x[0] : 0) / w) * 24 * 10);
+    });
+    if (rates.some((v) => v !== "" && v !== "0")) soldParts.push(`${item}=${rates.join(",")};`);
   }
-  return { text: parts.join(""), firstDay: days[0], seen, items: ids.length, listed: now.size };
+  return { text: parts.join(""), firstDay: days[0], seen, items: ids.length, listed: now.size,
+    sold: soldParts.join(""), soldFirst: salesDays[0] };
 }
 
 function luaString(s) {
@@ -284,7 +296,7 @@ function writeLua(results) {
     lines.push(`            name = "${region}",`);
     lines.push("            houses = {");
     for (const [houseId, enc] of Object.entries(houses)) {
-      lines.push(`                [${houseId}] = { t = ${enc.t}, firstDay = ${enc.firstDay}, seen = "${enc.seen.join(",")}", data = ${luaString(enc.text)} },`);
+      lines.push(`                [${houseId}] = { t = ${enc.t}, firstDay = ${enc.firstDay}, seen = "${enc.seen.join(",")}", data = ${luaString(enc.text)}, soldFirst = ${enc.soldFirst}, sold = ${luaString(enc.sold)} },`);
     }
     lines.push("            },");
     lines.push("        },");

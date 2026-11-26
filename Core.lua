@@ -4,7 +4,7 @@ local L = FT.L
 
 -- The version being released: a copy straight from the repository (not packaged) has no version in its TOC yet
 -- (the packager puts the tag there) and shows this one. Set it with every release.
-local RELEASE = "v0.21.1"
+local RELEASE = "v0.22"
 local GetMeta = (C_AddOns and C_AddOns.GetAddOnMetadata) or GetAddOnMetadata
 FT.VERSION = (GetMeta and GetMeta(ADDON, "Version")) or RELEASE
 if FT.VERSION == "" or FT.VERSION:find("@", 1, true) then FT.VERSION = RELEASE end
@@ -92,13 +92,14 @@ end
 
 -- step(i) for i = 1..n, as many as fit in each frame's share; done() at the end. A step returning false stops the
 -- job (done isn't called). The job: job:Cancel().
-function FT.Job(name, n, step, done)
+-- budget: ms per frame for a job nobody waits on (the lists made ahead: deals, crafts) - lighter on the frame rate
+function FT.Job(name, n, step, done, budget)
     local job = {}
     local i, spent, frames, worst, began = 1, 0, 0, 0, GetTime()
     local ticker
     ticker = C_Timer.NewTicker(0, function()
         local t0 = clock()
-        local stop = t0 + ((InCombatLockdown and InCombatLockdown()) and FIGHT_MS or FRAME_MS)
+        local stop = t0 + math.min(budget or FRAME_MS, (InCombatLockdown and InCombatLockdown()) and FIGHT_MS or FRAME_MS)
         while i <= n do
             if step(i) == false then
                 ticker:Cancel()
@@ -178,8 +179,8 @@ FT.DEFAULTS = {
     ahButton = true,
     replaceAH = false,      -- talking to an auctioneer opens Wolf of Booty Bay in place of the game's window
     sellDuration = 2,       -- posting: 1 short, 2 medium, 3 long (WoW Forever: 2, 8, 24 hours)
-    dockAH = true,
     chartTF = "1D",
+    chartRange = "30D",     -- the simple chart: 7D, 30D or 90D
     showMA = false,
 }
 
@@ -794,7 +795,7 @@ SLASH_WOLFOFBOOTYBAY3 = "/booty"
 -- the window, the minimap button and Settings do all of it.
 FT.COMMANDS = {
     { "/wolf", "open or close the window" },
-    { "/wolf market | signals | portfolio | sessions | settings", "open that page" },
+    { "/wolf market | signals | radar | portfolio | sessions | settings", "open that page" },
     { "/wolf farm", "start or stop a session (/wolf farm pause: pause it)" },
     { "/wolf scan", "a full scan at the auction house (Auctionator's when it's installed)" },
     { "/wolf scan mine", "check the prices of your own auctions" },
@@ -814,7 +815,7 @@ SlashCmdList.WOLFOFBOOTYBAY = function(msg)
     local cmd, rest = msg:match("^(%S*)%s*(.-)$")
     if cmd == "" then
         FT.Toggle()
-    elseif cmd == "market" or cmd == "craft" or cmd == "signals" or cmd == "portfolio" or cmd == "sell" or cmd == "settings" or cmd == "sessions" then
+    elseif cmd == "market" or cmd == "craft" or cmd == "signals" or cmd == "radar" or cmd == "portfolio" or cmd == "sell" or cmd == "settings" or cmd == "sessions" then
         FT.Show(cmd)
     elseif cmd == "words" and (rest == "plain" or rest == "trader") then
         FT.S.words = rest

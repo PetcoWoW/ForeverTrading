@@ -188,7 +188,7 @@ function T.Build(p)
     Check(g, "ticker", L["Ticker tape under the header"], L["Your watchlist and the day's biggest movers, scrolling. Takes effect after /reload."],
         function() FT.AskReload() end)
     Check(g, "minimap", L["Minimap button"], nil, function() if FT.UpdateMinimap then FT.UpdateMinimap() end end)
-    Check(g, "ahButton", L["Button on the auction house"], L["Opens Wolf of Booty Bay next to the auction house window."])
+    Check(g, "ahButton", L["Snipe tab at the auction house"], L["A Snipe tab in the auction house window: after a scan, what's listed under its price, with how sure and a Buy button."])
     Check(g, "replaceAH", L["Open Wolf of Booty Bay instead of the auction house window"],
         L["Talking to an auctioneer opens Wolf of Booty Bay; the game's window stays open behind it, unseen. The \"AH: online\" pill in the header brings it back for buying and selling (and Auctionator). Walking away: the terminal goes offline with the last known prices."])
     Check(g, "tooltip", L["Lines in item tooltips"], L["Price change, RSI, the signal and the craft profit of the item, and a material's best use."])

@@ -909,12 +909,19 @@ local function BuildItemView(parent)
         T.DrawChart()
     end)
     v.tf:SetPoint("TOPLEFT", 0, -100)
+    -- the simple chart: 7D / 30D / 90D in the same place
+    v.range = UI.Segmented(v, UI.RANGES, function(r)
+        FT.S.chartRange = r
+        T.DrawChart()
+    end)
+    v.range:SetPoint("TOPLEFT", 0, -100)
     v.pro = UI.Check(v, L["Pro chart"], function(on)
         FT.S.chartStyle = on and "pro" or "simple"
         T.ApplyChartStyle()
         T.DrawChart()
     end)
     v.pro:SetPoint("LEFT", v.tf, "RIGHT", 16, 0)
+    -- (placed after whichever of the two shows: T.ApplyChartStyle)
     v.pro:SetTip(L["Pro chart"], L["Candles (each period's open, high, low and close), the averages and a second chart of the price against its average. Off: one clean line, green when it went up, red when down."])
     v.ma = UI.Check(v, L["Averages"], function(on)
         FT.S.showMA = on
@@ -977,8 +984,8 @@ local function BuildItemView(parent)
     v.healthLine = Lines(v.health, v.healthWord, 8, 11, "muted", 2)
     v.healthNote = Lines(v.health, v.healthLine, 6, 11, "dim", 2)
     v.trendWord = Big(v.trend)
-    v.trendLine = Lines(v.trend, v.trendWord, 8, 11, "muted", 1)
-    v.trendNote = Lines(v.trend, v.trendLine, 6, 11, "dim", 3)
+    v.trendLine = Lines(v.trend, v.trendWord, 6, 11, "muted", 3)
+    v.trendNote = Lines(v.trend, v.trendLine, 4, 11, "dim", 2)
 
     -- the call: its badge, the reason, how sure and its record, the other side; your buttons at the bottom
     v.callBadge = UI.Badge(v.call, 104, 20)
@@ -1085,6 +1092,11 @@ function T.ApplyChartStyle()
     local pro = UI.ProChart()
     v.pchart:SetShown(pro)
     v.ma:SetShown(pro)
+    v.tf:SetShown(pro)
+    v.range:SetShown(not pro)
+    v.range:SetValue(FT.S.chartRange or "30D")
+    v.pro:ClearAllPoints()
+    v.pro:SetPoint("LEFT", pro and v.tf or v.range, "RIGHT", 16, 0)
     local w, h = v:GetSize()
     if w and w > 0 then
         local cards = v.compact and 0 or CARDS_H
@@ -1172,19 +1184,21 @@ function T.ShowItem(id, keepView)
     -- the price: where it's going, against its weeks, and what it did before
     local word, wordColor = FT.An.TrendWord(s)
     v.trendWord:SetText(FT.C(wordColor, word))
+    -- a short line each (one line of three cut the last with "...")
     local tBits = {}
-    if s.ch7 then tBits[#tBits + 1] = L["7 days"] .. " " .. FT.Pct(s.ch7) end
-    if s.ch30 then tBits[#tBits + 1] = L["30 days"] .. " " .. FT.Pct(s.ch30) end
-    if s.dev then tBits[#tBits + 1] = L["vs usual"] .. " " .. FT.Pct(s.dev) end
-    v.trendLine:SetText(table.concat(tBits, FT.C("dim", "  ·  ")))
+    if s.ch7 then tBits[#tBits + 1] = L["7 days"] .. "  " .. FT.Pct(s.ch7) end
+    if s.ch30 then tBits[#tBits + 1] = L["30 days"] .. "  " .. FT.Pct(s.ch30) end
+    if s.dev then tBits[#tBits + 1] = L["vs usual"] .. "  " .. FT.Pct(s.dev) end
+    v.trendLine:SetText(table.concat(tBits, "\n"))
+    -- the one record that matters now: what its jumps did when it's up, its dips when it's down
     local b = s.behavior or {}
-    local past = {}
-    local hi = b.knowsHighs and FT.An.HighRecord(b)
-    if hi then past[#past + 1] = hi:sub(1, 1):upper() .. hi:sub(2) .. "." end
-    local lo = b.knowsLows and FT.An.LowRecord(b)
-    if lo then past[#past + 1] = lo:sub(1, 1):upper() .. lo:sub(2) .. "." end
-    if b.bestDay and (b.bestUp or 0) >= 0.03 then past[#past + 1] = string.format(L["Best day: %s (%s)."], FT.An.DayName(b.bestDay), FT.An.Pc(b.bestUp)) end
-    v.trendNote:SetText(#past > 0 and table.concat(past, " ") or FT.C("dim", L["Its record shows after a few weeks of prices."]))
+    local rec
+    if (s.dev or 0) >= 0 and b.knowsHighs then rec = FT.An.HighRecord(b)
+    elseif b.knowsLows then rec = FT.An.LowRecord(b)
+    elseif b.knowsHighs then rec = FT.An.HighRecord(b) end
+    if rec then rec = rec:sub(1, 1):upper() .. rec:sub(2) .. "." end
+    if not rec and b.bestDay and (b.bestUp or 0) >= 0.03 then rec = string.format(L["Best day: %s (%s)."], FT.An.DayName(b.bestDay), FT.An.Pc(b.bestUp)) end
+    v.trendNote:SetText(rec or FT.C("dim", L["Its record shows after a few weeks of prices."]))
 
     -- the call: for you - selling if you have it, else buying - with how sure it is and its record
     local call = FT.An.Call(s, own)

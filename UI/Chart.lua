@@ -82,6 +82,8 @@ function UI.Chart(parent)
     ch.cxTag.text = UI.Text(ch.cxTag, 10, "text", "CENTER")
     ch.cxTag.text:SetPoint("CENTER")
     ch.cx:Hide(); ch.cy:Hide(); ch.cyTag:Hide(); ch.cxTag:Hide()
+    ch.hdot = UI.Dot(ch.mouse, 9, "up", 1, "OVERLAY")
+    ch.hdot:Hide()
 
     ch.empty = UI.EmptyState(ch, "", "")
     ch.empty:SetPoint("CENTER", 0, 10)
@@ -123,10 +125,12 @@ function UI.Chart(parent)
         return (d.fmt or FT.GoldNumber)(v)
     end
 
+    -- dates the American way: 11/25/26, 11/25 3 pm
+    local function Hour(t) return (date("%I %p", t):gsub("^0", ""):lower()) end
     local function TimeText(d, t)
         if not t then return "" end
-        if d.hourly then return date("%d.%m %H:%M", t) end
-        return date("%d.%m.%y", t)
+        if d.hourly then return date("%m/%d", t) .. " " .. FT.TimeOfDay(t):gsub("^%a+ ", "") end
+        return date("%m/%d/%y", t)
     end
 
     function ch:Render()
@@ -205,7 +209,7 @@ function UI.Chart(parent)
         while g <= hi and guard < 12 do
             local y = Y(g)
             local t = self.grid:Get()
-            t:SetColorTexture(C.line[1], C.line[2], C.line[3], 0.6)
+            t:SetColorTexture(C.line[1], C.line[2], C.line[3], (d.mode == "line" and not d.centerZero) and 0.3 or 0.6)
             t:ClearAllPoints()
             t:SetPoint("BOTTOMLEFT", self.plot, "BOTTOMLEFT", 0, y)
             t:SetPoint("BOTTOMRIGHT", self.plot, "BOTTOMRIGHT", 0, y)
@@ -220,22 +224,25 @@ function UI.Chart(parent)
             guard = guard + 1
         end
 
-        -- vertical grid and time labels
+        -- vertical grid (not on the simple line: its dates are enough) and time labels
+        local simpleLine = d.mode == "line" and not d.centerZero
         local every = math.max(1, math.floor(count / 6 + 0.5))
         for i = first, last do
             if (last - i) % every == 0 then
                 local x = X(i)
-                local t = self.grid:Get()
-                t:SetColorTexture(C.line[1], C.line[2], C.line[3], 0.35)
-                t:ClearAllPoints()
-                t:SetPoint("BOTTOMLEFT", self.plot, "BOTTOMLEFT", x, 0)
-                t:SetPoint("TOPLEFT", self.plot, "TOPLEFT", x, 0)
-                t:SetWidth(1)
-                t:Show()
+                if not simpleLine then
+                    local t = self.grid:Get()
+                    t:SetColorTexture(C.line[1], C.line[2], C.line[3], 0.35)
+                    t:ClearAllPoints()
+                    t:SetPoint("BOTTOMLEFT", self.plot, "BOTTOMLEFT", x, 0)
+                    t:SetPoint("TOPLEFT", self.plot, "TOPLEFT", x, 0)
+                    t:SetWidth(1)
+                    t:Show()
+                end
                 local fs = self.tlabels:Get()
                 fs:ClearAllPoints()
                 fs:SetPoint("CENTER", self, "BOTTOMLEFT", x, TIME_H / 2)
-                fs:SetText(d.hourly and date("%H:%M", candles[i].t) or date("%d.%m", candles[i].t))
+                fs:SetText(d.hourly and Hour(candles[i].t) or date("%m/%d", candles[i].t))
                 fs:Show()
             end
         end
@@ -309,25 +316,50 @@ function UI.Chart(parent)
                 t:SetSize(4, 4)
                 t:Show()
             end
+            local hiI, loI = first, first
+            for i = first, last do
+                if candles[i].c > candles[hiI].c then hiI = i end
+                if candles[i].c < candles[loI].c then loI = i end
+            end
             for i = first, last - 1 do
                 local x1, y1 = X(i), Y(candles[i].c)
                 local x2, y2 = X(i + 1), Y(candles[i + 1].c)
-                UI.PlaceLine(self.lines:Get(), x1, y1, x2, y2, 1.6, color, 1)
-                -- soft fill under the line, in narrow columns
+                UI.PlaceLine(self.lines:Get(), x1, y1, x2, y2, 5, color, 0.14) -- the glow
+                UI.PlaceLine(self.lines:Get(), x1, y1, x2, y2, 2, color, 1)
+                -- soft fill under the line, in fine columns
                 local px = x1
                 while px < x2 do
-                    local wcol = math.min(3, x2 - px)
+                    local wcol = math.min(2, x2 - px)
                     local frac = (px + wcol / 2 - x1) / (x2 - x1)
                     local y = y1 + (y2 - y1) * frac
                     if y > 1 then
                         local f = self.fills:Get()
-                        UI.Gradient(f, "VERTICAL", color, 0.0, 0.20)
+                        UI.Gradient(f, "VERTICAL", color, 0.0, 0.24)
                         f:ClearAllPoints()
                         f:SetPoint("BOTTOMLEFT", self.plot, "BOTTOMLEFT", px, 0)
                         f:SetSize(wcol, y)
                         f:Show()
                     end
                     px = px + wcol
+                end
+            end
+            -- the high and the low of what's shown, and the newest point
+            if count >= 3 and hiI ~= loI then
+                for _, m in ipairs({ { hiI, "H", 1 }, { loI, "L", -1 } }) do
+                    local i, tag, side = m[1], m[2], m[3]
+                    local dot = self.rects:Get()
+                    dot:SetTexture("Interface\\AddOns\\WolfOfBootyBay\\media\\round.tga")
+                    dot:SetVertexColor(color[1], color[2], color[3], 0.9)
+                    dot:ClearAllPoints()
+                    dot:SetPoint("CENTER", self.plot, "BOTTOMLEFT", X(i), Y(candles[i].c))
+                    dot:SetSize(6, 6)
+                    dot:Show()
+                    local fs = self.ylabels:Get()
+                    fs:ClearAllPoints()
+                    fs:SetPoint(side > 0 and "BOTTOM" or "TOP", self.plot, "BOTTOMLEFT",
+                        math.max(30, math.min(W - 30, X(i))), Y(candles[i].c) + side * 6)
+                    fs:SetText(FT.C("dim", tag .. " ") .. Fmt(d, candles[i].c))
+                    fs:Show()
                 end
             end
         else
@@ -385,7 +417,7 @@ function UI.Chart(parent)
             if d.centerZero then up = lastC >= 0 end
             local col = d.tagColor and Col(d.tagColor) or (up and C.up or C.down)
             local y = Y(lastC)
-            local x = 0
+            local x = (d.mode == "line" and not d.centerZero) and W or 0
             while x < W do
                 local t = self.dashes:Get()
                 t:SetColorTexture(col[1], col[2], col[3], 0.7)
@@ -538,7 +570,16 @@ function UI.Chart(parent)
         ch.cxTag:SetPoint("CENTER", ch, "BOTTOMLEFT", x, TIME_H / 2)
         ch.cxTag:Show()
         local H = ch.plot:GetHeight()
-        if py >= 0 and py <= H then
+        local simple = d.mode == "line" and not d.centerZero
+        if simple then
+            ch.hdot:ClearAllPoints()
+            ch.hdot:SetPoint("CENTER", ch.plot, "BOTTOMLEFT", x, ch.Y(d.candles[i].c))
+            UI.SetTexColor(ch.hdot, (d.candles[ch.last].c >= d.candles[ch.first].c) and "up" or "down", 1)
+            ch.hdot:Show()
+        else
+            ch.hdot:Hide()
+        end
+        if py >= 0 and py <= H and not simple then
             ch.cy:ClearAllPoints()
             ch.cy:SetPoint("LEFT", ch.plot, "BOTTOMLEFT", 0, py)
             ch.cy:SetPoint("RIGHT", ch.plot, "BOTTOMRIGHT", 0, py)
@@ -562,7 +603,7 @@ function UI.Chart(parent)
     ch.mouse:SetScript("OnLeave", function(self)
         if ch.dragging then return end
         self:SetScript("OnUpdate", nil)
-        ch.cx:Hide(); ch.cy:Hide(); ch.cyTag:Hide(); ch.cxTag:Hide()
+        ch.cx:Hide(); ch.cy:Hide(); ch.cyTag:Hide(); ch.cxTag:Hide(); ch.hdot:Hide()
         ch.hoverIndex = nil
         if ch.last then ch:UpdateLegend(ch.last) end
         if ch.onHover then ch.onHover(nil) end

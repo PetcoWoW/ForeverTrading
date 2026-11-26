@@ -12,6 +12,13 @@ FT.News = N
 -- start, after the files are read (a table made with them would keep the English)
 local function News()
     return {
+        ["v0.22"] = {
+            { L["Radar"], L["A new page: what's starting to sell faster before its price moves, what a rising craft is made of, what's cooling off, and the next raid opening. It grades its own calls."],
+                function() FT.Show("radar") end },
+            { L["Snipe at the auction house"], L["The Wolf tab at the auction house is Snipe now: after a scan, what's listed under its price with how sure (Safe, Good, Gamble) and Buy, plus the items worth searching again and again."] },
+            { L["A cleaner chart"], L["One smooth line with its high and low, 7D / 30D / 90D, dates as 11/25. Pro chart keeps the candles."],
+                function() FT.Show("market") end },
+        },
         ["v0.21"] = {
             { L["Fresh prices, by the clock"], L["The Wolf prices companion (Windows): every 15 minutes it puts the newest prices in your addon folder and tells you to /reload. Settings > About > Prices companion."],
                 function() FT.Show("settings") end },

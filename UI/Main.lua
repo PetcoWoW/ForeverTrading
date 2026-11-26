@@ -5,8 +5,8 @@ local L = FT.L
 
 FT.Tabs = {}
 
-local TAB_ORDER = { "market", "craft", "signals", "portfolio", "sessions", "settings" }
-local TAB_LABELS = { market = "Terminal", craft = "Craft", signals = "Money", portfolio = "Portfolio", sell = "Sell",
+local TAB_ORDER = { "market", "craft", "signals", "radar", "portfolio", "sessions", "settings" }
+local TAB_LABELS = { market = "Terminal", craft = "Craft", signals = "Money", radar = "Radar", portfolio = "Portfolio", sell = "Sell",
     sessions = "Sessions", settings = "Settings" }
 
 local win, nav, content, ticker, statusLeft, statusRight, scanDot, scanText, sizeBox, gearBtn, brand

@@ -178,7 +178,28 @@ local function Parse(h)
     -- the UTC days the house was really downloaded on (older feeds don't say: none counted)
     local seen = {}
     for d in (type(h.seen) == "string" and h.seen or ""):gmatch("(%d+)") do seen[#seen + 1] = tonumber(d) end
-    return { t = h.t, firstDay = h.firstDay, items = items, raw = raw, count = n, seen = seen }
+    -- what sold each day (the Radar): kept as text, an item read when asked for (F.SoldDays)
+    local soldRaw = {}
+    if type(h.sold) == "string" then
+        for id, rest in h.sold:gmatch("(%d+)=([^;]*);") do soldRaw[tonumber(id)] = rest end
+    end
+    return { t = h.t, firstDay = h.firstDay, items = items, raw = raw, count = n, seen = seen,
+        soldRaw = soldRaw, soldFirst = h.soldFirst }
+end
+
+-- An item's sales day by day, as a day's worth each (the robot's watched hours scaled to 24): { [utcDay] = n }
+-- for the last two weeks, days watched too little left out; nil when the feed has none (older feeds, no sales)
+function F.SoldDays(itemID, house)
+    local h = F.House(house)
+    local rest = h and h.soldRaw and h.soldRaw[itemID]
+    if not (rest and h.soldFirst) then return nil end
+    local out, k = {}, 0
+    for v in (rest .. ","):gmatch("([^,]*),") do
+        local x = Dec(v)
+        if x then out[h.soldFirst + k] = x / 10 end
+        k = k + 1
+    end
+    return out
 end
 
 -- the feed's data of one of our auction houses (default: the one you look at)
