@@ -1,5 +1,13 @@
 # The Wolf of Booty Bay
 
+## v0.21.1 - tooltip under Auctionator's
+
+- Our tooltip lines sit right under Auctionator's (Vendor / Auction / Disenchant), above other addons' lines (bag
+  counts, drop sources): "Wolf API  8g 05s  1h", then what to do (CASH OUT, HODL...) with today's move, then a
+  craft's profit or what it disenchants for. Moved only when it's safe (Auctionator's lines found, no icons in the
+  lines that move down); otherwise at the bottom as before.
+- No more "Best use" line in tooltips (the Best use button on an item's page stays).
+
 ## v0.21 - the prices companion, tidier sessions
 
 - Wolf prices companion (companion/, Windows): a tray app. Every 15 minutes it reads a small note of when the

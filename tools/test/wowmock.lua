@@ -175,13 +175,34 @@ function methods:CreateLine(name) return newObj("Line", name, self) end
 function methods:CreateFontString(name) return newObj("FontString", name, self) end
 function methods:CreateAnimationGroup() return newObj("AnimationGroup", nil, self) end
 function methods:CreateAnimation() return newObj("Animation", nil, self) end
-function methods:NumLines() return 0 end
+-- a tooltip's lines, as the game has them: <name>TextLeftN / TextRightN font strings, reused after ClearLines
+function methods:NumLines() return self.__n or 0 end
+local function TipLine(self, i)
+    local name = self.__name or "Tooltip"
+    local l = _G[name .. "TextLeft" .. i]
+    if not l then
+        l = newObj("FontString", name .. "TextLeft" .. i, self)
+        _G[name .. "TextLeft" .. i] = l
+        _G[name .. "TextRight" .. i] = newObj("FontString", name .. "TextRight" .. i, self)
+    end
+    return l, _G[name .. "TextRight" .. i]
+end
 function methods:GetOwner() return self.__owner end
 function methods:SetOwner(o) self.__owner = o end
 function methods:GetItem() return nil end
-function methods:AddLine(t) self.__lines = self.__lines or {}; table.insert(self.__lines, tostring(t)) end
-function methods:AddDoubleLine(a, b) self.__lines = self.__lines or {}; table.insert(self.__lines, tostring(a) .. " | " .. tostring(b)) end
-function methods:ClearLines() self.__lines = {} end
+function methods:AddLine(t)
+    self.__lines = self.__lines or {}; table.insert(self.__lines, tostring(t))
+    self.__n = (self.__n or 0) + 1
+    local l, r = TipLine(self, self.__n)
+    l:SetText(tostring(t)); l:Show(); r:SetText(""); r:Hide()
+end
+function methods:AddDoubleLine(a, b)
+    self.__lines = self.__lines or {}; table.insert(self.__lines, tostring(a) .. " | " .. tostring(b))
+    self.__n = (self.__n or 0) + 1
+    local l, r = TipLine(self, self.__n)
+    l:SetText(tostring(a)); l:Show(); r:SetText(tostring(b)); r:Show()
+end
+function methods:ClearLines() self.__lines = {}; self.__n = 0 end
 
 function CreateFrame(kind, name, parent, template)
     local f = newObj(kind or "Frame", name, parent)

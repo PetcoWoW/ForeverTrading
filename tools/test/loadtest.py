@@ -201,6 +201,23 @@ step("portfolio groups", function()
   table.sort(groups)
   print("portfolio groups:", table.concat(groups, " "))
 end)
+-- the tooltip: our price and call right under Auctionator's lines, above another addon's (bag counts)
+step("tooltip under auctionator", function()
+  local tt = GameTooltip
+  tt:ClearLines()
+  tt:AddLine("Arcane Crystal")
+  tt:AddDoubleLine("Vendor", "1g")
+  tt:AddDoubleLine("Auction", "48g")
+  tt:AddLine("Inventory")
+  tt:AddDoubleLine("Petco Forever", "Total: 1")
+  mock.tdp(tt, { id = 12363 })
+  local out = {}
+  for i = 1, tt:NumLines() do
+    local l, r = _G["GameTooltipTextLeft" .. i], _G["GameTooltipTextRight" .. i]
+    out[#out + 1] = (l:GetText() or "") .. ((r:IsShown() and r:GetText() ~= "") and (" | " .. r:GetText()) or "")
+  end
+  print("tooltip order: " .. table.concat(out, " // "):gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", ""):gsub("|T[^|]*|t", ""))
+end)
 step("open item", function() FT.OpenItem(12363) end)
 mock.run(1)
 step("best use", function() FT.ShowBestUse(12359) end)

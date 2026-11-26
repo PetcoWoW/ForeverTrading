@@ -356,42 +356,24 @@ FT.On("FT_PRICES_CHANGED", function() wipe(tipCache) end)
 FT.On("FT_SCAN_DONE", function() wipe(tipCache) end)
 FT.On("FT_LEARNED", function() wipe(tipCache) end)
 
--- "Best use: Thorium Bar, 2.6g each (+24%)" for a material, or nil - kept 2 minutes (a material in 100+
--- recipes takes a moment to price)
-local bestCache = {}
-FT.On("FT_SCAN_DONE", function() wipe(bestCache) end)
-local function BestUseLine(itemID)
-    local c = bestCache[itemID]
-    if c and GetTime() - c.t < 120 then return c.text end
-    local text = nil
-    local list, raw = FT.Craft.BestUse(itemID)
-    local x = list[1]
-    if x and x.each and x.each > 0 and x.sells then
-        text = string.format(L["Best use: %s, %s each"], FT.ItemText(x.recipe.output, 26), FT.Money(math.floor(x.each), "short"))
-        if raw and raw > 0 then text = text .. " " .. FT.Pct(x.each / raw - 1) end
-    end
-    bestCache[itemID] = { t = GetTime(), text = text }
-    return text
-end
-
 local function TipLines(itemID, detail)
     local s = FT.An.Stats(itemID)
     local rs = FT.Craft.ByOutput(itemID)
-    local uses = FT.S.tooltipBestUse ~= false and FT.Craft.UsedIn(itemID)
     local de = FT.Enchant and FT.Enchant.Value and FT.Enchant.Value(itemID)
-    if not s.price and not rs and not uses and not de then return false end
+    if not s.price and not rs and not de then return false end
     local out = {}
-    -- 1: what to do with it, and its price
+    -- 1: our price, like Auctionator's line it sits under: "Wolf API      8g 05s  1h"
     local sig, _, reason = FT.An.SellSignal(s)
-    local left = "|cfff0b90bWolf|r"
-    if sig ~= "NODATA" and sig ~= "FAIR" then
-        left = left .. "  " .. FT.C(FT.SIGNAL_COLORS[sig] or "muted", FT.SignalText(sig))
+    if s.price then
+        local _, name, age = FT.PriceTag(s.source, s.t)
+        out[#out + 1] = { "|cfff0b90bWolf|r " .. name, FT.Money(s.price, "short") .. (age and FT.C("dim", "  " .. age) or "") }
+        -- 2: what to do with it (CASH OUT, HODL...), today's move beside it
+        if sig ~= "NODATA" then
+            out[#out + 1] = { FT.C(FT.SIGNAL_COLORS[sig] or "muted", FT.SignalText(sig)),
+                s.ch1 and (FT.Pct(s.ch1) .. FT.C("dim", " " .. L["today"])) or "" }
+        end
     end
-    -- the price, where it's from and how old (API 1h, your scan 12m), today's move
-    local right = s.price and (FT.Money(s.price, "short") .. FT.C("dim", " · " .. FT.PriceTag(s.source, s.t))
-        .. (s.ch1 and ("  " .. FT.Pct(s.ch1) .. FT.C("dim", " " .. L["today"])) or "")) or ""
-    out[#out + 1] = { left, right }
-    -- 2: the one fact worth most: a craft's profit, a material's best use, what it disenchants for
+    -- 3: a craft's profit, or what it disenchants for
     local second
     if rs and rs[1] then
         local e = FT.Craft.Eval(rs[1])
@@ -399,7 +381,6 @@ local function TipLines(itemID, detail)
             second = string.format(L["Craft it: profit %s"], FT.C(e.profit >= 0 and "up" or "down", FT.Money(e.profit, "short")))
         end
     end
-    if not second and uses then second = BestUseLine(itemID) end
     if not second and de then
         -- worth disenchanting, or worth more sold as it is (auction house after its cut, or a vendor)?
         local asIs = math.max(s.price and s.price * (1 - FT.Cut()) or 0, FT.VendorSell(itemID) or 0)
@@ -426,6 +407,61 @@ local function TipLines(itemID, detail)
     return out
 end
 
+-- Our lines go right under Auctionator's (Vendor / Auction / Disenchant), not after every other addon's (bag counts,
+-- drop sources): the lines between move down. Only when it's safe: Auctionator's lines are found, and no line in
+-- that stretch carries an icon (an icon belongs to its line and wouldn't move with the text).
+local ATR_LABELS = { "^Auction", "^Vendor", "^Disenchant" }
+local function Plain(t) return (t or ""):gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "") end
+local function UnderAuctionator(tt, first, last)
+    local name = tt.GetName and tt:GetName()
+    if not name or first <= 2 then return end
+    local after
+    for i = first - 1, 2, -1 do
+        local fs = _G[name .. "TextLeft" .. i]
+        local t = fs and Plain(fs:GetText())
+        for _, pat in ipairs(ATR_LABELS) do
+            if t and t:find(pat) then after = i break end
+        end
+        if after then break end
+    end
+    if not after or after == first - 1 then return end
+    for i = 1, 30 do
+        local tex = _G[name .. "Texture" .. i]
+        if tex and tex.IsShown and tex:IsShown() then return end
+    end
+    -- read every line from under Auctionator's to the end, then write them back: ours first
+    local lines = {}
+    for i = after + 1, last do
+        local l, r = _G[name .. "TextLeft" .. i], _G[name .. "TextRight" .. i]
+        if not l then return end
+        local lr, lg, lb = l:GetTextColor()
+        local rr, rg, rb = 1, 1, 1
+        if r then rr, rg, rb = r:GetTextColor() end
+        lines[#lines + 1] = { l:GetText(), { lr, lg, lb }, r and r:IsShown() and r:GetText() or nil, { rr, rg, rb } }
+    end
+    local n = last - first + 1
+    local order = {}
+    for k = #lines - n + 1, #lines do order[#order + 1] = lines[k] end
+    for k = 1, #lines - n do order[#order + 1] = lines[k] end
+    for k, x in ipairs(order) do
+        local i = after + k
+        local l, r = _G[name .. "TextLeft" .. i], _G[name .. "TextRight" .. i]
+        l:SetText(x[1] or "")
+        l:SetTextColor(x[2][1], x[2][2], x[2][3])
+        if r then
+            if x[3] then
+                r:SetText(x[3])
+                r:SetTextColor(x[4][1], x[4][2], x[4][3])
+                r:Show()
+            else
+                r:SetText("")
+                r:Hide()
+            end
+        end
+    end
+    tt:Show() -- the size again
+end
+
 local function AddLines(tt, itemID)
     if not (FT.S and FT.S.tooltip and itemID) then return end
     if tt.IsForbidden and tt:IsForbidden() then return end
@@ -441,10 +477,12 @@ local function AddLines(tt, itemID)
         tipCache[key] = c
     end
     if not c.lines then return end
+    local first = tt:NumLines() + 1
     for _, l in ipairs(c.lines) do
         if l[2] then tt:AddDoubleLine(l[1], l[2], 0.8, 0.82, 0.86, 1, 1, 1)
         else tt:AddLine(l[1], 0.8, 0.82, 0.86) end
     end
+    if #c.lines > 0 then UnderAuctionator(tt, first, tt:NumLines()) end
 end
 
 local function HookTooltips()
