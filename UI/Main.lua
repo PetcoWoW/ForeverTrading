@@ -990,15 +990,9 @@ function UI.HouseChip(parent, opts)
         UI.SetTexColor(self.bg, "bg3", 1)
         local H = FT.House
         local house = self.get and self.get() or FT.house
-        local other = H.Name(house == "neutral" and "faction" or "neutral")
-        local text
-        if self.own then
-            text = string.format(L["Whose prices this window shows, whatever the main window and the other windows show. Click: %s."], other)
-        else
-            text = string.format(L["Whose prices the pages show: your faction's auction house or Blackwater, the neutral one shared by both factions. Each keeps its own prices, history, deals and your auctions. Click: %s."], other)
-            if FT.ahHere then
-                text = text .. "\n\n" .. string.format(L["You stand at %s: online while its prices are on, offline with the other's."], H.Name(FT.atHouse))
-            end
+        local text = L["The auction house Wolf of Booty Bay follows: your faction's. Blackwater, the neutral one, isn't tracked: its prices come too late to act on."]
+        if FT.ahHere and FT.atHouse ~= house then
+            text = text .. "\n\n" .. string.format(L["You stand at %s: offline here."], H.Name(FT.atHouse))
         end
         UI.TipText(self, string.format(L["Auction house: %s"], H.Name(house)), text)
     end)

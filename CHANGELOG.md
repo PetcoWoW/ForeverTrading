@@ -1,5 +1,12 @@
 # The Wolf of Booty Bay
 
+## v0.28 - your faction's auction house only
+
+- Blackwater, the neutral auction house, isn't followed any more: its prices arrive too late to act on (whoever is
+  standing there snipes first). No switching to it, no AH TO AH deals, no "sell it at the other house", and the
+  price robot no longer fetches it. At a neutral auctioneer Wolf of Booty Bay stays offline and says so once.
+- Buying to hold for a rise (Futures, buy the dip) is unchanged: it's about your own house.
+
 ## v0.27 - clearer words, buy the dip
 
 - Terminal cards: the label no longer runs into the gold; the gold is just the number.

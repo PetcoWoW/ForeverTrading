@@ -404,7 +404,7 @@ local function FromDeals(out, p)
     if not p.isTrader then return end
     local best
     for _, d in ipairs(FT.Deals.List() or {}) do
-        if (d.kind == "RESELL" or d.kind == "HOUSES") and (d.profit or 0) >= FLIP_MIN and (d.cost or 0) <= p.gold then
+        if d.kind == "RESELL" and (d.profit or 0) >= FLIP_MIN and (d.cost or 0) <= p.gold then
             if not best or d.profit > best.profit then best = d end
         end
     end

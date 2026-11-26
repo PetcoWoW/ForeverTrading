@@ -12,6 +12,9 @@ FT.News = N
 -- start, after the files are read (a table made with them would keep the English)
 local function News()
     return {
+        ["v0.28"] = {
+            { L["Your faction's auction house only"], L["Blackwater, the neutral house, isn't tracked any more: its prices came too late to act on. No more AH TO AH deals."], nil },
+        },
         ["v0.27"] = {
             { L["Buy the dip"], L["Futures now says BUY THE DIP when a raid consumable or its herbs fell this week with the raids ahead."], function() FT.Show("radar") end },
         },

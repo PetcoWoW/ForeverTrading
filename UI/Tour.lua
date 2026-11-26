@@ -22,7 +22,7 @@ local function MakeSteps() return {
       text = L["AH: your last auction house scan (scan in Auctionator: it's taken right away). API: Blizzard's prices, every hour, with each update. The lit one is what you see."],
       target = function() return FT.MainRefs and FT.MainRefs.pill end },
     { title = L["Which auction house"],
-      text = L["Your faction's or Blackwater, the neutral one: each has its own prices. Click to look at the other one."],
+      text = L["Your faction's auction house: the one Wolf of Booty Bay follows. Blackwater, the neutral one, isn't tracked: its prices come too late to act on."],
       target = function() return FT.MainRefs and FT.MainRefs.house end },
     { title = L["Terminal"], tab = "market",
       text = L["The market board: search any item, see its chart and what to do with it. Right-click an item to watch it."],

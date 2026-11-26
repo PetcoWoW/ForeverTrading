@@ -440,7 +440,7 @@ local function New(index)
     -- whose prices: this window's own auction house, whatever the others show
     w.houseChip = UI.HouseChip(w.left, {
         get = function() return w.house or FT.house end,
-        toggle = function() SetHouse(w, (w.house or FT.house) == "neutral" and "faction" or "neutral") end,
+        toggle = function() FT.House.Toggle() end,
     })
     w.ind = UI.Text(w.left, 11, "muted", "RIGHT")
 
@@ -549,7 +549,7 @@ end
 
 -- the window's own auction house: its numbers, charts, order book and materials are of it
 SetHouse = function(w, house)
-    w.house = (house == "neutral") and "neutral" or "faction"
+    w.house = "faction" -- one house only since v0.28
     w.book.house = w.house
     w.mats.house = w.house
     w.houseChip:Update()

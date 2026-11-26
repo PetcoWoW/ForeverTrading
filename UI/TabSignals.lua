@@ -199,8 +199,9 @@ local function BuildDeals(p)
     f:SetPoint("TOPLEFT", 8, -56)
     f:SetPoint("BOTTOMRIGHT", -8, 8)
     f:Hide()
-    f.kind = UI.Segmented(f, { { "all", L["All"] }, { "VENDOR", L["To a vendor"] }, { "RESELL", L["Resell"] },
-        { "HOUSES", L["Between houses"] } }, function(v)
+    -- (no "Between houses" since v0.28: only your faction's house is followed)
+    if dstate.kind == "HOUSES" then dstate.kind = "all" end
+    f.kind = UI.Segmented(f, { { "all", L["All"] }, { "VENDOR", L["To a vendor"] }, { "RESELL", L["Resell"] } }, function(v)
         dstate.kind = v
         T.RefreshDeals()
     end, 22)
@@ -238,7 +239,7 @@ local function BuildDeals(p)
     f.hint:SetPoint("TOPLEFT", 0, -32)
     f.hint:SetPoint("RIGHT", 0, 0)
     if f.hint.SetWordWrap then f.hint:SetWordWrap(false) end
-    DEALS_HINT = L["Buy it, then: AH TO AH (sell it at the other auction house), FLIP IT (list it again near its normal price) or VENDOR IT. Best first."]
+    DEALS_HINT = L["Buy it, then: FLIP IT (list it again near its normal price) or VENDOR IT. Best first."]
     f.hint:SetText(DEALS_HINT)
     local box = UI.Panel(f, "bg1", "line")
     box:SetPoint("TOPLEFT", 0, -50)
@@ -359,7 +360,7 @@ local function WhyNoDeals(older)
     if info and info.history == 0 and (dstate.kind == "all" or dstate.kind == "RESELL") then
         why[#why + 1] = L["Flipping needs at least 3 days of prices."]
     end
-    if dstate.kind == "all" or dstate.kind == "HOUSES" then
+    if false and (dstate.kind == "all" or dstate.kind == "HOUSES") then
         local other = FT.House.IsNeutral() and "faction" or "neutral"
         local seen = FT.Hist.MarketTimeIn(other)
         if not seen then
@@ -520,7 +521,8 @@ local function SellYours()
         local listAt = (st and st.listAt) or h.price
         local netHere = listAt * (1 - FT.Cut(here))
         local vendor = FT.SellPriceKnown(id) or 0
-        local pOther = FT.Hist.PriceIn(other, id)
+        -- only this house since v0.28 (no "sell it at the other house")
+        local pOther = nil
         local netOther = pOther and pOther * (1 - FT.Cut(other)) or 0
         local x = { id = id, qty = h.qty }
         local unit, house

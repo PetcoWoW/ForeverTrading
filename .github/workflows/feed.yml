@@ -3,7 +3,7 @@
 # it as a new release, which addon managers (WowUp) pick up. Checking often means a late or skipped GitHub run
 # costs minutes, not hours; a check with nothing new publishes nothing. Needs the repository secrets
 # BLIZZARD_CLIENT_ID and BLIZZARD_CLIENT_SECRET (https://develop.battle.net/access/clients). Optional repository variables FEED_REGIONS (default: us) and
-# FEED_HOUSES (default: 110,116 - PvP Alliance and PvP Blackwater).
+# FEED_HOUSES (default: 110 - PvP Alliance; Blackwater, the neutral house, isn't followed since v0.28).
 name: Price feed
 
 on:
@@ -89,8 +89,8 @@ jobs:
           BLIZZARD_CLIENT_ID: ${{ secrets.BLIZZARD_CLIENT_ID }}
           BLIZZARD_CLIENT_SECRET: ${{ secrets.BLIZZARD_CLIENT_SECRET }}
           FEED_REGIONS: ${{ vars.FEED_REGIONS || 'us' }}
-          # PvP Alliance (110) and PvP Blackwater (116); all twelve: set the repository variable FEED_HOUSES empty
-          FEED_HOUSES: ${{ vars.FEED_HOUSES || '110,116' }}
+          # PvP Alliance (110); all twelve: set the repository variable FEED_HOUSES to their ids
+          FEED_HOUSES: ${{ vars.FEED_HOUSES || '110' }}
           FEED_KEEP_DAYS: "90"
           FEED_SHIP_DAYS: "30"
         run: node tools/feed/build.mjs
