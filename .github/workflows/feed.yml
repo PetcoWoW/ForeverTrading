@@ -8,7 +8,8 @@ name: Price feed
 
 on:
   schedule:
-    - cron: "*/15 * * * *"
+    # every 15 minutes, off the busy minutes (GitHub delays and drops scheduled runs at :00 the most)
+    - cron: "4,19,34,49 * * * *"
   workflow_dispatch:
   # a merged change goes out at once (with the prices as they are, new or not)
   push:
