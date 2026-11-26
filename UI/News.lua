@@ -12,6 +12,10 @@ FT.News = N
 -- start, after the files are read (a table made with them would keep the English)
 local function News()
     return {
+        ["v0.20"] = {
+            { L["One price everywhere"], L["The session panel, sessions, tooltips and the Portfolio now all use the same market price (it was after the 5% cut on the panel). Always the newest of your scan, the Blizzard API and Auctionator; Shift on a tooltip says which and when."] },
+            { L["A bigger session panel"], L["Scroll it with the mouse wheel, drag its corner for more rows, hover a row for what it was worth when you found it and now. What you just looted shows on top for a moment."] },
+        },
         ["v0.19"] = {
             { L["A pickier engine"], L["Deals are checked like a broker would: it really sells, the price is its real one, no one is pushing or dumping it, and flipping it worked before on its own history. Each deal shows its risk and record. A cheap price on a falling market now says WAIT, not BUY."],
                 function() FT.Show("signals"); FT.Tabs.signals.SetView("make") end },

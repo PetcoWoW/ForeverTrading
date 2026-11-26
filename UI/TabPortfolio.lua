@@ -662,7 +662,7 @@ function ST.Refresh()
             -- what was found: how many, worth each then (new sessions) and now, the most valuable first
             local found = {}
             for id, qty in pairs(s.items or {}) do
-                local nowUnit = FT.Session.UnitValue(id)
+                local nowUnit = FT.Session.UnitValue(id) or 0
                 local thenTotal = s.found and s.found[id]
                 found[#found + 1] = { id = id, qty = qty, nowUnit = nowUnit, thenTotal = thenTotal,
                     thenUnit = thenTotal and qty > 0 and thenTotal / qty or nil, sortV = thenTotal or nowUnit * qty }

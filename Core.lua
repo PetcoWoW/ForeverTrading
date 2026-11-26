@@ -4,7 +4,7 @@ local L = FT.L
 
 -- The version being released: a copy straight from the repository (not packaged) has no version in its TOC yet
 -- (the packager puts the tag there) and shows this one. Set it with every release.
-local RELEASE = "v0.19"
+local RELEASE = "v0.20"
 local GetMeta = (C_AddOns and C_AddOns.GetAddOnMetadata) or GetAddOnMetadata
 FT.VERSION = (GetMeta and GetMeta(ADDON, "Version")) or RELEASE
 if FT.VERSION == "" or FT.VERSION:find("@", 1, true) then FT.VERSION = RELEASE end
@@ -312,9 +312,20 @@ local C_SUFFIX = FT.COIN.copper
 
 -- where a price came from, for people
 function FT.SourceName(source)
-    local names = { full = L["full scan"], mine = L["My items"], auctionator = "Auctionator", feed = L["price feed"],
-        history = L["history"], live = L["live search"], peer = L["exchange"] }
+    local names = { full = L["your AH scan"], mine = L["My items"], auctionator = L["Auctionator scan"], feed = L["Blizzard API"],
+        history = L["saved prices"], live = L["live search"], peer = L["exchange"] }
     return names[source] or L["scan"]
+end
+
+-- where an item's price is from and when, the same words everywhere: "Blizzard API, 3:05 pm (1h ago)"
+function FT.PriceFrom(itemID)
+    local p, t, source = FT.Price(itemID)
+    if not p then
+        local v = FT.VendorSell and FT.VendorSell(itemID)
+        return v and v > 0 and L["a vendor's price (not on the auction house)"] or L["no price yet"]
+    end
+    if not t then return FT.SourceName(source) end
+    return string.format("%s, %s (%s)", FT.SourceName(source), FT.TimeOfDay(t), FT.Ago(t))
 end
 
 function FT.Thousands(n)
@@ -766,6 +777,25 @@ end
 SLASH_WOLFOFBOOTYBAY1 = "/wolf"
 SLASH_WOLFOFBOOTYBAY2 = "/wolfbb"
 SLASH_WOLFOFBOOTYBAY3 = "/booty"
+-- Every chat command, once: the list in Settings > Chat commands and /wolf help both read it. Rarely needed:
+-- the window, the minimap button and Settings do all of it.
+FT.COMMANDS = {
+    { "/wolf", "open or close the window" },
+    { "/wolf market | signals | portfolio | sessions | settings", "open that page" },
+    { "/wolf farm", "start or stop a session (/wolf farm pause: pause it)" },
+    { "/wolf scan", "a full scan at the auction house (Auctionator's when it's installed)" },
+    { "/wolf scan mine", "check the prices of your own auctions" },
+    { "/wolf stop", "stop a scan" },
+    { "/wolf share", "ask guild and group for fresher prices (/wolf share test: check it works)" },
+    { "/wolf news", "what's new in this version" },
+    { "/wolf tour", "the short tour again" },
+    { "/wolf words plain | trader", "plain words or trader terms" },
+    { "/wolf reset", "put the window back in the middle" },
+    { "/wolf perf", "how fast it runs and the memory it takes" },
+    { "/wolf debug", "extra lines in chat, for bug reports" },
+    { "/wolf github | credits", "where the code is, who it's built on" },
+}
+
 SlashCmdList.WOLFOFBOOTYBAY = function(msg)
     msg = (msg or ""):lower():gsub("^%s+", ""):gsub("%s+$", "")
     local cmd, rest = msg:match("^(%S*)%s*(.-)$")
@@ -820,13 +850,8 @@ SlashCmdList.WOLFOFBOOTYBAY = function(msg)
     elseif cmd == "tour" then
         FT.Tour.Start()
     else
-        FT.Print("/wolf — " .. L["open / close"])
-        FT.Print("/wolf market | craft | signals | portfolio | sell | settings")
-        FT.Print("/wolf scan — " .. L["full scan"] .. ",  /wolf scan mine — " .. L["My items"] .. ",  /wolf stop")
-        FT.Print("/wolf share — " .. L["ask guild and group for fresh prices"] .. ",  /wolf share test — " .. L["check which ways the exchange can use"])
-        FT.Print("/wolf news — " .. L["what's new"] .. ",  /wolf tour — " .. L["the tour of Wolf of Booty Bay"])
-        FT.Print("/wolf perf — " .. L["how fast it works and the memory it takes"])
-        FT.Print("/wolf words plain | trader,  /wolf reset,  /wolf github,  /wolf credits")
+        for _, c in ipairs(FT.COMMANDS) do FT.Print(FT.C("accent", c[1]) .. "  " .. FT.C("dim", L[c[2]])) end
+        FT.Print(FT.C("dim", L["Also /wolfbb and /booty. Every one is in Settings > Chat commands."]))
     end
 end
 

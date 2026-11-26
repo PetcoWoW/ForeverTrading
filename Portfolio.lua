@@ -247,14 +247,15 @@ function Ses.ParseMoney(msg)
     return total
 end
 
--- what one is worth now: the auction house after its cut, else what a vendor pays; and where from
+-- what one is worth now: its market price - the same number as its tooltip and the Portfolio (FT.Price, the newest
+-- of your scans, the Blizzard API and Auctionator) - else what a vendor pays when the auction house has none;
+-- nil: no price anywhere yet (shown as such, never counted as 0 without saying so)
 function Ses.UnitValue(itemID)
     local p = FT.Price(itemID)
-    local ah = p and p * (1 - FT.Cut()) or nil
+    if p and p > 0 then return p, "ah" end
     local vendor = FT.VendorSell(itemID)
-    if ah and (not vendor or ah >= vendor) then return ah, "ah" end
     if vendor and vendor > 0 then return vendor, "vendor" end
-    return 0, nil
+    return nil, nil
 end
 
 function Ses.Current() return FT.db.session end
@@ -275,16 +276,22 @@ end
 function Ses.Summary(s)
     s = s or FT.db.session
     if not s then return nil end
-    local items, worth = {}, s.money or 0
+    local items, worth, unpriced = {}, s.money or 0, 0
     for id, qty in pairs(s.items or {}) do
         local unit, via = Ses.UnitValue(id)
-        local v = unit * qty
+        local v = (unit or 0) * qty
         worth = worth + v
-        items[#items + 1] = { id = id, qty = qty, value = v, via = via }
+        if not unit then unpriced = unpriced + 1 end
+        items[#items + 1] = { id = id, qty = qty, value = v, unit = unit, via = via,
+            thenUnit = s.found and s.found[id] and qty > 0 and s.found[id] / qty or nil, last = s.lastLoot == id }
     end
-    table.sort(items, function(a, b) return a.value > b.value end)
+    table.sort(items, function(a, b)
+        if a.value ~= b.value then return a.value > b.value end
+        return a.id < b.id
+    end)
     local secs = Ses.Elapsed(s)
-    return { worth = worth, perHour = secs >= 60 and worth / secs * 3600 or nil, items = items, money = s.money or 0, secs = secs }
+    return { worth = worth, perHour = secs >= 60 and worth / secs * 3600 or nil, items = items, money = s.money or 0,
+        secs = secs, unpriced = unpriced }
 end
 
 function Ses.Start()
@@ -342,7 +349,8 @@ FT.On("CHAT_MSG_LOOT", function(msg)
         s.items[id] = (s.items[id] or 0) + n
         -- what it was worth when found (the session's page shows then against now)
         s.found = s.found or {}
-        s.found[id] = (s.found[id] or 0) + math.floor(Ses.UnitValue(id) * n)
+        s.found[id] = (s.found[id] or 0) + math.floor((Ses.UnitValue(id) or 0) * n)
+        s.lastLoot, s.lastN, s.lastT = id, n, time()
         FT.Fire("FT_SESSION_LOOT", id, n)
     end
 end)

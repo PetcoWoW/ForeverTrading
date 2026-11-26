@@ -110,8 +110,22 @@ step("session", function()
   mock.fire("CHAT_MSG_LOOT", "Jelly receives loot: |cffffffff|Hitem:10620::::::::60:::::|h[Thorium Ore]|h|r.")
   mock.fire("CHAT_MSG_MONEY", "You loot 1 Gold, 20 Silver")
   mock.run(600, 0.5)
+  -- many kinds of loot: the panel scrolls, a row's hover shows then and now, the corner adds rows
+  for _, id in ipairs({ 2770, 2771, 2772, 2775, 2776, 3858, 7911, 2838, 7912, 12365, 12364, 12361, 99999901 }) do
+    mock.fire("CHAT_MSG_LOOT", "You receive loot: |cffffffff|Hitem:" .. id .. "::::::::60:::::|h[Ore " .. id .. "]|h|r.")
+  end
+  FT.UpdateHUD()
+  local hud = _G["WolfOfBootyBaySession"]
+  if hud then
+    hud:GetScript("OnMouseWheel")(hud, -1)
+    hud:GetScript("OnMouseWheel")(hud, -5)
+    local row = hud.rows[1]
+    if row and row.item then row:GetScript("OnEnter")(row) end
+    print("panel rows:", hud.total, "offset:", hud.offset, "just looted:", hud.just:GetText() or "")
+  end
   local sum = FT.Session.Summary()
-  print(string.format("session: %d items, worth %d, per hour %s, money %d, %ds", #sum.items, sum.worth, tostring(sum.perHour and math.floor(sum.perHour)), sum.money, sum.secs))
+  print(string.format("session: %d items, worth %d, per hour %s, money %d, %ds, no price %d", #sum.items, sum.worth, tostring(sum.perHour and math.floor(sum.perHour)), sum.money, sum.secs, sum.unpriced or 0))
+  print("value check: tooltip price", FT.Price(10620), "session unit", (FT.Session.UnitValue(10620)), "from", FT.PriceFrom(10620))
   FT.Session.Pause(); mock.run(60); FT.Session.Pause()
   FT.ShowMenu(UIParent)
   local mb = _G["WolfOfBootyBayMinimapButton"]

@@ -916,24 +916,42 @@ end
 ---------------------------------------------------------------------------
 -- The price now: price, time it was seen, source, listed now, gone
 ---------------------------------------------------------------------------
+-- Auctionator's price of an item, when it has one: price, time (its day's middle), listed
+local function AtrPrice(itemID)
+    if not (FT.S.useAuctionator and FT.Atr.Loaded()) then return nil end
+    local e = FT.Atr.Entry(itemID)
+    if not (e and type(e.m) == "number" and e.m > 0) then return nil end
+    local lastDay = FT.Atr.LastDay(e)
+    local t = lastDay and math.min(time(), FT.DayStart(lastDay) + 43200) or nil
+    return e.m, t, e.a and lastDay and e.a[tostring(lastDay)]
+end
+
+-- An item's price: the newest one known - this session's (your scans, the Blizzard API, live searches), today's or
+-- the last day's from the history - and Auctionator's when its day is newer than all of ours (a scan made
+-- without this addon). Only looked up in Auctionator when ours is half a day old or more (it costs more).
+local ATR_AFTER = 12 * 3600
 function FT.Price(itemID)
     if not itemID then return nil end
+    local p, t, source, q, gone
     local l = latest[itemID]
-    if l and l.p then return l.p, l.t, l.source, l.q, l.gone end
-    local tr = Today(itemID)
-    if tr then return tr.c, tr.m * 60 + EPOCH, "history", tr.q end
-    local recent = RecentDays(itemID, 1)
-    local last = recent[#recent]
-    if last then return last.c, FT.DayStart(last.day) + 43200, "history", last.q end
-    if FT.S.useAuctionator and FT.Atr.Loaded() then
-        local e = FT.Atr.Entry(itemID)
-        if e and type(e.m) == "number" and e.m > 0 then
-            local lastDay = FT.Atr.LastDay(e)
-            local t = lastDay and math.min(time(), FT.DayStart(lastDay) + 43200) or nil
-            return e.m, t, "auctionator", e.a and lastDay and e.a[tostring(lastDay)]
+    if l and l.p then
+        p, t, source, q, gone = l.p, l.t, l.source, l.q, l.gone
+    else
+        local tr = Today(itemID)
+        if tr then
+            p, t, source, q = tr.c, tr.m * 60 + EPOCH, "history", tr.q
+        else
+            local recent = RecentDays(itemID, 1)
+            local last = recent[#recent]
+            if last then p, t, source, q = last.c, FT.DayStart(last.day) + 43200, "history", last.q end
         end
     end
-    return nil
+    if not p or not t or time() - t >= ATR_AFTER then
+        local ap, at, aq = AtrPrice(itemID)
+        if ap and (not p or (at and t and at > t + 3600)) then return ap, at, "auctionator", aq end
+    end
+    if not p then return nil end
+    return p, t, source, q, gone
 end
 
 ---------------------------------------------------------------------------
