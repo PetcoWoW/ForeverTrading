@@ -12,6 +12,9 @@ FT.News = N
 -- start, after the files are read (a table made with them would keep the English)
 local function News()
     return {
+        ["v0.34"] = {
+            { L["The craft breakdown"], L["Click a crafted item (a flask in Futures): every material's cost and move, the profit of a craft, and whether to craft, hold or sell."], function() FT.Show("radar") end },
+        },
         ["v0.33"] = {
             { L["The notes follow what's yours"], L["At login and /reload: your portfolio, then what moved in what you hold most and watch since last time. After a scan of yours: what moved."], nil },
         },

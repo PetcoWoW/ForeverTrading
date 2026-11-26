@@ -387,6 +387,24 @@ step("companion", function()
   FT.FEED.built, FT.Feed.Time, FT.COMPANION = realBuilt, realTime, nil
   FT.UpdateAHPill()
 end)
+step("craft breakdown", function()
+  -- the flask: no character of yours knows it, the game's recipe; and a craft of yours
+  local inv = FT.db.inv[FT.charKey]
+  for _, id in ipairs({ 13510, 18405 }) do
+    FT.OpenItem(id)
+    local r, known = FT.UI.RecipeOf(id)
+    print("breakdown " .. id .. ": recipe " .. tostring(r and r.name) .. ", known " .. tostring(known))
+    local panel
+    local function find(f) if f.advice and f.sum then panel = f return end for _, k in ipairs(f.__kids or {}) do if not panel then find(k) end end end
+    find(WolfOfBootyBayFrame)
+    if panel then
+      print("  " .. tostring(panel.who.__text))
+      for _, sline in ipairs(panel.sum) do print("  " .. tostring(sline.label.__text) .. ": " .. tostring(sline.value.__text)) end
+      print("  advice: " .. tostring(panel.advice.__text):gsub("\n", " | "))
+      print("  shown " .. tostring(panel.__shown) .. ", height " .. tostring(panel.__h))
+    end
+  end
+end)
 step("wolf notes", function()
   -- a big position and a watched item; their prices "last time" lower: the note says what moved
   local inv = FT.db.inv[FT.charKey]
@@ -420,6 +438,8 @@ step("layout", function()
   FT.S.showCraft = true
   local pages = {
     { "market", "market" }, { "market item", "market", function() FT.OpenItem(12363) end },
+    { "market item: a flask", "market", function() FT.OpenItem(13510) end },
+    { "market item: a craft of yours", "market", function() FT.OpenItem(18405) end },
     { "money: make", "signals", function() FT.Tabs.signals.SetView("make") end },
     { "money: farm", "signals", function() FT.Tabs.signals.SetView("farm") end },
     { "money: craft", "signals", function() FT.Tabs.signals.SetView("craft") end },

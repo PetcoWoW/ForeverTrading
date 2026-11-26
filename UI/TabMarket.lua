@@ -66,7 +66,7 @@ local function PassFilters(id)
     return true
 end
 local page, list, countText, overview, itemView, center, mats
-local LEFT_W, RIGHT_W = 372, 232
+local LEFT_W, RIGHT_W = 372, 280
 local CARDS_H = 132 -- the market, price and call cards under the charts (124 high, 8 above them)
 
 local GetClassInfo = (C_Item and C_Item.GetItemClassInfo) or GetItemClassInfo

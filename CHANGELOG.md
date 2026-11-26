@@ -1,5 +1,14 @@
 # Wolf
 
+## v0.34 - the craft breakdown
+
+- An item's page (click it in Futures, Market or anywhere) now has a **Craft breakdown** beside the chart for
+  anything that's crafted - also when none of your characters knows the recipe (Flask of the Titans): each
+  material with what it adds to one craft and its move this week; what one craft costs, what it sells for after
+  the auction house's cut, the profit. Then what to do: worth crafting or not, which of your materials to hold
+  (rising) or sell (falling), dips to buy, how many crafts your materials make, and the raid timing for raid
+  consumables.
+
 ## v0.33 - the notes follow what's yours
 
 - At login and /reload, chat starts with your portfolio and its change since last time (no more "The wolf"
