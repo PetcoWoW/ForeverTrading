@@ -282,6 +282,7 @@ function UpdateUIPanelPositions() end
 function HandleModifiedItemClick() return false end
 function ChatFrame_AddMessageEventFilter() end
 function PanelTemplates_DeselectTab() end
+function PanelTemplates_SelectTab() end
 function PanelTemplates_TabResize() end
 function FauxScrollFrame_SetOffset() end
 function CreateColor(r, g, b, a) return { r = r, g = g, b = b, a = a, GetRGB = function() return r, g, b end } end

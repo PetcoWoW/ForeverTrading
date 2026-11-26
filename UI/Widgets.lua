@@ -15,7 +15,27 @@ local STYLES = {
     down = { bg = "down", bgA = 0.14, hover = "down", hoverA = 0.26, text = "down", border = "down", borderA = 0.45 },
 }
 
+-- the classic look: the game's red button paints itself (normal, pushed, lit, disabled); only the label is ours:
+-- gold, white under the mouse or when chosen, grey when off, green / red for the buy and sell styles
+local function PaintGame(b, hover)
+    local s = b.style
+    if b.active then
+        UI.SetTextColor(b.label, "text")
+        if b.LockHighlight then b:LockHighlight() end
+        return
+    end
+    if b.UnlockHighlight then b:UnlockHighlight() end
+    if b.disabled then
+        UI.SetTextColor(b.label, "dim")
+    elseif s.text == "up" or s.text == "down" then
+        UI.SetTextColor(b.label, s.text)
+    else
+        UI.SetTextColor(b.label, hover and "text" or "accent")
+    end
+end
+
 local function Paint(b, hover)
+    if b.game then return PaintGame(b, hover) end
     local s = b.style
     if b.active then
         UI.SetTexColor(b.bg, s.activeBg or "bg3", 1)
@@ -41,14 +61,27 @@ function UI.ButtonStyle(name)
     return STYLES[name] or STYLES.default
 end
 
+-- the game's red button (the classic look, every style but ghost); nil when the client hasn't the template
+local function GameButton(parent, style)
+    if not UI.Classic() or style == "ghost" then return nil end
+    local ok, b = pcall(CreateFrame, "Button", nil, parent, "UIPanelButtonTemplate")
+    if not ok or not b then return nil end
+    -- its own text stays empty: the label is ours (our font, our size)
+    local fs = b.GetFontString and b:GetFontString()
+    if fs then fs:SetText("") end
+    b.game = true
+    return b
+end
+
 function UI.Button(parent, text, w, h, style, onClick)
-    local b = CreateFrame("Button", nil, parent)
+    local b = GameButton(parent, style or "default") or CreateFrame("Button", nil, parent)
     h = UI.ControlH(h)
     b:SetSize(w or 80, h)
     b.style = STYLES[style or "default"] or STYLES.default
-    b.bg = UI.RoundTex(b, "BACKGROUND", "bg2", 1)
+    b.bg = UI.RoundTex(b, "BACKGROUND", "bg2", b.game and 0 or 1)
     b.bg:SetAllPoints()
-    if b.style.border then UI.Border(b, b.style.border, b.style.borderA) end
+    if b.game then b.bg:Hide() end
+    if b.style.border and not b.game then UI.Border(b, b.style.border, b.style.borderA) end
     b.label = UI.Text(b, 12, b.style.text, "CENTER")
     b.label:SetPoint("CENTER")
     b.label:SetText(text or "")
@@ -61,10 +94,12 @@ function UI.Button(parent, text, w, h, style, onClick)
         Paint(self, false)
         if self.tip then GameTooltip:Hide() end
     end)
-    b:SetScript("OnMouseDown", function(self)
-        if not self.disabled then self.label:SetPoint("CENTER", 0, -1) end
+    -- hooked, not set: the game's button swaps its pushed art in these
+    local Script = b.game and b.HookScript or b.SetScript
+    Script(b, "OnMouseDown", function(self)
+        if not self.disabled then self.label:SetPoint("CENTER", self.game and 1 or 0, self.game and -2 or -1) end
     end)
-    b:SetScript("OnMouseUp", function(self) self.label:SetPoint("CENTER", 0, 0) end)
+    Script(b, "OnMouseUp", function(self) self.label:SetPoint("CENTER", 0, 0) end)
     b:SetScript("OnClick", function(self, button)
         if self.disabled then return end
         if self.onClick then self.onClick(self, button) end
@@ -77,6 +112,10 @@ function UI.Button(parent, text, w, h, style, onClick)
     end
     function b:SetUsable(on)
         self.disabled = not on
+        -- the game's button shows its greyed art when disabled (hovering still shows a tip)
+        if self.game then
+            if on then self:Enable() else self:Disable() end
+        end
         Paint(self, false)
     end
     function b:SetTip(title, body) self.tip = title and { title, body } or nil end
@@ -87,21 +126,42 @@ function UI.Button(parent, text, w, h, style, onClick)
     return b
 end
 
+-- a window's close button: the game's red X in the classic look, a plain × in the dark one
+function UI.CloseButton(parent, onClick, size)
+    if UI.Classic() then
+        local ok, b = pcall(CreateFrame, "Button", nil, parent, "UIPanelCloseButton")
+        if ok and b then
+            b:SetSize(size or 30, size or 30)
+            b:SetScript("OnClick", function() onClick() end)
+            return b
+        end
+    end
+    local b = UI.Button(parent, "×", size or 30, size or 30, "ghost", onClick)
+    b.label:SetFont(UI.FONT, UI.Size(18), "")
+    return b
+end
+
 -- a row of buttons where one is chosen: options = { { value, label }, ... }
 function UI.Segmented(parent, options, onChange, h)
     h = h or 22
     local f = CreateFrame("Frame", nil, parent)
-    UI.Fill(f, "bg2")
-    UI.Border(f, "line")
+    -- the classic look: a row of the game's red buttons, the chosen one lit
+    local classic = UI.Classic()
+    if not classic then
+        UI.Fill(f, "bg2")
+        UI.Border(f, "line")
+    end
     f.buttons = {}
-    local x = 2
+    local x = classic and 0 or 2
     for i, opt in ipairs(options) do
-        local b = UI.Button(f, opt[2], 10, h - 4, "ghost")
-        b.style = { bg = "bg3", bgA = 0, hover = "bg3", hoverA = 0.6, text = "muted", hoverText = "text",
-            activeBg = "bg3", activeText = "accent" }
+        local b = UI.Button(f, opt[2], 10, classic and h or (h - 4), classic and "default" or "ghost")
+        if not b.game then
+            b.style = { bg = "bg3", bgA = 0, hover = "bg3", hoverA = 0.6, text = "muted", hoverText = "text",
+                activeBg = "bg3", activeText = "accent" }
+        end
         b:FitText(18)
         b:SetPoint("LEFT", x, 0)
-        x = x + b:GetWidth() + 2
+        x = x + b:GetWidth() + (classic and 1 or 2)
         b.value = opt[1]
         b.onClick = function()
             f:SetValue(opt[1])
@@ -117,8 +177,48 @@ function UI.Segmented(parent, options, onChange, h)
     return f
 end
 
+-- the classic look: the game's own tabs (TabButtonTemplate), standing on the header's bottom line; nil when the
+-- client hasn't them (then: the text tabs below)
+local navN = 0
+local function GameTabs(parent, items, onSelect)
+    if not (UI.Classic() and PanelTemplates_SelectTab and PanelTemplates_DeselectTab and PanelTemplates_TabResize) then return nil end
+    local f = CreateFrame("Frame", nil, parent)
+    local ok = pcall(function()
+        f.tabs = {}
+        local x = 0
+        for _, it in ipairs(items) do
+            navN = navN + 1
+            local b = CreateFrame("Button", "WolfOfBootyBayNavTab" .. navN, f, "TabButtonTemplate")
+            b:SetText(it[2])
+            PanelTemplates_TabResize(b, 0)
+            local fs = b:GetFontString()
+            local w = math.max(b:GetWidth() or 0, math.ceil(fs and fs:GetStringWidth() or 0) + 24)
+            b:SetWidth(w)
+            b:SetPoint("BOTTOMLEFT", x, -2)
+            x = x + w - 2
+            b.key = it[1]
+            b:SetScript("OnClick", function(self) onSelect(self.key) end)
+            f.tabs[#f.tabs + 1] = b
+        end
+        f:SetSize(x + 2, 44)
+        function f:SetValue(key)
+            self.value = key
+            for _, b in ipairs(self.tabs) do
+                if b.key == key then PanelTemplates_SelectTab(b) else PanelTemplates_DeselectTab(b) end
+            end
+        end
+        f:SetValue(items[1] and items[1][1])
+    end)
+    if ok then return f end
+    -- half built: out of sight
+    f:Hide()
+    return nil
+end
+
 -- top navigation: text tabs with an accent line under the chosen one
 function UI.NavTabs(parent, items, onSelect)
+    local game = GameTabs(parent, items, onSelect)
+    if game then return game end
     local f = CreateFrame("Frame", nil, parent)
     f.tabs = {}
     local x = 0
@@ -209,8 +309,10 @@ function UI.Input(parent, w, h, placeholder, onChange, onEnter)
     e:SetFont(UI.FONT, UI.Size(12), "")
     e:SetTextColor(UI.RGB("text"))
     e:SetTextInsets(8, 8, 0, 0)
-    UI.Fill(e, "bg2")
-    UI.Border(e, "line")
+    if not UI.InputEdge(e) then
+        UI.Fill(e, "bg2")
+        UI.Border(e, "line")
+    end
     e.ph = UI.Text(e, 12, "dim")
     e.ph:SetPoint("LEFT", 8, 0)
     e.ph:SetPoint("RIGHT", -8, 0)
@@ -263,10 +365,7 @@ function UI.Confirm(opts)
         d:SetScript("OnDragStart", d.StartMoving)
         d:SetScript("OnDragStop", d.StopMovingOrSizing)
         d:SetWidth(420)
-        UI.Fill(d, "bg1")
-        if not UI.ClassicEdge(d, "line", { edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border", edgeSize = 16,
-            insets = { left = 4, right = 4, top = 4, bottom = 4 } }) then
-            UI.Border(d, "line")
+        if UI.Skin(d, "window", "bg1") == 1 then
             d.accent = UI.RoundTex(d, "ARTWORK", "accent", 1, nil, "top", UI.RADIUS - 1)
             d.accent:SetHeight(2)
             d.accent:SetPoint("TOPLEFT", 1, -1)
@@ -483,11 +582,15 @@ function UI.Check(parent, label, onChange)
     b.box = CreateFrame("Frame", nil, b)
     b.box:SetSize(14, 14)
     b.box:SetPoint("LEFT")
-    UI.Fill(b.box, "bg2")
-    UI.Border(b.box, "line")
-    b.mark = UI.RoundTex(b.box, "OVERLAY", "accent", 1, nil, nil, 2)
-    b.mark:SetPoint("TOPLEFT", 3, -3)
-    b.mark:SetPoint("BOTTOMRIGHT", -3, 3)
+    if UI.CheckArt(b.box) then
+        b.mark = b.box.tick
+    else
+        UI.Fill(b.box, "bg2")
+        UI.Border(b.box, "line")
+        b.mark = UI.RoundTex(b.box, "OVERLAY", "accent", 1, nil, nil, 2)
+        b.mark:SetPoint("TOPLEFT", 3, -3)
+        b.mark:SetPoint("BOTTOMRIGHT", -3, 3)
+    end
     b.text = UI.Text(b, 12, "text")
     b.text:SetPoint("LEFT", b.box, "RIGHT", 8, 0)
     b.text:SetText(label or "")
@@ -562,8 +665,7 @@ function UI.Dropdown(parent, w, options, onSelect)
             m:SetClampedToScreen(true)
             m:SetFrameStrata("FULLSCREEN_DIALOG")
             m:SetFrameLevel(blocker:GetFrameLevel() + 5)
-            UI.Fill(m, "bg2")
-            UI.Border(m, "line")
+            UI.Skin(m, "popup", "bg2")
             m.items = {}
             self.menu = m
         end

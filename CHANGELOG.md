@@ -1,5 +1,14 @@
 # The Wolf of Booty Bay
 
+## v0.23 - the classic auction house look
+
+- New look, the default: the game's own auction house style everywhere. Windows and dialogs get the game's
+  stone-and-gold dialog edge and its title banner, panels the gold tooltip edge, buttons are the game's red ones
+  (gold label, white under the mouse), the pages are the game's tabs, inputs and check boxes the game's own, labels
+  gold, the wolf in a round portrait, the red X to close. Square corners, the game's green and red.
+- The dark terminal stays: Settings > General (and Basics) > Look > Dark terminal, after a reload.
+- Each piece falls back to the dark look's own if this client lacks the game's version of it.
+
 ## v0.22 - Radar, Snipe, a cleaner chart
 
 - Radar (new page, between Money and Portfolio): demand forming, from the market itself. Sales speeding up (the

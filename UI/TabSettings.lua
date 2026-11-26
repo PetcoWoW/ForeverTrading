@@ -140,7 +140,10 @@ function T.Build(p)
     local right = CreateFrame("Frame", nil, content)
 
     -- the basics: what most people ever change; the rest behind "Show all settings"
-    local bs = Section(left, L["Basics"], 7)
+    local bs = Section(left, L["Basics"], 8)
+    Choice(bs, "look", L["Look"], { { "classic", L["Classic auction house"] }, { "dark", L["Dark terminal"] } },
+        L["Classic: the game's own look, stone-and-gold edges, red buttons, gold labels, like the auction house. Dark: the exchange terminal at night. Takes effect after a reload."],
+        function() FT.AskReload(L["The new look shows after the interface reloads. Reload now?"]) end)
     Choice(bs, "realmType", L["Realm type"], { { "auto", L["Auto"] }, { "pvp", "PvP" }, { "normal", L["Normal"] }, { "roleplay", "RP" }, { "roleplay-pvp", "RP-PvP" } },
         L["Which auction house's Blizzard prices are yours. Auto works it out; pick it if the API chip says it couldn't."],
         function()
@@ -160,7 +163,10 @@ function T.Build(p)
         function() if T.Layout then T.Layout() end end)
 
     -- general
-    local g = Section(left, L["General"], 12)
+    local g = Section(left, L["General"], 13)
+    Choice(g, "look", L["Look"], { { "classic", L["Classic auction house"] }, { "dark", L["Dark terminal"] } },
+        L["Classic: the game's own look, stone-and-gold edges, red buttons, gold labels, like the auction house. Dark: the exchange terminal at night. Takes effect after a reload."],
+        function() FT.AskReload(L["The new look shows after the interface reloads. Reload now?"]) end)
     Choice(g, "words", L["Words"], { { "plain", L["Plain English"] }, { "trader", L["Trader terms"] } },
         L["Plain English swaps the trader terms (RSI, liquidity, volatility...) for plain words. Takes effect after a reload."],
         function() FT.AskReload(L["The new words show after the interface reloads. Reload now?"]) end)

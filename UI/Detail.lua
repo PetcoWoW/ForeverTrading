@@ -305,24 +305,23 @@ local function New(index)
         end
     end
     -- a shadow round it and a clear edge: it stands out from the main window under it
-    if UI.theme ~= "classic" then
-        local light = UI.theme == "light"
-        w.shadowOut = UI.RoundTex(w, "BACKGROUND", "black", light and 0.06 or 0.22, -8, nil, 9)
+    if not UI.Classic() then
+        w.shadowOut = UI.RoundTex(w, "BACKGROUND", "black", 0.22, -8, nil, 9)
         w.shadowOut:SetPoint("TOPLEFT", -8, 8)
         w.shadowOut:SetPoint("BOTTOMRIGHT", 8, -8)
-        w.shadowIn = UI.RoundTex(w, "BACKGROUND", "black", light and 0.10 or 0.32, -8, nil, 6)
+        w.shadowIn = UI.RoundTex(w, "BACKGROUND", "black", 0.32, -8, nil, 6)
         w.shadowIn:SetPoint("TOPLEFT", -4, 4)
         w.shadowIn:SetPoint("BOTTOMRIGHT", 4, -4)
-    end
-    UI.Fill(w, "bg0")
-    if not UI.ClassicEdge(w, "accent", { edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border", edgeSize = 16,
-        insets = { left = 4, right = 4, top = 4, bottom = 4 } }) then
+        UI.Fill(w, "bg0")
         -- a gold outline two wide: seen on any background, the main window's included
         UI.Border(w, "accent", 1)
         w.edge = CreateFrame("Frame", nil, w)
         w.edge:SetPoint("TOPLEFT", 1, -1)
         w.edge:SetPoint("BOTTOMRIGHT", -1, 1)
         UI.Border(w.edge, "accent", 0.55, nil, UI.RADIUS - 1)
+    else
+        -- the game's dialog: its stone-and-gold edge stands out on its own
+        UI.Skin(w, "window", "bg0")
     end
     table.insert(UISpecialFrames, w:GetName())
 
@@ -356,8 +355,7 @@ local function New(index)
     w.sub = UI.Text(header, 11, "dim")
     w.sub:SetPoint("TOPLEFT", w.name, "BOTTOMLEFT", 0, -6)
 
-    local close = UI.Button(header, "×", 30, 30, "ghost", function() w:Hide() end)
-    close.label:SetFont(UI.FONT, UI.Size(18), "")
+    local close = UI.CloseButton(header, function() w:Hide() end)
     w.close = close
     w.sizes = SizeButtons(w, header)
     w.sizes:SetPoint("RIGHT", close, "LEFT", -6, 0)

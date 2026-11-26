@@ -12,6 +12,10 @@ FT.News = N
 -- start, after the files are read (a table made with them would keep the English)
 local function News()
     return {
+        ["v0.23"] = {
+            { L["The classic auction house look"], L["The game's own style everywhere: stone-and-gold edges, red buttons, gold labels, the game's tabs. Prefer the dark terminal? Settings > Look."],
+                function() FT.Show("settings") end },
+        },
         ["v0.22"] = {
             { L["Radar"], L["A new page: what's starting to sell faster before its price moves, what a rising craft is made of, what's cooling off, and the next raid opening. It grades its own calls."],
                 function() FT.Show("radar") end },
@@ -172,11 +176,7 @@ local function Build()
     win:EnableMouse(true)
     win:SetScale(FT.S.scale or 1)
     win:SetPoint("CENTER", UIParent, "CENTER", 0, 40)
-    UI.Fill(win, "bg0")
-    if not UI.ClassicEdge(win, "line", { edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border", edgeSize = 16,
-        insets = { left = 4, right = 4, top = 4, bottom = 4 } }) then
-        UI.Border(win, "line")
-    end
+    UI.Skin(win, "window", "bg0")
     table.insert(UISpecialFrames, "WolfOfBootyBayNews")
     win:RegisterForDrag("LeftButton")
     win:SetScript("OnDragStart", function(self) self:StartMoving() end)
@@ -188,9 +188,8 @@ local function Build()
 
     win.title = UI.Text(win, 16, "text")
     win.title:SetPoint("TOPLEFT", 20, -18)
-    local close = UI.Button(win, "×", 26, 26, "ghost", function() win:Hide() end)
-    close.label:SetFont(UI.FONT, UI.Size(18), "")
-    close:SetPoint("TOPRIGHT", -10, -10)
+    local close = UI.CloseButton(win, function() win:Hide() end, 26)
+    close:SetPoint("TOPRIGHT", UI.Classic() and -6 or -10, UI.Classic() and -6 or -10)
     win.sub = UI.Text(win, 11, "dim")
     win.sub:SetPoint("TOPLEFT", win.title, "BOTTOMLEFT", 0, -4)
     win.sub:SetText(L["Press Show to go there."])

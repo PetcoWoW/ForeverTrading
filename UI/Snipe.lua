@@ -59,7 +59,8 @@ end
 local function Build(parent)
     local f = CreateFrame("Frame", "WolfOfBootyBaySnipe", parent)
     UI.ResolveFont()
-    UI.Fill(f, "bg0", 0.97)
+    -- over the auction house's own page: dark and solid (the classic look: with the tooltip's gold edge)
+    if UI.Classic() then UI.Skin(f, "popup", "bg0", 0.97) else UI.Fill(f, "bg0", 0.97) end
     f.head = UI.Text(f, 15, "accent")
     f.head:SetPoint("TOPLEFT", 12, -10)
     f.head:SetText(L["Snipe"])
