@@ -386,7 +386,27 @@ function T.RefreshDeals()
     -- still looking: how far (the page updates itself until done)
     local pct = FT.Deals.Progress and FT.Deals.Progress()
     local looking = pct and string.format(L["Finding deals... %d%%"], math.floor(pct * 100)) or L["Looking for deals..."]
-    if building then FT.Debounce("dealsProgress", 0.5, function() if dealsView and dealsView:IsVisible() then T.RefreshDeals() end end) end
+    -- while looking: only the percentage again every half second (the whole list took ~25 ms a time); the list
+    -- itself when the deals are ready (FT_DEALS_READY)
+    if building then
+        local function Tick()
+            if not (dealsView and dealsView:IsVisible()) then return end
+            local _, _, still = FT.Deals.List()
+            if not still then return end
+            local q = FT.Deals.Progress and FT.Deals.Progress()
+            local text = q and string.format(L["Finding deals... %d%%"], math.floor(q * 100)) or L["Looking for deals..."]
+            dealsView.count:SetText(text)
+            if dealsView.list.items == nil or #dealsView.list.items == 0 then
+                dealsView.list:SetEmptyText(text)
+                dealsView.list:Refresh()
+            end
+            C_Timer.After(0.5, Tick)
+        end
+        if not T.progressTicking then
+            T.progressTicking = true
+            C_Timer.After(0.5, function() T.progressTicking = false; Tick() end)
+        end
+    end
     f.list:SetEmptyText((building and #shown == 0) and looking or WhyNoDeals(older))
     -- vendor prices still coming: said in place of the hint
     local left = FT.Deals.Loading()

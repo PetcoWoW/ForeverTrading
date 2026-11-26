@@ -192,6 +192,7 @@ function FT.Duration(secs)
     return string.format(L["%d min"], m)
 end
 local MAX_SAVED = 50
+local RATE_AFTER = 600 -- gold an hour shows from this many seconds into a session
 
 -- the game's loot lines as patterns, from its own strings (any language): %s the item, %d how many
 local function Pattern(fmt)
@@ -290,8 +291,13 @@ function Ses.Summary(s)
         return a.id < b.id
     end)
     local secs = Ses.Elapsed(s)
-    return { worth = worth, perHour = secs >= 60 and worth / secs * 3600 or nil, items = items, money = s.money or 0,
-        secs = secs, unpriced = unpriced }
+    -- gold an hour only from 10 minutes on (a lucky first minute made it look huge), and without the single most
+    -- valuable find too (one rare drop shouldn't set your rate)
+    local best = items[1] and items[1].value or 0
+    local ok = secs >= RATE_AFTER
+    return { worth = worth, perHour = ok and worth / secs * 3600 or nil,
+        perHourNoBest = ok and #items > 1 and (worth - best) / secs * 3600 or nil, bestItem = items[1],
+        items = items, money = s.money or 0, secs = secs, unpriced = unpriced, rateIn = math.max(0, RATE_AFTER - secs) }
 end
 
 function Ses.Start()

@@ -27,10 +27,34 @@ function UI.ProChart()
     return FT.S.chartStyle == "pro"
 end
 
+-- the simple chart's range: 7D (points every 4 hours), 30D or 90D (a point a day)
+UI.RANGES = { { "7D", L["7D"] }, { "30D", L["30D"] }, { "90D", L["90D"] } }
+local RANGE_DAYS = { ["7D"] = 7, ["30D"] = 30, ["90D"] = 90 }
+
 function UI.PriceChartData(id, tf, ma)
+    local pro = UI.ProChart()
+    if not pro then
+        -- the simple line: the range picked, a point a day (every 4 hours over a week, when tracked hourly)
+        local range = RANGE_DAYS[FT.S.chartRange or "30D"] and FT.S.chartRange or "30D"
+        local days = RANGE_DAYS[range]
+        local candles, hourly = nil, false
+        if days == 7 then
+            candles = FT.Hist.Series(id, "4H")
+            hourly = #candles >= 6
+        end
+        if not hourly then candles = FT.Hist.Series(id, "1D") end
+        local keep = hourly and (days * 6) or days
+        local from = math.max(1, #candles - keep + 1)
+        local shown = {}
+        for i = from, #candles do shown[#shown + 1] = candles[i] end
+        return {
+            candles = shown, mode = "line", fmt = MoneyAxis, title = L["Price"], overlays = {}, hourly = hourly,
+            defaultCount = #shown, emptyTitle = L["No price history"],
+            emptyBody = L["No prices for it yet: scan My items or run a full scan at the auction house."],
+        }
+    end
     local candles = FT.Hist.Series(id, tf)
     local overlays = {}
-    local pro = UI.ProChart()
     ma = ma and pro
     -- the averages show from 3 points on (until there are 7 / 25, of the points there are); MA25 once there
     -- are more than 7, else it would be the same line
@@ -398,6 +422,14 @@ local function New(index)
             Draw(x)
         end)
     end)
+    w.range = UI.Segmented(w.left, UI.RANGES, function(r)
+        FT.S.chartRange = r
+        EachShown(function(x)
+            x.range:SetValue(r)
+            Draw(x)
+        end)
+    end)
+    w.range:SetPoint("TOPLEFT", w.tf, "TOPLEFT", 0, 0)
     w.ma = UI.Check(w.left, L["Averages"], function(on)
         FT.S.showMA = on
         EachShown(function(x)
@@ -619,6 +651,9 @@ local function RefreshIn(w, keepView)
     w.ind:SetText(table.concat(ind, FT.C("dim", "   ||   ")))
 
     w.tf:SetValue(FT.S.chartTF)
+    w.range:SetValue(FT.S.chartRange or "30D")
+    w.tf:SetShown(UI.ProChart())
+    w.range:SetShown(not UI.ProChart())
     w.ma:SetChecked(FT.S.showMA)
     w.ma:SetShown(UI.ProChart()) -- the averages are part of the Pro chart
     DrawIn(w, keepView)

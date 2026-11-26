@@ -393,7 +393,7 @@ end
 
 -- Once a day, in the background: every item's cases added up by kind, for this auction house (again at once when
 -- what is learned changes: LEARN_V)
-local LEARN_V = 2 -- 2: flips
+local LEARN_V = 3 -- 2: flips, 3: snipe targets
 function An.LearnKinds(force)
     local key = FT.houseKey or "?"
     FT.db.learned = FT.db.learned or {}
@@ -408,6 +408,7 @@ function An.LearnKinds(force)
     local fh = FT.Feed and FT.Feed.House and FT.Feed.House()
     if fh then for id in pairs(fh.raw or fh.items) do Add(id) end end
     local kinds = {}
+    local often = {} -- snipe targets: deep dips that came back most times, on a market that sells (FT.Snipe)
     FT.Job("learn", #ids, function(k)
         local id = ids[k]
         local kind, name = KindOf(id)
@@ -421,6 +422,10 @@ function An.LearnKinds(force)
         end
         r.highs, r.held, r.lows, r.back = r.highs + b.highs, r.held + b.held, r.lows + b.lows, r.back + b.back
         r.flips, r.flipped = r.flips + b.flips, r.flipped + b.flipped
+        if b.flips >= 3 and b.flipped / b.flips >= 0.6 then
+            local rate = FT.Feed and FT.Feed.Rate and FT.Feed.Rate(id)
+            if rate and rate.perDay >= 1 then often[#often + 1] = { id = id, ok = b.flipped, n = b.flips } end
+        end
         -- the week: the day this item usually sells highest, for the kind's calendar - real markets only (3+ sold
         -- a day), and no one item's odd week counted as more than +30%
         local rate = b.bestDay and FT.Sales.Rate(id)
@@ -443,7 +448,12 @@ function An.LearnKinds(force)
         end
         table.sort(week, function(a, b) return a.n * a.up > b.n * b.up end)
         for i = #week, 4, -1 do week[i] = nil end
-        FT.db.learned[key] = { day = FT.Day(), v = LEARN_V, kinds = kinds, week = week }
+        table.sort(often, function(a, b)
+            if a.ok ~= b.ok then return a.ok > b.ok end
+            return a.ok / a.n > b.ok / b.n
+        end)
+        for i = #often, (FT.Snipe and FT.Snipe.MAX_OFTEN or 40) + 1, -1 do often[i] = nil end
+        FT.db.learned[key] = { day = FT.Day(), v = LEARN_V, kinds = kinds, week = week, often = often }
         pcall(An.SeedScore, kinds)
         wipe(cache)
         FT.Fire("FT_LEARNED")

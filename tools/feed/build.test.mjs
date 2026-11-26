@@ -21,7 +21,7 @@ test("counts what sold between two downloads", () => {
   run("run1", out, cache, 1795500100);
   run("run2", out, cache, 1795503700);
   const lua = fs.readFileSync(out, "utf8");
-  const data = lua.match(/\[114\] = \{ t = (\d+), firstDay = \d+, seen = "([0-9,]*)", data = "([^"]*)" \}/);
+  const data = lua.match(/\[114\] = \{ t = (\d+), firstDay = \d+, seen = "([0-9,]*)", data = "([^"]*)"/);
   assert.ok(data, "house 114 written");
   assert.equal(Number(data[1]), 1795503600);
   const items = Object.fromEntries(data[3].split(";").filter(Boolean).map((e) => {
@@ -62,7 +62,7 @@ test("fills older days from a backfill, never over the robot's own", () => {
       FEED_NOW: String(now), FEED_HOUSES: "", FEED_BACKFILL: bf },
   });
   const lua = fs.readFileSync(out, "utf8");
-  const data = lua.match(/\[114\] = \{ t = \d+, firstDay = (\d+), seen = "([0-9,]*)", data = "([^"]*)" \}/);
+  const data = lua.match(/\[114\] = \{ t = \d+, firstDay = (\d+), seen = "([0-9,]*)", data = "([^"]*)"/);
   assert.ok(data, "house 114 written");
   const first = Number(data[1]);
   assert.ok(data[2].split(",").map(Number).includes(day - 2), "the backfill's scanned day counts as seen");
@@ -89,4 +89,12 @@ test("the frequent checks skip a download Blizzard hasn't refreshed", () => {
   assert.equal(check("run1", 1795500100 + 900), "changed=false"); // same snapshot 15 minutes later
   assert.equal(fs.readFileSync(out, "utf8"), first, "nothing rewritten");
   assert.equal(check("run2", 1795503700), "changed=true"); // Blizzard refreshed
+});
+
+test("ships what sold day by day (the Radar)", () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "feed-"));
+  const cache = path.join(dir, "cache"), out = path.join(dir, "Feed.lua");
+  run("run1", out, cache, 1795500100);
+  const lua = fs.readFileSync(out, "utf8");
+  assert.match(lua, /soldFirst = \d+, sold = "[0-9a-z=,;]*"/);
 });

@@ -447,7 +447,7 @@ function C.ProfitCrafts(done)
         profitList, profitBusy, profitAt = out, false, time()
         FT.Fire("FT_CRAFTS_READY")
         if done then done(out) end
-    end)
+    end, done == nil and 2 or nil) -- made ahead (no one waiting): lighter on the frame rate
     return nil
 end
 
@@ -715,6 +715,6 @@ function E.Deals()
         table.sort(out, function(a, b) return a.profit > b.profit end)
         dealsCache, dealsAt, dealsJob = out, GetTime(), nil
         FT.Fire("FT_DEALS_READY")
-    end)
+    end, 2)
     return dealsCache or {}
 end

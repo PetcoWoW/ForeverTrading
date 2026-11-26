@@ -184,63 +184,61 @@ end
 -- Auction house: a button that opens Wolf of Booty Bay right next to it
 ---------------------------------------------------------------------------
 local ahButton
-local docked = false
 
 local function AHFrame()
     return AuctionFrame or AuctionHouseFrame
 end
 
-local function Dock()
-    if FT.WindowMaximized() then return end
-    local win = FT.Window()
-    local ah = AHFrame()
-    if not (win and ah and ah:IsShown()) then return end
-    local scale = win:GetEffectiveScale()
-    local right = (ah:GetRight() or 0) * ah:GetEffectiveScale()
-    local room = GetScreenWidth() * UIParent:GetEffectiveScale() - right
-    if room >= win:GetWidth() * scale then
-        win:ClearAllPoints()
-        win:SetPoint("TOPLEFT", ah, "TOPRIGHT", 6, -2)
-        docked = true
-    end
-end
-
+-- the auction house's Wolf tab is Snipe now: without a tab library, the panel docks beside the auction house
 local function ToggleFromAH()
-    if FT.IsShown() then
-        FT.Window():Hide()
-    else
-        FT.Show("market")
-        if FT.S.dockAH then Dock() end
-    end
+    local ah = AHFrame()
+    local p = FT.SnipePanel.Get(UIParent)
+    if p:IsShown() then p:Hide() return end
+    p:SetParent(UIParent)
+    p:ClearAllPoints()
+    if ah then p:SetPoint("TOPLEFT", ah, "TOPRIGHT", 6, 0) else p:SetPoint("CENTER") end
+    p:SetSize(660, 440)
+    p:SetFrameStrata("HIGH")
+    p:Show()
 end
 
 local function TipAH(self)
     GameTooltip:SetOwner(self, "ANCHOR_TOP")
-    GameTooltip:AddLine("|cfff0b90bWolf of Booty Bay|r")
-    GameTooltip:AddLine(L["Charts, order books, craft profit and signals"], 0.8, 0.8, 0.8, true)
+    GameTooltip:AddLine("|cfff0b90bWolf of Booty Bay|r  " .. L["Snipe"])
+    GameTooltip:AddLine(L["After a scan: what's listed under its price, how sure, and Buy. Plus the items worth searching again and again."], 0.8, 0.8, 0.8, true)
     GameTooltip:Show()
 end
 
--- the text of the button (with how far a scan got)
+-- the text of the tab: Snipe, how far a scan got, how many are underpriced now
 local function AHLabel()
     local frac = FT.Scanner.Running() and FT.Scanner.Progress()
-    return frac and string.format("Wolf of Booty Bay  %d%%", math.floor(frac * 100)) or "Wolf of Booty Bay"
+    if frac then return string.format("%s  %d%%", L["Snipe"], math.floor(frac * 100)) end
+    local n = FT.SnipePanel and FT.SnipePanel.Count() or 0
+    return n > 0 and string.format("%s (%d)", L["Snipe"], n) or L["Snipe"]
 end
 
 -- The modern auction house: a tab in the row of its tabs, the game's own look. With Auctionator its tab
 -- library places it after Auctionator's tabs; without it we put it after the game's last tab.
 local function BuildAHTab(ah)
-    local tab
+    local tab, libTab
     local lib = LibStub and LibStub("LibAHTab-1-0", true)
     if lib and lib.CreateTab then
         local ok = pcall(function()
             if not lib:DoesIDExist("Wolf of Booty Bay") then
+                -- the Snipe panel, shown inside the auction house when its tab is picked (like Auctionator's)
                 local holder = CreateFrame("Frame", nil, ah)
-                lib:CreateTab("Wolf of Booty Bay", holder, "Wolf of Booty Bay")
+                holder:SetPoint("TOPLEFT", ah, "TOPLEFT", 4, -60)
+                holder:SetPoint("BOTTOMRIGHT", ah, "BOTTOMRIGHT", -4, 28)
+                local p = FT.SnipePanel.Get(holder)
+                p:SetParent(holder)
+                p:SetAllPoints(holder)
+                p:Show()
+                lib:CreateTab("Wolf of Booty Bay", holder, L["Snipe"])
             end
             tab = lib:GetButton("Wolf of Booty Bay")
         end)
         if not ok then tab = nil end
+        if tab then libTab = true end
     end
     if not tab then
         local ok, made = pcall(CreateFrame, "Button", "WolfOfBootyBayAHTab", ah, "AuctionHouseFrameDisplayModeTabTemplate")
@@ -261,15 +259,17 @@ local function BuildAHTab(ah)
             tab:SetPoint("TOPRIGHT", ah, "BOTTOMRIGHT", -4, 2)
         end
     end
-    -- it opens our window; it never becomes the auction house's chosen tab
-    tab:SetScript("OnClick", function(self)
-        ToggleFromAH()
-        if PanelTemplates_DeselectTab then PanelTemplates_DeselectTab(self) end
-    end)
+    -- with the tab library it shows the Snipe panel inside the auction house; without it, the panel beside it
+    if not libTab then
+        tab:SetScript("OnClick", function(self)
+            ToggleFromAH()
+            if PanelTemplates_DeselectTab then PanelTemplates_DeselectTab(self) end
+        end)
+    end
     tab:HookScript("OnEnter", TipAH)
     tab:HookScript("OnLeave", function() GameTooltip:Hide() end)
     if PanelTemplates_TabResize then PanelTemplates_TabResize(tab, 20, nil, 70) end
-    if PanelTemplates_DeselectTab then PanelTemplates_DeselectTab(tab) end
+    if PanelTemplates_DeselectTab and not libTab then PanelTemplates_DeselectTab(tab) end
     tab.SetLabel = function(self, text)
         self:SetText(text)
         if PanelTemplates_TabResize then PanelTemplates_TabResize(self, 20, nil, 70) end
@@ -280,7 +280,7 @@ end
 
 -- The classic auction house (or no tab template): our own button
 local function BuildAHPlainButton(ah)
-    local b = UI.Button(ah, "Wolf of Booty Bay", 10, 22, "default", ToggleFromAH)
+    local b = UI.Button(ah, L["Snipe"], 10, 22, "default", ToggleFromAH)
     b.style = { bg = "bg0", bgA = 0.92, hover = "bg2", hoverA = 1, text = "accent", border = "line" }
     b:SetActive(false)
     b:FitText(24)
@@ -290,7 +290,7 @@ local function BuildAHPlainButton(ah)
     else
         b:SetPoint("TOPRIGHT", ah, "BOTTOMRIGHT", -4, -2)
     end
-    b:SetTip("Wolf of Booty Bay", L["Charts, order books, craft profit and signals"])
+    b:SetTip("Wolf of Booty Bay  " .. L["Snipe"], L["After a scan: what's listed under its price, how sure, and Buy. Plus the items worth searching again and again."])
     local set = b.SetLabel
     b.SetLabel = function(self, text)
         set(self, text)
@@ -328,15 +328,10 @@ FT.On("AUCTION_HOUSE_SHOW", function()
     end)
 end)
 
+-- the Snipe panel beside the auction house goes with it
 FT.On("AUCTION_HOUSE_CLOSED", function()
-    if docked then
-        docked = false
-        local win = FT.Window()
-        if win and win:IsShown() then
-            win:Hide()
-            FT.ResetWindow()
-        end
-    end
+    local p = FT.SnipePanel and FT.SnipePanel.Panel()
+    if p and p:GetParent() == UIParent then p:Hide() end
 end)
 
 ---------------------------------------------------------------------------
@@ -1029,6 +1024,26 @@ local function BuildHUD()
     h.worth:SetPoint("TOPLEFT", 10, -24)
     h.rate = UI.Text(h, 12, "up", "RIGHT")
     h.rate:SetPoint("TOPRIGHT", -10, -27)
+    -- its hover: the rate without your best find, and why it waits 10 minutes
+    h.rateHit = CreateFrame("Frame", nil, h)
+    h.rateHit:SetPoint("TOPRIGHT", -6, -22)
+    h.rateHit:SetSize(120, 18)
+    h.rateHit:EnableMouse(true)
+    h.rateHit:SetScript("OnEnter", function(self)
+        local sm = h.sum
+        GameTooltip:SetOwner(self, "ANCHOR_LEFT")
+        GameTooltip:AddLine(L["Gold an hour"], 1, 1, 1)
+        if sm and sm.perHour then
+            GameTooltip:AddDoubleLine(L["Everything you found"], FT.Money(math.floor(sm.perHour), "short"), 0.8, 0.82, 0.86, 1, 1, 1)
+            if sm.perHourNoBest and sm.bestItem then
+                GameTooltip:AddDoubleLine(string.format(L["Without your best find (%s)"], FT.ItemText(sm.bestItem.id, 20)),
+                    FT.Money(math.floor(sm.perHourNoBest), "short"), 0.8, 0.82, 0.86, 1, 1, 1)
+            end
+        end
+        GameTooltip:AddLine(L["At market prices. Shown from 10 minutes in: a lucky first minute would make it look far bigger than it is."], 0.6, 0.64, 0.7, true)
+        GameTooltip:Show()
+    end)
+    h.rateHit:SetScript("OnLeave", function() GameTooltip:Hide() end)
     -- what you just looted (a few seconds), or how many have no price yet
     h.just = UI.Text(h, 11, "up")
     h.just:SetPoint("TOPLEFT", 10, -44)
@@ -1128,7 +1143,9 @@ function FT.UpdateHUD()
     local secs = math.floor(sum.secs)
     h.time:SetText(string.format("%d:%02d:%02d", math.floor(secs / 3600), math.floor(secs % 3600 / 60), secs % 60))
     h.worth:SetText(FT.Money(math.floor(sum.worth), "short"))
-    h.rate:SetText(sum.perHour and (FT.Money(math.floor(sum.perHour), "short") .. FT.C("dim", " " .. L["/ hour"])) or FT.C("dim", L["counting..."]))
+    h.rate:SetText(sum.perHour and (FT.Money(math.floor(sum.perHour), "short") .. FT.C("dim", " " .. L["/ hour"]))
+        or FT.C("dim", string.format(L["/ hour in %d min"], math.ceil((sum.rateIn or 0) / 60))))
+    h.sum = sum
     if s.lastT and time() - s.lastT <= JUST_LOOTED and s.lastLoot then
         h.just:SetText("+" .. FT.Num(s.lastN or 1) .. " " .. FT.ItemText(s.lastLoot, 26))
     elseif (sum.unpriced or 0) > 0 then

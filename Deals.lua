@@ -352,13 +352,16 @@ local function Finished(out, unknown)
 end
 
 -- every item
+-- reused between searches: a fresh 7,000-item list every time is garbage the game has to sweep up
+local idList = {}
 local function BuildAll()
     building, dirty = true, false
     FT.Hist.TakeChanged("deals") -- every item is looked at: what changed so far is in it
     -- an error here must not leave the page "looking" for ever
     local ok, ids, mine = pcall(function()
-        local list = {}
-        FT.Hist.EachItem(function(id) list[#list + 1] = id end)
+        local list, n = idList, 0
+        FT.Hist.EachItem(function(id) n = n + 1; list[n] = id end)
+        for k = #list, n + 1, -1 do list[k] = nil end
         return list, OwnedMap()
     end)
     if not ok then
@@ -372,11 +375,13 @@ local function BuildAll()
     local out, unknown = {}, {}
     local today = FT.Day()
     counted = {}
+    -- half the usual share of a frame unless the page is waiting for it
+    local waiting = D.watching and D.watching() and not builtAt
     D.job = FT.Job("deals", #ids, function(k) Look(ids[k], mine, below, minProfit, look, out, unknown) end, function()
         info, fullAt, builtDay = look, time(), today
         D.job = nil
         Finished(out, unknown)
-    end)
+    end, (not waiting) and 2 or nil)
 end
 
 -- while looking through every item: how far, 0-1 (nil: not looking)
@@ -393,6 +398,10 @@ FT.On("FT_READY", function()
         if InCombatLockdown and InCombatLockdown() then C_Timer.After(30, Go) return end
         if not builtAt and not building then D.Build() end
         if FT.Enchant and FT.Enchant.Deals then FT.Enchant.Deals() end
+        -- Craft for profit too, a little later (each list on its own)
+        C_Timer.After(20, function()
+            if not (InCombatLockdown and InCombatLockdown()) and FT.Craft and FT.Craft.ProfitCrafts then FT.Craft.ProfitCrafts() end
+        end)
     end
     C_Timer.After(60, Go)
 end)

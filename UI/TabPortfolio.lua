@@ -584,7 +584,7 @@ function ST.Build(p)
             row.openBg:SetShown(x.session ~= nil and openSess[x.session.start] == true)
             if x.session then
                 local s = x.session
-                local rate = (s.secs or 0) >= 60 and (s.worth or 0) / s.secs * 3600 or nil
+                local rate = (s.secs or 0) >= 600 and (s.worth or 0) / s.secs * 3600 or nil
                 local mark = openSess[s.start] and "Interface\\Buttons\\UI-MinusButton-Up" or "Interface\\Buttons\\UI-PlusButton-Up"
                 c.name:SetText("|T" .. mark .. ":14|t  " .. (s.name or s.zone or "?"))
                 c.when:SetText(FT.C("dim", FT.TimeOfDay(s.start or s.stop)))

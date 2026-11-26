@@ -44,7 +44,7 @@ local FT = ...
 local function step(name, fn) mock.call("step " .. name, fn) end
 step("slash", function() SlashCmdList["WOLFOFBOOTYBAY"]("") end)
 mock.run(1)
-for _, tab in ipairs({ "market", "signals", "portfolio", "sessions", "sell", "settings", "craft" }) do
+for _, tab in ipairs({ "market", "signals", "radar", "portfolio", "sessions", "sell", "settings", "craft" }) do
   step("tab " .. tab, function() FT.Show(tab) end)
   mock.run(1)
 end
@@ -257,6 +257,50 @@ step("auctionator daily", function()
   local n = 0; for _ in pairs(d or {}) do n = n + 1 end
   print("auctionator days for 2770:", n)
 end)
+-- Snipe: the lists after a scan, the panel beside the auction house (no tab library in the fake game), Re-check
+step("snipe", function()
+  FT.Snipe.Build()
+end)
+mock.run(30)
+step("snipe panel", function()
+  local now = FT.Snipe.Now()
+  local often = FT.Snipe.Often()
+  local p = FT.SnipePanel.Get(UIParent)
+  p:SetSize(660, 440); p:Show(); FT.SnipePanel.Refresh()
+  FT.SnipePanel.Recheck()
+  local by = {}
+  for _, x in ipairs(now) do by[x.conf] = (by[x.conf] or 0) + 1 end
+  local whys = {}
+  for i = 1, math.min(8, #now) do whys[#whys + 1] = now[i].conf .. ": " .. now[i].why .. string.format(" (%.0f%%)", now[i].off * 100) end
+  print("snipe reasons: " .. table.concat(whys, " | "))
+  print("snipe now:", #now, "safe", by.safe or 0, "good", by.good or 0, "gamble", by.gamble or 0, "often:", #often,
+    now[1] and ("first: " .. now[1].id .. " " .. now[1].conf .. " " .. now[1].why) or "")
+end)
+-- Radar, with made-up daily sales (the release's price file has none yet): one item selling 5x faster lately with
+-- its price flat, one slowing down - and what the rising one is made of
+step("radar", function()
+  local h = FT.Feed.House()
+  local today = math.floor(FT.Feed.Time() / 86400)
+  h.soldFirst = today - 13
+  local function Enc(list) local t = {} for i, v in ipairs(list) do t[i] = string.format("%s", (function(n) local d, out = "0123456789abcdefghijklmnopqrstuvwxyz", "" if n == 0 then return "0" end while n > 0 do local r = n % 36 out = d:sub(r + 1, r + 1) .. out n = math.floor(n / 36) end return out end)(v * 10)) end return table.concat(t, ",") end
+  -- a crafted item (a recipe output) rising, a material of nothing slowing
+  local rising
+  for _, r in ipairs(FT.Craft.AllRecipes() or {}) do if FT.Price(r.output) then rising = r.output break end end
+  h.soldRaw = {
+    [rising or 12363] = Enc({ 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 20, 22, 25 }),
+    [2770] = Enc({ 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 5, 4, 3 }),
+  }
+  FT.Radar.Build()
+end)
+mock.run(30)
+step("radar shown", function()
+  FT.Show("radar")
+  local list = FT.Radar.List()
+  local parts = {}
+  for i, x in ipairs(list) do if i <= 4 then parts[#parts + 1] = x.kind .. "/" .. tostring(x.stage) .. ": " .. FT.Radar.Text(x) end end
+  print("radar:", #list, table.concat(parts, " | "))
+  print("radar next event:", FT.Radar.Next() and FT.Radar.Next().days or "none")
+end)
 step("AH close", function() mock.fire("AUCTION_HOUSE_CLOSED") end)
 mock.run(3)
 step("tour", function() if FT.Tour and FT.Tour.Start then FT.Tour.Start() end end)
@@ -341,6 +385,32 @@ step("timing", function()
   FT.Craft.BestUse(4234)
   print(string.format("BestUse(Heavy Leather) %.1f ms", (os.clock() - t0) * 1000))
 end)
+-- how long opening each Money view takes in one go, and what one sales lookup costs
+step("page open times", function()
+  local function T(f) local t0 = os.clock(); f(); return (os.clock() - t0) * 1000 end
+  local a = T(function() FT.Show("signals"); FT.Tabs.signals.SetView("make") end)
+  local b = T(function() FT.Tabs.signals.SetView("craft") end)
+  local c = T(function() FT.Tabs.signals.SetView("farm") end)
+  local ids, n = {}, 0
+  for id in pairs(FT.Feed.House().raw) do n = n + 1; ids[n] = id; if n >= 200 then break end end
+  local r = T(function() for _, id in ipairs(ids) do FT.Sales.Rate(id) end end)
+  local r2 = T(function() for _, id in ipairs(ids) do FT.Sales.Rate(id) end end)
+  print(string.format("open ms: make %.1f, craft %.1f, farm %.1f; Sales.Rate x200 first %.1f ms, again %.1f ms", a, b, c, r, r2))
+  print("longest frames:", (function()
+    local parts = {}
+    for k, v in pairs(FT.perf or {}) do if (v.worst or 0) > 8 then parts[#parts + 1] = string.format("%s %.1f", k, v.worst) end end
+    table.sort(parts); return table.concat(parts, ", ")
+  end)())
+end)
+step("deal start cost", function()
+  local function T(f) local t0 = os.clock(); f(); return (os.clock() - t0) * 1000 end
+  local n = 0
+  local a = T(function() FT.Hist.EachItem(function() n = n + 1 end) end)
+  local b = T(function() if FT.Owned and FT.Owned.List then FT.Owned.List() end end)
+  local c = T(function() FT.Deals.Build() end)
+  print(string.format("deal start: EachItem %d items %.1f ms, Owned %.1f ms, Build call %.1f ms", n, a, b, c))
+end)
+mock.run(20)
 step("learn kinds", function() FT.An.LearnKinds(true) end)
 mock.run(30)
 step("learned", function()
