@@ -46,7 +46,8 @@ local function MenuItems()
     return { { L["Start a session"], function() S.Start() end, "up" } }
 end
 
-function FT.ShowMenu(anchor)
+-- items: { { label, fn, color } or { "-" } } (none: the session menu of the minimap button)
+function FT.ShowMenu(anchor, given)
     UI.ResolveFont()
     if not menuBlock then
         menuBlock = CreateFrame("Button", nil, UIParent)
@@ -63,7 +64,7 @@ function FT.ShowMenu(anchor)
         menu.rows = {}
         tinsert(UISpecialFrames, "WolfOfBootyBayMenu")
     end
-    local items = MenuItems()
+    local items = given or MenuItems()
     local y, w = -6, 170
     for i, it in ipairs(items) do
         local row = menu.rows[i]
@@ -386,7 +387,9 @@ local function TipLines(itemID, detail)
     if sig ~= "NODATA" and sig ~= "FAIR" then
         left = left .. "  " .. FT.C(FT.SIGNAL_COLORS[sig] or "muted", FT.SignalText(sig))
     end
-    local right = s.price and (FT.Money(s.price, "short") .. (s.ch1 and ("  " .. FT.Pct(s.ch1) .. FT.C("dim", " " .. L["today"])) or "")) or ""
+    -- the price, where it's from and how old (API 1h, your scan 12m), today's move
+    local right = s.price and (FT.Money(s.price, "short") .. FT.C("dim", " · " .. FT.PriceTag(s.source, s.t))
+        .. (s.ch1 and ("  " .. FT.Pct(s.ch1) .. FT.C("dim", " " .. L["today"])) or "")) or ""
     out[#out + 1] = { left, right }
     -- 2: the one fact worth most: a craft's profit, a material's best use, what it disenchants for
     local second

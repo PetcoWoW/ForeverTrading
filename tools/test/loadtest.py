@@ -84,6 +84,8 @@ step("disenchant", function()
   for id in pairs(FT.Feed.House().raw) do
     if id % 5 == 0 then local x = FT.Enchant.Value(id) if x then n = n + 1; v = v or x end end
   end
+  FT.Enchant.Deals() -- worked out in the background now
+  mock.run(20)
   local deals = FT.Enchant.Deals()
   print("disenchantable priced:", n, "first value:", v and math.floor(v), "DE deals:", #deals, deals[1] and math.floor(deals[1].profit))
   FT.Show("signals"); FT.Tabs.signals.SetView("make")
@@ -141,6 +143,17 @@ step("session details", function()
   local list = FT.Session.List()
   if list[1] then FT.Tabs.sessions.Toggle(list[1]) end
   print("session found:", list[1] and list[1].found and next(list[1].found) and "prices kept" or "none")
+  -- right-click: the menu, the rename box, delete
+  if list[1] then
+    FT.Tabs.sessions.Menu(list[1])
+    FT.UI.Confirm({ title = "t", text = "x", input = "old", onOK = function(v) FT.Session.Rename(list[1], v) end })
+    local d = _G["WolfOfBootyBayConfirm"]
+    if d and d.input then d.input:SetText("Mining run"); d.ok:GetScript("OnClick")(d.ok, "LeftButton") end
+    local n = #FT.Session.List()
+    print("session renamed:", list[1].name)
+    FT.Session.Delete(list[1])
+    print("sessions after delete:", n, "->", #FT.Session.List())
+  end
 end)
 step("recap and pings", function()
   FT.Port.Recap()

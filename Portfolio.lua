@@ -334,6 +334,19 @@ end
 
 function Ses.List() return FT.db.sessions or {} end
 
+-- a saved session renamed (empty: its zone and length again), or deleted
+function Ses.Rename(s, name)
+    name = name and name:gsub("^%s+", ""):gsub("%s+$", "") or ""
+    s.name = name ~= "" and name or string.format("%s, %d min", s.zone or "?", math.floor((s.secs or 0) / 60 + 0.5))
+    FT.Fire("FT_SESSION_CHANGED")
+end
+function Ses.Delete(s)
+    for i, x in ipairs(FT.db.sessions or {}) do
+        if x == s then table.remove(FT.db.sessions, i) break end
+    end
+    FT.Fire("FT_SESSION_CHANGED")
+end
+
 -- your gold an hour over your saved sessions (nil: none of an hour or more in all)
 function Ses.UsualPerHour()
     local worth, secs = 0, 0

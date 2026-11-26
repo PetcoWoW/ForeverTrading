@@ -264,6 +264,8 @@ local function Solid(r)
     -- one overpriced day is no move
     if r.sane == nil then
         local s = FT.An.Stats(r.id)
+        -- a jump with what's listed thinned out: the cheap ones bought to be relisted higher - tagged "pushed up?"
+        r.pushed = (r.ch1 or 0) > 0 and s.pumped and s.listed and s.typicalQ and s.listed <= s.typicalQ * 0.6 or false
         local today, before, yest = FT.Day(), {}, nil
         for _, c in ipairs(s.daily or {}) do
             if c.day == today - 1 then yest = c.c
@@ -562,7 +564,7 @@ function M.CheckBanners()
         if ch and (ch >= MOON or ch <= RUG) and Plausible(ch) and Cares(r.id) and Solid(r) then
             if shown < MAX_BANNERS then
                 if ch >= MOON and not Seen(r.id, "moon") then
-                    Banner(r.id, string.format(L["up %s today"], Whole(ch)), L["TO THE MOON"], "up")
+                    Banner(r.id, string.format(L["up %s today"], Whole(ch)) .. (r.pushed and L[": pushed up? it may not hold"] or ""), L["TO THE MOON"], "up")
                     shown = shown + 1
                 elseif ch <= RUG and not Seen(r.id, "rug") then
                     Banner(r.id, string.format(L["down %s today"], Whole(ch)), L["RUG PULL"], "down")
@@ -573,7 +575,7 @@ function M.CheckBanners()
     end
     -- the market's biggest of the day, owned or not
     if shown < MAX_BANNERS and topUp and not Seen(0, "moon") and not Seen(topUp.id, "moon") then
-        Banner(topUp.id, string.format(L["up %s today: the market's biggest"], Whole(topUp.ch1)), L["TO THE MOON"], "up")
+        Banner(topUp.id, string.format(L["up %s today: the market's biggest"], Whole(topUp.ch1)) .. (topUp.pushed and L[" (pushed up? it may not hold)"] or ""), L["TO THE MOON"], "up")
         shown = shown + 1
     end
     if shown < MAX_BANNERS and topDown and not Seen(0, "rug") and not Seen(topDown.id, "rug") then

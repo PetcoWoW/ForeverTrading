@@ -1,5 +1,22 @@
 # The Wolf of Booty Bay
 
+## v0.21 - the prices companion, tidier sessions
+
+- Wolf prices companion (companion/, Windows): a tray app. Every 15 minutes it reads a small note of when the
+  newest prices are from (releases/latest/download/latest.json) and, when they're newer than the addon's, downloads
+  the price file into the addon folder and says so ("/reload to load them"); its hover shows what the game has
+  loaded (from the addon's saved data) and what's ready. Finds World of Warcraft by itself (else asks once),
+  offers to start with Windows, one copy at a time, a log in %APPDATA%\WolfPrices. Every release now carries
+  Feed.lua, latest.json and WolfPrices.zip. Settings > About > Prices companion links it.
+- Tooltips say where our price is from and how old: "8g · API 1h", "· your scan 12m", "· Auctionator 2d" - so it
+  can't be taken for Auctionator's own line. A saved Blizzard price read back after a /reload still says API.
+- TO THE MOON: a jump with what's listed thinned out (the cheap ones bought to be relisted) is tagged "pushed up?",
+  and its banner says it may not hold.
+- Money: deals are worked out in the background a minute after login (never in a fight), disenchant deals too, so
+  the page isn't blank when opened; while looking it says "Finding deals... 40%".
+- Sessions: an opened session shows Qty, Then, Now and Change (what the stack gained or lost since it was found);
+  right-click a session to rename or delete it (asked first). Questions can take a typed answer (UI.Confirm input).
+
 ## v0.20.1 - fixes from the first in-game pass
 
 - Portfolio: clicking a group's header didn't close it (the click called a function defined further down the

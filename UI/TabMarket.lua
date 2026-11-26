@@ -536,7 +536,7 @@ local function MoverList(parent, title)
             local cell = row.cells.name
             cell.icon:SetItem(r.id)
             cell.star:SetText("")
-            cell.text:SetText(FT.ItemText(r.id))
+            cell.text:SetText(FT.ItemText(r.id) .. (r.pushed and FT.C("accent", "  " .. L["pushed up?"]) or ""))
             -- its last week, colored by the week's move (today's move is the number beside it)
             local wk = r.ch7 or r.ch1 or 0
             row.cells.spark:SetValues(r.spark, wk > 0 and "up" or (wk < 0 and "down" or "muted"))

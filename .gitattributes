@@ -2,3 +2,9 @@
 # fonts and images as they are (no line-end changes)
 *.ttf binary
 *.tga binary
+
+# the companion app runs on Windows: Windows line endings
+companion/*.ps1 text eol=crlf
+companion/*.cmd text eol=crlf
+companion/*.txt text eol=crlf
+companion/*.ico binary
