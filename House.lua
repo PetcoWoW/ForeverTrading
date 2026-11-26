@@ -106,8 +106,8 @@ end
 -- else `text` (talk to an auctioneer...)
 function Ho.Why(text)
     if FT.ahHere and not FT.ahOpen and FT.atHouse ~= FT.house then
-        return string.format(L["You stand at %s, the prices of %s are on: switch on the chip in the header first."],
-            Ho.Name(FT.atHouse), Ho.Name())
+        return string.format(L["You stand at %s, which isn't tracked: Wolf of Booty Bay follows your faction's auction house."],
+            Ho.Name(FT.atHouse))
     end
     return text
 end
@@ -121,7 +121,8 @@ end
 -- whose data is read and written from now on; told in chat when `say`. False when it can't now (a scan runs) -
 -- unless `force` (an auctioneer just talked to: nothing can be scanning yet, whatever a flag left from before says)
 function Ho.Set(house, say, force)
-    if house ~= "neutral" then house = "faction" end
+    -- one house's prices only: your faction's (Blackwater isn't followed since v0.28)
+    house = "faction"
     if house == FT.house then return true end
     if not force and Busy() then
         FT.Print(L["Not while scanning: the prices being read belong to the auction house they come from."])
@@ -200,7 +201,8 @@ end
 
 -- the chip in the header: whose prices you see (at an auctioneer too: the other house is offline here)
 function Ho.Toggle()
-    Ho.Set(Other(FT.house), false)
+    -- nothing to switch to: your faction's house is the only one followed
+    FT.Print(L["Wolf of Booty Bay follows your faction's auction house. Blackwater, the neutral one, isn't tracked: its prices come too late to act on."])
 end
 
 -- the pencil on the chip, at an auctioneer: this auction house is the other one (asked first; remembered for the
@@ -252,7 +254,14 @@ FT.On("AUCTION_HOUSE_SHOW", function()
         house = "faction"
     end
     FT.ahHere, FT.atHouse = true, house
-    if house == "neutral" then BeginVisit() end
+    if house == "neutral" then
+        BeginVisit()
+        -- offline here (its prices aren't ours): said once a session
+        if not Ho.toldNeutral then
+            Ho.toldNeutral = true
+            FT.Print(L["Blackwater, the neutral auction house, isn't tracked: Wolf of Booty Bay stays offline here and follows your faction's."])
+        end
+    end
     opening = true
     Ho.Set(house, true, true)
     opening = false

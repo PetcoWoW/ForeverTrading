@@ -4,7 +4,7 @@ local L = FT.L
 
 -- The version being released: a copy straight from the repository (not packaged) has no version in its TOC yet
 -- (the packager puts the tag there) and shows this one. Set it with every release.
-local RELEASE = "v0.27"
+local RELEASE = "v0.28"
 local GetMeta = (C_AddOns and C_AddOns.GetAddOnMetadata) or GetAddOnMetadata
 FT.VERSION = (GetMeta and GetMeta(ADDON, "Version")) or RELEASE
 if FT.VERSION == "" or FT.VERSION:find("@", 1, true) then FT.VERSION = RELEASE end
@@ -732,8 +732,10 @@ FT.On("PLAYER_LOGIN", function()
     FT.sideKey = FT.SideKey()
     local c = FT.db.chars[FT.charKey] or {}
     FT.db.chars[FT.charKey] = c
-    -- the auction house whose prices this character looked at last (talking to an auctioneer picks its own)
-    FT.house = (c.house == "neutral") and "neutral" or "faction"
+    -- your faction's auction house, always (v0.28: Blackwater, the neutral one, isn't followed - its prices arrive
+    -- too late to act on there; c.house from before is forgotten)
+    c.house = nil
+    FT.house = "faction"
     FT.houseKey = FT.HouseKey(FT.house)
     c.name = UnitName("player")
     c.realm = GetRealmName()

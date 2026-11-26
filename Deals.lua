@@ -194,8 +194,11 @@ local function Median(list)
     return s[math.ceil(#s / 2)]
 end
 
--- buy at one auction house, carry it to the other, sell it there
+-- buy at one auction house, carry it to the other, sell it there - off since v0.28: the neutral house's prices
+-- arrive too late to act on (a snipe fest), so no deal is built on them
+local CARRY = false
 local function Between(id, mine)
+    if not CARRY then return nil end
     local here = FT.house
     local other = (here == "neutral") and "faction" or "neutral"
     local pHere, tHere, qHere = FT.Hist.PriceIn(here, id)
@@ -529,6 +532,8 @@ local CARRY_DAYS = 14
 -- itemID -> { buy, sell (houses), unit (bought for), target (to list at), qty, cut (there), at (taken on), had }
 local function Store()
     local r = FT.Side()
+    -- off since v0.28 (no carrying between the houses): what was in it goes
+    if not CARRY then r.carry = {} end
     r.carry = r.carry or {}
     return r.carry
 end
@@ -560,6 +565,8 @@ end
 -- the list as rows of the deals page - those not among the deals found now (`have`: itemID -> true)
 function C.Rows(have)
     local out = {}
+    -- no carrying between the houses since v0.28: the list stays empty (what was in it is forgotten)
+    if not CARRY then return out end
     for id, e in pairs(Store()) do
         if not (have and have[id]) and e.unit and e.target then
             local qty = e.qty or 1
