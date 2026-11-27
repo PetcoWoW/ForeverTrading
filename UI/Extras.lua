@@ -1477,11 +1477,19 @@ local function CraftWindow()
     d.list:SetPoint("TOPLEFT", d.header, "BOTTOMLEFT", 0, -2)
     d.list:SetPoint("BOTTOMRIGHT", -1, 2)
     d.sum = {}
+    -- (v0.51) each row one line, label and answer on its middle (money icons made the answer sit lower), clear of
+    -- the window's bottom edge
     for i = 1, 4 do
-        local l = UI.Text(d, 12, "muted")
-        l:SetPoint("BOTTOMLEFT", 18, 76 - i * 18)
-        local r = UI.Text(d, 12, "text", "RIGHT")
-        r:SetPoint("BOTTOMRIGHT", -18, 76 - i * 18)
+        local row = CreateFrame("Frame", nil, d)
+        row:SetPoint("BOTTOMLEFT", 18, 86 - i * 18)
+        row:SetPoint("RIGHT", d, "RIGHT", -18, 0)
+        row:SetHeight(18)
+        local l = UI.Text(row, 12, "muted")
+        l:SetPoint("LEFT", 0, 0)
+        local r = UI.Text(row, 12, "text", "RIGHT")
+        r:SetPoint("RIGHT", 0, 0)
+        r:SetPoint("LEFT", l, "RIGHT", 12, 0)
+        if r.SetWordWrap then r:SetWordWrap(false) end
         d.sum[i] = { l, r }
     end
     tinsert(UISpecialFrames, "WolfOfBootyBayCraft")
@@ -1550,8 +1558,8 @@ function FT.ShowCraft(r)
         local ready = buyReady * qty
         local diff = ready - e.cost
         rows[#rows + 1] = { L["Need it yourself?"], diff > 0
-            and FT.C("up", string.format(L["crafting saves %s vs buying it"], FT.Money(math.floor(diff), "short")))
-            or FT.C("accent", string.format(L["buying it ready is %s cheaper"], FT.Money(math.floor(-diff), "short"))) }
+            and FT.C("up", string.format(L["craft it: saves %s"], FT.Money(math.floor(diff), "short")))
+            or FT.C("accent", string.format(L["buy it: %s cheaper"], FT.Money(math.floor(-diff), "short"))) }
     end
     for i, s in ipairs(d.sum) do
         local row = rows[i]
@@ -1636,6 +1644,23 @@ local function BuildHUD()
         FT.UpdateHUD()
     end)
     h.fold:SetPoint("TOPRIGHT", -6, -5)
+    -- (v0.51) folded: pause and stop right on it, small
+    local function Mini(tex, onClick, tip)
+        local b = CreateFrame("Button", nil, h)
+        b:SetSize(14, 14)
+        b.tex = b:CreateTexture(nil, "ARTWORK")
+        b.tex:SetAllPoints()
+        b.tex:SetTexture(tex)
+        b:SetScript("OnClick", onClick)
+        b:SetScript("OnEnter", function(self) UI.TipText(self, tip()) end)
+        b:SetScript("OnLeave", function() GameTooltip:Hide() end)
+        return b
+    end
+    h.miniStop = Mini("Interface\\Buttons\\UI-StopButton", function() FT.Session.Stop() end, function() return L["Stop the session"] end)
+    h.miniStop:SetPoint("RIGHT", h.fold, "LEFT", -4, 0)
+    h.miniPause = Mini("Interface\\TimeManager\\PauseButton", function() FT.Session.Pause() end,
+        function() local c = FT.Session.Current() return c and c.paused and L["Resume"] or L["Pause"] end)
+    h.miniPause:SetPoint("RIGHT", h.miniStop, "LEFT", -3, 0)
     h.time = UI.Text(h, 11, "muted", "RIGHT")
     h.time:SetPoint("TOPRIGHT", -30, -8)
     h.worth = UI.Text(h, 15, "text")
@@ -1756,7 +1781,8 @@ function FT.UpdateHUD()
     local h = hud or BuildHUD()
     h:Show()
     local sum = S.Summary(s)
-    h.title:SetText(s.paused and (L["Session"] .. "  " .. FT.C("accent", s.afk and L["paused (AFK)"] or L["paused"])) or (L["Session"] .. "  ·  " .. (s.zone or "")))
+    -- (v0.51) no "Session": the zone, or that it's paused
+    h.title:SetText(s.paused and FT.C("accent", s.afk and L["paused (AFK)"] or L["paused"]) or (s.zone or ""))
     UI.SetTexColor(h.bar, s.paused and "accent" or "up", 1)
     local secs = math.floor(sum.secs)
     h.time:SetText(string.format("%d:%02d:%02d", math.floor(secs / 3600), math.floor(secs % 3600 / 60), secs % 60))
@@ -1784,12 +1810,24 @@ function FT.UpdateHUD()
     h.fold:SetLabel(folded and "+" or "-")
     h.fold:SetTip(folded and L["Show the items"] or L["Fold it"], folded and L["Brings back what you've found."] or L["Just the gold and gold an hour: takes less room."])
     for _, x in ipairs({ h.just, h.pause, h.stop, h.open, h.grip }) do x:SetShown(not folded) end
+    h.miniPause:SetShown(folded)
+    h.miniStop:SetShown(folded)
+    h.time:ClearAllPoints()
     if folded then
+        h.miniPause.tex:SetTexture(s.paused and "Interface\\TimeManager\\PlayButton" or "Interface\\TimeManager\\PauseButton")
+        h.time:SetPoint("RIGHT", h.miniPause, "LEFT", -6, 0)
         for _, r in ipairs(h.rows) do r:Hide() end
         h.track:Hide()
         h.thumb:Hide()
+        -- as wide as what's in it
+        local left = math.max(h.title:GetStringWidth() or 0, h.worth:GetStringWidth() or 0)
+        local right = math.max((h.time:GetStringWidth() or 0) + 6 + 14 + 3 + 14 + 4 + 18 + 6, (h.rate:GetStringWidth() or 0) + 10)
+        local w = math.floor(math.max(170, 10 + left + 16 + right) + 0.5)
+        if math.abs((h:GetWidth() or 0) - w) > 1 then h:SetWidth(w) end
         return
     end
+    h.time:SetPoint("TOPRIGHT", -30, -8)
+    if math.abs((h:GetWidth() or 0) - 260) > 1 then h:SetWidth(260) end
     h.total = #lines
     h.offset = math.max(0, math.min(h.offset or 0, #lines - rows))
     for i, r in ipairs(h.rows) do
