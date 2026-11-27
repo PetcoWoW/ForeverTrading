@@ -1,5 +1,16 @@
 # Wolf
 
+## v0.41 - when it sells: its price by the hour
+
+- **Price by hour of the day** in When it sells: each hour's price against the item's usual, your clock, the
+  priciest three hours in gold and the cheapest in blue, the hour it is now marked.
+- **When to buy and post**, on its own line: "Cheapest 7p-10p (-4%): buy then · priciest 10a-1p (+5%): post just
+  before 10a" - or that its price hardly moves through the day. The line above: when it sells most, the best day,
+  the quietest hours.
+- The price robot now keeps each item's price by the hour: the last 48 hours, and a running profile of every hour
+  of the day (about two weeks each). It needs five looks at an hour before it shows it, so the price section fills
+  in over the next few days.
+
 ## v0.40 - smarter sell or hold, Best crafts, Wowhead on the chart
 
 - **Sell or hold reads history now.** In a weeks-old economy a steady climber always looked "higher than usual",

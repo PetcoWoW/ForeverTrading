@@ -12,6 +12,9 @@ FT.News = N
 -- start, after the files are read (a table made with them would keep the English)
 local function News()
     return {
+        ["v0.41"] = {
+            { L["When it sells: its price by the hour"], L["The hours it's cheapest (buy then) and priciest (post just before): on an item's chart, When it sells."], nil },
+        },
         ["v0.40"] = {
             { L["Smarter sell or hold"], L["Wolf now reads an item's climb, the raids ahead and whether it's an endgame material: hold, sell a third, or sell into the run-up."], nil },
             { L["Best crafts"], L["What a material makes, by what one of it brings or the best sellers: from an item's chart or Where to farm."], nil },

@@ -738,12 +738,32 @@ step("sell model", function()
   assert(An.Right("trend", 100, 110) == true and An.Right("demand", 100, 90) == false and An.Right("endgame", 100, 98) == true)
 end)
 step("when it sells", function()
+  -- a feed line with prices by the hour: 4% under its usual 3-5 UTC, 5% over 18-20
+  local h = FT.Feed.House()
+  local rawLine = h.hourRaw[12360]
+  if rawLine and not rawLine:find("/.*/.*/") then
+    local tp = {}
+    for u = 0, 23 do tp[u + 1] = (u >= 3 and u <= 5) and "qo" or ((u >= 18 and u <= 20) and "t6" or "rs") end -- 960 / 1050 / 1000
+    local lp = {}
+    for k = 1, 48 do lp[k] = "1kw" end
+    h.hourRaw[12360] = rawLine .. "/" .. table.concat(lp, ",") .. "/" .. table.concat(tp, ",")
+  end
+  local hp = FT.Feed.Hourly(12360)
+  if rawLine then -- (a feed with no hourly lines at all: nothing to read)
+    assert(hp.todPrice, "prices by the hour read")
+    local lo, hi = 9, 0
+    for u = 0, 23 do if hp.todPrice[u] then lo, hi = math.min(lo, hp.todPrice[u]), math.max(hi, hp.todPrice[u]) end end
+    assert(math.abs(lo - 0.96) < 0.001 and math.abs(hi - 1.05) < 0.001, lo .. " " .. hi)
+    assert(hp.hours[48].p == tonumber("1kw", 36), "the last hours' prices")
+  end
   local hr = FT.Feed.Hourly(12360)
   print("hourly: " .. tostring(hr and #hr.hours) .. " hours")
   FT.ShowWhenSells(12360)
   local d = _G.WolfOfBootyBayWhenSells
   if d then
     print("when it sells: " .. tostring(d.sum.__text):gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", ""))
+    print("when to buy and post: " .. tostring(d.advice.__text):gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", ""))
+    assert(not rawLine or tostring(d.advice.__text):find("buy then"), "the advice says when to buy")
     mock.layout.Settle(d)
     local found, texts = mock.layout.Overlaps(d)
     for _, o in ipairs(found) do print(string.format("OVERLAP [when it sells] %q x %q  (%dx%d px)", o[1].text:sub(1, 50), o[2].text:sub(1, 50), o[3], o[4])) end

@@ -229,14 +229,16 @@ function F.UTCOffsetHours()
     return math.floor((now - time(date("!*t", now))) / 3600 + 0.5)
 end
 
--- An item's sales hour by hour: { hours = { { t = start of the hour (unix), n = sold or nil when not watched }
--- x48, oldest first }, tod = { [0..23] = sold an hour at that hour of YOUR day, nil: not watched enough } };
--- nil when the feed has none (older feeds, too few sales)
+-- An item's sales hour by hour: { hours = { { t = start of the hour (unix), n = sold or nil when not watched,
+-- p = its lowest price that hour or nil } x48, oldest first }, tod = { [0..23] = sold an hour at that hour of YOUR
+-- day, nil: not watched enough }, todPrice = { [0..23] = its price then against its usual (0.95: 5% under), nil:
+-- not known yet } (todPrice nil: a feed from before the robot kept prices by the hour) }; nil when the feed has
+-- none (older feeds, too few sales)
 function F.Hourly(itemID, house)
     local h = F.House(house)
     local rest = h and h.hourRaw and h.hourRaw[itemID]
     if not (rest and h.hourFirst) then return nil end
-    local last, tod = rest:match("^([^/]*)/(.*)$")
+    local last, tod, lastP, todP = rest:match("^([^/]*)/([^/]*)/?([^/]*)/?([^/]*)$")
     if not last then return nil end
     local out = { hours = {}, tod = {} }
     local k = 0
@@ -250,6 +252,27 @@ function F.Hourly(itemID, house)
         local x = Dec(v)
         if u <= 23 then out.tod[(u + off) % 24] = x and x / 10 or nil end
         u = u + 1
+    end
+    if lastP and lastP ~= "" then
+        local i = 0
+        for v in (lastP .. ","):gmatch("([^,]*),") do
+            i = i + 1
+            if out.hours[i] then out.hours[i].p = Dec(v) end
+        end
+    end
+    if todP and todP ~= "" then
+        out.todPrice = {}
+        local any = false
+        u = 0
+        for v in (todP .. ","):gmatch("([^,]*),") do
+            local x = Dec(v)
+            if u <= 23 and x then
+                out.todPrice[(u + off) % 24] = x / 1000
+                any = true
+            end
+            u = u + 1
+        end
+        if not any then out.todPrice = nil end
     end
     return out
 end

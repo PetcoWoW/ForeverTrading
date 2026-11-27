@@ -120,4 +120,41 @@ test("ships what sold hour by hour (the item page's timeline)", () => {
   const todVals = tod.split(",");
   assert.equal(todVals.length, 24);
   assert.equal(parseInt(todVals[hour % 24], 36), 150);
+  // then its price: the last 48 hours' lowest (this hour's known), and the time of day (too few samples yet: empty)
+  const [, , lastP, todP] = line.split("=")[1].split("/");
+  const lp = lastP.split(",");
+  assert.equal(lp.length, 48);
+  assert.ok(parseInt(lp[47], 36) > 0, "this hour's price");
+  assert.equal(todP.split(",").length, 24);
+  assert.ok(todP.split(",").every((v) => v === ""), "no time of day from two samples");
+});
+
+test("the price's time of day builds up over the hours", () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "feed-"));
+  const cache = path.join(dir, "cache"), out = path.join(dir, "Feed.lua");
+  // the same two snapshots again and again, an hour apart, for a week: every hour of the day gets 5+ samples
+  // (each a copy stamped with its own time, as Blizzard's refreshes are)
+  const fx = fs.mkdtempSync(path.join(os.tmpdir(), "fx-"));
+  for (let k = 0; k < 24 * 7; k++) {
+    const t = 1795500100 + k * 3600;
+    const src = path.join(here, "test", k % 2 ? "run2" : "run1");
+    const dst = path.join(fx, "f" + k);
+    fs.mkdirSync(dst);
+    for (const f of fs.readdirSync(src)) {
+      const j = JSON.parse(fs.readFileSync(path.join(src, f), "utf8"));
+      j.modified = t - 60;
+      fs.writeFileSync(path.join(dst, f), JSON.stringify(j));
+    }
+    execFileSync("node", [path.join(here, "build.mjs")], {
+      env: { ...process.env, FEED_FIXTURE: dst, FEED_OUT: out, FEED_CACHE: cache, FEED_NOW: String(t), FEED_HOUSES: "" },
+    });
+  }
+  const lua = fs.readFileSync(out, "utf8");
+  const m = lua.match(/\[114\] = \{[^\n]*hourly = "([0-9a-z=,;/]*)"/);
+  const line = m[1].split(";").find((e) => e.startsWith("12359="));
+  const parts = line.split("=")[1].split("/");
+  assert.equal(parts.length, 4);
+  const tod = parts[3].split(",").map((v) => (v === "" ? null : parseInt(v, 36)));
+  assert.ok(tod.filter((v) => v !== null).length >= 20, "most hours of the day known");
+  for (const v of tod) if (v !== null) assert.ok(v > 500 && v < 2000, "a sane ratio: " + v);
 });

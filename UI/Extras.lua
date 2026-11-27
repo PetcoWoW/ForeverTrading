@@ -977,30 +977,45 @@ local function Bars(parent, n)
     f.base = UI.HLine(f, "line")
     f.base:SetPoint("BOTTOMLEFT", 0, 14)
     f.base:SetPoint("BOTTOMRIGHT", 0, 14)
-    -- values, labels (by index), best: indexes in gold; fmt: the top value's text
+    -- the hour it is now: a faint line behind its bar
+    f.now = UI.Tex(f, "BACKGROUND", "text", 0.12)
+    f.now:Hide()
+    -- values, labels (by index), best: indexes in gold; fmt: the top value's text; opts: { low = indexes in blue,
+    -- floor = the value at the bottom (differences of a few percent show), now = an index to mark }
     f:SetScript("OnSizeChanged", function(self) if self.args then self:Set(unpack(self.args)) end end)
-    function f:Set(values, labels, best, fmt)
-        self.args = { values, labels, best, fmt }
+    function f:Set(values, labels, best, fmt, opts)
+        self.args = { values, labels, best, fmt, opts }
         local w, h = self:GetWidth(), self:GetHeight() - 16
         if not w or w <= 0 then return end
-        local top = 0
+        opts = opts or {}
+        local floor = opts.floor or 0
+        local top = floor
         for i = 1, n do if values[i] and values[i] > top then top = values[i] end end
         local bw = w / n
         for i = 1, n do
             local b, v = self.bars[i], values[i]
             b:ClearAllPoints()
-            local bh = (v and top > 0) and math.max(1, math.floor(h * v / top + 0.5)) or 2
+            local bh = (v and top > floor) and math.max(1, math.floor(h * (v - floor) / (top - floor) + 0.5)) or 2
             b:SetPoint("BOTTOMLEFT", (i - 1) * bw + 1, 15)
             b:SetSize(math.max(1, bw - 2), bh)
             if v == nil then UI.SetTexColor(b, "line", 0.6)
             elseif best and best[i] then UI.SetTexColor(b, "accent", 1)
+            elseif opts.low and opts.low[i] then UI.SetTexColor(b, "blue", 1)
             else UI.SetTexColor(b, "muted", 0.55) end
             local l = self.labels[i]
             l:ClearAllPoints()
             l:SetPoint("TOP", self, "BOTTOMLEFT", (i - 0.5) * bw, 13)
             l:SetText(labels[i] or "")
         end
-        self.max:SetText(top > 0 and (fmt and fmt(top) or FT.Num(top)) or "")
+        self.now:ClearAllPoints()
+        if opts.now then
+            self.now:SetPoint("BOTTOMLEFT", (opts.now - 1) * bw, 15)
+            self.now:SetSize(bw, h)
+            self.now:Show()
+        else
+            self.now:Hide()
+        end
+        self.max:SetText(top > floor and (fmt and fmt(top) or FT.Num(top)) or "")
     end
     return f
 end
@@ -1033,7 +1048,7 @@ local function WhenWindow()
     if whenWin then return whenWin end
     UI.ResolveFont()
     local d = CreateFrame("Frame", "WolfOfBootyBayWhenSells", UIParent)
-    d:SetSize(660, 470)
+    d:SetSize(660, 630)
     d:SetPoint("CENTER", 0, 40)
     d:SetFrameStrata("DIALOG")
     d:SetToplevel(true)
@@ -1053,6 +1068,10 @@ local function WhenWindow()
     d.sum = UI.Text(d, 11, "muted")
     d.sum:SetPoint("TOPLEFT", d.title, "BOTTOMLEFT", 0, -4)
     d.sum:SetPoint("RIGHT", d, "RIGHT", -16, 0)
+    -- when to buy and to post, from its price by the hour
+    d.advice = UI.Text(d, 11, "text")
+    d.advice:SetPoint("TOPLEFT", d.sum, "BOTTOMLEFT", 0, -4)
+    d.advice:SetPoint("RIGHT", d, "RIGHT", -16, 0)
     d.close = UI.Button(d, L["Close"], 10, 22, "default", function() d:Hide() end)
     d.close:FitText(24)
     d.close:SetPoint("TOPRIGHT", -12, -12)
@@ -1065,19 +1084,29 @@ local function WhenWindow()
         sub:SetPoint("RIGHT", d, "RIGHT", -16, 0)
         return t, sub
     end
-    d.t1, d.s1 = Section(-66, L["The last 48 hours"])
+    d.t1, d.s1 = Section(-84, L["The last 48 hours"])
     d.hours = Bars(d, 48)
-    d.hours:SetPoint("TOPLEFT", 64, -86)
+    d.hours:SetPoint("TOPLEFT", 64, -104)
     d.hours:SetPoint("RIGHT", d, "RIGHT", -16, 0)
     d.hours:SetHeight(96)
-    d.t2, d.s2 = Section(-200, L["By hour of the day"])
+    d.t2, d.s2 = Section(-218, L["By hour of the day"])
     d.tod = Bars(d, 24)
-    d.tod:SetPoint("TOPLEFT", 64, -220)
+    d.tod:SetPoint("TOPLEFT", 64, -238)
     d.tod:SetPoint("RIGHT", d, "RIGHT", -16, 0)
     d.tod:SetHeight(96)
-    d.t3, d.s3 = Section(-334, L["By day of the week"])
+    d.t4, d.s4 = Section(-352, L["Price by hour of the day"])
+    d.price = Bars(d, 24)
+    d.price:SetPoint("TOPLEFT", 64, -372)
+    d.price:SetPoint("RIGHT", d, "RIGHT", -16, 0)
+    d.price:SetHeight(96)
+    d.priceNone = UI.Text(d, 11, "dim", "CENTER")
+    d.priceNone:SetPoint("TOPLEFT", 64, -398)
+    d.priceNone:SetPoint("RIGHT", d, "RIGHT", -16, 0)
+    if d.priceNone.SetWordWrap then d.priceNone:SetWordWrap(true) end
+    d.priceNone:SetText(L["Its price by the hour comes with the next days of the price robot: it needs five looks at every hour of the day."])
+    d.t3, d.s3 = Section(-486, L["By day of the week"])
     d.days = Bars(d, 7)
-    d.days:SetPoint("TOPLEFT", 64, -354)
+    d.days:SetPoint("TOPLEFT", 64, -506)
     d.days:SetPoint("RIGHT", d, "RIGHT", -280, 0)
     d.days:SetHeight(80)
     d.empty = UI.Text(d, 12, "muted", "CENTER")
@@ -1100,9 +1129,12 @@ function FT.ShowWhenSells(itemID)
     d:Raise()
     local hr = FT.Feed and FT.Feed.Hourly and FT.Feed.Hourly(itemID)
     local any = hr ~= nil
-    for _, x in ipairs({ d.t1, d.s1, d.hours, d.t2, d.s2, d.tod, d.t3, d.s3, d.days }) do x:SetShown(any) end
+    for _, x in ipairs({ d.t1, d.s1, d.hours, d.t2, d.s2, d.tod, d.t3, d.s3, d.days, d.t4, d.s4 }) do x:SetShown(any) end
+    d.price:SetShown(any and hr.todPrice ~= nil)
+    d.priceNone:SetShown(any and hr.todPrice == nil)
     if not hr then
         UI.FitBits(d.sum, "")
+        UI.FitBits(d.advice, "")
         d.empty:SetText(L["Not enough sales seen yet for an hour-by-hour picture: the price robot needs 10 or more sold in four weeks. It looks at the whole auction house every hour."])
         d.empty:Show()
         return
@@ -1127,8 +1159,37 @@ function FT.ShowWhenSells(itemID)
     local bestAt, lowAt = Window(hr.tod)
     local best = {}
     if bestAt then for k = 0, 2 do best[(bestAt + k) % 24 + 1] = true end end
-    d.tod:Set(tv, tl, best, function(v) return string.format(L["%s/h"], FT.Num(math.floor(v + 0.5))) end)
+    local nowH = tonumber(date("%H")) + 1
+    d.tod:Set(tv, tl, best, function(v) return string.format(L["%s/h"], FT.Num(math.floor(v + 0.5))) end, { now = nowH })
     d.s2:SetText(L["your clock, the last four weeks: sold an hour, on average"])
+    -- its price by the hour: when it's cheapest (buy then) and priciest (post then)
+    local dearAt, cheapAt, dearPct, cheapPct
+    if hr.todPrice then
+        local pv, lo, hi = {}, nil, nil
+        for h = 0, 23 do
+            local x = hr.todPrice[h]
+            pv[h + 1] = x
+            if x then lo, hi = math.min(lo or x, x), math.max(hi or x, x) end
+        end
+        dearAt, cheapAt = Window(hr.todPrice)
+        local function Avg(at)
+            if not at then return nil end
+            local s = 0
+            for k = 0, 2 do s = s + hr.todPrice[(at + k) % 24] end
+            return s / 3 - 1
+        end
+        dearPct, cheapPct = Avg(dearAt), Avg(cheapAt)
+        local dear, cheap = {}, {}
+        if dearAt then for k = 0, 2 do dear[(dearAt + k) % 24 + 1] = true end end
+        if cheapAt then for k = 0, 2 do cheap[(cheapAt + k) % 24 + 1] = true end end
+        local span = (hi or 1) - (lo or 1)
+        d.price:Set(pv, tl, dear, function(v) return FT.Pct(v - 1) end,
+            { low = cheap, floor = (lo or 1) - math.max(span * 0.3, 0.005), now = nowH })
+        UI.FitBits(d.s4, table.concat({ L["against its usual, your clock, two weeks"], FT.C("accent", L["gold: priciest"]),
+            FT.C("blue", L["blue: cheapest"]) }, FT.C("dim", "  ·  ")))
+    else
+        UI.FitBits(d.s4, "")
+    end
     -- the days of the week, from the two weeks of daily sales
     local days = FT.Feed.SoldDays and FT.Feed.SoldDays(itemID) or {}
     local sum, cnt = {}, {}
@@ -1147,15 +1208,26 @@ function FT.ShowWhenSells(itemID)
     end
     d.days:Set(dv, dl, bestDay and { [bestDay] = true } or nil)
     d.s3:SetText(L["the last two weeks, sold a day"])
-    -- the summary: when to post
+    -- the summary, what to do first (a long line drops its last parts): when it sells, when to buy and to post
     local bits = {}
+    local timed = cheapPct and dearPct and (dearPct - cheapPct) >= 0.02 -- a dip worth timing: 2%+ through the day
     if bestAt then
         bits[#bits + 1] = FT.C("accent", string.format(L["Sells most %s-%s"], HourLabel(bestAt), HourLabel(bestAt + 3)))
             .. FT.C("dim", " " .. L["your time"])
     end
-    if lowAt then bits[#bits + 1] = string.format(L["quietest %s-%s"], HourLabel(lowAt), HourLabel(lowAt + 3)) end
     if bestDay then bits[#bits + 1] = string.format(L["best day: %s"], dl[bestDay]) end
-    bits[#bits + 1] = L["post a little before the busy hours"]
+    if lowAt then bits[#bits + 1] = string.format(L["quietest %s-%s"], HourLabel(lowAt), HourLabel(lowAt + 3)) end
+    -- the line under it: when to buy and when to post
+    local adv = {}
+    if timed then
+        adv[#adv + 1] = FT.C("blue", string.format(L["Cheapest %s-%s (%s): buy then"], HourLabel(cheapAt), HourLabel(cheapAt + 3), FT.Pct(cheapPct)))
+        adv[#adv + 1] = FT.C("accent", string.format(L["priciest %s-%s (%s): post just before %s"], HourLabel(dearAt), HourLabel(dearAt + 3), FT.Pct(dearPct), HourLabel(dearAt)))
+    elseif hr.todPrice then
+        adv[#adv + 1] = L["Its price hardly moves through the day: post when it sells most"]
+    else
+        adv[#adv + 1] = FT.C("dim", L["Post a little before the busy hours (its price by the hour comes in a few days)"])
+    end
+    UI.FitBits(d.advice, table.concat(adv, FT.C("dim", "  ·  ")))
     UI.FitBits(d.sum, table.concat(bits, FT.C("dim", "  ·  ")))
 end
 

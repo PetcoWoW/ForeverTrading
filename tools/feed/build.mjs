@@ -48,6 +48,12 @@ const DAILY_SALES = 14;       // what sold day by day: the last two weeks (the R
 const HOURLY_SHIP = 48;       // what sold hour by hour: the last two days (the item page's timeline)
 const HOURLY_KEEP = 28 * 24;  // hours kept for the time-of-day profile (four weeks)
 const HOURLY_MIN = 10;        // items with fewer sold in four weeks: no hourly line (too little to tell)
+// price by the hour of the day: each hour's lowest price against the item's own running average (a day's half-life),
+// kept as a running average per hour of the day (about two weeks of samples each) - 24 numbers an item, not 672
+const PRICE_AVG_A = 1 - Math.pow(0.5, 1 / 24); // the running price average: half its weight after a day
+const TOD_A = 1 / 14;                          // an hour of the day's profile: ~two weeks of that hour
+const TOD_MIN = 5;                             // samples an hour of the day needs before it's shipped
+const PRICE_MIN_Q = 3;                         // listed at least this many: one odd listing isn't a price
 const MAX_GAP = 3 * 3600;     // two downloads further apart than this: no sales are counted between them
 // A listing gone by the next download: with more than 2 hours left it was bought (or taken off by its seller,
 // which looks the same from outside); with under 30 minutes left it ran out. 30 min - 2 h: can't tell, not counted.
@@ -208,6 +214,29 @@ function processHouse(region, houseId, got, hist) {
       r.h[hour] = (r.h[hour] || 0) + s.sold;
     }
   }
+  // price hour by hour (the lowest of the hour), and the time-of-day profile of the price
+  const hod = hour % 24;
+  for (const [item, e] of now) {
+    if (!(e.p > 0) || (e.q || 0) < PRICE_MIN_Q) continue;
+    const r = h.items[item];
+    r.hp = r.hp || {};
+    if (r.hp[hour] === undefined || e.p < r.hp[hour]) r.hp[hour] = e.p;
+    if (r.ph !== hour) {
+      // once an hour: this hour against the running average, then the average moves
+      r.ph = hour;
+      if (r.pa > 0) {
+        const ratio = e.p / r.pa;
+        r.tp = r.tp || new Array(24).fill(null);
+        r.tn = r.tn || new Array(24).fill(0);
+        const next = r.tp[hod] === null ? ratio : r.tp[hod] * (1 - TOD_A) + ratio * TOD_A;
+        r.tp[hod] = Math.round(next * 10000) / 10000; // (kept short: the history file stays small)
+        r.tn[hod] = Math.min(r.tn[hod] + 1, 999);
+        r.pa = Math.round(r.pa * (1 - PRICE_AVG_A) + e.p * PRICE_AVG_A);
+      } else {
+        r.pa = e.p;
+      }
+    }
+  }
   const fromHour = hour - HOURLY_KEEP + 1;
   for (const k of Object.keys(h.hours)) if (Number(k) < fromHour) delete h.hours[k];
   // forget what's older than the window
@@ -220,6 +249,10 @@ function processHouse(region, houseId, got, hist) {
     if (r.h) {
       for (const k of Object.keys(r.h)) if (Number(k) < fromHour) delete r.h[k];
       if (Object.keys(r.h).length === 0) delete r.h;
+    }
+    if (r.hp) {
+      for (const k of Object.keys(r.hp)) if (Number(k) <= hour - HOURLY_SHIP) delete r.hp[k];
+      if (Object.keys(r.hp).length === 0) delete r.hp;
     }
     if (!now.has(Number(item)) && Object.keys(r.l).length === 0 && Object.keys(r.s).length === 0) delete h.items[item];
   }
@@ -304,7 +337,16 @@ function encodeHouse(res) {
         for (const [k, sec] of Object.entries(h.hours)) seenSec[Number(k) % 24] += sec;
         for (const [k, v] of Object.entries(r.h)) sold[Number(k) % 24] += v;
         const tod = sold.map((v, i) => (seenSec[i] >= 3600 ? b36((v / (seenSec[i] / 3600)) * 10) : ""));
-        hourParts.push(`${item}=${last.join(",")}/${tod.join(",")};`);
+        // then its price: the last HOURLY_SHIP hours' lowest (empty: not listed), and the time of day - each UTC
+        // hour's price against its average, in thousandths (1000 = its usual; empty: too few samples yet)
+        let price = "";
+        if (r.hp || r.tp) {
+          const lastP = [];
+          for (let k = hour - HOURLY_SHIP + 1; k <= hour; k++) lastP.push(r.hp && r.hp[k] !== undefined ? b36(r.hp[k]) : "");
+          const todP = new Array(24).fill("").map((_, i) => (r.tp && r.tn && r.tn[i] >= TOD_MIN && r.tp[i] !== null ? b36(r.tp[i] * 1000) : ""));
+          price = `/${lastP.join(",")}/${todP.join(",")}`;
+        }
+        hourParts.push(`${item}=${last.join(",")}/${tod.join(",")}${price};`);
       }
     }
   }
