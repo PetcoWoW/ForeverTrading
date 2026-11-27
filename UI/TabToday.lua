@@ -404,11 +404,65 @@ local function BestAsset()
         tip = L["The most valuable thing you hold, across your characters."] }
 end
 
+-- (v0.51) the undercut check: your listings someone listed under, from your auctions (kept away from the auction
+-- house) and the newest prices - one row, the biggest gap first
+local function Undercuts()
+    local O = FT.Owned
+    if not (O and O.List and O.Undercut) then return nil end
+    local n, worst, gap = 0, nil, 0
+    for _, a in ipairs((O.List()) or {}) do
+        if a.itemID and not a.sold then
+            local low = O.Undercut(a)
+            if low then
+                n = n + 1
+                local g = (a.unit - low) * (a.qty or 1)
+                if g > gap then worst, gap = a, a.unit - low end
+            end
+        end
+    end
+    if n == 0 then return nil end
+    return { id = worst.itemID, kind = "SELL", label = L["UNDERCUT"], gold = "-" .. FT.Money(math.floor(gap), "short"),
+        what = (n == 1 and string.format(L["%s: someone listed under yours"], FT.ItemText(worst.itemID, 24))
+            or string.format(L["%d of your listings undercut: %s the most"], n, FT.ItemText(worst.itemID, 22))),
+        tip = L["Your auctions against the newest prices. At the auction house, Wolf says which to repost."] }
+end
+
+-- (v0.51) what to post tonight: what you hold that sells best in the next few hours (its price by the hour)
+local function PostTonight()
+    local now = tonumber(date("%H")) or 0
+    local best
+    for _, r in ipairs(FT.Port and FT.Port.Rows and (FT.Port.Rows()) or {}) do
+        if r.value and r.value >= 10000 and r.signal ~= "HOLD" then
+            local w = FT.WhenSummary and FT.WhenSummary(r.id)
+            local at = w and (w.timed and w.sellAt or w.busyAt)
+            if at then
+                local wait = (at - now) % 24
+                if wait >= 1 and wait <= 6 and (not best or r.value > best.r.value) then best = { r = r, w = w, at = at } end
+            end
+        end
+    end
+    if not best then return nil end
+    local w = best.w
+    return { id = best.r.id, kind = "SELL", label = L["POST"], gold = FT.Money(math.floor(best.r.value), "gold"),
+        what = string.format(L["%s: post before %s, it sells best %s"], FT.ItemText(best.r.id, 22), date("%I%p", time() + ((best.at - now) % 24) * 3600):gsub("^0", ""):lower(),
+            w.timed and w.sell or w.busy),
+        tip = L["From its price by the hour: post a little before its best hours."] }
+end
+
+T.Undercuts, T.PostTonight = Undercuts, PostTonight
+
 function T.FillMoves()
     if not T.moves then return end
     local cards = FT.TopMoves(8)
-    local asset = BestAsset()
-    if asset then table.insert(cards, 1, asset) end
+    -- your best asset first; then your listings undercut, and what to post tonight (one row each)
+    local extras = {}
+    for _, x in ipairs({ BestAsset() or false, Undercuts() or false, PostTonight() or false }) do
+        if x then extras[#extras + 1] = x end
+    end
+    for _, x in ipairs(extras) do
+        for i = #cards, 1, -1 do if cards[i].id == x.id then table.remove(cards, i) end end
+    end
+    for i = #extras, 1, -1 do table.insert(cards, 1, extras[i]) end
     T.moves.list:SetItems(cards)
 end
 

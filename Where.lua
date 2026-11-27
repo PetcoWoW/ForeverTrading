@@ -170,6 +170,10 @@ function W.Lines(id, max)
     -- (v0.51) crafted: its drops only when worth farming (5%+); gear: the world drop first, then only real farms
     local crafted = FT.Craft and FT.Craft.ByOutputAll and FT.Craft.ByOutputAll(id)
     local _, _, _, _, _, classID = FT.GetItemInfoInstant(id)
+    if not classID then
+        local row = FT.Market and FT.Market.Row and FT.Market.Row(id)
+        classID = row and row.cls
+    end
     local gear = classID == 2 or classID == 4
     local dropMin = crafted and 500 or (gear and 200 or 0)
     local mob = FT.Farm and FT.Farm.Mobs and FT.Farm.Mobs(id, 1)[1]

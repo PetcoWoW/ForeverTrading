@@ -8,9 +8,9 @@ FT.Tabs = {}
 -- v0.42: four tabs - Today, Market, Make gold, You (Settings behind the gear). Make gold and You are groups of
 -- pages, switched by one row of buttons on each of them (UI.GroupBar): Flip it / Craft it / Farm it / Raids / PvP, and
 -- Holdings / Sessions / Characters / Journal.
-local TAB_ORDER = { "today", "market", "craft", "make", "you", "settings" }
+local TAB_ORDER = { "today", "market", "craft", "make", "you", "calc", "settings" }
 local TAB_LABELS = { today = "Today", market = "Market", craft = "Craft", make = "Make gold", you = "You", signals = "Make gold",
-    radar = "Raids", pvp = "PvP", portfolio = "You", sell = "Sell", sessions = "Sessions", settings = "Settings" }
+    calc = "Calculator", radar = "Raids", pvp = "PvP", portfolio = "You", sell = "Sell", sessions = "Sessions", settings = "Settings" }
 
 -- the groups: their sections in order { key, label, page, view (the page's own view, if it has views) }
 FT.GROUPS = {

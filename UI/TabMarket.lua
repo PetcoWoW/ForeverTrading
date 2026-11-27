@@ -1075,7 +1075,7 @@ local function SectionTexts(key, id, s)
         if FT.PvPTag and FT.PvPTag(id) then more[#more + 1] = FT.C("blue", FT.PvPTag(id)) end
         local sold = FT.Net and FT.Net.SoldText and FT.Net.SoldText(id)
         if sold then more[#more + 1] = sold end
-        return sum, more, { L["Buy/sell"], function() FT.ShowCalc(id) end }
+        return sum, more
     elseif key == "history" then
         local bits = {}
         if s.ch7 then bits[#bits + 1] = L["7d"] .. " " .. FT.Pct(s.ch7) end
@@ -1314,10 +1314,15 @@ local function BuildItemView(parent)
     v.wowhead:SetTip(L["Wowhead"], L["Its page on Wowhead (WoW Forever): a link to copy into your browser."])
     v.watch = UI.Button(v, L["Watch"], 10, 24, "default", function(self) if state.selected then UI.WatchMenu(state.selected, self) end end)
     v.watch:SetPoint("RIGHT", v.wowhead, "LEFT", -6, 0)
+    -- (v0.51) the calculator, on this item
+    v.calc = UI.Button(v, L["Calculator"], 10, 24, "default", function() if state.selected then FT.ShowCalc(state.selected) end end)
+    v.calc:FitText(22)
+    v.calc:SetPoint("RIGHT", v.watch, "LEFT", -6, 0)
+    v.calc:SetTip(L["Calculator"], L["What buying or selling some of it comes to: walks up the listings, takes off the cut. Your sums stay on its cheat sheet."])
 
     v.call = UI.Panel(v, "bg2", "accent")
     v.call:SetPoint("TOPLEFT", 0, -48)
-    v.call:SetPoint("RIGHT", v.watch, "LEFT", -10, 0)
+    v.call:SetPoint("RIGHT", v.calc, "LEFT", -10, 0)
     v.call:SetHeight(UI.RowH(34))
     v.call:EnableMouse(true)
     v.callBadge = UI.Badge(v.call, 84, 22)

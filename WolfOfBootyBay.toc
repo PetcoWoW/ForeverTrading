@@ -69,7 +69,7 @@ UI\TabSettings.lua
 UI\TabRadar.lua
 UI\TabPvP.lua
 UI\Extras.lua
-UI\Calc.lua
+UI\TabCalc.lua
 UI\Farm.lua
 UI\Snipe.lua
 UI\News.lua

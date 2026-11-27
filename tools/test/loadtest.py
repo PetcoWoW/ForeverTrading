@@ -893,6 +893,8 @@ step("layout", function()
       for _, dd in ipairs(TT.coming.days) do if #dd.events > 0 then TT.coming.picked = dd.t break end end
       TT.FillComing()
     end },
+    { "calculator", "calc", function() FT.ShowCalc(12363, "sell"); FT.Tabs.calc.qty:SetValue("500"); FT.Tabs.calc.Log(); FT.Tabs.calc.Update() end },
+    { "calculator: buying", "calc", function() FT.ShowCalc(12363, "buy") end },
     { "today: four weeks", "today", function() local c = FT.Tabs.today.coming; c.picked = nil; c.weeks = 4; FT.Tabs.today.FillComing() end },
     { "today again", "today", function() local c = FT.Tabs.today.coming; c.picked, c.weeks, c.from = nil, 1, nil; FT.Tabs.today.FillComing() end },
     { "futures", "radar", function() FT.Tabs.radar.SetSection("consumables") end },
@@ -1524,26 +1526,30 @@ step("v0.50", function()
   assert(b and b.total > 0 and b.got >= 1, "buying walks the listings")
   local x = C.Sell(12363, 5)
   assert(x and x.take == x.gross - x.cut and x.cut == math.floor(x.gross * FT.Cut() + 0.5), "selling: take home after the cut")
+  -- (v0.51) the Calculator page and its cheat sheet
+  FT.db.calcSheet = nil
   FT.ShowCalc(12363, "sell")
-  assert(WolfOfBootyBayCalc:IsShown() and (WolfOfBootyBayCalc.lines[1].__text or ""):find("take home", 1, true), "the calculator window")
-  print("calc: " .. (WolfOfBootyBayCalc.lines[1].__text or ""):gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", ""))
-  local function CheckWin(win, label)
-    mock.layout.Settle(win)
-    local found, texts = mock.layout.Overlaps(win)
-    local bad = #found
-    for _, o in ipairs(found) do print(string.format("OVERLAP [%s] %q x %q", label, o[1].text:sub(1, 50), o[2].text:sub(1, 50))) end
-    for _, t in ipairs(texts) do
-      if t.cut or t.spill or t.out then bad = bad + 1; print(string.format("CUT [%s] %q", label, t.text:sub(1, 100))) end
-    end
-    assert(bad == 0, label .. ": " .. bad .. " texts overlap or are cut")
-  end
-  CheckWin(WolfOfBootyBayCalc, "calculator: selling")
-  WolfOfBootyBayCalc.qty:SetValue("500")
-  FT.CalcUpdate()
-  CheckWin(WolfOfBootyBayCalc, "calculator: selling 500")
+  local CT = FT.Tabs.calc
+  assert(FT.currentTab == "calc" and (CT.lines[1].__text or ""):find("take home", 1, true), "the calculator page, selling")
+  print("calc: " .. (CT.lines[1].__text or ""):gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", ""))
+  CT.qty:SetValue("500")
+  CT.Log()
   FT.ShowCalc(12363, "buy")
-  CheckWin(WolfOfBootyBayCalc, "calculator: buying 500")
-  WolfOfBootyBayCalc:Hide()
+  CT.Log()
+  -- no item: plain sums
+  CT.item:SetValue(""); CT.FindItem("")
+  FT.ShowCalc(nil, "buy")
+  CT.each:SetValue("12g 50s"); CT.qty:SetValue("4")
+  local plain = CT.Sum()
+  assert(plain.total == 500000, "4 at 12g 50s: " .. tostring(plain.total))
+  CT.Log()
+  assert(#FT.db.calcSheet == 3 and FT.db.calcSheet[1].total == 500000, "the cheat sheet keeps the sums, newest first")
+  assert(CT.FindItem(FT.Name(12363) or "x") == 12363, "an item by its name")
+  local w = CT.wipe:GetScript("OnClick")
+  w(CT.wipe); assert(#FT.db.calcSheet == 3, "one click on Wipe only asks")
+  w(CT.wipe); assert(#FT.db.calcSheet == 0, "the second wipes it")
+  CT.Log()
+  CT.each:SetValue(""); CT.qty:SetValue("")
 
   -- Level it up and Worth learning (the test's recipes are another character's: this one gets a copy, and skills)
   local ks = {}
@@ -1571,6 +1577,109 @@ step("v0.50", function()
   FT.Tabs.craft.SetView("recipes")
   if marked then marked.diff = nil end
   if not hadRecipes then FT.db.recipes[FT.charKey] = nil; FT.Fire("FT_RECIPES_CHANGED") end
+end)
+-- v0.51: how to learn it, truer sources, the craft window's last row, the small tracker, Make gold apart, the
+-- calendar's jumps, the undercut check and what to post tonight
+step("v0.51", function()
+  local W = FT.Where
+  local function Plain(x) return (x or ""):gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "") end
+  -- Thorium Widget: made, so no Where to get it; its Craft it section leads with the recipe
+  assert(#W.Lines(15994, 6) == 0, "Thorium Widget: no target dummy, no drops under 5%")
+  local r = FT.UI.RecipeOf(15994)
+  local rt = Plain(FT.Tabs.market.RecipeText(r, false))
+  assert(rt:find("^Recipe: ") and (rt:find("trainer", 1, true) or rt:find("vendor", 1, true) or rt:find("drops", 1, true)), "the recipe line: " .. rt)
+  print("thorium widget: " .. rt)
+  -- Thornstone Sledgehammer, BoE gear: the world drop first
+  local realInstant = FT.GetItemInfoInstant
+  FT.GetItemInfoInstant = function(i) if i == 1722 then return i, nil, nil, nil, nil, 2, 4 end return realInstant(i) end
+  local tl = W.Lines(1722, 6)
+  FT.GetItemInfoInstant = realInstant
+  assert(tl[1] and Plain(tl[1]):find("^World drop"), "gear: the world drop first: " .. Plain(tl[1] or "none"))
+  for _, l in ipairs(tl) do assert(not Plain(l):find("Chest"), "no chest for gear with a drop: " .. Plain(l)) end
+  -- vendors that aren't in the world aren't vendors (Jimmy McWeaksauce on Thorium Headed Arrow)
+  for _, l in ipairs(W.Lines(18042, 6)) do assert(not l:find("McWeaksauce", 1, true), "no test vendors") end
+  -- a boss's instance: Ragnaros, Molten Core
+  assert((FT.SRC_N[11502] or ""):find("Molten Core", 1, true), "Ragnaros is in Molten Core")
+  -- the item page with a long source line: no "..." (it wraps), and the hover has it whole
+  FT.OpenItem(264011)
+  mock.run(1)
+
+  -- the craft window: the last row's answer sits beside its label
+  local rr = FT.UI.RecipeOf(13446)
+  if rr then
+    FT.ShowCraft(rr)
+    local d = WolfOfBootyBayCraft
+    for _, pair in ipairs(d.sum) do assert(pair[1]:GetParent() == pair[2]:GetParent(), "label and answer on one row") end
+    d:Hide()
+  end
+
+  -- the folded session tracker: no "Session", pause and stop on it, narrower
+  FT.S.sessionPanel = true
+  FT.Session.Start()
+  FT.db.ui = FT.db.ui or {}
+  FT.db.ui.hudFolded = true
+  FT.UpdateHUD()
+  local h = WolfOfBootyBaySession
+  assert(h and h:IsShown(), "the tracker shows")
+  assert(not (h.title.__text or ""):find("Session", 1, true), "no Session in it: " .. tostring(h.title.__text))
+  assert(h.miniPause:IsShown() and h.miniStop:IsShown(), "pause and stop when folded")
+  assert(h:GetWidth() < 260, "folded, it's narrower: " .. h:GetWidth())
+  h.miniPause:GetScript("OnClick")(h.miniPause)
+  assert(FT.Session.Current().paused, "pause from the folded tracker")
+  h.miniPause:GetScript("OnClick")(h.miniPause)
+  FT.db.ui.hudFolded = nil
+  FT.UpdateHUD()
+  assert(not h.miniPause:IsShown() and h:GetWidth() == 260, "unfolded: as before")
+  FT.Session.Stop()
+
+  -- Make gold: Flip it, Craft it, Farm it, Raids, PvP (Coming up came apart)
+  local keys = {}
+  for _, e in ipairs(FT.GROUPS.make) do keys[#keys + 1] = e[1] end
+  assert(table.concat(keys, ",") == "make,craft,farm,raid,pvp", "Make gold's sections: " .. table.concat(keys, ","))
+  assert(not FT.Tabs.coming, "no Coming up page")
+
+  -- the calendar: a battleground week's tag jumps to PvP; All of it shows four weeks
+  FT.Show("today")
+  local TT = FT.Tabs.today
+  local c = TT.coming
+  c.weeks, c.from, c.picked = 1, nil, nil
+  TT.FillComing()
+  local bgDay
+  for _, dd in ipairs(c.days) do
+    if dd:IsShown() and dd.events and dd.events[1] and dd.events[1].kind == "bg" then bgDay = dd break end
+  end
+  if bgDay then
+    bgDay.evBtn:GetScript("OnClick")(bgDay.evBtn)
+    assert(FT.currentTab == "pvp", "a battleground week's tag opens PvP: " .. tostring(FT.currentTab))
+    FT.Show("today")
+  end
+  c.all:GetScript("OnClick")(c.all)
+  assert(c.weeks == 4 and c.days[28]:IsShown() and not c.list:IsShown(), "All of it: four weeks")
+  c.all:GetScript("OnClick")(c.all)
+  assert(c.weeks == 1 and not c.days[8]:IsShown() and c.list:IsShown(), "and back to this week")
+
+  -- the undercut check and what to post tonight: one row each, on top of your best moves
+  local realList, realUnder = FT.Owned.List, FT.Owned.Undercut
+  FT.Owned.List = function() return { { itemID = 12363, unit = 50000, qty = 5 }, { itemID = 13446, unit = 9000, qty = 2 } } end
+  FT.Owned.Undercut = function(a) if a.itemID == 12363 then return 48000 end end
+  local u = TT.Undercuts()
+  assert(u and u.id == 12363 and u.label == "UNDERCUT", "the undercut row")
+  TT.FillMoves()
+  local found
+  for _, m in ipairs(TT.moves.list.items) do if m.label == "UNDERCUT" then found = true end end
+  assert(found, "the undercut row is in your best moves")
+  FT.Owned.List, FT.Owned.Undercut = realList, realUnder
+  local realWhen, realRows = FT.WhenSummary, FT.Port.Rows
+  local hour = tonumber(date("%H"))
+  FT.Port.Rows = function() return { { id = 12363, value = 900000, signal = "SELL" } } end
+  FT.WhenSummary = function() return { timed = true, sellAt = (hour + 3) % 24, sell = "later" } end
+  local pt = TT.PostTonight()
+  assert(pt and pt.id == 12363 and pt.label == "POST", "what to post tonight")
+  print("post tonight: " .. Plain(pt.what) .. " | undercut: " .. Plain(u.what))
+  FT.WhenSummary = function() return { timed = true, sellAt = (hour + 12) % 24, sell = "later" } end
+  assert(not TT.PostTonight(), "not in the next few hours: no row")
+  FT.WhenSummary, FT.Port.Rows = realWhen, realRows
+  TT.FillMoves()
 end)
 step("logout", function() mock.fire("PLAYER_LOGOUT") end)
 '''
