@@ -87,6 +87,7 @@ async function recipeItems() {
     if (!res.ok) throw new Error(`item search: HTTP ${res.status}`);
     const j = await res.json();
     pages = j.pageCount || 1;
+    if (page === 1) console.log(`recipe item search: ${pages} pages of ${j.pageSize}, max ${j.maxPageSize}`);
     for (const r of j.results || []) {
       const d = r.data || {};
       const name = typeof d.name === "string" ? d.name : (d.name?.en_US || "");
@@ -96,6 +97,7 @@ async function recipeItems() {
       out.get(key).push(d.id);
     }
   }
+  console.log(`recipe items found: ${[...out.values()].reduce((a, b) => a + b.length, 0)} (${out.size} names)`);
   return out;
 }
 let items = null;
