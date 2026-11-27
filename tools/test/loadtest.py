@@ -741,7 +741,9 @@ step("when it sells", function()
   -- a feed line with prices by the hour: 4% under its usual 3-5 UTC, 5% over 18-20
   local h = FT.Feed.House()
   local rawLine = h.hourRaw[12360]
+  local injected = false
   if rawLine and not rawLine:find("/.*/.*/") then
+    injected = true
     local tp = {}
     for u = 0, 23 do tp[u + 1] = (u >= 3 and u <= 5) and "qo" or ((u >= 18 and u <= 20) and "t6" or "rs") end -- 960 / 1050 / 1000
     local lp = {}
@@ -749,7 +751,8 @@ step("when it sells", function()
     h.hourRaw[12360] = rawLine .. "/" .. table.concat(lp, ",") .. "/" .. table.concat(tp, ",")
   end
   local hp = FT.Feed.Hourly(12360)
-  if rawLine then -- (a feed with no hourly lines at all: nothing to read)
+  -- (a feed with no hourly lines at all: nothing to read; a live feed's own line may not have five looks an hour yet)
+  if rawLine and injected then
     assert(hp.todPrice, "prices by the hour read")
     local lo, hi = 9, 0
     for u = 0, 23 do if hp.todPrice[u] then lo, hi = math.min(lo, hp.todPrice[u]), math.max(hi, hp.todPrice[u]) end end
@@ -763,7 +766,7 @@ step("when it sells", function()
   if d then
     -- v0.42: the three answers first (sell, buy, the busiest day)
     for i, r in ipairs(d.answers) do print("when it sells " .. i .. ": " .. tostring(r.text.__text):gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "")) end
-    assert(not rawLine or tostring(d.answers[2].text.__text):find("cheapest"), "the window says when to buy")
+    assert(not injected or tostring(d.answers[2].text.__text):find("cheapest"), "the window says when to buy")
     assert(d:GetHeight() < 400 or (FT.db.ui and FT.db.ui.whenCharts), "the charts only on request")
     if FT.Feed.Hourly(12360) then
       FT.db.ui = FT.db.ui or {}; FT.db.ui.whenCharts = true; FT.ShowWhenSells(12360)
