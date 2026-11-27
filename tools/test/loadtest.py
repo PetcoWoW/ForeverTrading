@@ -874,14 +874,27 @@ step("layout", function()
       FT.Tabs.craft.SetView("learn")
     end },
     { "craft again", "craft", function() FT.Tabs.craft.SetView("recipes") end },
-    { "make: coming up", "coming", function() FT.ShowSub("make", "coming") end },
+    { "make: raids", "radar", function() FT.ShowSub("make", "raid") end },
+    { "make: pvp", "pvp", function() FT.ShowSub("make", "pvp") end },
+    { "money: farm next week", "signals", function()
+      FT.ShowSub("make", "farm")
+      FT.Ahead.Lists()
+      mock.run(20, 0.05)
+      local f = FT.Tabs.signals
+      for _, b in ipairs(f.farmKindBar and f.farmKindBar.buttons or {}) do if b.value == "next" then b.onClick() end end
+    end },
+    { "money: farm again", "signals", function()
+      local f = FT.Tabs.signals
+      for _, b in ipairs(f.farmKindBar and f.farmKindBar.buttons or {}) do if b.value == "all" then b.onClick() end end
+    end },
     { "today: a day picked", "today", function()
       local TT = FT.Tabs.today
       TT.FillComing()
       for _, dd in ipairs(TT.coming.days) do if #dd.events > 0 then TT.coming.picked = dd.t break end end
       TT.FillComing()
     end },
-    { "today again", "today", function() FT.Tabs.today.coming.picked = nil; FT.Tabs.today.FillComing() end },
+    { "today: four weeks", "today", function() local c = FT.Tabs.today.coming; c.picked = nil; c.weeks = 4; FT.Tabs.today.FillComing() end },
+    { "today again", "today", function() local c = FT.Tabs.today.coming; c.picked, c.weeks, c.from = nil, 1, nil; FT.Tabs.today.FillComing() end },
     { "futures", "radar", function() FT.Tabs.radar.SetSection("consumables") end },
     { "futures: gear", "radar", function() FT.Tabs.radar.SetSection("gear") end },
     { "settings", "settings" },
@@ -1456,8 +1469,14 @@ step("v0.50", function()
   assert(l, "next week's calls are worked out")
   for _, r in ipairs(l.farms) do assert(r.call.sure >= 40 and r.call.sure <= 100, "how sure: " .. r.call.sure) end
   print(string.format("coming up: %d farms, %d raids, %d pvp", #l.farms, #l.raids, #l.pvp))
-  FT.ShowSub("make", "coming")
-  assert(FT.currentTab == "coming", "Make gold > Coming up")
+  -- (v0.51) Coming up came apart: Raids, PvP, Farm it's Next week
+  FT.ShowSub("make", "pvp")
+  assert(FT.currentTab == "pvp", "Make gold > PvP")
+  local pv = FT.Futures.PvP()
+  assert(#pv >= 15 and pv[1].roles and pv[1].conf, "the PvP study's list: " .. #pv)
+  print("pvp: " .. #pv .. " items, first " .. FT.ItemText(pv[1].id):gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "") .. ", " .. #FT.Futures.PvPMaterials(10) .. " materials; " .. FT.Futures.PvPHeadline())
+  FT.ShowSub("make", "raid")
+  assert(FT.currentTab == "radar", "Make gold > Raids")
   FT.Show("today")
   local TT = FT.Tabs.today
   TT.FillComing()

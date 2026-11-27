@@ -321,6 +321,13 @@ out.extend("[%d]=%s," % (i, lstr(t)) for i, t in sorted(notes.items()))
 out.append("}")
 for key, ids in sorted(lists.items()):
     out.append("FT.SRC_LIST_%s = {%s}" % (key.upper(), ",".join(str(i) for i in ids)))
+# the PvP study (v0.51): { id, roles, conf, note } in rank order (its names are the "pvp" list's, in order)
+pvp_ids = lists.get("pvp", [])
+out.append("FT.SRC_PVP = {")
+for n, x in enumerate([x for x in hand.get("pvpStudy", {}).get("items", [])]):
+    if n < len(pvp_ids):
+        out.append("{%d,%s,%s,%s}," % (pvp_ids[n], lstr(x["roles"]), lstr(x["conf"]), lstr(x["note"])))
+out.append("}")
 out.append("-- Forever's calendar: { start (unix), hours, kind, name, where }")
 out.append("FT.SRC_EVENTS = {")
 out.extend("{%d,%d,%s,%s,%s}," % (t, h, lstr(k), lstr(n), lstr(w)) for t, h, k, n, w in events)

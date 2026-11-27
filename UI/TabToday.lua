@@ -135,12 +135,73 @@ local function DayStart(t)
     return time(d)
 end
 
+-- (v0.51) where an event's tag leads: a battleground week to PvP, the raids to Raids; the Faire and the holidays
+-- open their day here (what they pull on)
+local function Jump(c, d)
+    local e = d.events and d.events[1]
+    if not e then return end
+    if e.kind == "bg" then return FT.ShowSub("make", "pvp") end
+    if e.kind == "raid" then return FT.ShowSub("make", "raid") end
+    c.weeks = 1
+    c.from = d.t
+    c.picked = d.t
+    T.FillComing()
+end
+
+local function DayCell(c, parent)
+    local d = CreateFrame("Button", nil, parent)
+    d.bg = d:CreateTexture(nil, "BACKGROUND")
+    d.bg:SetAllPoints()
+    d.bg:SetColorTexture(1, 1, 1, 0.04)
+    d.day = UI.Text(d, 11, "dim")
+    d.day:SetPoint("TOPLEFT", 6, -4)
+    d.num = UI.Text(d, 13, "text")
+    d.num:SetPoint("TOPRIGHT", -6, -3)
+    d.ev = UI.Text(d, 10, "accent")
+    d.ev:SetPoint("TOPLEFT", 6, -22)
+    d.ev:SetPoint("BOTTOMRIGHT", -4, 2)
+    d.ev:SetJustifyV("TOP")
+    if d.ev.SetWordWrap then d.ev:SetWordWrap(true) end
+    if d.ev.SetMaxLines then d.ev:SetMaxLines(2) end
+    -- the tag: a link to its section
+    d.evBtn = CreateFrame("Button", nil, d)
+    d.evBtn:SetAllPoints(d.ev)
+    d.evBtn:SetScript("OnClick", function() Jump(c, d) end)
+    d.evBtn:SetScript("OnEnter", function() d:GetScript("OnEnter")(d) end)
+    d.evBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    d:SetScript("OnClick", function(self)
+        if c.weeks > 1 then return Jump(c, self) end
+        if c.picked == self.t then c.picked = nil else c.picked = self.t end
+        T.FillComing()
+    end)
+    d:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
+        GameTooltip:AddLine(date("%A %b %d", self.t), 1, 0.82, 0)
+        for _, e in ipairs(self.events or {}) do GameTooltip:AddLine(e.name .. (e.where and (" (" .. e.where .. ")") or ""), 0.85, 0.87, 0.9) end
+        if not self.events or #self.events == 0 then GameTooltip:AddLine(L["Nothing on the calendar"], 0.6, 0.6, 0.6) end
+        local e = self.events and self.events[1]
+        if e and (e.kind == "bg" or e.kind == "raid") then
+            GameTooltip:AddLine(e.kind == "bg" and L["Click the event: PvP"] or L["Click the event: Raids"], 0.58, 0.55, 0.5)
+        end
+        if c.weeks == 1 then GameTooltip:AddLine(L["Click the day: what it pulls on"], 0.58, 0.55, 0.5) end
+        GameTooltip:Show()
+    end)
+    d:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    return d
+end
+
 local function BuildComing(parent)
     local c = UI.Panel(parent, "bg1", "line")
+    c.weeks = 1
     c.title = UI.Text(c, 13, "muted")
     c.title:SetPoint("TOPLEFT", 12, -10)
     c.title:SetText(L["Coming up"])
-    c.all = UI.Button(c, L["All of it"], 10, 18, "default", function() FT.ShowSub("make", "coming") end)
+    -- (v0.51) "All of it": four weeks right here; again, back to this week
+    c.all = UI.Button(c, L["All of it"], 10, 18, "default", function()
+        c.weeks = (c.weeks == 1) and 4 or 1
+        c.from, c.picked = nil, nil
+        T.FillComing()
+    end)
     c.all:FitText(16)
     c.all:SetPoint("TOPRIGHT", -8, -6)
     c.hint = UI.Text(c, 11, "dim")
@@ -152,44 +213,30 @@ local function BuildComing(parent)
     strip:SetPoint("TOPLEFT", 8, -32)
     strip:SetPoint("RIGHT", -8, 0)
     strip:SetHeight(UI.RowH(58))
-    for i = 1, 7 do
-        local d = CreateFrame("Button", nil, strip)
-        d.bg = d:CreateTexture(nil, "BACKGROUND")
-        d.bg:SetAllPoints()
-        d.bg:SetColorTexture(1, 1, 1, 0.04)
-        d.day = UI.Text(d, 11, "dim")
-        d.day:SetPoint("TOPLEFT", 6, -4)
-        d.num = UI.Text(d, 13, "text")
-        d.num:SetPoint("TOPRIGHT", -6, -3)
-        d.ev = UI.Text(d, 10, "accent")
-        d.ev:SetPoint("TOPLEFT", 6, -22)
-        d.ev:SetPoint("BOTTOMRIGHT", -4, 2)
-        d.ev:SetJustifyV("TOP")
-        if d.ev.SetWordWrap then d.ev:SetWordWrap(true) end
-        if d.ev.SetMaxLines then d.ev:SetMaxLines(2) end
-        d:SetScript("OnClick", function(self)
-            if c.picked == self.t then c.picked = nil else c.picked = self.t end
-            T.FillComing()
-        end)
-        d:SetScript("OnEnter", function(self)
-            GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
-            GameTooltip:AddLine(date("%A %b %d", self.t), 1, 0.82, 0)
-            for _, e in ipairs(self.events or {}) do GameTooltip:AddLine(e.name .. (e.where and (" (" .. e.where .. ")") or ""), 0.85, 0.87, 0.9) end
-            if not self.events or #self.events == 0 then GameTooltip:AddLine(L["Nothing on the calendar"], 0.6, 0.6, 0.6) end
-            GameTooltip:AddLine(L["Click: what it pulls on"], 0.58, 0.55, 0.5)
-            GameTooltip:Show()
-        end)
-        d:SetScript("OnLeave", function() GameTooltip:Hide() end)
-        c.days[i] = d
-    end
-    UI.OnSize(strip, function(self, w, h)
+    c.strip = strip
+    for i = 1, 28 do c.days[i] = DayCell(c, strip) end
+    function c:LayDays()
+        local w, h = strip:GetWidth() or 0, strip:GetHeight() or 0
+        local rows = self.weeks
         local cw = (w - 6 * 4) / 7
-        for i, d in ipairs(c.days) do
-            d:ClearAllPoints()
-            d:SetPoint("TOPLEFT", self, "TOPLEFT", (i - 1) * (cw + 4), 0)
-            d:SetSize(cw, h)
+        local ch = (h - (rows - 1) * 4) / rows
+        for i, d in ipairs(self.days) do
+            local on = i <= rows * 7
+            d:SetShown(on)
+            if on then
+                local r, k = math.floor((i - 1) / 7), (i - 1) % 7
+                d:ClearAllPoints()
+                d:SetPoint("TOPLEFT", strip, "TOPLEFT", k * (cw + 4), -r * (ch + 4))
+                d:SetSize(cw, ch)
+                -- small cells: the day and one tag
+                if d.ev.SetMaxLines then d.ev:SetMaxLines(rows > 1 and 1 or 2) end
+                d.ev:ClearAllPoints()
+                d.ev:SetPoint("TOPLEFT", 6, rows > 1 and -18 or -22)
+                d.ev:SetPoint("BOTTOMRIGHT", -4, 2)
+            end
         end
-    end)
+    end
+    UI.OnSize(strip, function() c:LayDays() end)
     c.list = UI.List(c, {
         rowHeight = UI.RowH(24),
         setup = function(row)
@@ -232,13 +279,20 @@ function T.FillComing()
     local c = T.coming
     if not c then return end
     local now = time()
-    local today = DayStart(now)
-    local events = FT.Ahead.Events(8, now)
+    local four = c.weeks > 1
+    -- four weeks: the days fill the card; this week: seven days and their list under them
+    c.strip:SetHeight(four and math.max(UI.RowH(58), (c:GetHeight() or 196) - 40) or UI.RowH(58))
+    c.list:SetShown(not four)
+    c:LayDays()
+    c.all:SetLabel(four and L["This week"] or L["All of it"])
+    c.all:FitText(16)
+    local first = DayStart(c.from or now)
+    local events = FT.Ahead.Events(c.weeks * 7 + 1, first)
     for i, d in ipairs(c.days) do
-        local t = today + (i - 1) * DAY + 3600 -- (an hour in: a clock change doesn't slip a day)
-        t = DayStart(t)
+        if i > c.weeks * 7 then break end
+        local t = DayStart(first + (i - 1) * DAY + 3600) -- (an hour in: a clock change doesn't slip a day)
         d.t = t
-        d.day:SetText(i == 1 and L["Today"] or date("%a", t))
+        d.day:SetText((t == DayStart(now)) and L["Today"] or date(four and "%b" or "%a", t))
         d.num:SetText(date("%d", t))
         d.events = {}
         local tags = {}
@@ -249,7 +303,12 @@ function T.FillComing()
             end
         end
         d.ev:SetText(table.concat(tags, "\n"))
+        d.evBtn:SetShown(#d.events > 0)
         d.bg:SetColorTexture(1, 1, 1, (c.picked == t) and 0.14 or (#d.events > 0 and 0.07 or 0.03))
+    end
+    if four then
+        c.hint:SetText(L["four weeks · click an event for its page"])
+        return
     end
     -- the list: the picked day's event items, else next week's best farms
     local rows = {}

@@ -129,6 +129,9 @@ local function Tape(parent)
     return t
 end
 
+-- (v0.51) the PvP page draws its rows the same way
+T.Chip, T.RowSetup, T.MatSetup, T.MOVES, T.Change = Chip, RowSetup, MatSetup, MOVES, Change
+
 function T.Build(p)
     head = UI.Text(p, 16, "text")
     head:SetPoint("TOPLEFT", 12, -10 - SIGN_H)
@@ -147,12 +150,17 @@ function T.Build(p)
         T.Refresh()
     end, 22)
     T.seg = seg
-    -- v0.42: Futures is Make gold's Raid prep; the group's bar on the right, its own two buttons beside it
+    -- v0.51: Make gold's Raids - the section bar top left as on every page, the lead line beside it, its own two
+    -- buttons on the right
+    head:Hide()
     T.bar = UI.GroupBar(p, "make")
-    T.bar:SetPoint("TOPRIGHT", -8, -8 - SIGN_H)
-    seg:SetPoint("RIGHT", T.bar, "LEFT", -12, 0)
+    T.bar:SetPoint("TOPLEFT", 12, -8)
+    seg:SetPoint("TOPRIGHT", -8, -8)
+    sub:ClearAllPoints()
+    sub:SetPoint("LEFT", T.bar, "RIGHT", 14, 0)
     sub:SetPoint("RIGHT", seg, "LEFT", -12, 0)
-    sub:SetHeight(UI.RowH(28))
+    if sub.SetWordWrap then sub:SetWordWrap(false) end
+    if sub.SetMaxLines then sub:SetMaxLines(1) end
     seg:SetValue(state.section)
 
     box = UI.Panel(p, "bg1", "line")
@@ -168,7 +176,11 @@ function T.Build(p)
                 row.rank:SetText(tostring(x.g.specs))
                 row.name:SetText(FT.ItemText(x.id, 34) .. FT.C("dim", "  " .. L[x.g.slot] .. ": " .. x.g.who))
             end
-            row.line:SetText(x.moveText or "")
+            -- (v0.51) next week's call, how sure, from Coming up (which came apart)
+            local c = FT.Ahead and FT.Ahead.Call(x.id)
+            local call = (c and c.sure >= 40) and (FT.C("dim", "  ·  ") .. FT.C(c.move >= 0 and "up" or "down", (c.move >= 0 and "+" or "") .. FT.An.Pc(c.move))
+                .. FT.C("dim", " " .. L["next week"] .. ", " .. c.sure .. "% " .. L["sure"])) or ""
+            UI.FitBits(row.line, (x.moveText or "") .. call)
             UI.SetTextColor(row.line, (MOVES[x.move] or MOVES.STEADY)[2])
             row.price:SetText(m.price and FT.Money(m.price, "short") or FT.C("dim", L["none listed"]))
             row.ch:SetText(Change(m.ch7))
@@ -188,6 +200,10 @@ function T.Build(p)
             end
             GameTooltip:AddDoubleLine(L["Listed / sold a day"], FT.Num(m.listed or 0) .. " / " .. FT.Num(math.floor((m.perDay or 0) + 0.5)), 0.6, 0.64, 0.7, 1, 1, 1)
             if m.ch30 then GameTooltip:AddDoubleLine(L["Since its first weeks"], FT.Pct(m.ch30), 0.6, 0.64, 0.7, 1, 1, 1) end
+            local c = FT.Ahead and FT.Ahead.Call(x.id)
+            if c and c.sure >= 40 then
+                GameTooltip:AddLine(string.format(L["How sure: %d%% (right %d of %d weeks on its last 30 days)"], c.sure, c.hits, c.weeks), 0.85, 0.87, 0.9, true)
+            end
             AddMaterials(x.recipe)
             GameTooltip:AddLine(" ")
             GameTooltip:AddLine(x.moveText or "", 0.4, 0.9, 0.4, true)
@@ -265,7 +281,7 @@ end
 
 function T.Refresh()
     if not list then return end
-    sub:SetText(FT.Futures.Headline())
+    UI.FitBits(sub, FT.Futures.Headline())
     if state.section == "consumables" then
         local items = FT.Futures.Consumables()
         list:SetEmptyText(L["The study's list is empty."])

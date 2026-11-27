@@ -11760,8 +11760,30 @@ FT.SRC_H = {
 [289303]="Quest reward (the Hunter epic quest).",
 }
 FT.SRC_LIST_FAIRE = {5134,11407,4582,5117,11404,19933,4363,4375,9313,11590,15994,3240,3486,7945,12644,2309,2314}
-FT.SRC_LIST_PVP = {5634,3387,2459,9030,13455,14530,13442,8529,13446,13444,10646,15993,18641,260817,260816,260805,260809,260818,260830,260828,260829,260827,260822}
+FT.SRC_LIST_PVP = {5634,2459,13446,20008,260817,260816,260805,260809,260818,3387,13455,18253,13510,13459,13457,14530,13444,13442,8529,10646}
 FT.SRC_LIST_PVPMATS = {260815,260813,249429,249726,15992,15994,14047,12359}
+FT.SRC_PVP = {
+{5634,"everyone","confirmed","Immune to stuns and slows for 30 sec: drink before a fight"},
+{2459,"flag carriers, everyone","confirmed","+50% run speed: flags, bases, getting away"},
+{13446,"everyone","confirmed","The main potion heal (all potions share 2 min)"},
+{20008,"everyone 47+","confirmed","Breaks a stun or slow you're already in"},
+{260817,"everyone","confirmed","Fire and a 4 sec stun, no Engineering needed"},
+{260816,"everyone","confirmed","Fire and a 3 sec stun, no Engineering needed"},
+{260805,"everyone","confirmed","Fire and a 3 sec stun, no Engineering needed"},
+{260809,"everyone","confirmed","An 8 yd 2 sec stun, no Engineering needed"},
+{260818,"everyone","confirmed","Burns mana and silences: for healers and casters"},
+{3387,"casters, healers","confirmed","Immune to physical attacks for 6 sec: when a rogue or warrior jumps you"},
+{13455,"melee, flag carriers","confirmed","+2,000 armor for 2 min"},
+{18253,"healers","confirmed","Health and mana at once"},
+{13510,"everyone","confirmed","+1,200 health: the flask PvP players pick"},
+{13459,"everyone","confirmed","Absorbs shadow damage: against warlocks and priests"},
+{13457,"everyone","confirmed","Absorbs fire damage: against mages and bombs"},
+{14530,"everyone","likely","Between fights, out of combat"},
+{13444,"casters, healers","likely","Mana mid-fight"},
+{13442,"warriors","likely","Rage and strength for a burst"},
+{8529,"everyone","likely","Slow fall and a smaller target"},
+{10646,"engineers","likely","Big area damage; engineers only"},
+}
 -- Forever's calendar: { start (unix), hours, kind, name, where }
 FT.SRC_EVENTS = {
 {1795536000,168,"bg","Call to Arms: Arathi Basin",""},

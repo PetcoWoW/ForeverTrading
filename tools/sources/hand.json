@@ -449,31 +449,28 @@
    ]
   },
   "pvp": {
-   "src": "the PvP study (build doc): Blizzard item data, foreverbattlegrounds.com, overgear.com",
+   "src": "the PvP study (pvpStudy below)",
    "names": [
     "Free Action Potion",
-    "Limited Invulnerability Potion",
     "Swiftness Potion",
-    "Restorative Potion",
-    "Greater Stoneshield Potion",
-    "Heavy Runecloth Bandage",
-    "Mighty Rage Potion",
-    "Noggenfogger Elixir",
     "Major Healing Potion",
-    "Major Mana Potion",
-    "Goblin Sapper Charge",
-    "Thorium Grenade",
-    "Dense Dynamite",
+    "Living Action Potion",
     "EZ-Thro Dark Bomb",
     "EZ-Thro Thorium Grenade",
     "SAF-T Bomb",
     "Tru-Trigger Frag Bomb",
     "EZ-Thro Mana Bomb",
-    "SAF-T Teleport",
-    "SAF-T Nitro Boosts",
-    "EZ-Thro Magnetic Displacer",
-    "Stealthman 52",
-    "Ultrasafe Rechargeable Battery"
+    "Limited Invulnerability Potion",
+    "Greater Stoneshield Potion",
+    "Major Rejuvenation Potion",
+    "Flask of the Titans",
+    "Greater Shadow Protection Potion",
+    "Greater Fire Protection Potion",
+    "Heavy Runecloth Bandage",
+    "Major Mana Potion",
+    "Mighty Rage Potion",
+    "Noggenfogger Elixir",
+    "Goblin Sapper Charge"
    ]
   },
   "pvpMats": {
@@ -507,5 +504,150 @@
   "14834": "Zul'Gurub",
   "16011": "Naxxramas",
   "15990": "Naxxramas"
+ },
+ "pvpStudy": {
+  "_about": "The PvP study (Nov 27; v0.51): what battlegrounds burn through, ranked by how many use it. conf: confirmed (a Forever source or Forever's item data), likely (Classic guides).",
+  "items": [
+   {
+    "name": "Free Action Potion",
+    "roles": "everyone",
+    "conf": "confirmed",
+    "note": "Immune to stuns and slows for 30 sec: drink before a fight",
+    "src": "rankedboost.com WoW Forever PvP buffs (checked Nov 10, 2026); icy-veins.com Classic PvP class guides (consumables)"
+   },
+   {
+    "name": "Swiftness Potion",
+    "roles": "flag carriers, everyone",
+    "conf": "confirmed",
+    "note": "+50% run speed: flags, bases, getting away",
+    "src": "rankedboost.com WoW Forever PvP buffs (checked Nov 10, 2026)"
+   },
+   {
+    "name": "Major Healing Potion",
+    "roles": "everyone",
+    "conf": "confirmed",
+    "note": "The main potion heal (all potions share 2 min)",
+    "src": "rankedboost.com WoW Forever PvP buffs (checked Nov 10, 2026); icy-veins.com Classic PvP class guides (consumables)"
+   },
+   {
+    "name": "Living Action Potion",
+    "roles": "everyone 47+",
+    "conf": "confirmed",
+    "note": "Breaks a stun or slow you're already in",
+    "src": "rankedboost.com WoW Forever PvP buffs (checked Nov 10, 2026); icy-veins.com Classic PvP class guides (consumables)"
+   },
+   {
+    "name": "EZ-Thro Dark Bomb",
+    "roles": "everyone",
+    "conf": "confirmed",
+    "note": "Fire and a 4 sec stun, no Engineering needed",
+    "src": "Blizzard item data (the PvP study): use level 1, no Engineering needed"
+   },
+   {
+    "name": "EZ-Thro Thorium Grenade",
+    "roles": "everyone",
+    "conf": "confirmed",
+    "note": "Fire and a 3 sec stun, no Engineering needed",
+    "src": "Blizzard item data (the PvP study): use level 1, no Engineering needed"
+   },
+   {
+    "name": "SAF-T Bomb",
+    "roles": "everyone",
+    "conf": "confirmed",
+    "note": "Fire and a 3 sec stun, no Engineering needed",
+    "src": "Blizzard item data (the PvP study): use level 1, no Engineering needed"
+   },
+   {
+    "name": "Tru-Trigger Frag Bomb",
+    "roles": "everyone",
+    "conf": "confirmed",
+    "note": "An 8 yd 2 sec stun, no Engineering needed",
+    "src": "Blizzard item data (the PvP study): use level 1, no Engineering needed"
+   },
+   {
+    "name": "EZ-Thro Mana Bomb",
+    "roles": "everyone",
+    "conf": "confirmed",
+    "note": "Burns mana and silences: for healers and casters",
+    "src": "Blizzard item data (the PvP study): use level 1, no Engineering needed"
+   },
+   {
+    "name": "Limited Invulnerability Potion",
+    "roles": "casters, healers",
+    "conf": "confirmed",
+    "note": "Immune to physical attacks for 6 sec: when a rogue or warrior jumps you",
+    "src": "rankedboost.com WoW Forever PvP buffs (checked Nov 10, 2026)"
+   },
+   {
+    "name": "Greater Stoneshield Potion",
+    "roles": "melee, flag carriers",
+    "conf": "confirmed",
+    "note": "+2,000 armor for 2 min",
+    "src": "rankedboost.com WoW Forever PvP buffs (checked Nov 10, 2026)"
+   },
+   {
+    "name": "Major Rejuvenation Potion",
+    "roles": "healers",
+    "conf": "confirmed",
+    "note": "Health and mana at once",
+    "src": "rankedboost.com WoW Forever PvP buffs (checked Nov 10, 2026)"
+   },
+   {
+    "name": "Flask of the Titans",
+    "roles": "everyone",
+    "conf": "confirmed",
+    "note": "+1,200 health: the flask PvP players pick",
+    "src": "rankedboost.com WoW Forever PvP buffs (checked Nov 10, 2026)"
+   },
+   {
+    "name": "Greater Shadow Protection Potion",
+    "roles": "everyone",
+    "conf": "confirmed",
+    "note": "Absorbs shadow damage: against warlocks and priests",
+    "src": "rankedboost.com WoW Forever PvP buffs (checked Nov 10, 2026)"
+   },
+   {
+    "name": "Greater Fire Protection Potion",
+    "roles": "everyone",
+    "conf": "confirmed",
+    "note": "Absorbs fire damage: against mages and bombs",
+    "src": "rankedboost.com WoW Forever PvP buffs (checked Nov 10, 2026)"
+   },
+   {
+    "name": "Heavy Runecloth Bandage",
+    "roles": "everyone",
+    "conf": "likely",
+    "note": "Between fights, out of combat",
+    "src": "icy-veins.com Classic PvP class guides (consumables)"
+   },
+   {
+    "name": "Major Mana Potion",
+    "roles": "casters, healers",
+    "conf": "likely",
+    "note": "Mana mid-fight",
+    "src": "icy-veins.com Classic PvP class guides (consumables)"
+   },
+   {
+    "name": "Mighty Rage Potion",
+    "roles": "warriors",
+    "conf": "likely",
+    "note": "Rage and strength for a burst",
+    "src": "icy-veins.com Classic PvP class guides (consumables)"
+   },
+   {
+    "name": "Noggenfogger Elixir",
+    "roles": "everyone",
+    "conf": "likely",
+    "note": "Slow fall and a smaller target",
+    "src": "icy-veins.com Classic PvP class guides (consumables)"
+   },
+   {
+    "name": "Goblin Sapper Charge",
+    "roles": "engineers",
+    "conf": "likely",
+    "note": "Big area damage; engineers only",
+    "src": "icy-veins.com Classic PvP class guides (consumables)"
+   }
+  ]
  }
 }

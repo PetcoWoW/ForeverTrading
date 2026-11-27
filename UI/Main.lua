@@ -6,21 +6,21 @@ local L = FT.L
 FT.Tabs = {}
 
 -- v0.42: four tabs - Today, Market, Make gold, You (Settings behind the gear). Make gold and You are groups of
--- pages, switched by one row of buttons on each of them (UI.GroupBar): Flip it / Craft it / Farm it / Raid prep, and
+-- pages, switched by one row of buttons on each of them (UI.GroupBar): Flip it / Craft it / Farm it / Raids / PvP, and
 -- Holdings / Sessions / Characters / Journal.
 local TAB_ORDER = { "today", "market", "craft", "make", "you", "settings" }
 local TAB_LABELS = { today = "Today", market = "Market", craft = "Craft", make = "Make gold", you = "You", signals = "Make gold",
-    radar = "Raid prep", portfolio = "You", sell = "Sell", sessions = "Sessions", settings = "Settings" }
+    radar = "Raids", pvp = "PvP", portfolio = "You", sell = "Sell", sessions = "Sessions", settings = "Settings" }
 
 -- the groups: their sections in order { key, label, page, view (the page's own view, if it has views) }
 FT.GROUPS = {
     make = { { "make", "Flip it", "signals", "make" }, { "craft", "Craft it", "signals", "craft" }, { "farm", "Farm it", "signals", "farm" },
-        { "coming", "Coming up", "coming" } },
+        { "raid", "Raids", "radar" }, { "pvp", "PvP", "pvp" } },
     you = { { "portfolio", "Holdings", "portfolio", "portfolio" }, { "sessions", "Sessions", "sessions" },
         { "chars", "Characters", "portfolio", "chars" }, { "journal", "Journal", "portfolio", "journal" } },
 }
 -- the group a page belongs to (the tab that lights up for it)
-local GROUP_OF = { signals = "make", radar = "make", coming = "make", portfolio = "you", sessions = "you", sell = "you" }
+local GROUP_OF = { signals = "make", radar = "make", pvp = "make", portfolio = "you", sessions = "you", sell = "you" }
 local groupBars = { make = {}, you = {} }
 local groupLast = { make = "make", you = "portfolio" }
 
@@ -732,7 +732,8 @@ function FT.SelectTab(name)
     -- a group's tab: the section shown there last
     if FT.GROUPS[name] then
         local saved = FT.db and FT.db.ui and FT.db.ui.groupLast
-        if saved then for g, k in pairs(saved) do groupLast[g] = (k == "raid") and "coming" or k end end
+        -- (v0.51: Coming up came apart - its farms are Farm it's Next week, its raids Raids)
+        if saved then for g, k in pairs(saved) do groupLast[g] = (k == "coming") and "raid" or k end end
         return FT.ShowSub(name, groupLast[name])
     end
     if not FT.Tabs[name] then name = "today" end

@@ -254,3 +254,91 @@ function F.Headline()
     end
     return L["The raids are open: consumables sell best before each raid night"]
 end
+
+---------------------------------------------------------------------------
+-- PvP (v0.51): what battlegrounds burn through (the PvP study: Data/Sources.lua FT.SRC_PVP, ranked), with the move
+-- that's yours around Forever's battleground holiday weeks - stock up the week before, sell into the week - and
+-- next week's call with how sure. The materials the list is made of beside it.
+---------------------------------------------------------------------------
+local function BGWeek()
+    local now = time()
+    for _, e in ipairs(FT.Ahead and FT.Ahead.Events(10, now) or {}) do
+        if e.kind == "bg" then return e, e.t <= now end
+    end
+end
+F.BGWeek = BGWeek
+
+function F.PvP()
+    local bg, on = BGWeek()
+    local out = {}
+    for rank, x in ipairs(FT.SRC_PVP or {}) do
+        local id = x[1]
+        local m = Market(id)
+        local r = Recipe(id)
+        local held = FT.Port.Count(id)
+        local e = Known(r) and FT.Craft.Eval(r)
+        local move, text
+        if on and held > 0 then
+            move, text = "SELL", string.format(L["You hold %s: %s is on, they sell most now"], FT.Num(held), bg.short)
+        elseif e and e.profit and e.profit > 0 then
+            move, text = "CRAFT", string.format(L["%s can make it: +%s each"], FT.Craft.KnownByText(r), FT.Money(math.floor(e.profit), "short"))
+        elseif bg and not on then
+            move, text = "STOCK", string.format(L["Stock up before %s (%s)"], bg.short, date("%b %d", bg.t))
+        elseif not m.price then
+            move, text = "NONE", L["None listed"]
+        else
+            move, text = "STEADY", string.format(L["%s listed, ~%s sold a day"], FT.Num(m.listed or 0), FT.Num(math.floor((m.perDay or 0) + 0.5)))
+        end
+        out[#out + 1] = { id = id, rank = rank, roles = x[2], conf = x[3], note = x[4], market = m, recipe = r, move = move, moveText = text }
+    end
+    return out
+end
+
+function F.PvPMaterials(n)
+    local mats = {}
+    for rank, x in ipairs(FT.SRC_PVP or {}) do
+        local r = Recipe(x[1])
+        if r then
+            local w = math.max(0.2, 1 - (rank - 1) / 30)
+            local q = math.max(r.outputQty or 1, 1)
+            for _, rg in ipairs(r.reagents or {}) do
+                local id = rg.itemID
+                if id and not (FT.VENDOR_REAGENTS and FT.VENDOR_REAGENTS[id]) then
+                    local m = mats[id]
+                    if not m then
+                        m = { id = id, score = 0, into = {} }
+                        mats[id] = m
+                    end
+                    m.score = m.score + w * (rg.qty or 1) / q
+                    m.into[#m.into + 1] = x[1]
+                end
+            end
+        end
+    end
+    local list = {}
+    for _, m in pairs(mats) do list[#list + 1] = m end
+    table.sort(list, function(a, b) return a.score > b.score end)
+    local bg, on = BGWeek()
+    local out = {}
+    for i = 1, math.min(n or 10, #list) do
+        local m = list[i]
+        m.market = Market(m.id)
+        m.held = FT.Port.Count(m.id)
+        if m.held > 0 and on then
+            m.move, m.moveText = "SELL", string.format(L["You hold %s: battleground week, sell into it"], FT.Num(m.held))
+        elseif bg and not on then
+            m.move, m.moveText = "STOCK", string.format(L["In %d of the kit: stock up before %s"], #m.into, bg.short)
+        else
+            m.move, m.moveText = "STEADY", L["About its usual price"]
+        end
+        out[#out + 1] = m
+    end
+    return out
+end
+
+function F.PvPHeadline()
+    local bg, on = BGWeek()
+    if bg and on then return string.format(L["%s is on: more players in battlegrounds, the kit sells most this week"], bg.short) end
+    if bg then return string.format(L["Next battleground week: %s, from %s. Stock up the week before."], bg.short, date("%b %d", bg.t)) end
+    return L["What battlegrounds burn through, ranked by how many use it"]
+end

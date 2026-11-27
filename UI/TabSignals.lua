@@ -566,7 +566,7 @@ end
 -- day), with the week's move. Where to farm them is up to you: right-click gives a Wowhead link.
 local FARM_KINDS = {
     { "all", "All" }, { "ore", "Ore & stone" }, { "herb", "Herbs" }, { "leather", "Leather" }, { "cloth", "Cloth" },
-    { "elemental", "Elemental" }, { "gem", "Gems" },
+    { "elemental", "Elemental" }, { "gem", "Gems" }, { "next", "Next week" },
 }
 local FARM_CLASS = FT.Farm.CLASS -- the item classes and subclasses of each (FT.Farm)
 local farmKind = "all"
@@ -760,6 +760,10 @@ local function BuildFarmView(p)
     end, function(row, x)
         UI.TipItem(row, x.id)
         GameTooltip:AddLine(" ")
+        if x.call then
+            GameTooltip:AddLine(string.format(L["How sure: %d%% (right %d of %d weeks on its last 30 days)"], x.call.sure, x.call.hits, x.call.weeks), 0.85, 0.87, 0.9, true)
+            if x.call.event then GameTooltip:AddLine(string.format(L["%s is on the calendar: a known pull."], x.call.event.name), 0.75, 0.78, 0.82, true) end
+        end
         GameTooltip:AddLine(L["Click: where to farm it || Right-click: watchlist"], 0.6, 0.64, 0.7)
         GameTooltip:Show()
     end)
@@ -771,6 +775,7 @@ local function BuildFarmView(p)
     end, 22)
     f.kind:SetPoint("TOPLEFT", 0, -1)
     f.kind:SetValue(farmKind)
+    T.farmKindBar = f.kind
     f.hint:SetText(L["Raw materials by what one farmer could sell of them a day, best first. Click one: where to farm it for your level."])
     f.list:SetEmptyText(L["No sales seen yet: the price feed fills this over a few hours."])
     return f
@@ -791,8 +796,34 @@ function T.RefreshSell()
     sellView.list:SetItems(list, true)
 end
 
+-- (v0.51) Next week: the best farms for next week, each with how sure Wolf is (from Coming up, which came apart)
+local function NextWeekRows()
+    local l = FT.Ahead.Lists(function() if farmView and farmView:IsShown() and farmKind == "next" then T.RefreshFarm() end end)
+    if not l then return nil end
+    local out = {}
+    for _, r in ipairs(l.farms) do
+        local c = r.call
+        local bits = {}
+        if r.hour then bits[#bits + 1] = "~" .. FT.Money(math.floor(r.hour), "gold") .. " " .. L["an hour"] .. (r.where and (" " .. string.format(L["in %s"], r.where)) or "") end
+        bits[#bits + 1] = FT.C(c.move >= 0 and "up" or "down", (c.move >= 0 and "+" or "") .. FT.An.Pc(c.move)) .. FT.C("dim", " " .. L["next week"])
+        if c.why then bits[#bits + 1] = c.why end
+        out[#out + 1] = { id = r.id, reason = table.concat(bits, FT.C("dim", "  ·  ")), call = c,
+            value = FT.Ahead.SureText(c.sure), signal = "FARM", label = L["FARM"], strength = 2 }
+    end
+    return out
+end
+
 function T.RefreshFarm()
     if not (farmView and farmView:IsShown()) then return end
+    if farmKind == "next" then
+        local rows = NextWeekRows()
+        farmView.hint:SetText(L["Next week's best farms, and how sure Wolf is: its record on each item's last 30 days. Under 40% isn't shown."])
+        farmView.list:SetEmptyText(rows and L["No call sure enough yet: new prices come every hour."] or L["Working out next week's calls..."])
+        farmView.list:SetItems(rows or {}, true)
+        return
+    end
+    farmView.hint:SetText(L["Raw materials by what one farmer could sell of them a day, best first. Click one: where to farm it for your level."])
+    farmView.list:SetEmptyText(L["No sales seen yet: the price feed fills this over a few hours."])
     local list = FarmRows()
     local matches = FT.NameMatcher(T.search)
     if matches then

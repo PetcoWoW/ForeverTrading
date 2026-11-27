@@ -67,7 +67,7 @@ UI\TabPortfolio.lua
 UI\TabSell.lua
 UI\TabSettings.lua
 UI\TabRadar.lua
-UI\TabComing.lua
+UI\TabPvP.lua
 UI\Extras.lua
 UI\Calc.lua
 UI\Farm.lua
