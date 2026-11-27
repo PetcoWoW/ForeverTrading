@@ -133,7 +133,8 @@ local function BuildToolbar(p)
     charDD:SetValue("all")
 
     -- the recipes, or the craft queue
-    T.viewSeg = UI.Segmented(bar2, { { "recipes", L["Recipes"] }, { "queue", L["Craft queue"] } }, function(v) T.SetView(v) end, 22)
+    T.viewSeg = UI.Segmented(bar2, { { "recipes", L["Recipes"] }, { "queue", L["Craft queue"] }, { "level", L["Level it up"] },
+        { "learn", L["Worth learning"] } }, function(v) T.SetView(v) end, 22)
     T.viewSeg:SetPoint("LEFT", 0, 0)
     T.viewSeg:SetValue(state.view)
     T.bar2Filters = { charDD, T.profitable, T.search }
@@ -153,7 +154,7 @@ local function UpdateFilters()
             c = UI.Chip(T.bar, label, function(self)
                 state.prof = self.key
                 for _, ch in ipairs(profChips) do ch:SetOn(ch.key == state.prof) end
-                T.RefreshList()
+                if state.view == "level" or state.view == "learn" then T.RefreshPlan() else T.RefreshList() end
             end)
             profChips[i] = c
         end
@@ -778,16 +779,143 @@ function T.RefreshQueue()
     summary:SetText(#rows > 0 and string.format(L["%d recipes in the queue"], #rows) or "")
 end
 
+
+---------------------------------------------------------------------------
+-- Level it up and Worth learning (v0.50): two lists in the recipes' place; the profession chips filter them
+---------------------------------------------------------------------------
+local planViews = {}
+local DIFF_COLOR = { optimal = { "ff8040", "Orange" }, medium = { "ffff00", "Yellow" }, easy = { "40c040", "Green" } }
+
+local function PlanView(p, key, cols, update, onEnter, empty)
+    local f = UI.Panel(p, "bg1", "line")
+    f:SetPoint("TOPLEFT", 8, -70)
+    f:SetPoint("BOTTOMRIGHT", -8, 34)
+    f:Hide()
+    f.head = UI.Header(f, cols)
+    f.head:SetPoint("TOPLEFT", 1, -1)
+    f.head:SetPoint("TOPRIGHT", -1, -1)
+    f.list = UI.List(f, {
+        rowHeight = 28, cols = cols, update = update,
+        onClick = function(x)
+            if UI.ItemClick(x.r.output) then return end
+            if key == "level" then
+                T.SetView("recipes")
+                T.Select(x.r.key)
+            else
+                FT.OpenItem(x.r.output)
+            end
+        end,
+        onEnter = onEnter,
+    })
+    f.list:SetPoint("TOPLEFT", f.head, "BOTTOMLEFT", 0, -2)
+    f.list:SetPoint("BOTTOMRIGHT", -1, 4)
+    f.list:SetEmptyText(empty)
+    f.foot = UI.Text(p, 11, "dim")
+    f.foot:SetPoint("BOTTOMLEFT", 12, 12)
+    f.foot:SetPoint("BOTTOMRIGHT", -12, 12)
+    if f.foot.SetWordWrap then f.foot:SetWordWrap(false) end
+    f.foot:Hide()
+    planViews[key] = f
+    return f
+end
+
+local function Net(c)
+    if not c then return FT.C("dim", "—") end
+    -- a craft that pays for itself: a gain
+    if c <= 0 then return FT.C("up", "+" .. FT.Money(-c, "short")) end
+    return FT.C("down", "-" .. FT.Money(c, "short"))
+end
+
+local function BuildPlans(p)
+    PlanView(p, "level", {
+        { key = "name", title = L["Recipe"], width = "fill", make = NameCell, cellHeight = 26 },
+        { key = "color", title = L["Colour"], width = 70 },
+        { key = "rank", title = L["Skill"], width = 56, justify = "RIGHT" },
+        { key = "net", title = L["A craft"], width = 90, justify = "RIGHT",
+            tip = L["What one craft costs you once what it makes is sold (green: it pays for itself)."] },
+        { key = "point", title = L["A point"], width = 90, justify = "RIGHT",
+            tip = L["What a skill point costs: a craft over the chance it gives one (orange always, yellow ~3 in 4, green ~1 in 4)."] },
+    }, function(row, x)
+        local c = row.cells.name
+        c.icon:SetItem(x.r.output)
+        c.text:SetText(FT.ItemText(x.r.output, 32) .. FT.C("dim", "  " .. ProfName(x.prof)))
+        local dc = DIFF_COLOR[x.diff]
+        row.cells.color:SetText(dc and ("|cff" .. dc[1] .. L[dc[2]] .. "|r") or "")
+        row.cells.rank:SetText(x.rank and FT.Num(x.rank) or FT.C("dim", "—"))
+        row.cells.net:SetText(Net(x.net))
+        row.cells.point:SetText(Net(x.perPoint))
+    end, function(row, x)
+        UI.TipItem(row, x.r.output)
+        GameTooltip:AddLine(" ")
+        GameTooltip:AddLine(string.format(L["Materials ~%s, what it makes sells for %s"], FT.Money(math.floor(x.e.cost), "short"),
+            FT.Money(math.floor(x.e.revenue or 0), "short")), 0.85, 0.87, 0.9, true)
+        GameTooltip:AddLine(L["The colour is as of when you last opened the profession window: open it again as you level."], 0.6, 0.62, 0.66, true)
+        GameTooltip:AddLine(L["Click: the recipe."], 0.6, 0.62, 0.66, true)
+        GameTooltip:Show()
+    end, L["Open your profession window once: Wolf reads there which recipes still give a point."])
+
+    PlanView(p, "learn", {
+        { key = "name", title = L["Recipe"], width = "fill", make = NameCell, cellHeight = 26 },
+        { key = "profit", title = L["Profit"], width = 86, justify = "RIGHT" },
+        { key = "sells", title = L["Sells"], width = 70, justify = "RIGHT" },
+        { key = "how", title = L["Where to get it"], width = 250 },
+        { key = "back", title = L["Pays back"], width = 76, justify = "RIGHT",
+            tip = L["How many crafts pay for the recipe at its auction house price."] },
+    }, function(row, x)
+        local c = row.cells.name
+        c.icon:SetItem(x.r.output)
+        c.text:SetText(FT.ItemText(x.r.output, 30) .. FT.C("dim", "  " .. ProfName(x.r.prof)))
+        row.cells.profit:SetText(FT.C("up", "+" .. FT.Money(math.floor(x.e.profit), "short")))
+        row.cells.sells:SetText(string.format(L["~%s/d"], x.perDay >= 10 and FT.Num(math.floor(x.perDay + 0.5)) or string.format("%.1f", x.perDay)))
+        UI.FitBits(row.cells.how, FT.Craft.LearnText(x))
+        row.cells.back:SetText(x.payback and string.format(L["%d crafts"], x.payback) or FT.C("dim", "—"))
+    end, function(row, x)
+        UI.TipItem(row, x.r.output)
+        GameTooltip:AddLine(" ")
+        GameTooltip:AddLine(string.format(L["Costs ~%s to make, sells for %s after the cut"], FT.Money(math.floor(x.e.cost), "short"),
+            FT.Money(math.floor(x.e.revenue), "short")), 0.85, 0.87, 0.9, true)
+        GameTooltip:AddLine(FT.Craft.LearnText(x), 0.85, 0.87, 0.9, true)
+        GameTooltip:AddLine(L["Click: its page."], 0.6, 0.62, 0.66, true)
+        GameTooltip:Show()
+    end, L["Nothing worth learning for your professions right now (or Wolf hasn't seen them yet: open a profession window once)."])
+end
+
+function T.RefreshPlan()
+    local v = state.view
+    local f = planViews[v]
+    if not (f and f:IsShown()) then return end
+    if v == "level" then
+        local rows = FT.Craft.LevelUp(state.prof)
+        f.list:SetItems(rows or {}, true)
+        local bits = {}
+        for k, n in pairs(FT.Me and FT.Me.MyProfs() or {}) do bits[#bits + 1] = ProfName(k) .. " " .. n end
+        table.sort(bits)
+        summary:SetText(#bits > 0 and table.concat(bits, ", ") or "")
+        f.foot:SetText(L["The cheapest point first. Orange: always a point · yellow: ~3 in 4 · green: ~1 in 4."])
+    else
+        local rows = FT.Craft.WorthLearning(state.prof)
+        f.list:SetItems(rows, true)
+        summary:SetText(string.format(L["%d recipes worth learning"], #rows))
+        f.foot:SetText(L["Recipes none of your characters know, for professions they have, that make a profit and sell a day or more."])
+    end
+    f.foot:Show()
+end
+
 function T.SetView(view)
     state.view = view
     if T.viewSeg then T.viewSeg:SetValue(view) end
     local q = view == "queue"
-    if T.tablePanel then T.tablePanel:SetShown(not q) end
-    if detail then detail:SetShown(not q) end
+    local plan = view == "level" or view == "learn"
+    if T.tablePanel then T.tablePanel:SetShown(view == "recipes") end
+    if detail then detail:SetShown(view == "recipes") end
     if queueView then queueView:SetShown(q) end
+    for k, f in pairs(planViews) do
+        f:SetShown(k == view)
+        f.foot:SetShown(k == view)
+    end
     if T.bar then T.bar:SetShown(not q) end
-    for _, x in ipairs(T.bar2Filters or {}) do x:SetShown(not q) end
-    if q then T.RefreshQueue() else T.Refresh() end
+    for _, x in ipairs(T.bar2Filters or {}) do x:SetShown(view == "recipes") end
+    if q then T.RefreshQueue() elseif plan then UpdateFilters(); T.RefreshPlan() else T.Refresh() end
 end
 
 FT.On("FT_QUEUE_CHANGED", function()
@@ -806,6 +934,7 @@ function T.Build(p)
     BuildTable(p)
     BuildDetail(p)
     BuildQueue(p)
+    BuildPlans(p)
 end
 
 function T.Select(key)
@@ -826,6 +955,7 @@ end
 
 function T.Refresh()
     if state.view == "queue" then return T.RefreshQueue() end
+    if state.view == "level" or state.view == "learn" then UpdateFilters(); return T.RefreshPlan() end
     UpdateFilters()
     T.RefreshList(true)
 end

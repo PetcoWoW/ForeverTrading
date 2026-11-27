@@ -793,6 +793,21 @@ function An.Health(s)
     return "healthy", L["Healthy"], "up", line
 end
 
+-- Propped up (v0.50): a few listings, by one or two sellers, hold the price far over its usual - it resets the
+-- moment someone lists more. The line that says so, nil when it isn't.
+function An.Propped(s)
+    if not (s and s.price and s.avg and s.avg > 0) then return nil end
+    local over = s.price / s.avg - 1
+    if over < 0.35 then return nil end
+    local listed = s.listed
+    if not listed then return nil end
+    local few = listed <= math.max(3, (s.typicalQ or 0) * 0.4)
+    local sellers = s.sellersNow or s.sellers
+    if not few or (sellers and sellers > 2) then return nil end
+    return string.format(L["Propped up: %s listed%s hold it %s over its usual %s. It resets when more are listed: don't buy into it."],
+        FT.Num(listed), sellers and string.format(L[" by %d seller(s)"], sellers) or "", FT.Pct(over), FT.Money(s.avg, "short"))
+end
+
 -- where the price is going: a word and its colour
 function An.TrendWord(s)
     if not (s and s.price) then return L["No price yet"], "dim" end

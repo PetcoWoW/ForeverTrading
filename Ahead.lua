@@ -43,6 +43,23 @@ function A.Events(days, now)
     return out
 end
 
+-- Forever's content phases (v0.50, partial): what's known of them. Only the raids' opening has a date so far;
+-- the later phases come in when Forever posts them (a line here, and the calendar shows them).
+A.PHASES = {
+    { name = "The raids open", t = nil, from = "radar" },
+    { name = "The next phase", t = nil, note = "No date yet: Wolf adds it when Forever posts one." },
+}
+function A.Phases()
+    local out = {}
+    local _, ev = FT.Futures and FT.Futures.Days and FT.Futures.Days()
+    for _, ph in ipairs(A.PHASES) do
+        local t = ph.t
+        if ph.from == "radar" then t = ev and ev.t end
+        out[#out + 1] = { name = L[ph.name], t = t, note = ph.note and L[ph.note] or nil }
+    end
+    return out
+end
+
 -- the items an event pulls on: the Faire's turn-ins, the PvP kit in a battleground's holiday week, the raids' list
 function A.EventItems(kind)
     if kind == "faire" then return FT.SRC_LIST_FAIRE or {} end
@@ -53,6 +70,24 @@ function A.EventItems(kind)
         return out
     end
     return {}
+end
+
+-- the PvP tag (v0.50): what battlegrounds burn through (the PvP study: the Classic PvP kit, stun bombs, their
+-- materials) - sells most in a battleground's holiday week
+local pvpSet
+function FT.PvPTag(id)
+    if not pvpSet then
+        pvpSet = {}
+        for _, x in ipairs(FT.SRC_LIST_PVP or {}) do pvpSet[x] = "kit" end
+        for _, x in ipairs(FT.SRC_LIST_PVPMATS or {}) do pvpSet[x] = pvpSet[x] or "mat" end
+    end
+    local k = id and pvpSet[id]
+    if not k then return nil end
+    local bg
+    for _, e in ipairs(A.Events(10)) do if e.kind == "bg" then bg = e; break end end
+    local when = bg and (bg.t <= time() and string.format(L["%s now"], bg.short) or string.format(L["next: %s, %s"], bg.short, date("%b %d", bg.t))) or nil
+    return (k == "kit" and L["PvP: battlegrounds burn through it"] or L["PvP: goes into the battleground kit"])
+        .. (when and ("  ·  " .. when) or "")
 end
 
 local pullOf -- item -> { kind, ev } of the soonest event pulling on it in the next 10 days
@@ -160,6 +195,8 @@ function A.Lists(done)
         local id = r.id
         local c = A.Call(id)
         if not (c and c.sure >= HIDE_UNDER and c.move > -0.02) then return end
+        -- (Wolf knows you: a farm you can't do - no skinner for a skinning farm, mobs far over your level - isn't one)
+        if FT.Me and not FT.Me.CanFarm(id) then return end
         local row = Row(id, "FARM", c)
         if not row or row.perDay < 10 then return end
         -- what you'd make: your own rate an hour when you've farmed it, else a farmer's share of a day's sales

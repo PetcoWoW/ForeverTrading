@@ -1038,13 +1038,21 @@ local function SectionTexts(key, id, s)
             end
             more[#more + 1] = line
         end
+        -- (v0.50) the warnings first: a vendor sells it for less, the price looks propped up
+        local floor, how = FT.VendorFloor(id, s.price)
+        if floor then
+            more[#more + 1] = FT.C("accent", string.format(L["A vendor sells it for %s: never pay over that"], FT.Money(floor, "short") .. (how == "estimate" and "~" or "")))
+        end
+        local propped = FT.An.Propped and FT.An.Propped(s)
+        if propped then more[#more + 1] = FT.C("down", propped) end
         if s.fair then more[#more + 1] = string.format(L["Normal price %s"], FT.Money(s.fair, "short")) end
         local key2 = FT.An.Health(s)
-        if (key2 == "pumped" or key2 == "dumping") and healthWhy then more[#more + 1] = healthWhy end
+        if (key2 == "pumped" or key2 == "dumping") and healthWhy and not propped then more[#more + 1] = healthWhy end
         if s.bait then more[#more + 1] = L["The cheapest one looks like bait: don't price off it."] end
+        if FT.PvPTag and FT.PvPTag(id) then more[#more + 1] = FT.C("blue", FT.PvPTag(id)) end
         local sold = FT.Net and FT.Net.SoldText and FT.Net.SoldText(id)
         if sold then more[#more + 1] = sold end
-        return sum, more
+        return sum, more, { L["Buy/sell"], function() FT.ShowCalc(id) end }
     elseif key == "history" then
         local bits = {}
         if s.ch7 then bits[#bits + 1] = L["7d"] .. " " .. FT.Pct(s.ch7) end

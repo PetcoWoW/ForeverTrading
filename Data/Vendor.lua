@@ -30,11 +30,22 @@ function FT.VendorBuy(itemID)
     if not itemID then return nil end
     local own = FT.db and FT.db.vendor[itemID]
     if own then return own, "seen" end
-    if VENDOR_REAGENTS[itemID] then
+    -- (v0.50: and anything a vendor of your side sells, from the sources - vendors charge about four times what
+    -- they pay)
+    if VENDOR_REAGENTS[itemID] or (FT.Where and FT.Where.VendorSold(itemID)) then
         local _, _, _, sellPrice = FT.Item(itemID)
         if sellPrice and sellPrice > 0 then return sellPrice * 4, "estimate" end
     end
     return nil
+end
+
+-- The vendor price floor (v0.50): what a vendor sells it for, when the auction house asks more - never pay over
+-- that. Returns the vendor's price and how sure ("seen" / "estimate"), nil when the auction house is cheaper or
+-- no vendor sells it.
+function FT.VendorFloor(itemID, ahPrice)
+    local v, how = FT.VendorBuy(itemID)
+    if not v or not ahPrice or ahPrice <= v then return nil end
+    return v, how
 end
 
 -- what a vendor pays you for one

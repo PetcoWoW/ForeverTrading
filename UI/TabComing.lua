@@ -41,6 +41,9 @@ local function Rows()
         out[#out + 1] = Head(string.format(L["PvP: %s"], bgWeek.name))
         for i = 1, math.min(4, #l.pvp) do out[#out + 1] = l.pvp[i] end
     end
+    -- (v0.50, partial) Forever's content phases: what's known of them
+    out[#out + 1] = Head(L["Content phases"])
+    for _, ph in ipairs(FT.Ahead.Phases()) do out[#out + 1] = { phase = ph } end
     return out
 end
 
@@ -60,7 +63,7 @@ function T.Build(p)
     lead:SetPoint("LEFT", bar, "RIGHT", 14, 0)
     lead:SetPoint("RIGHT", p, "RIGHT", -PAD, 0)
     if lead.SetWordWrap then lead:SetWordWrap(false) end
-    UI.FitSize(lead, L["What should pay next week, and how sure Wolf is: every call checked against the item's last 30 days."], 11, 2)
+    T.lead = lead
 
     local box = UI.Panel(p, "bg1", "line")
     box:SetPoint("TOPLEFT", PAD, -40)
@@ -92,6 +95,14 @@ function T.Build(p)
             row.text:SetShown(not isHead)
             row.right:SetShown(not isHead)
             if isHead then row.head:SetText(x.head) return end
+            if x.phase then
+                local ph = x.phase
+                row.badge:Set("WAIT", L["PHASE"])
+                row.name:SetText(ph.name)
+                UI.FitBits(row.text, ph.note or (ph.t and L["from the raids' study: what to stock is under The raids"]) or L["No date yet"])
+                row.right:SetText(ph.t and FT.C("accent", When(ph.t)) or FT.C("dim", L["not dated"]))
+                return
+            end
             if x.event then
                 local e = x.event
                 row.badge:Set(e.kind == "bg" and "BUY" or (e.kind == "raid" and "HOLD" or "WAIT"), e.kind == "raid" and L["RAIDS"] or L["EVENT"])
@@ -126,7 +137,7 @@ function T.Build(p)
                 GameTooltip:Show()
                 return
             end
-            if not x.id then return end
+            if not x.id or not x.call then return end
             UI.TipItem(row, x.id)
             local c = x.call
             GameTooltip:AddLine(" ")
@@ -145,6 +156,10 @@ end
 
 function T.Refresh()
     if not built then return end
+    -- (Wolf knows you: the farms fit your professions and level)
+    local me = FT.Me and FT.Me.Text()
+    UI.FitSize(lead, L["What should pay next week, and how sure Wolf is: every call checked against the item's last 30 days."]
+        .. (me and FT.C("dim", "  ·  " .. L["fits you"] .. ": " .. me) or ""), 11, 2)
     list:SetItems(Rows())
 end
 T.OnShow = T.Refresh

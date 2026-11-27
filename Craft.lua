@@ -766,3 +766,88 @@ function E.Deals()
     end, 2)
     return dealsCache or {}
 end
+
+---------------------------------------------------------------------------
+-- Level it up (v0.50): the cheapest way to skill up this character's professions - each recipe it knows that
+-- still gives a point (its colour when you last opened the profession window: orange always, yellow most times,
+-- green now and then), what one craft costs you once what it makes is sold, and so what a point costs.
+---------------------------------------------------------------------------
+local CHANCE = { optimal = 1, medium = 0.75, easy = 0.25 }
+C.SKILL_CHANCE = CHANCE
+
+-- rows { r, e, diff, chance, net (a craft's cost less what it brings), perPoint, rank } for prof ("all": every
+-- profession), the cheapest point first; nil when the profession window was never opened on this character
+function C.LevelUp(prof)
+    local mine = FT.charKey and FT.db.recipes and FT.db.recipes[FT.charKey]
+    if type(mine) ~= "table" then return nil end
+    local c = FT.db.chars[FT.charKey] or {}
+    local byKey = {}
+    for _, r in ipairs(C.List()) do byKey[r.key] = r end
+    local out, any = {}, false
+    for pname, data in pairs(mine) do
+        local key = FT.ProfKey(pname)
+        if (prof == nil or prof == "all" or key == prof) and type(data) == "table" then
+            for _, x in ipairs(data.list or {}) do
+                if x.diff then any = true end
+                local chance = CHANCE[x.diff or ""]
+                local r = chance and x.output and byKey[x.output .. ":" .. tostring(x.name)]
+                if r then
+                    local e = C.Eval(r)
+                    if e.complete and e.cost then
+                        -- what it makes: sold (or to a vendor), it pays part of the way
+                        local back = e.revenue or 0
+                        local net = e.cost - back
+                        out[#out + 1] = { r = r, e = e, diff = x.diff, chance = chance, net = net, perPoint = net / chance,
+                            rank = type(c.profs) == "table" and c.profs[key] or nil, prof = key }
+                    end
+                end
+            end
+        end
+    end
+    if not any and #out == 0 then return nil end
+    table.sort(out, function(a, b)
+        if a.perPoint ~= b.perPoint then return a.perPoint < b.perPoint end
+        return a.r.key < b.r.key
+    end)
+    return out
+end
+
+---------------------------------------------------------------------------
+-- Recipes worth learning (v0.50): recipes none of your characters know, for professions they have, that make
+-- a profit and sell - and where to get each one (a trainer, a vendor, a drop, Merchant's Favor), what it costs on
+-- the auction house, and how many crafts pay it back.
+---------------------------------------------------------------------------
+function C.WorthLearning(prof)
+    local profs = FT.Me and FT.Me.Profs() or {}
+    local out = {}
+    for _, r in ipairs(C.AllRecipes()) do
+        if next(r.knownBy) == nil and profs[r.prof] and (prof == nil or prof == "all" or r.prof == prof) then
+            local e = C.Eval(r)
+            local rate = e.stats and e.stats.sales
+            local perDay = rate and (rate.hours or 0) >= 12 and rate.perDay or 0
+            if e.complete and e.profit and e.profit > 0 and perDay >= 1 then
+                local src = C.RecipeSource(r) or {}
+                local cost = src.ah and src.ah.price or nil
+                local x = { r = r, e = e, perDay = perDay, src = src, cost = cost,
+                    payback = cost and math.max(1, math.ceil(cost / e.profit)) or nil,
+                    score = e.profit * math.min(perDay, 10) }
+                out[#out + 1] = x
+            end
+        end
+    end
+    table.sort(out, function(a, b) return a.score > b.score end)
+    while #out > 60 do table.remove(out) end
+    return out
+end
+
+-- how to get a recipe, in a few words
+function C.LearnText(x)
+    local src = x.src or {}
+    if src.trainer then return L["a trainer"] end
+    local bits = {}
+    if src.line then bits[#bits + 1] = src.line
+    elseif src.vendor then bits[#bits + 1] = string.format(L["%s (vendor), %s"], src.vendor.n or "?", src.vendor.z or "?") end
+    if src.ah then bits[#bits + 1] = string.format(L["AH %s"], FT.Money(src.ah.price, "short")) end
+    if #bits == 0 then return FT.C("dim", L["not in Wolf's sources yet"]) end
+    return table.concat(bits, "  ·  ")
+end

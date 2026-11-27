@@ -1,7 +1,7 @@
 -- Wolf: is there a newer version? An addon can't go online, so guild and group members who use
 -- Wolf tell each other which version they have (a hidden addon message): at login and when you join
 -- a group - at most once a minute per channel, never in a fight. A newer one than yours: one line in chat a
--- session and a link in the status bar. Someone with an older version hears yours back, so the news gets round.
+-- line in chat once per new version (v0.50) and a link in the status bar. Someone with an older version hears yours back, so the news gets round.
 local ADDON, FT = ...
 local L = FT.L
 
@@ -63,6 +63,36 @@ function V.Newest()
     return V.newest
 end
 
+-- v0.50: told once per new version, then quiet - however it was heard (a guild member, the Wolf network, the price
+-- file). FT.db.told.version: the newest version the chat line was said for.
+local function MM(v)
+    local a, b = tostring(v or ""):match("^v?(%d+)%.(%d+)")
+    if not a then return nil end
+    return tonumber(a) * 1000 + tonumber(b)
+end
+function V.Tell(theirs)
+    if not (FT.db and theirs) then return false end
+    FT.db.told = FT.db.told or {}
+    local n, mine = MM(theirs), MM(FT.VERSION)
+    if not (n and mine) or n <= mine then return false end
+    local was = MM(FT.db.told.version)
+    if was and was >= n then return false end
+    FT.db.told.version = string.format("%d.%d", math.floor(n / 1000), n % 1000)
+    FT.Print(string.format(L["A newer Wolf is out: v%s (you have %s). Update it in the CurseForge app or WowUp."],
+        FT.db.told.version, FT.VERSION_TEXT or FT.VERSION))
+    return true
+end
+
+-- a newer version heard from another Wolf user (this file's version message, or any Wolf network message)
+function V.Heard(theirs)
+    if not (theirs and V.Newer(theirs, FT.VERSION)) then return end
+    if not V.newest or V.Newer(theirs, V.newest) then
+        V.newest = theirs
+        FT.Fire("FT_NEWER_VERSION", theirs)
+    end
+    V.Tell(theirs)
+end
+
 FT.On("FT_LOGIN", function()
     if C_ChatInfo and C_ChatInfo.RegisterAddonMessagePrefix then
         pcall(C_ChatInfo.RegisterAddonMessagePrefix, PREFIX)
@@ -79,12 +109,7 @@ FT.On("CHAT_MSG_ADDON", function(prefix, text, channel, sender)
     local theirs = text:match("^V\t(.+)$")
     if not theirs then return end
     if V.Newer(theirs, FT.VERSION) then
-        if not V.newest or V.Newer(theirs, V.newest) then
-            V.newest = theirs
-            FT.Print(string.format(L["A newer Wolf is out: %s (you have %s). Update it in the CurseForge app or WowUp (link: /wolf curseforge)."],
-                theirs, FT.VERSION))
-            FT.Fire("FT_NEWER_VERSION", theirs)
-        end
+        V.Heard(theirs)
     elseif V.Newer(FT.VERSION, theirs) and sender and not answered[sender] then
         -- they are behind: tell them ours, once
         answered[sender] = true
@@ -96,7 +121,7 @@ end)
 ---------------------------------------------------------------------------
 -- The outdated reminder (v0.42): one chat line at login when a newer Wolf is out, or the prices companion is behind -
 -- from the price file the companion brings every hour (FT.FEED.release / .companion, written by the release robot).
--- Once a day per version; never a pop-up.
+-- Once per version (v0.50; it was once a day); never a pop-up.
 ---------------------------------------------------------------------------
 local function MajMin(v)
     local a, b = tostring(v or ""):match("^v?(%d+)%.(%d+)")
@@ -116,10 +141,7 @@ function V.Remind()
     FT.db.told = FT.db.told or {}
     local today = date("%Y%m%d")
     local rel = FT.FEED.release
-    if rel and V.ReleaseNewer(rel, FT.VERSION) and FT.db.told.release ~= rel .. today then
-        FT.db.told.release = rel .. today
-        FT.Print(string.format(L["A newer Wolf is out: v%s (you have %s). Update it in the CurseForge app or WowUp."], rel, FT.VERSION_TEXT or FT.VERSION))
-    end
+    if rel and V.ReleaseNewer(rel, FT.VERSION) then V.Tell(rel) end
     local want, have = FT.FEED.companion, FT.COMPANION and FT.COMPANION.version
     if want and have and V.Newer(want, have) and FT.db.told.companion ~= want .. today then
         FT.db.told.companion = want .. today

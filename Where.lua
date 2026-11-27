@@ -118,6 +118,42 @@ function W.Farmable(id)
     return row and row.cls == 7 and GATHERED[row.sub] or false
 end
 
+-- a vendor of your side sells it (v0.50: the vendor price floor)
+function W.VendorSold(id)
+    if not id then return false end
+    for _, n in ipairs(W.Get(id).vendors) do
+        if ForYou(n.fac) then return true end
+    end
+    return false
+end
+
+-- the gathering profession it needs, when that's the only way to get it (v0.50: Wolf knows you): "Skinning",
+-- "Mining", "Herbalism" - nil when mobs drop it, a vendor sells it, or it isn't gathered
+function W.Needs(id)
+    if not id then return nil end
+    local g = W.Get(id)
+    local dropped = false
+    for _, x in ipairs(g.drops) do if x.chance >= 300 then dropped = true end end
+    if dropped or #g.vendors > 0 or #g.favor > 0 or (FT.FarmSpots and FT.FarmSpots[id]) then return nil end
+    if #g.skin > 0 then return "Skinning" end
+    if #g.nodes > 0 then
+        local row = FT.Market and FT.Market.Row and FT.Market.Row(id)
+        if row and row.cls == 7 and row.sub == 7 then return "Mining" end
+        if row and row.cls == 7 and row.sub == 9 then return "Herbalism" end
+    end
+    return nil
+end
+
+-- the lowest level of the mobs that drop it (nil: no drop of known level)
+function W.DropLevel(id)
+    local lo
+    for _, x in ipairs(W.Get(id).drops) do
+        local lv = x.who and x.who.lv and tonumber(tostring(x.who.lv):match("^(%d+)"))
+        if lv and x.chance >= 100 then lo = math.min(lo or lv, lv) end
+    end
+    return lo
+end
+
 -- the lines that say where it comes from, best first (each one string, parts apart with " · " so a narrow line
 -- drops its last part): your loot, Wolf users' loot, Wolf's note, nodes, skinning, drops, vendors, Merchant's
 -- Favor, containers, quests, world drop

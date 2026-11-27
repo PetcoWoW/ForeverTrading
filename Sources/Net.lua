@@ -19,7 +19,7 @@ FT.Net = N
 local PREFIX = "WOLFNET1"
 local PROTO = "1"
 local SEND_EVERY = 1.2
-local MSG_MAX = 240
+local MSG_MAX = 236          -- (and the version, a few more)
 local MAX_LIVE = 400          -- prices in one round of live updates
 local CHANGED = 0.03          -- a price counts as changed from 3% on
 local OUTLIER = 3             -- 3x either way of what we know: held until a second user agrees
@@ -55,9 +55,20 @@ local function Channels()
     return out
 end
 
+-- v0.50: every message ends with the sender's Wolf version ("v0.50"): a newer one heard means one chat line
+-- (FT.Ver.Heard). Older Wolfs read the fields they know and leave the rest.
+local function VerTag()
+    local a, b = tostring(FT.VERSION or ""):match("^v?(%d+)%.(%d+)")
+    return a and ("v" .. a .. "." .. b) or nil
+end
+N.VerTag = VerTag
+
 local function Push(...)
     if not On() then return end
-    local text = table.concat({ ... }, "\t")
+    local parts = { ... }
+    local tag = VerTag()
+    if tag then parts[#parts + 1] = tag end
+    local text = table.concat(parts, "\t")
     if #text > 250 then return end
     for _, ch in ipairs(Channels()) do queue[#queue + 1] = { ch, text } end
 end
@@ -378,6 +389,8 @@ FT.On("CHAT_MSG_ADDON", function(prefix, text, channel, sender)
     local kind, proto, a, b, c, d, e = strsplit("\t", text)
     if proto ~= PROTO then return end
     if FT.Share and FT.Share.Met then FT.Share.Met(sender) end
+    local ver = text:match("\t(v%d+%.%d+)$")
+    if ver and FT.Ver and FT.Ver.Heard then FT.Ver.Heard(ver) end
     if kind == "L" then OnLive(sender, a, b, c)
     elseif kind == "F" then OnFarm(sender, a, b, c, d)
     elseif kind == "O" then OnObjects(sender, a, b, c, d)

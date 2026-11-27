@@ -290,7 +290,7 @@ local function BuildMoves(parent)
     c.title:SetPoint("TOPLEFT", 12, -10)
     c.title:SetText(L["Your best moves"])
     c.list = UI.List(c, {
-        rowHeight = UI.RowH(44),
+        rowHeight = UI.RowH(62),
         setup = function(row)
             row.badge = UI.Badge(row, 60, 18)
             row.badge:SetPoint("TOPLEFT", 4, -4)
@@ -300,12 +300,16 @@ local function BuildMoves(parent)
             row.what = UI.Text(row, 12, "muted")
             row.what:SetPoint("TOPLEFT", row.badge, "BOTTOMLEFT", 2, -4)
             row.what:SetPoint("RIGHT", -4, 0)
-            if row.what.SetWordWrap then row.what:SetWordWrap(false) end
+            row.what:SetPoint("BOTTOM", row, "BOTTOM", 0, 3)
+            row.what:SetJustifyV("TOP")
+            if row.what.SetWordWrap then row.what:SetWordWrap(true) end
+            if row.what.SetMaxLines then row.what:SetMaxLines(2) end
         end,
         update = function(row, m)
             row.badge:Set(m.kind, m.label)
             row.gold:SetText(m.gold or "")
-            UI.FitSize(row.what, m.what or FT.ItemText(m.id), 12, 3)
+            row.what:SetFont(UI.FONT, UI.Size(11), "")
+            row.what:SetText(m.what or FT.ItemText(m.id))
         end,
         onClick = function(m) if m.id and not UI.ItemClick(m.id) then FT.OpenItem(m.id) end end,
         onEnter = function(row, m)
