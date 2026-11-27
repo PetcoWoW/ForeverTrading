@@ -89,7 +89,7 @@ local function UpdateSummary(rows)
     if best then
         parts[#parts + 1] = L["Best"] .. ": " .. FT.ItemText(best.r.output, 32) .. " " .. FT.C("up", "+" .. FT.Money(best.e.profit, "short"))
     end
-    summary:SetText(table.concat(parts, FT.C("dim", "   ||   ")))
+    UI.FitBits(summary, table.concat(parts, FT.C("dim", "   ||   ")))
 end
 
 ---------------------------------------------------------------------------
@@ -776,6 +776,7 @@ function T.RefreshQueue()
             (tot.profit >= 0 and "+" or "-") .. FT.Money(math.abs(tot.profit), "short"))
     end
     f.total:SetText(table.concat(parts, FT.C("dim", "   ||   ")))
+    summary.fitText = nil
     summary:SetText(#rows > 0 and string.format(L["%d recipes in the queue"], #rows) or "")
 end
 
@@ -858,7 +859,7 @@ local function BuildPlans(p)
         { key = "name", title = L["Recipe"], width = "fill", make = NameCell, cellHeight = 26 },
         { key = "profit", title = L["Profit"], width = 86, justify = "RIGHT" },
         { key = "sells", title = L["Sells"], width = 70, justify = "RIGHT" },
-        { key = "how", title = L["Where to get it"], width = 250 },
+        { key = "how", title = L["Where to get it"], width = 250 + 20 * (tonumber(FT.S and FT.S.textSize) or 0) },
         { key = "back", title = L["Pays back"], width = 76, justify = "RIGHT",
             tip = L["How many crafts pay for the recipe at its auction house price."] },
     }, function(row, x)
@@ -890,12 +891,12 @@ function T.RefreshPlan()
         local bits = {}
         for k, n in pairs(FT.Me and FT.Me.MyProfs() or {}) do bits[#bits + 1] = ProfName(k) .. " " .. n end
         table.sort(bits)
-        summary:SetText(#bits > 0 and table.concat(bits, ", ") or "")
+        UI.FitBits(summary, #bits > 0 and table.concat(bits, "  ·  ") or "")
         f.foot:SetText(L["The cheapest point first. Orange: always a point · yellow: ~3 in 4 · green: ~1 in 4."])
     else
         local rows = FT.Craft.WorthLearning(state.prof)
         f.list:SetItems(rows, true)
-        summary:SetText(string.format(L["%d recipes worth learning"], #rows))
+        UI.FitBits(summary, string.format(L["%d recipes worth learning"], #rows))
         f.foot:SetText(L["Recipes none of your characters know, for professions they have, that make a profit and sell a day or more."])
     end
     f.foot:Show()

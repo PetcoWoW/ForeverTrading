@@ -225,12 +225,15 @@ function W.RecipeLine(itemID)
         end
     end
     for _, n in ipairs(g.vendors) do
-        if ForYou(n.fac) then return string.format(L["%s (vendor), %s"], n.name, n.zones or "?"), "vendor" end
+        if ForYou(n.fac) then
+            return n.zones and string.format(L["%s (vendor)  ·  %s"], n.name, n.zones) or string.format(L["%s (vendor)"], n.name), "vendor"
+        end
     end
     if g.note then return g.note, "note" end
     local d = g.drops[1]
     if d and d.who then
-        return string.format(L["drops from %s (%s)"], d.who.name, d.who.zones or "?") .. (Pct(d.chance) and (" " .. Pct(d.chance)) or ""), "drop"
+        return (d.who.zones and string.format(L["drops from %s  ·  %s"], d.who.name, d.who.zones) or string.format(L["drops from %s"], d.who.name))
+            .. (Pct(d.chance) and (" " .. Pct(d.chance)) or ""), "drop"
     end
     local q = g.quests[1]
     if q then return string.format(L["quest: %s"], q.name), "quest" end

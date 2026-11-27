@@ -106,10 +106,10 @@ function C.BuyLines(b)
     elseif b.enough == false then
         lines[#lines + 1] = FT.C("down", string.format(L["Only %s listed: you'd buy them all"], FT.Num(b.got)))
     else
-        lines[#lines + 1] = string.format(L["The dearest you'd pay: %s (%d prices up the listings)"], FT.Money(b.top, "short"), b.levels)
+        lines[#lines + 1] = string.format(L["The dearest you'd pay: %s  ·  %d prices up the listings"], FT.Money(b.top, "short"), b.levels)
     end
     if b.cheaper and b.cheaper > 0 then
-        lines[#lines + 1] = FT.C("accent", string.format(L["A vendor sells it for %s: never pay over that (%s saved)"],
+        lines[#lines + 1] = FT.C("accent", string.format(L["A vendor sells it for %s  ·  never pay over that  ·  %s saved"],
             FT.Money(b.vendor, "short") .. (b.vendorHow == "estimate" and "~" or ""), FT.Money(math.floor(b.cheaper), "short")))
     elseif b.vendor then
         lines[#lines + 1] = FT.C("dim", string.format(L["A vendor sells it for %s"], FT.Money(b.vendor, "short") .. (b.vendorHow == "estimate" and "~" or "")))
@@ -135,12 +135,12 @@ function C.SellLines(x)
         lines[#lines + 1] = string.format(L["%s cheaper than yours  ·  not enough sales seen to say how fast"], FT.Num(x.ahead))
     end
     if x.slip and x.slip >= 0.03 then
-        lines[#lines + 1] = FT.C("accent", string.format(L["Yours are %d%% of what's listed: expect the price to slip ~%d%% while they sit. Post fewer at a time."],
+        lines[#lines + 1] = FT.C("accent", string.format(L["Yours are %d%% of what's listed  ·  expect the price to slip ~%d%% while they sit  ·  post fewer at a time"],
             math.floor(x.share * 100 + 0.5), math.floor(x.slip * 100 + 0.5)))
     elseif x.share then
-        lines[#lines + 1] = FT.C("dim", string.format(L["Yours are %d%% of what's listed: the price holds."], math.floor(x.share * 100 + 0.5)))
+        lines[#lines + 1] = FT.C("dim", string.format(L["Yours are %d%% of what's listed  ·  the price holds"], math.floor(x.share * 100 + 0.5)))
     end
-    if x.high then lines[#lines + 1] = FT.C("down", string.format(L["Over its normal price (%s): it may sit."], FT.Money(x.high, "short"))) end
+    if x.high then lines[#lines + 1] = FT.C("down", string.format(L["Over its normal price (%s)  ·  it may sit"], FT.Money(x.high, "short"))) end
     return lines
 end
 

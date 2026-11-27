@@ -830,7 +830,8 @@ function C.WorthLearning(prof)
                 local cost = src.ah and src.ah.price or nil
                 local x = { r = r, e = e, perDay = perDay, src = src, cost = cost,
                     payback = cost and math.max(1, math.ceil(cost / e.profit)) or nil,
-                    score = e.profit * math.min(perDay, 10) }
+                    -- (a recipe that takes a hundred crafts to pay back is a long way off)
+                    score = e.profit * math.min(perDay, 10) / (1 + (cost and cost / (e.profit * 20) or 0)) }
                 out[#out + 1] = x
             end
         end
@@ -846,7 +847,7 @@ function C.LearnText(x)
     if src.trainer then return L["a trainer"] end
     local bits = {}
     if src.line then bits[#bits + 1] = src.line
-    elseif src.vendor then bits[#bits + 1] = string.format(L["%s (vendor), %s"], src.vendor.n or "?", src.vendor.z or "?") end
+    elseif src.vendor then bits[#bits + 1] = string.format(L["%s (vendor)  ·  %s"], src.vendor.n or "?", src.vendor.z or "?") end
     if src.ah then bits[#bits + 1] = string.format(L["AH %s"], FT.Money(src.ah.price, "short")) end
     if #bits == 0 then return FT.C("dim", L["not in Wolf's sources yet"]) end
     return table.concat(bits, "  ·  ")

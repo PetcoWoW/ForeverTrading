@@ -5,7 +5,7 @@ local UI = FT.UI
 local L = FT.L
 
 local win
-local W, H = 500, 236
+local W, H = 580, 236
 
 local function Window()
     if win then return win end
@@ -58,7 +58,7 @@ local function Window()
     d.priceLabel = UI.Text(d, 11, "muted")
     d.priceLabel:SetPoint("LEFT", d.stack, "RIGHT", 14, 0)
     d.priceLabel:SetText(L["Each"])
-    d.price = UI.Input(d, 96, 22, L["under the cheapest"], function() FT.CalcUpdate() end, function() FT.CalcUpdate() end)
+    d.price = UI.Input(d, 96, 22, L["auto"], function() FT.CalcUpdate() end, function() FT.CalcUpdate() end)
     d.price:SetPoint("LEFT", d.priceLabel, "RIGHT", 6, 0)
     d.price:SetPoint("RIGHT", d, "RIGHT", -14, 0)
 
@@ -88,7 +88,7 @@ function FT.CalcUpdate()
     local lines
     if selling then
         lines = FT.Calc.SellLines(FT.Calc.Sell(d.itemID, qty, FT.Calc.ParseMoney(d.price:GetText()), 24))
-        d.foot:SetText(L["Price: gold (12.5) or 12g 50s. Empty: a copper under the cheapest. For a 24 hour posting."])
+        d.foot:SetText(L["Each: gold (12.5) or 12g 50s; empty, a copper under the cheapest. A 24 hour posting."])
     else
         lines = FT.Calc.BuyLines(FT.Calc.Buy(d.itemID, qty))
         d.foot:SetText(L["Walks up the listings from your last scan: the cheapest first."])

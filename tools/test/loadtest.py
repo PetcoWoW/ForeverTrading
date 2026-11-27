@@ -863,6 +863,22 @@ step("layout", function()
     { "sessions", "sessions" },
     { "craft", "craft", function() if FT.Tabs.craft and FT.Tabs.craft.SetView then FT.Tabs.craft.SetView("recipes") end end },
     { "craft queue", "craft", function() if FT.Tabs.craft and FT.Tabs.craft.SetView then FT.Tabs.craft.SetView("queue") end end },
+    -- v0.50
+    { "craft: level it up", "craft", function() FT.Tabs.craft.SetView("level") end },
+    { "craft: worth learning", "craft", function()
+      local c = FT.db.chars[FT.charKey]
+      c.profs = c.profs or { Alchemy = 280, Tailoring = 250, Engineering = 260, Blacksmithing = 270, Leatherworking = 260 }
+      FT.Tabs.craft.SetView("learn")
+    end },
+    { "craft again", "craft", function() FT.Tabs.craft.SetView("recipes") end },
+    { "make: coming up", "coming", function() FT.ShowSub("make", "coming") end },
+    { "today: a day picked", "today", function()
+      local TT = FT.Tabs.today
+      TT.FillComing()
+      for _, dd in ipairs(TT.coming.days) do if #dd.events > 0 then TT.coming.picked = dd.t break end end
+      TT.FillComing()
+    end },
+    { "today again", "today", function() FT.Tabs.today.coming.picked = nil; FT.Tabs.today.FillComing() end },
     { "futures", "radar", function() FT.Tabs.radar.SetSection("consumables") end },
     { "futures: gear", "radar", function() FT.Tabs.radar.SetSection("gear") end },
     { "settings", "settings" },
@@ -1346,6 +1362,193 @@ step("v0.43", function()
   FT.RECIPE_ITEMS = nil
   assert(FT.Craft.RecipeSource(r) == nil, "no recipe data: nothing said")
   FT.RECIPE_ITEMS, FT.db.recipeVendors = had, nil
+end)
+-- v0.50: where things come from, Coming up, the calendar and the best-moves card, the uniform bar, the
+-- reminder, the calculator, Level it up and Worth learning, the version line
+step("v0.50", function()
+  local W = FT.Where
+  -- Cured Rugged Hide: made (with salt on a timer), not farmed; Rugged Leather: farmed
+  assert(FT.Craft.ByOutputAll(15407), "Cured Rugged Hide is crafted")
+  assert(not W.Farmable(15407), "Cured Rugged Hide isn't farmed")
+  local d = FT.Craft.TimerOf(15409)
+  assert(d == 3, "Refined Deeprock Salt: every 3 days, got " .. tostring(d))
+  assert(W.Farmable(8170), "Rugged Leather is farmed")
+  local lines = W.Lines(8170, 6)
+  assert(#lines > 0, "Rugged Leather says where")
+  print("rugged leather: " .. lines[1]:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", ""))
+  -- every traded item has a source (the build's gap list is empty) - spot check a few on the market
+  local none = 0
+  for i, r in ipairs(FT.Market.Rows() or {}) do
+    if i > 400 then break end
+    if not (FT.SRC[r.id] or (FT.SRC_H and FT.SRC_H[r.id]) or FT.Craft.ByOutputAll(r.id)) then none = none + 1 end
+  end
+  print("market rows without a source (first 400): " .. none)
+  -- the vendor floor: a vendor reagent over its vendor price
+  local v = FT.VendorBuy(3371)
+  assert(v and FT.VendorFloor(3371, v * 3) == v, "the vendor floor")
+  assert(FT.VendorFloor(3371, math.max(1, v - 1)) == nil, "cheaper on the AH: no floor")
+
+  -- the network's nodes and chests: an O message, pooled into the loot line
+  local enc = FT.Hist.Enc
+  local realGuild = IsInGuild
+  IsInGuild = function() return true end
+  mock.fire("CHAT_MSG_ADDON", "WOLFNET1", table.concat({ "O", "1", enc(176584), "Felwood", enc(12), enc(13463) .. ":" .. enc(20) }, "\t"), "GUILD", "Sarge-Realm")
+  assert(FT.db.netObj and next(FT.db.netObj), "the nodes are pooled")
+
+  -- the version line: once per new version, then quiet - from the network (the version rides on every message)
+  -- and from the price file
+  FT.db.told = {}
+  local said = #mock.prints
+  mock.fire("CHAT_MSG_ADDON", "WOLFNET1", table.concat({ "S", "1", "otherhouse", enc(1), enc(1), enc(1), enc(1), "v0.98" }, "\t"), "GUILD", "Sarge-Realm")
+  assert(#mock.prints == said + 1 and mock.prints[#mock.prints]:find("v0.98", 1, true), "a newer version heard: one line")
+  mock.fire("CHAT_MSG_ADDON", "WOLFNET1", table.concat({ "S", "1", "otherhouse", enc(1), enc(1), enc(1), enc(1), "v0.98" }, "\t"), "GUILD", "Kev-Realm")
+  mock.fire("CHAT_MSG_ADDON", "WOLFNET1", table.concat({ "S", "1", "otherhouse", enc(1), enc(1), enc(1), enc(1), "v0.5" }, "\t"), "GUILD", "Kev-Realm")
+  assert(#mock.prints == said + 1, "the same version again, or an older one: quiet")
+  local feedRel = FT.FEED.release
+  FT.FEED.release = "0.98.202612010000"
+  FT.Ver.Remind()
+  assert(#mock.prints == said + 1, "the price file's same version: quiet")
+  FT.FEED.release = "0.99.202612020000"
+  FT.Ver.Remind(); FT.Ver.Remind()
+  assert(#mock.prints == said + 2 and mock.prints[#mock.prints]:find("v0.99", 1, true), "a newer one from the price file: one line")
+  FT.FEED.release = feedRel
+  -- ours goes with every message
+  local sent = {}
+  local realSend = C_ChatInfo.SendAddonMessage
+  C_ChatInfo.SendAddonMessage = function(prefix, text) if prefix == "WOLFNET1" then sent[#sent + 1] = text end return true end
+  FT.Net.Deal(12363, 100, -0.4)
+  mock.run(5, 0.5)
+  C_ChatInfo.SendAddonMessage = realSend
+  IsInGuild = realGuild
+  for _, t in ipairs(sent) do assert(t:find("\tv0%.9$"), "the version rides along: " .. t) end
+  assert(#sent > 0, "a message went out")
+  print("network messages with the version: " .. #sent)
+
+  -- the calendar: the Darkmoon Faire in Mulgore from Dec 7, 2026; a battleground holiday week each week
+  local t0 = time({ year = 2026, month = 12, day = 1, hour = 12 })
+  local ev = FT.Ahead.Events(14, t0)
+  local faire, bg
+  for _, e in ipairs(ev) do
+    if e.kind == "faire" then faire = e end
+    if e.kind == "bg" then bg = e end
+  end
+  assert(faire and (faire.where or ""):find("Mulgore", 1, true) and date("%d", faire.t) == "07", "the Faire: Mulgore, Dec 7")
+  assert(bg, "a battleground's holiday week")
+  -- the reminder: the day before, once
+  FT.db.reminded = {}
+  said = #mock.prints
+  FT.Ahead.Remind(faire.t - 20 * 3600)
+  FT.Ahead.Remind(faire.t - 19 * 3600)
+  local faireLines = 0
+  for i = said + 1, #mock.prints do if mock.prints[i]:find("Coming up tomorrow", 1, true) and mock.prints[i]:find("Darkmoon", 1, true) then faireLines = faireLines + 1 end end
+  assert(faireLines == 1, "the Faire's reminder, once: " .. faireLines)
+
+  -- Coming up: the calls (how sure, never under 40%), the page and Today's calendar
+  local l = FT.Ahead.Lists()
+  for _ = 1, 40 do
+    if l then break end
+    mock.run(5, 0.05)
+    l = FT.Ahead.Lists()
+  end
+  assert(l, "next week's calls are worked out")
+  for _, r in ipairs(l.farms) do assert(r.call.sure >= 40 and r.call.sure <= 100, "how sure: " .. r.call.sure) end
+  print(string.format("coming up: %d farms, %d raids, %d pvp", #l.farms, #l.raids, #l.pvp))
+  FT.ShowSub("make", "coming")
+  assert(FT.currentTab == "coming", "Make gold > Coming up")
+  FT.Show("today")
+  local TT = FT.Tabs.today
+  TT.FillComing()
+  assert(TT.coming.days[1].day.__text == "Today", "the calendar starts today")
+  local withEvent
+  for _, dd in ipairs(TT.coming.days) do if #dd.events > 0 then withEvent = dd break end end
+  if withEvent then
+    withEvent:GetScript("OnClick")(withEvent)
+    assert(TT.coming.picked == withEvent.t, "a day picked")
+    withEvent:GetScript("OnClick")(withEvent)
+    assert(TT.coming.picked == nil, "and unpicked")
+  end
+  TT.FillMoves()
+  print("best moves card: " .. #TT.moves.list.items .. " rows" .. (TT.moves.list.items[1] and (", first " .. tostring(TT.moves.list.items[1].kind)) or ""))
+
+  -- the uniform bar: the same spot on every Make gold and You page
+  local function Vis(f)
+    while f do
+      if f.__shown == false then return false end
+      if f == UIParent then return true end
+      f = f.__parent
+    end
+    return true
+  end
+  for _, g in ipairs({ "make", "you" }) do
+    local at
+    for _, e in ipairs(FT.GROUPS[g]) do
+      FT.ShowSub(g, e[1])
+      for _, bar in ipairs(FT.GroupBarsOf(g)) do
+        if Vis(bar) then
+          local r = mock.layout.Rect(bar)
+          if at then
+            assert(math.abs(r[1] - at[1]) <= 1 and math.abs(r[3] - at[3]) <= 1,
+              string.format("%s > %s: the bar at %d,%d, not %d,%d", g, e[1], r[1], r[3], at[1], at[3]))
+          else at = r end
+        end
+      end
+    end
+  end
+
+  -- the calculator
+  local C = FT.Calc
+  assert(C.ParseMoney("12g 50s") == 125000 and C.ParseMoney("1.5") == 15000 and C.ParseMoney("75s") == 7500 and C.ParseMoney("x") == nil, "prices typed")
+  local b = C.Buy(12363, 5)
+  assert(b and b.total > 0 and b.got >= 1, "buying walks the listings")
+  local x = C.Sell(12363, 5)
+  assert(x and x.take == x.gross - x.cut and x.cut == math.floor(x.gross * FT.Cut() + 0.5), "selling: take home after the cut")
+  FT.ShowCalc(12363, "sell")
+  assert(WolfOfBootyBayCalc:IsShown() and (WolfOfBootyBayCalc.lines[1].__text or ""):find("take home", 1, true), "the calculator window")
+  print("calc: " .. (WolfOfBootyBayCalc.lines[1].__text or ""):gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", ""))
+  local function CheckWin(win, label)
+    mock.layout.Settle(win)
+    local found, texts = mock.layout.Overlaps(win)
+    local bad = #found
+    for _, o in ipairs(found) do print(string.format("OVERLAP [%s] %q x %q", label, o[1].text:sub(1, 50), o[2].text:sub(1, 50))) end
+    for _, t in ipairs(texts) do
+      if t.cut or t.spill or t.out then bad = bad + 1; print(string.format("CUT [%s] %q", label, t.text:sub(1, 100))) end
+    end
+    assert(bad == 0, label .. ": " .. bad .. " texts overlap or are cut")
+  end
+  CheckWin(WolfOfBootyBayCalc, "calculator: selling")
+  WolfOfBootyBayCalc.qty:SetValue("500")
+  FT.CalcUpdate()
+  CheckWin(WolfOfBootyBayCalc, "calculator: selling 500")
+  FT.ShowCalc(12363, "buy")
+  CheckWin(WolfOfBootyBayCalc, "calculator: buying 500")
+  WolfOfBootyBayCalc:Hide()
+
+  -- Level it up and Worth learning (the test's recipes are another character's: this one gets a copy, and skills)
+  local ks = {}
+  for k, profs in pairs(FT.db.recipes) do ks[#ks + 1] = tostring(k) .. ":" .. tostring(FT.db.chars[k] and FT.db.chars[k].side) end
+  print("recipes of: " .. table.concat(ks, ", ") .. " me " .. tostring(FT.charKey) .. " side " .. tostring(FT.sideKey))
+  local hadRecipes = FT.db.recipes[FT.charKey]
+  if not hadRecipes then
+    FT.db.recipes[FT.charKey] = { Alchemy = { scanned = time(), name = "Alchemy", list = {
+      { name = "Major Healing Potion", output = 13446, outputQty = 1, reagents = { { itemID = 13464, qty = 2 }, { itemID = 13465, qty = 1 }, { itemID = 8925, qty = 1 } } } } } }
+    FT.Fire("FT_RECIPES_CHANGED")
+  end
+  FT.db.chars[FT.charKey].profs = FT.db.chars[FT.charKey].profs or { Alchemy = 280, Tailoring = 250, Engineering = 260, Blacksmithing = 270, Leatherworking = 260, Enchanting = 270, Cooking = 250 }
+  local mine = FT.db.recipes[FT.charKey]
+  local marked
+  for _, data in pairs(mine or {}) do
+    for _, r in ipairs(data.list or {}) do if not marked then r.diff = "optimal"; marked = r end end
+  end
+  local lv = FT.Craft.LevelUp("all")
+  local wl = FT.Craft.WorthLearning("all")
+  print("level it up: " .. (lv and #lv or "nil") .. " rows; worth learning: " .. #wl .. (wl[1] and (", first " .. FT.Craft.LearnText(wl[1]):gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "")) or ""))
+  assert(lv and #lv >= 1, "Level it up lists the orange recipe")
+  FT.SelectTab("craft")
+  FT.Tabs.craft.SetView("level")
+  FT.Tabs.craft.SetView("learn")
+  FT.Tabs.craft.SetView("recipes")
+  if marked then marked.diff = nil end
+  if not hadRecipes then FT.db.recipes[FT.charKey] = nil; FT.Fire("FT_RECIPES_CHANGED") end
 end)
 step("logout", function() mock.fire("PLAYER_LOGOUT") end)
 '''

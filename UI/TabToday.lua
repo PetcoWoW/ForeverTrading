@@ -168,7 +168,7 @@ local function BuildComing(parent)
         if d.ev.SetWordWrap then d.ev:SetWordWrap(true) end
         if d.ev.SetMaxLines then d.ev:SetMaxLines(2) end
         d:SetScript("OnClick", function(self)
-            c.picked = (c.picked == self.t) and nil or self.t
+            if c.picked == self.t then c.picked = nil else c.picked = self.t end
             T.FillComing()
         end)
         d:SetScript("OnEnter", function(self)
@@ -292,7 +292,7 @@ local function BuildMoves(parent)
     c.list = UI.List(c, {
         rowHeight = UI.RowH(62),
         setup = function(row)
-            row.badge = UI.Badge(row, 60, 18)
+            row.badge = UI.Badge(row, 64 + 6 * (tonumber(FT.S.textSize) or 0), 18)
             row.badge:SetPoint("TOPLEFT", 4, -4)
             row.gold = UI.Text(row, 13, "text", "RIGHT")
             row.gold:SetPoint("TOPRIGHT", -4, -4)

@@ -718,6 +718,9 @@ function UI.GroupBar(parent, group)
     return bar
 end
 
+-- (for the tests) the section bars of a group
+function FT.GroupBarsOf(group) return groupBars[group] end
+
 -- a page's own view changed (from inside it): the group's bars follow
 function FT.GroupShows(group, key)
     if not FT.GROUPS[group] then return end

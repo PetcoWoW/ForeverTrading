@@ -1,5 +1,34 @@
 # Wolf
 
+## v0.50 - Coming up, where everything comes from, the buy/sell calculator
+
+- **Coming up** (Make gold, in place of Raid prep): this week's events (the Darkmoon Faire, a battleground's holiday
+  week, the raids, the holidays), next week's best farms, what to hold or sell for the raids, the PvP kit in a
+  battleground week, and Forever's content phases. Every call says how sure Wolf is - High from 75%, Medium from
+  55%, Low below, the colour fading as it drops - from how often the same call was right on that item over its
+  last 30 days (the hover shows the record). Calls under 40% aren't shown.
+- **Today, redone:** a seven-day calendar on the left (click a day for what it pulls on; again for next week's
+  farms) and one scrolling card on the right - your best asset first, then your best moves - in place of the three
+  top cards. One chat line the day before an event.
+- **Where everything comes from:** an item's page says where it's from - your loot, Wolf users' loot, mobs with
+  their drop chance, nodes, skinning, vendors (your side), Merchant's Favor (Three Corners, the Crossroads),
+  containers, quests, world drops - from ForeverDB and Wolf's own notes on Forever's new items. Every item that
+  trades has a source. Crafted materials (Cured Rugged Hide, bars, bolts) say Craft it, with their timers: "needs
+  Refined Deeprock Salt: every 3 days". The loot log now counts nodes and chests too, pooled over the Wolf network.
+- **Buy/sell calculator** (the Market section's button): buying N walks up the listings - the total, the average,
+  the dearest you'd pay; selling N takes home what's left after the auction house's real cut (read from your own
+  sale letters) with the deposit, how fast yours sell, and what your N do to the price while they sit.
+- **Smarter:** the vendor price floor ("a vendor sells it for 2s: never pay over that"), a propped-up price warning
+  (a few listings by one seller holding it far over its usual), a PvP tag on what battlegrounds burn through, and
+  farms that fit you (no skinning farm without a skinner, no mobs far over your level).
+- **Craft it: Level it up** (the cheapest skill point first, from each recipe's colour) **and Worth learning**
+  (recipes none of your characters know, for your professions, that profit and sell - with where to get each and
+  how many crafts pay it back). Season of Discovery leftovers are gone from the recipes.
+- **The bar:** Make gold and You keep their section bar in the same spot top left on every page.
+- **A newer Wolf:** one chat line per new version, then quiet. Every Wolf network message carries its version, so
+  the news gets round the guild.
+- **Licence:** Wolf is now GPL v3, to carry ForeverDB's data. Credits in NOTICE and /wolf credits.
+
 ## v0.43 - search from anywhere, what you own live, where recipes come from
 
 - **Search from any page:** a search box at the top of the window. The first letter takes you to Market and the

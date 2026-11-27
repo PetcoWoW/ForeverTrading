@@ -12,6 +12,13 @@ FT.News = N
 -- start, after the files are read (a table made with them would keep the English)
 local function News()
     return {
+        ["v0.50"] = {
+            { L["Coming up"], L["Make gold > Coming up and a calendar on Today: the Darkmoon Faire, battleground weeks, the raids, and next week's best farms, each with how sure Wolf is."], function() FT.ShowSub("make", "coming") end },
+            { L["Where everything comes from"], L["Every item's page says where it's from: the mobs, nodes, vendors, Merchant's Favor and quests, Forever's new ones too. Crafted materials say Craft it, with their timers."], function() FT.Show("market") end },
+            { L["Buy/sell calculator"], L["On an item's Market section: what buying N costs up the listings, what selling N takes home after the cut, and what your N do to the price."], function() FT.Show("market") end },
+            { L["Level it up, Worth learning"], L["Craft it: the cheapest way to skill up, and the recipes worth learning for your professions, with where to get them."], function() FT.SelectTab("craft") end },
+            { L["Your best moves"], L["Today's three cards are one: your best asset first, then the moves, scrolling."], function() FT.Show("today") end },
+        },
         ["v0.43"] = {
             { L["Search from any page"], L["The search box at the top of the window: type and Market opens with it. Wolf now always opens on Today."], function() FT.Show("today") end },
             { L["What you own, live"], L["Loot, mail, buys, crafts and gold show on Today and You as they happen, and Today says what you picked up today apart from what prices did."], function() FT.Show("today") end },

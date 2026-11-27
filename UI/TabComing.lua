@@ -158,8 +158,8 @@ function T.Refresh()
     if not built then return end
     -- (Wolf knows you: the farms fit your professions and level)
     local me = FT.Me and FT.Me.Text()
-    UI.FitSize(lead, L["What should pay next week, and how sure Wolf is: every call checked against the item's last 30 days."]
-        .. (me and FT.C("dim", "  ·  " .. L["fits you"] .. ": " .. me) or ""), 11, 2)
+    UI.FitBits(lead, L["Next week's calls, each with how sure Wolf is from its record on the item"]
+        .. (me and FT.C("dim", "  ·  " .. L["fits you"] .. ": " .. me) or ""))
     list:SetItems(Rows())
 end
 T.OnShow = T.Refresh
