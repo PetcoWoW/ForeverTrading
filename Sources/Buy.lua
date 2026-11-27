@@ -221,6 +221,7 @@ FT.On("COMMODITY_PURCHASE_SUCCEEDED", function()
     local p = pending
     if not (p and p.kind == "commodity" and p.confirmed) then return end
     FT.Print(string.format(L["Bought: %s x %s for %s."], FT.Num(p.qty), Name(p.itemID), FT.Money(p.total)))
+    FT.Fire("FT_AH_BOUGHT", p.itemID, p.qty, p.total)
     Done(true)
 end)
 
@@ -281,6 +282,7 @@ FT.On("AUCTION_HOUSE_PURCHASE_COMPLETED", function(auctionID)
     if not (p and p.kind == "item" and p.confirmed) then return end
     if auctionID and auctionID ~= p.auctionID then return end
     FT.Print(string.format(L["Bought out: %s for %s."], Name(p.itemID), FT.Money(p.price)))
+    FT.Fire("FT_AH_BOUGHT", p.itemID, 1, p.price)
     Done(true)
 end)
 

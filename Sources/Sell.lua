@@ -256,6 +256,7 @@ local function Posted(p, auctionID)
     end
     -- the deposit, for the deals journal
     if FT.Journal then FT.Journal.Posted(p.itemID, p.qty, p.deposit) end
+    FT.Fire("FT_AH_POSTED", p.itemID, p.qty, p.unit)
     Done(true)
 end
 

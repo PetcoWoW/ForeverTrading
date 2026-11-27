@@ -445,12 +445,93 @@ function M.IsWatched(id)
 end
 
 function M.ToggleWatch(id)
-    if FT.db.watch[id] then
-        FT.db.watch[id] = nil
-    else
-        FT.db.watch[id] = { added = time() }
+    if FT.db.watch[id] then M.Unwatch(id) else M.Watch(id) end
+end
+
+-- Groups: your own (named, in your order: FT.db.watchGroups), and for the rest one by what the item is (herbs,
+-- ore, consumables...). An item is in one group.
+local AUTO_KIND = { herb = "Herbs", ore = "Ore and stone", leather = "Leather", cloth = "Cloth", elemental = "Elementals", gem = "Gems" }
+local AUTO_CLASS = { [0] = "Consumables", [2] = "Gear", [4] = "Gear", [9] = "Recipes", [7] = "Trade goods", [5] = "Reagents" }
+
+function M.AutoGroup(id)
+    local cls, sub = FT.ItemClass(id)
+    local kind = FT.Eye and FT.Eye.KindOf and FT.Eye.KindOf(id, cls, sub)
+    return L[(kind and AUTO_KIND[kind]) or AUTO_CLASS[cls or -1] or "Other"]
+end
+
+function M.WatchGroups()
+    FT.db.watchGroups = FT.db.watchGroups or {}
+    return FT.db.watchGroups
+end
+
+local function HasGroup(name)
+    for _, g in ipairs(M.WatchGroups()) do if g == name then return true end end
+    return false
+end
+
+-- the group of a watched item: its name, and true when it's one of yours
+function M.GroupOf(id)
+    local w = FT.db.watch[id]
+    if w and w.group and HasGroup(w.group) then return w.group, true end
+    return M.AutoGroup(id), false
+end
+
+function M.NewGroup(name)
+    name = name and name:gsub("^%s+", ""):gsub("%s+$", "")
+    if not name or name == "" then return nil end
+    if not HasGroup(name) then table.insert(M.WatchGroups(), name) end
+    FT.Fire("FT_WATCH_CHANGED")
+    return name
+end
+
+function M.RenameGroup(old, new)
+    new = new and new:gsub("^%s+", ""):gsub("%s+$", "")
+    if not new or new == "" or HasGroup(new) then return end
+    for i, g in ipairs(M.WatchGroups()) do if g == old then M.WatchGroups()[i] = new end end
+    for _, w in pairs(FT.db.watch) do if w.group == old then w.group = new end end
+    FT.Fire("FT_WATCH_CHANGED")
+end
+
+-- the group goes; its items stay watched, in their own kind's group
+function M.DeleteGroup(name)
+    local list = M.WatchGroups()
+    for i = #list, 1, -1 do if list[i] == name then table.remove(list, i) end end
+    for _, w in pairs(FT.db.watch) do if w.group == name then w.group = nil end end
+    FT.Fire("FT_WATCH_CHANGED")
+end
+
+-- watch an item (group: one of yours, or nil for its kind's)
+function M.Watch(id, group)
+    local w = FT.db.watch[id]
+    if not w then
+        w = { added = time() }
+        FT.db.watch[id] = w
     end
+    if group ~= nil then w.group = group ~= false and group or nil end
     FT.Fire("FT_WATCH_CHANGED", id)
+end
+
+function M.Unwatch(id)
+    FT.db.watch[id] = nil
+    FT.Fire("FT_WATCH_CHANGED", id)
+end
+
+-- a crafted item and the materials of its recipe (not the vendor's), together in a group named after it
+function M.WatchWithMaterials(id)
+    local r = FT.UI and FT.UI.RecipeOf and FT.UI.RecipeOf(id)
+    local name = M.NewGroup(FT.Name(id) or ("#" .. id))
+    M.Watch(id, name)
+    local n = 0
+    if r then
+        for _, rg in ipairs(r.reagents or {}) do
+            local mid = rg.itemID
+            if mid and not (FT.VENDOR_REAGENTS and FT.VENDOR_REAGENTS[mid]) then
+                M.Watch(mid, name)
+                n = n + 1
+            end
+        end
+    end
+    return name, n
 end
 
 -- kind: "above" / "below"; value in copper or nil to clear

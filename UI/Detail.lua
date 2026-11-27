@@ -367,11 +367,8 @@ local function New(index)
     end)
     w.market:FitText(20)
     w.market:SetPoint("RIGHT", w.sizes, "LEFT", -10, 0)
-    w.watch = UI.Button(header, L["Watch"], 10, 24, "default", function()
-        if w.id then
-            FT.Market.ToggleWatch(w.id)
-            UpdateWatch(w)
-        end
+    w.watch = UI.Button(header, L["Watch"], 10, 24, "default", function(self)
+        if w.id then UI.WatchMenu(w.id, self) end
     end)
     w.watch:SetPoint("RIGHT", w.market, "LEFT", -6, 0)
     w.search = UI.Button(header, L["Search on AH"], 10, 24, "primary", function()

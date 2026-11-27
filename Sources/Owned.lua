@@ -467,6 +467,7 @@ FT.On("AUCTION_CANCELED", function(auctionID)
     local p = cancelling
     if p and p.sent and (auctionID == nil or auctionID == p.auctionID) then
         FT.Print(string.format(L["Taken off: %s x %s (it comes by mail)."], FT.Num(p.qty), p.link or FT.ItemText(p.itemID, 40)))
+        FT.Fire("FT_AH_CANCELLED", p.itemID, p.qty, p.unit)
         cancelling = nil
         O.Remove(p.auctionID)
         TakenOff(p.itemID)
@@ -492,6 +493,7 @@ FT.On("CHAT_MSG_SYSTEM", function(message)
     FT.Debug("owned: system line", message)
     if ERR_AUCTION_REMOVED and message == ERR_AUCTION_REMOVED then
         FT.Print(string.format(L["Taken off: %s x %s (it comes by mail)."], FT.Num(p.qty), p.link or FT.ItemText(p.itemID, 40)))
+        FT.Fire("FT_AH_CANCELLED", p.itemID, p.qty, p.unit)
         cancelling = nil
         O.Remove(p.auctionID)
         TakenOff(p.itemID)

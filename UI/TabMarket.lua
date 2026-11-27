@@ -176,6 +176,36 @@ local function Filtered()
     end
     -- My recipes: the open item's materials under it
     local count = #out
+    -- the watchlist: by group (yours first, in your order; then by kind), each under a header that folds it
+    if state.filter == "fav" then
+        local byGroup, order = {}, {}
+        for _, r in ipairs(out) do
+            local g, own = FT.Market.GroupOf(r.id)
+            if not byGroup[g] then
+                byGroup[g] = { rows = {}, own = own, value = 0 }
+                order[#order + 1] = g
+            end
+            table.insert(byGroup[g].rows, r)
+            byGroup[g].value = byGroup[g].value + (r.price or 0) * FT.Port.Count(r.id)
+        end
+        local rank = {}
+        for i, g in ipairs(FT.Market.WatchGroups()) do rank[g] = i end
+        table.sort(order, function(a, b)
+            local ra, rb = rank[a] or 1000, rank[b] or 1000
+            if ra ~= rb then return ra < rb end
+            return a < b
+        end)
+        state.closed = state.closed or {}
+        local grouped = {}
+        for _, g in ipairs(order) do
+            local x = byGroup[g]
+            grouped[#grouped + 1] = { header = true, id = "group:" .. g, group = g, own = x.own, n = #x.rows, value = x.value }
+            if not state.closed[g] then
+                for _, r in ipairs(x.rows) do grouped[#grouped + 1] = r end
+            end
+        end
+        return grouped, count
+    end
     if mine and state.open then
         for i, r in ipairs(out) do
             if r.id == state.open then
@@ -420,6 +450,12 @@ local function BuildList(parent)
     end
     local row1 = { Chip("all", L["All"]), Chip("fav", L["Watchlist"]), Chip("mine", L["My recipes"]),
         Chip("bags", L["I own"]) }
+    -- another page asks for a list: the Watchlist, say
+    function T.SetFilter(key)
+        state.filter = key
+        for _, ch in ipairs(chips) do ch:SetOn(ch.key == key) end
+        T.RefreshList()
+    end
     local row2 = { Chip("up", L["Rising"]), Chip("down", L["Falling"]) }
     local Y1, Y2 = -42, -42 - RH - GAP
     for i, c in ipairs(row1) do
@@ -468,9 +504,26 @@ local function BuildList(parent)
     list = UI.List(panel, {
         rowHeight = 26,
         cols = cols,
-        liveID = function(r) return r.id end,
+        liveID = function(r) return not r.header and r.id or nil end,
         update = function(row, r)
             local cell = row.cells.name
+            if r.header then
+                -- a watchlist group: its name, how many, what you hold of it; folds on a click
+                cell.chev:Show()
+                local closed = state.closed and state.closed[r.group]
+                cell.chev:SetDir(closed and "right" or "down", "accent")
+                cell.icon:Hide()
+                cell.star:SetText("")
+                cell.text:ClearAllPoints()
+                cell.text:SetPoint("LEFT", cell, "LEFT", 16, 0)
+                cell.text:SetPoint("RIGHT", cell, "RIGHT", 0, 0)
+                cell.text:SetText(FT.C(r.own and "accent" or "text", r.group) .. FT.C("dim", "  " .. r.n))
+                row.cells.price:SetText(r.value > 0 and FT.C("dim", FT.Money(math.floor(r.value), "short")) or "")
+                row.cells.ch1:SetText("")
+                row.cells.spark:SetValues({}, "muted")
+                return
+            end
+            cell.icon:Show()
             -- My recipes: the items with an arrow, their materials indented under them
             local indent = 0
             if state.filter == "mine" then
@@ -506,15 +559,31 @@ local function BuildList(parent)
         end,
         isSelected = function(r) return r.id == state.selected end,
         onClick = function(r, button)
+            if r.header then
+                if button == "RightButton" and r.own then UI.WatchGroupMenu(r.group) return end
+                state.closed = state.closed or {}
+                state.closed[r.group] = not state.closed[r.group] or nil
+                T.RefreshList(true)
+                return
+            end
             if UI.ItemClick(r.id) then return end
             if button == "RightButton" then
-                FT.Market.ToggleWatch(r.id)
+                -- the watchlist: a click right on it straight away (Settings), or its menu
+                if FT.S.rightClickWatch then FT.Market.ToggleWatch(r.id) else UI.WatchMenu(r.id) end
                 return
             end
             T.Select(r.id)
             if state.filter == "mine" and not r.child then ToggleOpen(r.id) end
         end,
         onEnter = function(row, r)
+            if r.header then
+                GameTooltip:SetOwner(row, "ANCHOR_RIGHT")
+                GameTooltip:AddLine(r.group, 1, 0.82, 0)
+                GameTooltip:AddLine(r.own and L["Your group. Click: fold it || Right-click: rename or remove it"]
+                    or L["Grouped by kind. Click: fold it"], 0.52, 0.56, 0.61, true)
+                GameTooltip:Show()
+                return
+            end
             GameTooltip:SetOwner(row, "ANCHOR_RIGHT")
             if GameTooltip.SetItemByID then GameTooltip:SetItemByID(r.id) end
             GameTooltip:AddLine(" ")
@@ -526,11 +595,11 @@ local function BuildList(parent)
                     GameTooltip:AddLine(FT.Money(r.unit) .. "  " .. FT.C("dim", tag) .. "  =  " .. FT.Money(r.unit * r.qty), 0.85, 0.87, 0.9)
                 end
                 GameTooltip:AddLine(" ")
-                GameTooltip:AddLine(L["Click: chart || Right-click: watchlist || Shift-click: link"], 0.52, 0.56, 0.61)
+                GameTooltip:AddLine((FT.S.rightClickWatch and L["Click: chart || Right-click: watchlist || Shift-click: link"] or L["Click: chart || Right-click: watchlist menu || Shift-click: link"]), 0.52, 0.56, 0.61)
             elseif state.filter == "mine" then
-                GameTooltip:AddLine(L["Click: chart and materials || Right-click: watchlist || Shift-click: link"], 0.52, 0.56, 0.61)
+                GameTooltip:AddLine((FT.S.rightClickWatch and L["Click: chart and materials || Right-click: watchlist || Shift-click: link"] or L["Click: chart and materials || Right-click: watchlist menu || Shift-click: link"]), 0.52, 0.56, 0.61)
             else
-                GameTooltip:AddLine(L["Click: chart || Right-click: watchlist || Shift-click: link"], 0.52, 0.56, 0.61)
+                GameTooltip:AddLine((FT.S.rightClickWatch and L["Click: chart || Right-click: watchlist || Shift-click: link"] or L["Click: chart || Right-click: watchlist menu || Shift-click: link"]), 0.52, 0.56, 0.61)
             end
             GameTooltip:Show()
         end,
@@ -822,7 +891,7 @@ function T.FillMoves()
     end
     overview.movesTitle:SetText(#personal > 0 and L["Your top 3"] or L["Today's 3 moves"])
     local okSees, sees = pcall(FT.Eye.ProfileText)
-    overview.sees:SetText(okSees and sees and (FT.C("dim", L["The wolf sees"] .. ":  ") .. sees) or "")
+    overview.sees:SetText(okSees and sees or "")
     local best = {}
     for _, d in ipairs(FT.Deals.List() or {}) do
         local k = d.kind
@@ -998,9 +1067,8 @@ local function BuildItemView(parent)
     end)
     v.search:FitText(20)
     v.search:SetPoint("TOPRIGHT", 0, -100)
-    v.watch = UI.Button(v, "", 10, 22, "default", function()
-        FT.Market.ToggleWatch(state.selected)
-        T.UpdateWatchButton()
+    v.watch = UI.Button(v, "", 10, 22, "default", function(self)
+        if state.selected then UI.WatchMenu(state.selected, self) end
     end)
     v.watch:SetPoint("RIGHT", v.search, "LEFT", -6, 0)
     v.bestUse = UI.Button(v, L["Best use"], 10, 22, "default", function()
@@ -1009,6 +1077,11 @@ local function BuildItemView(parent)
     v.bestUse:FitText(20)
     v.bestUse:SetPoint("RIGHT", v.watch, "LEFT", -6, 0)
     v.bestUse:SetTip(L["Best use"], L["Every recipe this goes into, ranked by what one of it brings made into each."])
+    v.when = UI.Button(v.chart, L["When it sells"], 10, 20, "default", function()
+        if state.selected then FT.ShowWhenSells(state.selected) end
+    end)
+    v.when:FitText(20)
+    v.when:SetTip(L["When it sells"], L["Hour by hour over the last two days, the time of day it sells most (your clock) and the best day of the week."])
 
     -- charts: the price on top, the profitability under it (zero in the middle)
     v.chart = UI.Chart(v)
@@ -1136,6 +1209,11 @@ function T.UpdateWatchButton()
     local v = itemView
     if not (v and state.selected) then return end
     if v.bestUse then v.bestUse:SetShown(FT.Craft.UsedIn(state.selected) ~= nil) end
+    if v.when then
+        -- on the chart, beside More
+        v.when:ClearAllPoints()
+        v.when:SetPoint("RIGHT", v.more, "LEFT", -4, 0)
+    end
     if v.longHold then
         local on = FT.db.longHold and FT.db.longHold[state.selected]
         v.longHold:SetLabel(on and L["Long hold: on"] or L["Long hold"])
@@ -1631,3 +1709,10 @@ function T.ClearSelection()
     if list then list:Refresh() end
     T.ShowOverview()
 end
+
+-- the watchlist changed (a menu, another page): the Watch button and the list follow
+FT.On("FT_WATCH_CHANGED", function()
+    if not FT.IsShown() then return end
+    T.UpdateWatchButton()
+    T.RefreshList(true)
+end)

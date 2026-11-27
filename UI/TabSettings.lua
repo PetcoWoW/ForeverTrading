@@ -163,7 +163,7 @@ function T.Build(p)
         function() if T.Layout then T.Layout() end end)
 
     -- general
-    local g = Section(left, L["General"], 14)
+    local g = Section(left, L["General"], 15)
     Choice(g, "look", L["Look"], { { "classic", L["Classic auction house"] }, { "dark", L["Dark terminal"] } },
         L["Classic: the game's own look, stone-and-gold edges, red buttons, gold labels, like the auction house. Dark: the exchange terminal at night. Takes effect after a reload."],
         function() FT.AskReload(L["The new look shows after the interface reloads. Reload now?"]) end)
@@ -194,8 +194,10 @@ function T.Build(p)
     Check(g, "ticker", L["Ticker tape under the header"], L["Your watchlist and the day's biggest movers, scrolling. Takes effect after /reload."],
         function() FT.AskReload() end)
     Check(g, "tickerMove", L["Keep the ticker moving under the mouse"], L["Off: the tape stops while you point at it, so an item is easy to click."])
+    Check(g, "rightClickWatch", L["Right-click adds to or removes from the watchlist"],
+        L["On the Market list: a right-click puts the item on your watchlist or takes it off, straight away. Off: a right-click opens the watchlist menu (watch it, its group, remove it)."])
     Check(g, "minimap", L["Minimap button"], nil, function() if FT.UpdateMinimap then FT.UpdateMinimap() end end)
-    Check(g, "ahButton", L["Snipe tab at the auction house"], L["A Snipe tab in the auction house window: after a scan, what's listed under its price, with how sure and a Buy button."])
+    Check(g, "ahButton", L["Wolf tab at the auction house"], L["A Wolf tab in the auction house window: this visit (what you bought and posted, against usual), your watchlist live with Buy, deals after a scan, past visits."])
     Check(g, "replaceAH", L["Open Wolf instead of the auction house window"],
         L["Talking to an auctioneer opens Wolf; the game's window stays open behind it, unseen. The \"AH: online\" pill in the header brings it back for buying and selling (and Auctionator). Walking away: the terminal goes offline with the last known prices."])
     Check(g, "tooltip", L["Lines in item tooltips"], L["Price change, RSI, the signal and the craft profit of the item, and a material's best use."])
@@ -231,12 +233,14 @@ function T.Build(p)
         L["Bars from ore, cloth bolts from cloth...: when one of your characters knows the recipe and it costs less than buying."])
 
     -- alerts
-    local al = Section(left, L["Alerts"], 4)
+    local al = Section(left, L["Alerts"], 5)
     Check(al, "eyeChat", L["The wolf's notes in chat"], L["At login and /reload: your portfolio, what moved in what you hold most and watch since you were last told, and up to three moves (sell, buy, craft, gather). After a scan of yours: what moved. Only what matters; never anything on screen."])
     Check(al, "sessionPanel", L["Session panel"], L["The small panel on screen while a session runs: time, worth, gold an hour, your best loot."],
         function() FT.UpdateHUD() end)
     Check(al, "meme", L["Meme mode"],
         L["TO THE MOON and RUG PULL names on the Terminal, WHALE ALERT when one seller holds most of an item, APE IN on the strongest buys."])
+    Check(al, "watchLive", L["Watchlist deals at the auction house"],
+        L["While the auction house is open, your watched items take turns in the live searches; one listed 15% or more under its usual price is said in chat, with how many and [Buy them]."])
     Check(al, "undercutAlert", L["Say in chat when you are undercut"],
         L["At the auction house: when an auction of yours is no longer the cheapest (your own other lots aside) - once per auction and price. Sell > My auctions tells whether to wait or post it again."])
 

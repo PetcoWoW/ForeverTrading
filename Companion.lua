@@ -44,17 +44,22 @@ end
 ---------------------------------------------------------------------------
 local actions = {}
 local registered = false
-local function Link(action, label, words)
+-- a link for chat: [label], which runs the action (with arg) when clicked; words: what a client without the link
+-- type gets instead
+function FT.ChatLink(action, label, words, arg)
     if not (EventRegistry and EventRegistry.RegisterCallback) then return words end
     if not registered then
         registered = true
         EventRegistry:RegisterCallback("SetItemRef", function(_, link)
-            local a = type(link) == "string" and link:match("^addon:WolfOfBootyBay:(%w+)")
-            if a and actions[a] then actions[a]() end
+            local a, rest = nil, nil
+            if type(link) == "string" then a, rest = link:match("^addon:WolfOfBootyBay:(%w+):?(.*)") end
+            if a and actions[a] then actions[a](rest ~= "" and rest or nil) end
         end, C)
     end
-    return "|cffffd100|Haddon:WolfOfBootyBay:" .. action .. "|h[" .. label .. "]|h|r"
+    return "|cffffd100|Haddon:WolfOfBootyBay:" .. action .. (arg and (":" .. tostring(arg)) or "") .. "|h[" .. label .. "]|h|r"
 end
+function FT.ChatAction(action, fn) actions[action] = fn end
+local Link = FT.ChatLink
 
 actions.reload = function() ReloadUI() end
 actions.get = function()

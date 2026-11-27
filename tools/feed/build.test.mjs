@@ -98,3 +98,26 @@ test("ships what sold day by day (the Radar)", () => {
   const lua = fs.readFileSync(out, "utf8");
   assert.match(lua, /soldFirst = \d+, sold = "[0-9a-z=,;]*"/);
 });
+
+test("ships what sold hour by hour (the item page's timeline)", () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "feed-"));
+  const cache = path.join(dir, "cache"), out = path.join(dir, "Feed.lua");
+  run("run1", out, cache, 1795500100);
+  run("run2", out, cache, 1795503700);
+  const lua = fs.readFileSync(out, "utf8");
+  const m = lua.match(/\[114\] = \{[^\n]*hourFirst = (\d+), hourly = "([0-9a-z=,;/]*)"/);
+  assert.ok(m, "hourly written");
+  const hour = Math.floor(1795503600 / 3600);
+  assert.equal(Number(m[1]), hour - 47);
+  // goods 12359: 15 sold in the last hour (the only one watched); its time of day: 15 an hour at that UTC hour
+  const line = m[2].split(";").find((e) => e.startsWith("12359="));
+  assert.ok(line, "12359 has an hourly line");
+  const [last, tod] = line.split("=")[1].split("/");
+  const lastVals = last.split(",");
+  assert.equal(lastVals.length, 48);
+  assert.equal(parseInt(lastVals[47], 36), 15);
+  assert.equal(lastVals[0], "", "hours not watched are empty");
+  const todVals = tod.split(",");
+  assert.equal(todVals.length, 24);
+  assert.equal(parseInt(todVals[hour % 24], 36), 150);
+});

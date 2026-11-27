@@ -795,6 +795,13 @@ local function LiveTargets()
             Add(tab.LiveItem())
         end
     end
+    -- your watchlist (a deal on one is said in chat: FT.AHVisit): when nothing is on screen, or its view is - an
+    -- item you have open keeps its quick turns
+    local ahTab = FT.SnipePanel and FT.SnipePanel.Panel()
+    local watchView = ahTab and ahTab:IsVisible() and FT.SnipePanel.view == "watch"
+    if FT.AHVisit and (#list == 0 or watchView) then
+        for _, id in ipairs(FT.AHVisit.LiveWatch(12)) do Add(id) end
+    end
     return list[1] and list or nil
 end
 

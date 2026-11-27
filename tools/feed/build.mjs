@@ -45,6 +45,9 @@ const KEEP_DAYS = Number(process.env.FEED_KEEP_DAYS) || 90;  // daily lows and s
 const SHIP_DAYS = Math.min(KEEP_DAYS, Number(process.env.FEED_SHIP_DAYS) || 30); // daily lows shipped
 const SALES_DAYS = 7;         // what sold: over the last week
 const DAILY_SALES = 14;       // what sold day by day: the last two weeks (the Radar)
+const HOURLY_SHIP = 48;       // what sold hour by hour: the last two days (the item page's timeline)
+const HOURLY_KEEP = 28 * 24;  // hours kept for the time-of-day profile (four weeks)
+const HOURLY_MIN = 10;        // items with fewer sold in four weeks: no hourly line (too little to tell)
 const MAX_GAP = 3 * 3600;     // two downloads further apart than this: no sales are counted between them
 // A listing gone by the next download: with more than 2 hours left it was bought (or taken off by its seller,
 // which looks the same from outside); with under 30 minutes left it ran out. 30 min - 2 h: can't tell, not counted.
@@ -193,6 +196,20 @@ function processHouse(region, houseId, got, hist) {
     const d = r.s[day] || (r.s[day] = [0, 0, 0]);
     d[0] += s.sold; d[1] += s.value; d[2] += s.expired;
   }
+  // hour by hour: what sold in the hour this download closes, and how long that hour was watched
+  const hour = Math.floor(t / 3600);
+  h.hours = h.hours || {};
+  if (watched > 0) {
+    h.hours[hour] = (h.hours[hour] || 0) + watched;
+    for (const [item, s] of sales) {
+      if (s.sold <= 0) continue;
+      const r = h.items[item];
+      r.h = r.h || {};
+      r.h[hour] = (r.h[hour] || 0) + s.sold;
+    }
+  }
+  const fromHour = hour - HOURLY_KEEP + 1;
+  for (const k of Object.keys(h.hours)) if (Number(k) < fromHour) delete h.hours[k];
   // forget what's older than the window
   const from = day - KEEP_DAYS + 1;
   for (const d of Object.keys(h.watched)) if (Number(d) < from) delete h.watched[d];
@@ -200,9 +217,13 @@ function processHouse(region, houseId, got, hist) {
   for (const [item, r] of Object.entries(h.items)) {
     for (const d of Object.keys(r.l)) if (Number(d) < from) delete r.l[d];
     for (const d of Object.keys(r.s)) if (Number(d) < from) delete r.s[d];
+    if (r.h) {
+      for (const k of Object.keys(r.h)) if (Number(k) < fromHour) delete r.h[k];
+      if (Object.keys(r.h).length === 0) delete r.h;
+    }
     if (!now.has(Number(item)) && Object.keys(r.l).length === 0 && Object.keys(r.s).length === 0) delete h.items[item];
   }
-  return { t, now, h, day };
+  return { t, now, h, day, hour };
 }
 
 // ---------------------------------------------------------------------------------------------------------------
@@ -242,12 +263,13 @@ const b36 = (n) => (n === undefined || n === null ? "" : Math.round(n).toString(
 // SHIP_DAYS days
 function encodeHouse(res) {
   const { now, h, day } = res;
+  const hour = res.hour || Math.floor(res.t / 3600);
   const days = [];
   for (let d = day - SHIP_DAYS + 1; d <= day; d++) days.push(d);
   const seen = days.filter((d) => h.seen && h.seen[d]);
   let watchedSec = 0;
   for (const d of days.slice(-SALES_DAYS)) watchedSec += h.watched[d] || 0;
-  const parts = [], soldParts = [];
+  const parts = [], soldParts = [], hourParts = [];
   const salesDays = days.slice(-DAILY_SALES);
   const ids = Object.keys(h.items).map(Number).sort((x, y) => x - y);
   for (const item of ids) {
@@ -270,13 +292,28 @@ function encodeHouse(res) {
       return b36(((x ? x[0] : 0) / w) * 24 * 10);
     });
     if (rates.some((v) => v !== "" && v !== "0")) soldParts.push(`${item}=${rates.join(",")};`);
+    // hour by hour: the last HOURLY_SHIP hours (how many sold; empty: not watched), then the time of day over four
+    // weeks - per UTC hour, sold per hour watched in tenths (the addon turns it to your clock)
+    if (r.h) {
+      let total = 0;
+      for (const v of Object.values(r.h)) total += v;
+      if (total >= HOURLY_MIN) {
+        const last = [];
+        for (let k = hour - HOURLY_SHIP + 1; k <= hour; k++) last.push(h.hours[k] ? b36(r.h[k] || 0) : "");
+        const sold = new Array(24).fill(0), seenSec = new Array(24).fill(0);
+        for (const [k, sec] of Object.entries(h.hours)) seenSec[Number(k) % 24] += sec;
+        for (const [k, v] of Object.entries(r.h)) sold[Number(k) % 24] += v;
+        const tod = sold.map((v, i) => (seenSec[i] >= 3600 ? b36((v / (seenSec[i] / 3600)) * 10) : ""));
+        hourParts.push(`${item}=${last.join(",")}/${tod.join(",")};`);
+      }
+    }
   }
   return { text: parts.join(""), firstDay: days[0], seen, items: ids.length, listed: now.size,
-    sold: soldParts.join(""), soldFirst: salesDays[0] };
+    sold: soldParts.join(""), soldFirst: salesDays[0], hourly: hourParts.join(""), hourFirst: hour - HOURLY_SHIP + 1 };
 }
 
 function luaString(s) {
-  // the data has only [0-9a-z=,;]: a plain quoted string is safe
+  // the data has only [0-9a-z=,;/]: a plain quoted string is safe
   return `"${s}"`;
 }
 
@@ -296,7 +333,7 @@ function writeLua(results) {
     lines.push(`            name = "${region}",`);
     lines.push("            houses = {");
     for (const [houseId, enc] of Object.entries(houses)) {
-      lines.push(`                [${houseId}] = { t = ${enc.t}, firstDay = ${enc.firstDay}, seen = "${enc.seen.join(",")}", data = ${luaString(enc.text)}, soldFirst = ${enc.soldFirst}, sold = ${luaString(enc.sold)} },`);
+      lines.push(`                [${houseId}] = { t = ${enc.t}, firstDay = ${enc.firstDay}, seen = "${enc.seen.join(",")}", data = ${luaString(enc.text)}, soldFirst = ${enc.soldFirst}, sold = ${luaString(enc.sold)}, hourFirst = ${enc.hourFirst}, hourly = ${luaString(enc.hourly)} },`);
     }
     lines.push("            },");
     lines.push("        },");

@@ -203,17 +203,17 @@ end
 
 local function TipAH(self)
     GameTooltip:SetOwner(self, "ANCHOR_TOP")
-    GameTooltip:AddLine("|cfff0b90bWolf|r  " .. L["Snipe"])
-    GameTooltip:AddLine(L["After a scan: what's listed under its price, how sure, and Buy. Plus the items worth searching again and again."], 0.8, 0.8, 0.8, true)
+    GameTooltip:AddLine("|cfff0b90bWolf|r")
+    GameTooltip:AddLine(L["This visit (what you bought and posted, against usual), your watchlist live, deals after a scan, past visits."], 0.8, 0.8, 0.8, true)
     GameTooltip:Show()
 end
 
 -- the text of the tab: Snipe, how far a scan got, how many are underpriced now
 local function AHLabel()
     local frac = FT.Scanner.Running() and FT.Scanner.Progress()
-    if frac then return string.format("%s  %d%%", L["Snipe"], math.floor(frac * 100)) end
+    if frac then return string.format("%s  %d%%", L["Wolf"], math.floor(frac * 100)) end
     local n = FT.SnipePanel and FT.SnipePanel.Count() or 0
-    return n > 0 and string.format("%s (%d)", L["Snipe"], n) or L["Snipe"]
+    return n > 0 and string.format("%s (%d)", L["Wolf"], n) or L["Wolf"]
 end
 
 -- The modern auction house: a tab in the row of its tabs, the game's own look. With Auctionator its tab
@@ -232,7 +232,7 @@ local function BuildAHTab(ah)
                 p:SetParent(holder)
                 p:SetAllPoints(holder)
                 p:Show()
-                lib:CreateTab("Wolf", holder, L["Snipe"])
+                lib:CreateTab("Wolf", holder, L["Wolf"])
             end
             tab = lib:GetButton("Wolf")
         end)
@@ -279,7 +279,7 @@ end
 
 -- The classic auction house (or no tab template): our own button
 local function BuildAHPlainButton(ah)
-    local b = UI.Button(ah, L["Snipe"], 10, 22, "default", ToggleFromAH)
+    local b = UI.Button(ah, L["Wolf"], 10, 22, "default", ToggleFromAH)
     b.style = { bg = "bg0", bgA = 0.92, hover = "bg2", hoverA = 1, text = "accent", border = "line" }
     b:SetActive(false)
     b:FitText(24)
@@ -289,7 +289,7 @@ local function BuildAHPlainButton(ah)
     else
         b:SetPoint("TOPRIGHT", ah, "BOTTOMRIGHT", -4, -2)
     end
-    b:SetTip("Wolf  " .. L["Snipe"], L["After a scan: what's listed under its price, how sure, and Buy. Plus the items worth searching again and again."])
+    b:SetTip("Wolf", L["This visit (what you bought and posted, against usual), your watchlist live, deals after a scan, past visits."])
     local set = b.SetLabel
     b.SetLabel = function(self, text)
         set(self, text)
@@ -700,6 +700,108 @@ function FT.ShowLink(title, body, url)
 end
 
 ---------------------------------------------------------------------------
+-- A name to type (a new watchlist group, a rename): the link dialog's look, with an OK
+---------------------------------------------------------------------------
+local askDialog
+
+function FT.AskText(title, body, default, onOK)
+    if not askDialog then
+        UI.ResolveFont()
+        local d = CreateFrame("Frame", "WolfOfBootyBayAskText", UIParent)
+        d:SetSize(400, 150)
+        d:SetPoint("CENTER", 0, 120)
+        d:SetFrameStrata("FULLSCREEN_DIALOG")
+        d:SetToplevel(true)
+        d:EnableMouse(true)
+        UI.Skin(d, "window", "bg1")
+        d.title = UI.Text(d, 14, "text")
+        d.title:SetPoint("TOPLEFT", 16, -16)
+        d.body = UI.Text(d, 11, "muted")
+        d.body:SetPoint("TOPLEFT", 16, -40)
+        d.body:SetPoint("RIGHT", d, "RIGHT", -16, 0)
+        d.input = UI.Input(d, 368, 26, "")
+        d.input:SetPoint("TOPLEFT", 16, -64)
+        local function OK()
+            local text = d.input:GetText()
+            d:Hide()
+            if d.onOK and text and text:match("%S") then d.onOK(text) end
+        end
+        d.input:SetScript("OnEnterPressed", OK)
+        d.input:SetScript("OnEscapePressed", function() d:Hide() end)
+        d.ok = UI.Button(d, L["OK"], 10, 24, "primary", OK)
+        d.ok:FitText(28)
+        d.ok:SetPoint("BOTTOMRIGHT", -16, 14)
+        d.cancel = UI.Button(d, L["Cancel"], 10, 24, "default", function() d:Hide() end)
+        d.cancel:FitText(28)
+        d.cancel:SetPoint("RIGHT", d.ok, "LEFT", -8, 0)
+        tinsert(UISpecialFrames, "WolfOfBootyBayAskText")
+        d:Hide()
+        askDialog = d
+    end
+    local d = askDialog
+    d.onOK = onOK
+    d.title:SetText(title)
+    d.body:SetText(body or "")
+    d.input:SetText(default or "")
+    d:Show()
+    d:Raise()
+    d.input:SetFocus()
+    d.input:HighlightText()
+end
+
+---------------------------------------------------------------------------
+-- The watchlist menu of one item: watch it (alone, with its materials, in a group of yours), move it, remove it
+---------------------------------------------------------------------------
+function UI.WatchMenu(id, anchor)
+    local M = FT.Market
+    local items = {}
+    local function NewGroupThen(fn)
+        FT.AskText(L["New watchlist group"], L["A name for it (Flask mats, Flips, Raid night...)"], "", function(name)
+            local g = M.NewGroup(name)
+            if g then fn(g) end
+        end)
+    end
+    if not M.IsWatched(id) then
+        items[#items + 1] = { L["Watch it"], function() M.Watch(id) end }
+        if UI.RecipeOf and UI.RecipeOf(id) then
+            items[#items + 1] = { L["Watch it and its materials"], function()
+                local g, n = M.WatchWithMaterials(id)
+                FT.Print(string.format(L["Watching %s and its %d materials, in the group %s."], FT.ItemText(id), n, g))
+            end }
+        end
+        items[#items + 1] = { "-" }
+        for _, g in ipairs(M.WatchGroups()) do
+            items[#items + 1] = { string.format(L["Watch it in: %s"], g), function() M.Watch(id, g) end }
+        end
+        items[#items + 1] = { L["Watch it in a new group..."], function() NewGroupThen(function(g) M.Watch(id, g) end) end }
+    else
+        local cur, own = M.GroupOf(id)
+        items[#items + 1] = { FT.C("dim", string.format(L["In the group: %s"], cur)) }
+        for _, g in ipairs(M.WatchGroups()) do
+            if g ~= cur then items[#items + 1] = { string.format(L["Move to: %s"], g), function() M.Watch(id, g) end } end
+        end
+        items[#items + 1] = { L["Move to a new group..."], function() NewGroupThen(function(g) M.Watch(id, g) end) end }
+        if own then
+            items[#items + 1] = { string.format(L["Back to: %s"], M.AutoGroup(id)), function() M.Watch(id, false) end }
+        end
+        items[#items + 1] = { "-" }
+        items[#items + 1] = { L["Remove from the watchlist"], function() M.Unwatch(id) end, "down" }
+    end
+    FT.ShowMenu(anchor, items)
+end
+
+-- a group of yours: rename it, or let it go (its items stay watched)
+function UI.WatchGroupMenu(name, anchor)
+    local M = FT.Market
+    FT.ShowMenu(anchor, {
+        { L["Rename the group..."], function()
+            FT.AskText(L["Rename the group"], name, name, function(new) M.RenameGroup(name, new) end)
+        end },
+        { L["Remove the group (its items stay watched)"], function() M.DeleteGroup(name) end, "down" },
+    })
+end
+
+---------------------------------------------------------------------------
 -- Best use: every recipe a material goes into, ranked by what one of it brings (FT.Craft.BestUse)
 ---------------------------------------------------------------------------
 local bestUse
@@ -828,6 +930,209 @@ function FT.ShowBestUse(itemID)
     d.list:SetItems(list)
     d:Show()
     d:Raise()
+end
+
+---------------------------------------------------------------------------
+-- When it sells: the last 48 hours hour by hour, the time of day it sells most (your clock, four weeks) and the
+-- day of the week (two weeks) - from the price robot's hourly looks at the whole auction house (FT.Feed.Hourly)
+---------------------------------------------------------------------------
+local whenWin
+
+-- a row of bars: values (nil: not watched, drawn faint), a label under some of them, the best ones in gold
+local function Bars(parent, n)
+    local f = CreateFrame("Frame", nil, parent)
+    f.bars, f.labels = {}, {}
+    for i = 1, n do
+        local b = UI.Tex(f, "ARTWORK", "accent", 1)
+        f.bars[i] = b
+        local l = UI.Text(f, 10, "dim", "CENTER")
+        f.labels[i] = l
+    end
+    f.max = UI.Text(f, 10, "dim", "RIGHT")
+    f.max:SetPoint("TOPRIGHT", f, "TOPLEFT", -4, 2)
+    f.base = UI.HLine(f, "line")
+    f.base:SetPoint("BOTTOMLEFT", 0, 14)
+    f.base:SetPoint("BOTTOMRIGHT", 0, 14)
+    -- values, labels (by index), best: indexes in gold; fmt: the top value's text
+    f:SetScript("OnSizeChanged", function(self) if self.args then self:Set(unpack(self.args)) end end)
+    function f:Set(values, labels, best, fmt)
+        self.args = { values, labels, best, fmt }
+        local w, h = self:GetWidth(), self:GetHeight() - 16
+        if not w or w <= 0 then return end
+        local top = 0
+        for i = 1, n do if values[i] and values[i] > top then top = values[i] end end
+        local bw = w / n
+        for i = 1, n do
+            local b, v = self.bars[i], values[i]
+            b:ClearAllPoints()
+            local bh = (v and top > 0) and math.max(1, math.floor(h * v / top + 0.5)) or 2
+            b:SetPoint("BOTTOMLEFT", (i - 1) * bw + 1, 15)
+            b:SetSize(math.max(1, bw - 2), bh)
+            if v == nil then UI.SetTexColor(b, "line", 0.6)
+            elseif best and best[i] then UI.SetTexColor(b, "accent", 1)
+            else UI.SetTexColor(b, "muted", 0.55) end
+            local l = self.labels[i]
+            l:ClearAllPoints()
+            l:SetPoint("TOP", self, "BOTTOMLEFT", (i - 0.5) * bw, 13)
+            l:SetText(labels[i] or "")
+        end
+        self.max:SetText(top > 0 and (fmt and fmt(top) or FT.Num(top)) or "")
+    end
+    return f
+end
+
+local function HourLabel(h)
+    h = h % 24
+    if h == 0 then return "12a" elseif h == 12 then return "12p" end
+    return h < 12 and (h .. "a") or ((h - 12) .. "p")
+end
+
+-- the 3 hours in a row (around the day) that sell the most, and the 3 that sell the least
+local function Window(tod)
+    local best, bestAt, low, lowAt
+    for start = 0, 23 do
+        local sum, ok = 0, true
+        for k = 0, 2 do
+            local v = tod[(start + k) % 24]
+            if v == nil then ok = false break end
+            sum = sum + v
+        end
+        if ok then
+            if not best or sum > best then best, bestAt = sum, start end
+            if not low or sum < low then low, lowAt = sum, start end
+        end
+    end
+    return bestAt, lowAt
+end
+
+local function WhenWindow()
+    if whenWin then return whenWin end
+    UI.ResolveFont()
+    local d = CreateFrame("Frame", "WolfOfBootyBayWhenSells", UIParent)
+    d:SetSize(660, 470)
+    d:SetPoint("CENTER", 0, 40)
+    d:SetFrameStrata("DIALOG")
+    d:SetToplevel(true)
+    d:EnableMouse(true)
+    d:SetMovable(true)
+    d:SetClampedToScreen(true)
+    d:RegisterForDrag("LeftButton")
+    d:SetScript("OnDragStart", d.StartMoving)
+    d:SetScript("OnDragStop", d.StopMovingOrSizing)
+    UI.Skin(d, "window", "bg1")
+    if d.bg then d.bg:SetAlpha(0.92) end
+    d.icon = UI.Icon(d, 30)
+    d.icon:SetPoint("TOPLEFT", 16, -14)
+    d.title = UI.Text(d, 14, "text")
+    d.title:SetPoint("TOPLEFT", d.icon, "TOPRIGHT", 10, -1)
+    d.title:SetPoint("RIGHT", d, "RIGHT", -110, 0)
+    d.sum = UI.Text(d, 11, "muted")
+    d.sum:SetPoint("TOPLEFT", d.title, "BOTTOMLEFT", 0, -4)
+    d.sum:SetPoint("RIGHT", d, "RIGHT", -16, 0)
+    d.close = UI.Button(d, L["Close"], 10, 22, "default", function() d:Hide() end)
+    d.close:FitText(24)
+    d.close:SetPoint("TOPRIGHT", -12, -12)
+    local function Section(y, title)
+        local t = UI.Text(d, 12, "text")
+        t:SetPoint("TOPLEFT", 16, y)
+        t:SetText(title)
+        local sub = UI.Text(d, 10, "dim")
+        sub:SetPoint("LEFT", t, "RIGHT", 10, 0)
+        sub:SetPoint("RIGHT", d, "RIGHT", -16, 0)
+        return t, sub
+    end
+    d.t1, d.s1 = Section(-66, L["The last 48 hours"])
+    d.hours = Bars(d, 48)
+    d.hours:SetPoint("TOPLEFT", 64, -86)
+    d.hours:SetPoint("RIGHT", d, "RIGHT", -16, 0)
+    d.hours:SetHeight(96)
+    d.t2, d.s2 = Section(-200, L["By hour of the day"])
+    d.tod = Bars(d, 24)
+    d.tod:SetPoint("TOPLEFT", 64, -220)
+    d.tod:SetPoint("RIGHT", d, "RIGHT", -16, 0)
+    d.tod:SetHeight(96)
+    d.t3, d.s3 = Section(-334, L["By day of the week"])
+    d.days = Bars(d, 7)
+    d.days:SetPoint("TOPLEFT", 64, -354)
+    d.days:SetPoint("RIGHT", d, "RIGHT", -280, 0)
+    d.days:SetHeight(80)
+    d.empty = UI.Text(d, 12, "muted", "CENTER")
+    d.empty:SetPoint("CENTER", 0, -20)
+    d.empty:SetWidth(520)
+    if d.empty.SetWordWrap then d.empty:SetWordWrap(true) end
+    tinsert(UISpecialFrames, "WolfOfBootyBayWhenSells")
+    d:Hide()
+    whenWin = d
+    return d
+end
+
+function FT.ShowWhenSells(itemID)
+    if not itemID then return end
+    local d = WhenWindow()
+    d.itemID = itemID
+    d.icon:SetItem(itemID)
+    d.title:SetText(L["When it sells"] .. ": " .. FT.ItemText(itemID, 40))
+    d:Show()
+    d:Raise()
+    local hr = FT.Feed and FT.Feed.Hourly and FT.Feed.Hourly(itemID)
+    local any = hr ~= nil
+    for _, x in ipairs({ d.t1, d.s1, d.hours, d.t2, d.s2, d.tod, d.t3, d.s3, d.days }) do x:SetShown(any) end
+    if not hr then
+        d.sum:SetText("")
+        d.empty:SetText(L["Not enough sales seen yet for an hour-by-hour picture: the price robot needs 10 or more sold in four weeks. It looks at the whole auction house every hour."])
+        d.empty:Show()
+        return
+    end
+    d.empty:Hide()
+    -- the last 48 hours, your clock under every 6th
+    local vals, labels, total, watched = {}, {}, 0, 0
+    for i, x in ipairs(hr.hours) do
+        vals[i] = x.n
+        if x.n then total, watched = total + x.n, watched + 1 end
+        local hh = tonumber(date("%H", x.t))
+        if hh % 6 == 0 then labels[i] = HourLabel(hh) end
+    end
+    d.hours:Set(vals, labels, nil)
+    d.s1:SetText(string.format(L["%s sold in the %d hours watched; each bar an hour (faint: not watched)"], FT.Num(total), watched))
+    -- the time of day, your clock
+    local tv, tl = {}, {}
+    for h = 0, 23 do
+        tv[h + 1] = hr.tod[h]
+        if h % 3 == 0 then tl[h + 1] = HourLabel(h) end
+    end
+    local bestAt, lowAt = Window(hr.tod)
+    local best = {}
+    if bestAt then for k = 0, 2 do best[(bestAt + k) % 24 + 1] = true end end
+    d.tod:Set(tv, tl, best, function(v) return string.format(L["%s/h"], FT.Num(math.floor(v + 0.5))) end)
+    d.s2:SetText(L["your clock, the last four weeks: sold an hour, on average"])
+    -- the days of the week, from the two weeks of daily sales
+    local days = FT.Feed.SoldDays and FT.Feed.SoldDays(itemID) or {}
+    local sum, cnt = {}, {}
+    for day, n in pairs(days) do
+        local wd = tonumber(date("!%w", day * 86400)) -- 0 = Sunday (UTC days)
+        sum[wd] = (sum[wd] or 0) + n
+        cnt[wd] = (cnt[wd] or 0) + 1
+    end
+    local dv, dl, order = {}, {}, { 1, 2, 3, 4, 5, 6, 0 }
+    local NAMES = { [0] = L["Sun"], L["Mon"], L["Tue"], L["Wed"], L["Thu"], L["Fri"], L["Sat"] }
+    local bestDay, bestDayV
+    for i, wd in ipairs(order) do
+        dv[i] = cnt[wd] and sum[wd] / cnt[wd] or nil
+        dl[i] = NAMES[wd]
+        if dv[i] and (not bestDayV or dv[i] > bestDayV) then bestDay, bestDayV = i, dv[i] end
+    end
+    d.days:Set(dv, dl, bestDay and { [bestDay] = true } or nil)
+    d.s3:SetText(L["the last two weeks, sold a day"])
+    -- the summary: when to post
+    local bits = {}
+    if bestAt then
+        bits[#bits + 1] = FT.C("accent", string.format(L["Sells most %s-%s"], HourLabel(bestAt), HourLabel(bestAt + 3)))
+            .. FT.C("dim", " " .. L["your time"])
+    end
+    if lowAt then bits[#bits + 1] = string.format(L["quietest %s-%s"], HourLabel(lowAt), HourLabel(lowAt + 3)) end
+    if bestDay then bits[#bits + 1] = string.format(L["best day: %s"], dl[bestDay]) end
+    bits[#bits + 1] = L["post a little before the busy hours"]
+    d.sum:SetText(table.concat(bits, FT.C("dim", "  ·  ")))
 end
 
 ---------------------------------------------------------------------------

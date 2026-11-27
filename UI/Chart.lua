@@ -204,6 +204,7 @@ function UI.Chart(parent)
 
         -- horizontal grid and price labels (a label where the last price's tag sits is left out: the tag says it)
         local tagY = (candles[n].c >= lo and candles[n].c <= hi) and Y(candles[n].c) or nil
+        local lastLabelY
         local step = NiceStep((hi - lo) / 4)
         local g = math.ceil(lo / step) * step
         local guard = 0
@@ -216,7 +217,8 @@ function UI.Chart(parent)
             t:SetPoint("BOTTOMRIGHT", self.plot, "BOTTOMRIGHT", 0, y)
             t:SetHeight(1)
             t:Show()
-            if not (tagY and math.abs(y - tagY) < 14) then
+            if not (tagY and math.abs(y - tagY) < 14) and not (lastLabelY and math.abs(y - lastLabelY) < 14) then
+                lastLabelY = y
                 local fs = self.ylabels:Get()
                 fs:ClearAllPoints()
                 fs:SetPoint("LEFT", self.plot, "BOTTOMRIGHT", 6, y)

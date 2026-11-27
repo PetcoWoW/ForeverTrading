@@ -183,8 +183,44 @@ local function Parse(h)
     if type(h.sold) == "string" then
         for id, rest in h.sold:gmatch("(%d+)=([^;]*);") do soldRaw[tonumber(id)] = rest end
     end
+    -- what sold hour by hour (the item page's timeline): kept as text too (F.Hourly)
+    local hourRaw = {}
+    if type(h.hourly) == "string" then
+        for id, rest in h.hourly:gmatch("(%d+)=([^;]*);") do hourRaw[tonumber(id)] = rest end
+    end
     return { t = h.t, firstDay = h.firstDay, items = items, raw = raw, count = n, seen = seen,
-        soldRaw = soldRaw, soldFirst = h.soldFirst }
+        soldRaw = soldRaw, soldFirst = h.soldFirst, hourRaw = hourRaw, hourFirst = h.hourFirst }
+end
+
+-- your clock against UTC, in whole hours (Pacific: -8)
+function F.UTCOffsetHours()
+    local now = time()
+    return math.floor((now - time(date("!*t", now))) / 3600 + 0.5)
+end
+
+-- An item's sales hour by hour: { hours = { { t = start of the hour (unix), n = sold or nil when not watched }
+-- x48, oldest first }, tod = { [0..23] = sold an hour at that hour of YOUR day, nil: not watched enough } };
+-- nil when the feed has none (older feeds, too few sales)
+function F.Hourly(itemID, house)
+    local h = F.House(house)
+    local rest = h and h.hourRaw and h.hourRaw[itemID]
+    if not (rest and h.hourFirst) then return nil end
+    local last, tod = rest:match("^([^/]*)/(.*)$")
+    if not last then return nil end
+    local out = { hours = {}, tod = {} }
+    local k = 0
+    for v in (last .. ","):gmatch("([^,]*),") do
+        out.hours[#out.hours + 1] = { t = (h.hourFirst + k) * 3600, n = Dec(v) }
+        k = k + 1
+    end
+    local off = F.UTCOffsetHours()
+    local u = 0
+    for v in (tod .. ","):gmatch("([^,]*),") do
+        local x = Dec(v)
+        if u <= 23 then out.tod[(u + off) % 24] = x and x / 10 or nil end
+        u = u + 1
+    end
+    return out
 end
 
 -- An item's sales day by day, as a day's worth each (the robot's watched hours scaled to 24): { [utcDay] = n }

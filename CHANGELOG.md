@@ -1,5 +1,23 @@
 # Wolf
 
+## v0.36 - watchlist groups, the AH visit, when it sells
+
+- **Watchlist groups.** Watched items are grouped on the Market list's Watchlist: your own groups first (make,
+  rename, remove them), the rest by kind (herbs, ore, consumables...). Click a group to fold it.
+- **Watch materials.** An item's Watch button opens a menu: watch it, watch it with its materials (a group named
+  after it), put it in a group, move it, remove it. The craft breakdown has a star on each material and Watch all.
+- **Right-click** on the Market list opens that menu now; Settings > General can make it add/remove straight away
+  again (off by default).
+- **The Wolf tab at the auction house** (was Snipe): This visit - what you bought, posted and took off, each
+  against its usual price, and the totals; Watchlist - your watched items as the live searches see them, with Buy
+  on a deal; Deals - the snipe lists; Past visits - your last 30. One chat line when you walk away.
+- **Watchlist deals, live.** While the auction house is open your watched items take turns in the live searches;
+  one listed 15% or more under its usual price is said in chat with how many and [Buy them] (Settings > Alerts).
+- **Buy under your price.** Posting: when some are listed under the price you're about to post at, a button buys
+  them out first (stackable goods all at once; gear the cheapest, a click each).
+- **When it sells.** On an item's chart: the last 48 hours hour by hour, the time of day it sells most (your clock)
+  and the best day of the week, from the price robot's hourly looks. The hourly picture fills up over the next days.
+
 ## v0.35 - the breakdown beside the chart
 
 - The craft breakdown shows on the item's page in every window size: beside the chart, or under it in the

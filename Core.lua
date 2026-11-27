@@ -4,7 +4,7 @@ local L = FT.L
 
 -- The version being released: a copy straight from the repository (not packaged) has no version in its TOC yet
 -- (the packager puts the tag there) and shows this one. Set it with every release.
-local RELEASE = "v0.35"
+local RELEASE = "v0.36"
 local GetMeta = (C_AddOns and C_AddOns.GetAddOnMetadata) or GetAddOnMetadata
 FT.VERSION = (GetMeta and GetMeta(ADDON, "Version")) or RELEASE
 if FT.VERSION == "" or FT.VERSION:find("@", 1, true) then FT.VERSION = RELEASE end
@@ -128,7 +128,9 @@ end
 -- Saved data
 ---------------------------------------------------------------------------
 FT.DEFAULTS = {
-    tickerMove = false,     -- the ticker keeps moving under the mouse (off: it stops so the item is easy to click)
+    tickerMove = false,
+    rightClickWatch = false,
+    watchLive = true,       -- at the auction house: the watchlist searched live, a deal on one said in chat -- the Market list's right-click: on, it watches / unwatches; off, the watchlist menu     -- the ticker keeps moving under the mouse (off: it stops so the item is easy to click)
     look = "classic",       -- classic (the game's own auction house look) / dark (the exchange terminal), after a reload
     words = "plain",        -- plain (Plain English) / trader (the trader terms), after a reload
     useFeed = true,         -- the price feed shipped with the addon (Sources/Feed.lua)

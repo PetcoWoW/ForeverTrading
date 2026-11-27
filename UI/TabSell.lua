@@ -298,6 +298,10 @@ local function BuildForm(p)
     f.post.label:SetFont(UI.FONT, UI.Size(13), "")
     f.post:FitText(40)
     f.post:SetPoint("BOTTOMRIGHT", -16, 16)
+    -- what's listed under your price: buy it out first (stackable: all at once; gear: the cheapest, a click each)
+    f.buyUnder = UI.Button(f, "", 10, 30, "default", function() T.BuyUnder() end)
+    f.buyUnder:SetPoint("RIGHT", f.post, "LEFT", -8, 0)
+    f.buyUnder:Hide()
     f.hint = UI.Text(f, 10, "dim")
     f.hint:SetPoint("BOTTOMLEFT", 16, 24)
     f.hint:SetPoint("RIGHT", f.post, "LEFT", -12, 0)
@@ -501,6 +505,24 @@ function T.UpdateSummary()
 
     local can = FT.Sell.Possible() and unit and unit > 0 and qty > 0 and not FT.Sell.Busy() and not FT.Buy.Busy()
     f.post:SetUsable(can and true or false)
+    -- listed under your price now: how many, what they cost (bought out, yours is the cheapest)
+    local n, cost = 0, 0
+    if unit and unit > 0 and FT.Buy.Possible() and FT.AHVisit then n, cost = FT.AHVisit.Under(e.id, unit) end
+    if n > 0 then
+        local commodity = kind == "commodity"
+        f.buyUnder:SetLabel(commodity and string.format(L["Buy %s under it (%s)"], FT.Num(n), FT.Money(math.floor(cost), "short"))
+            or string.format(L["Buy the cheapest (%s left under it)"], FT.Num(n)))
+        f.buyUnder:FitText(16)
+        f.buyUnder:SetTip(L["Buy out what's under your price"], commodity
+            and string.format(L["%s listed under your price, %s in all: bought at once (the server's price first, then your OK). Then yours is the cheapest."], FT.Num(n), FT.Money(math.floor(cost)))
+            or L["Each click buys the cheapest auction under your price (the server's price first, then your OK), until none is left."])
+        f.buyUnder:SetUsable(not FT.Buy.Busy() and not FT.Sell.Busy())
+        f.buyUnder:Show()
+        f.hint:SetPoint("RIGHT", f.buyUnder, "LEFT", -12, 0)
+    else
+        f.buyUnder:Hide()
+        f.hint:SetPoint("RIGHT", f.post, "LEFT", -12, 0)
+    end
     if not FT.Sell.Possible() then
         f.post:SetTip(L["Post"], FT.House.Why(L["Talk to an auctioneer to sell."]))
     else
@@ -519,6 +541,16 @@ local function FindLocation(e)
         end
     end
     return nil
+end
+
+-- buy out what's listed under the price in the box
+function T.BuyUnder()
+    local e = Current()
+    local unit = form and FT.Sell.Price(form.price:GetValue())
+    if not (e and unit and FT.AHVisit) then return end
+    local n, cost, low = FT.AHVisit.Under(e.id, unit)
+    if n == 0 then return end
+    if FT.Buy.IsCommodity(e.id) then FT.Buy.Start(e.id, n, cost / n) else FT.Buy.Start(e.id, 1, low) end
 end
 
 function T.Post()
@@ -984,3 +1016,7 @@ function T.OpenOwned(auctionID)
     if state.view ~= "owned" then T.SetView("owned") end
     T.SelectOwned(auctionID)
 end
+
+-- a purchase or a fresh look at the item: what's under your price follows
+FT.On("FT_AH_BOUGHT", function() if form and form:IsVisible() then T.UpdateSummary() end end)
+FT.On("FT_LIVE_UPDATED", function() if form and form:IsVisible() then FT.Debounce("sellUnder", 0.3, T.UpdateSummary) end end)

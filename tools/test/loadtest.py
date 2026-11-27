@@ -387,6 +387,70 @@ step("companion", function()
   FT.FEED.built, FT.Feed.Time, FT.COMPANION = realBuilt, realTime, nil
   FT.UpdateAHPill()
 end)
+step("watchlist groups", function()
+  local M = FT.Market
+  FT.db.watch, FT.db.watchGroups = {}, {}
+  M.Watch(12360); M.Watch(7080)
+  local g, n = M.WatchWithMaterials(13510)
+  assert(g and n > 0, "the flask and its materials in a group")
+  assert(M.GroupOf(13510) == g, "the flask in its group")
+  M.NewGroup("Flips"); M.Watch(12360, "Flips")
+  assert(select(2, M.GroupOf(12360)), "moved into a group of yours")
+  FT.Show("market"); FT.Tabs.market.SetFilter("fav")
+  local headers = 0
+  local list = FT.Tabs.market.list or nil
+  print("watchlist groups: " .. table.concat(M.WatchGroups(), ", ") .. "; flask group " .. g .. ", 7080 in " .. M.GroupOf(7080))
+  M.RenameGroup("Flips", "Quick flips")
+  assert(M.GroupOf(12360) == "Quick flips", "renamed")
+  M.DeleteGroup("Quick flips")
+  assert(not select(2, M.GroupOf(12360)) and M.IsWatched(12360), "group gone, item still watched")
+  UI = FT.UI
+  FT.UI.WatchMenu(13468)
+  FT.UI.WatchMenu(13510)
+end)
+step("ah visit", function()
+  -- a visit: Wolf's own purchase and posting, a purchase in another window; then walking away
+  mock.fire("AUCTION_HOUSE_SHOW")
+  FT.Fire("FT_AH_BOUGHT", 12360, 20, 20 * 30000)
+  FT.Fire("FT_AH_POSTED", 7080, 5, 80000)
+  mock.fire("COMMODITY_PRICE_UPDATED", 25000, 250000)
+  if C_AuctionHouse and C_AuctionHouse.ConfirmCommoditiesPurchase then C_AuctionHouse.ConfirmCommoditiesPurchase(7078, 10) end
+  mock.fire("COMMODITY_PURCHASE_SUCCEEDED")
+  local v = FT.AHVisit.Current()
+  print("ah visit: " .. #v.events .. " events")
+  FT.SnipePanel.Get(UIParent):Show()
+  for _, view in ipairs({ "visit", "watch", "deals", "past" }) do FT.SnipePanel.SetView(view) end
+  -- a watched item with a book under its usual price: a deal
+  FT.db.watch[12360] = FT.db.watch[12360] or { added = time() }
+  local s = FT.An.Stats(12360)
+  local usual = (s.avg and s.fair and math.min(s.avg, s.fair)) or s.fair or s.avg
+  FT.Hist.SetBook(12360, { t = time(), levels = { { math.floor(usual * 0.7), 12 }, { math.floor(usual * 0.8), 5 }, { usual, 40 } }, auctions = 3, qty = 57, sellers = 3, source = "live" })
+  local d = FT.AHVisit.WatchDeal(12360)
+  assert(d and d.n == 17, "17 under usual -15%: " .. tostring(d and d.n))
+  FT.ahOpen = true
+  FT.Fire("FT_LIVE_UPDATED", 12360)
+  FT.ahOpen = false
+  mock.fire("AUCTION_HOUSE_CLOSED")
+  assert(#FT.AHVisit.Past() >= 1, "the visit kept")
+  FT.SnipePanel.SetView("past")
+  FT.SnipePanel.Get():Hide()
+end)
+step("when it sells", function()
+  local hr = FT.Feed.Hourly(12360)
+  print("hourly: " .. tostring(hr and #hr.hours) .. " hours")
+  FT.ShowWhenSells(12360)
+  local d = _G.WolfOfBootyBayWhenSells
+  if d then
+    print("when it sells: " .. tostring(d.sum.__text):gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", ""))
+    mock.layout.Settle(d)
+    local found, texts = mock.layout.Overlaps(d)
+    for _, o in ipairs(found) do print(string.format("OVERLAP [when it sells] %q x %q  (%dx%d px)", o[1].text:sub(1, 50), o[2].text:sub(1, 50), o[3], o[4])) end
+    for _, t in ipairs(texts) do if t.cut then print(string.format("CUT [when it sells] %q", t.text:sub(1, 80))) end end
+    d:Hide()
+  end
+  FT.ShowWhenSells(13510) -- no hourly line: the note instead
+  if d then d:Hide() end
+end)
 step("craft breakdown", function()
   -- the flask: no character of yours knows it, the game's recipe; and a craft of yours
   local inv = FT.db.inv[FT.charKey]
@@ -439,6 +503,7 @@ step("layout", function()
   local pages = {
     { "market", "market" }, { "market item", "market", function() FT.OpenItem(12363) end },
     { "market item: a flask", "market", function() FT.OpenItem(13510) end },
+    { "market: watchlist", "market", function() FT.Tabs.market.ClearSelection(); FT.Tabs.market.SetFilter("fav") end },
     { "market item: a craft of yours", "market", function() FT.OpenItem(18405) end },
     { "money: make", "signals", function() FT.Tabs.signals.SetView("make") end },
     { "money: farm", "signals", function() FT.Tabs.signals.SetView("farm") end },
@@ -496,8 +561,30 @@ step("layout", function()
     end
   end
   FT.S.showAdvanced = false
+  FT.Tabs.market.SetFilter("all")
   FT.Tabs.radar.SetSection("consumables")
   end
+  -- the auction house's Wolf tab, each view
+  local ah = FT.SnipePanel.Get(UIParent)
+  ah:ClearAllPoints(); ah:SetPoint("CENTER"); ah:SetSize(800, 440); ah:Show()
+  mock.fire("AUCTION_HOUSE_SHOW")
+  FT.Fire("FT_AH_BOUGHT", 12360, 20, 20 * 30000)
+  FT.Fire("FT_AH_POSTED", 7080, 5, 80000)
+  for _, view in ipairs({ "visit", "watch", "deals", "past" }) do
+    FT.SnipePanel.SetView(view)
+    mock.layout.Settle(ah)
+    local found, texts = mock.layout.Overlaps(ah)
+    for _, o in ipairs(found) do
+      total = total + 1
+      print(string.format("OVERLAP [ah tab: %s] %q x %q  (%dx%d px)", view, o[1].text:sub(1, 50), o[2].text:sub(1, 50), o[3], o[4]))
+    end
+    for _, t in ipairs(texts) do
+      if t.cut then cuts = cuts + 1; local r = mock.layout.Rect(t.f); print(string.format("CUT [ah tab: %s] %q  box %d text %d", view, t.text:sub(1, 90), r[2] - r[1], mock.layout.TextWidth(t.f))) end
+      if t.spill then cuts = cuts + 1; print(string.format("SPILL [ah tab: %s] %q", view, t.text:sub(1, 60))) end
+    end
+  end
+  mock.fire("AUCTION_HOUSE_CLOSED")
+  ah:Hide()
   -- the item window (More), on a flask, standard size
   FT.ShowDetail(13510)
   mock.run(1)

@@ -114,26 +114,53 @@ function UI.Materials(parent, onPick)
     f.recipe:FitText(16)
     f.recipe:SetPoint("TOPRIGHT", -6, -7)
     f.recipe:SetTip(L["Recipe"], L["Open it on the Craft page"])
+    f.watchAll = UI.Button(f, L["Watch all"], 10, 18, "default", function()
+        if not f.itemID then return end
+        local g, n = FT.Market.WatchWithMaterials(f.itemID)
+        FT.Print(string.format(L["Watching %s and its %d materials, in the group %s."], FT.ItemText(f.itemID), n, g))
+    end)
+    f.watchAll.label:SetFont(UI.FONT, UI.Size(11), "")
+    f.watchAll:FitText(16)
+    f.watchAll:SetTip(L["Watch all"], L["This item and its materials on your watchlist, together in a group named after it"])
 
     local cols = {
         { key = "name", title = "", width = "fill", make = function(row)
             local c = CreateFrame("Frame", nil, row)
             c:SetHeight(ROW_H)
+            -- the material's own watch star
+            c.star = CreateFrame("Button", nil, c)
+            c.star:SetSize(14, ROW_H)
+            c.star:SetPoint("LEFT")
+            c.star.text = UI.Text(c.star, 13, "dim", "CENTER")
+            c.star.text:SetPoint("CENTER", 0, -2)
+            c.star.text:SetText("*")
+            c.star:SetScript("OnClick", function(self)
+                if self.itemID then FT.Market.ToggleWatch(self.itemID) end
+            end)
+            c.star:SetScript("OnEnter", function(self)
+                GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+                GameTooltip:AddLine(FT.Market.IsWatched(self.itemID) and L["On your watchlist: click to remove it"]
+                    or L["Click: watch this material"], 1, 1, 1)
+                GameTooltip:Show()
+            end)
+            c.star:SetScript("OnLeave", function() GameTooltip:Hide() end)
             c.icon = UI.Icon(c, 16)
-            c.icon:SetPoint("LEFT")
+            c.icon:SetPoint("LEFT", 16, 0)
             c.text = UI.Text(c, 11, "text")
             c.text:SetPoint("LEFT", c.icon, "RIGHT", 6, 0)
             c.text:SetPoint("RIGHT")
             return c
         end, cellHeight = ROW_H },
-        { key = "total", title = "", width = 64, justify = "RIGHT", size = 11 },
-        { key = "ch", title = "", width = 44, justify = "RIGHT", size = 11 },
+        { key = "total", title = "", width = 56 + 4 * (tonumber(FT.S.textSize) or 0), justify = "RIGHT", size = 11 },
+        { key = "ch", title = "", width = 46 + 2 * (tonumber(FT.S.textSize) or 0), justify = "RIGHT", size = 11 },
     }
     f.list = UI.List(f, {
         rowHeight = ROW_H, cols = cols,
         liveID = function(part) return part.itemID end,
         update = function(row, part)
             local c = row.cells.name
+            c.star.itemID = part.itemID
+            UI.SetTextColor(c.star.text, FT.Market.IsWatched(part.itemID) and "accent" or "dim")
             c.icon:SetItem(part.itemID)
             -- how many first: the name may be cut short in the narrow column
             c.text:SetText(FT.C("dim", part.qty .. "x ") .. FT.ItemText(part.itemID))
@@ -233,6 +260,9 @@ function UI.Materials(parent, onPick)
         self.itemID = id
         -- the Recipe button: only a recipe one of yours knows opens on the Craft page
         self.recipe:SetShown(known and FT.Craft.Best(id) ~= nil)
+        self.watchAll:ClearAllPoints()
+        if self.recipe:IsShown() then self.watchAll:SetPoint("RIGHT", self.recipe, "LEFT", -4, 0)
+        else self.watchAll:SetPoint("TOPRIGHT", -6, -7) end
         self.who:SetText(known and string.format(L["%s knows it"], FT.Craft.KnownByText(r))
             or L["No character of yours knows it"])
         local qty = math.max(1, r.outputQty or 1)
@@ -264,6 +294,8 @@ function UI.Materials(parent, onPick)
     -- the house its prices are of: an item window's own (nil: the one on)
     local setItem = f.SetItem
     function f:SetItem(id, maxH) return FT.House.With(self.house, setItem, self, id, maxH) end
+
+    FT.On("FT_WATCH_CHANGED", function() if f:IsShown() and f.list.Refresh then f.list:Refresh() end end)
 
     -- one of its materials
     function f:Has(id)

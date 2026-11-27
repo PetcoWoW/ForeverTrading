@@ -12,6 +12,11 @@ FT.News = N
 -- start, after the files are read (a table made with them would keep the English)
 local function News()
     return {
+        ["v0.36"] = {
+            { L["Watchlist groups"], L["Your watchlist in groups (yours and by kind); watch an item with its materials; right-click opens the watchlist menu."], function() FT.Show("market"); FT.Tabs.market.SetFilter("fav") end },
+            { L["The Wolf tab at the auction house"], L["This visit (bought, posted, against usual), your watchlist live with Buy, deals, past visits."], nil },
+            { L["When it sells"], L["On an item's chart: hour by hour, the busiest time of day and the best day."], nil },
+        },
         ["v0.35"] = {
             { L["The breakdown beside the chart"], L["The craft breakdown is on the item's page in every window size, and the More window is solid and tidy."], nil },
         },
