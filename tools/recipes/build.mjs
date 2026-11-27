@@ -80,24 +80,30 @@ export function RecipeName(itemName) {
   return m ? m[2].trim().toLowerCase() : null;
 }
 async function recipeItems() {
+  // one search per kind of recipe (Leatherworking, Tailoring, ...): a search stops at 1,000 results
   const out = new Map();
-  for (let page = 1, pages = 1; page <= pages && page <= 20; page++) {
-    const res = await fetch(`https://us.api.blizzard.com/data/wow/search/item?namespace=${NS}&locale=en_US&item_class.id=9&orderby=id&_pageSize=1000&_page=${page}`,
-      { headers: { Authorization: `Bearer ${auth}` } });
-    if (!res.ok) throw new Error(`item search: HTTP ${res.status}`);
-    const j = await res.json();
-    pages = j.pageCount || 1;
-    if (page === 1) console.log(`recipe item search: ${pages} pages of ${j.pageSize}, max ${j.maxPageSize}`);
-    for (const r of j.results || []) {
-      const d = r.data || {};
-      const name = typeof d.name === "string" ? d.name : (d.name?.en_US || "");
-      const key = RecipeName(name);
-      if (!key || !d.id) continue;
-      if (!out.has(key)) out.set(key, []);
-      out.get(key).push(d.id);
+  let total = 0;
+  for (let sub = 0; sub <= 11; sub++) {
+    for (let page = 1, pages = 1; page <= pages && page <= 20; page++) {
+      const res = await fetch(`https://us.api.blizzard.com/data/wow/search/item?namespace=${NS}&locale=en_US&item_class.id=9&item_subclass.id=${sub}&orderby=id&_pageSize=1000&_page=${page}`,
+        { headers: { Authorization: `Bearer ${auth}` } });
+      if (!res.ok) throw new Error(`item search ${sub}: HTTP ${res.status}`);
+      const j = await res.json();
+      pages = j.pageCount || 1;
+      const n = (j.results || []).length;
+      total += n;
+      if (n >= 1000 && pages <= page) console.log(`recipe items ${sub}: a full page with no next one - may be cut short`);
+      for (const r of j.results || []) {
+        const d = r.data || {};
+        const name = typeof d.name === "string" ? d.name : (d.name?.en_US || "");
+        const key = RecipeName(name);
+        if (!key || !d.id) continue;
+        if (!out.has(key)) out.set(key, []);
+        if (!out.get(key).includes(d.id)) out.get(key).push(d.id);
+      }
     }
   }
-  console.log(`recipe items found: ${[...out.values()].reduce((a, b) => a + b.length, 0)} (${out.size} names)`);
+  console.log(`recipe items found: ${total} searched, ${out.size} recipe names`);
   return out;
 }
 let items = null;
