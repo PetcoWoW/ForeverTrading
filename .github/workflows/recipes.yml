@@ -21,11 +21,16 @@ jobs:
         env:
           BLIZZARD_CLIENT_ID: ${{ secrets.BLIZZARD_CLIENT_ID }}
           BLIZZARD_CLIENT_SECRET: ${{ secrets.BLIZZARD_CLIENT_SECRET }}
+      - name: The Forever study's item data (every newer item, what it does, what makes and uses it)
+        run: node tools/recipes/study.mjs || echo "study data skipped"
+        env:
+          BLIZZARD_CLIENT_ID: ${{ secrets.BLIZZARD_CLIENT_ID }}
+          BLIZZARD_CLIENT_SECRET: ${{ secrets.BLIZZARD_CLIENT_SECRET }}
       - name: Commit it when it changed
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add Data/Recipes.lua
+          git add Data/Recipes.lua tools/study
           if git diff --cached --quiet; then echo "no change"; exit 0; fi
-          git commit -m "Recipes from the Blizzard API"
+          git commit -m "Recipes (and the Forever study's item data) from the Blizzard API"
           git push
