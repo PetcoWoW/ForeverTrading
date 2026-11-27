@@ -135,6 +135,9 @@ jobs:
           PREVMAJMIN=$(echo "${PREV#v}" | cut -d. -f1,2)
           if [ "$PREVMAJMIN" != "$MAJMIN" ]; then echo "NEW_VERSION=1" >> "$GITHUB_ENV"; fi
           echo "MAJMIN=$MAJMIN" >> "$GITHUB_ENV"
+          # the newest Wolf and prices companion, for the addon's "a newer one is out" line (v0.42): the companion
+          # brings this file every hour, so even a friend with nobody online hears of a new version
+          printf '\nif FT.FEED then FT.FEED.release = "%s"; FT.FEED.companion = "%s" end\n' "$MAJMIN" "$(tr -d '\r\n ' < companion/VERSION)" >> Data/Feed.lua
           mkdir -p dist/WolfOfBootyBay
           git archive HEAD | tar -x -C dist/WolfOfBootyBay
           cp Data/Feed.lua dist/WolfOfBootyBay/Data/Feed.lua

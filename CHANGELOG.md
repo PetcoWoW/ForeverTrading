@@ -1,5 +1,32 @@
 # Wolf
 
+## v0.42 - Simple Wolf and the Wolf network
+
+Wolf slimmed down for first-timers, tried out first in Wolf Lab.
+
+- **Four tabs:** Today, Market, Make gold (Flip it, Craft it, Farm it, Raid prep) and You (Holdings, Sessions,
+  Characters, Journal). Settings is behind the gear.
+- **Today:** what everything you own is worth and what the last price update did to it ("+12g with the last
+  prices"), since yesterday, a line of the last 24 updates; Your top 3; then In your bags, Going down today and
+  Going up today, each scrolling.
+- **Six verdicts everywhere:** BUY, SELL, HOLD, WAIT, CRAFT, FARM, one colour each. CASH OUT, HODL, APE IN and the
+  rest only with Settings > Meme mode (now off to start).
+- **Item pages read top to bottom:** the verdict and its reason first, one clean chart (7D / 30D / 90D), and beside
+  it sections that fit the item - When it sells, Market, Price history, then Best crafts (it's made into things),
+  Craft it (it's made: materials, cost, profit) and Where to farm (it's gathered). Watch, Wowhead and Share.
+- **When it sells at a glance:** when to sell, when to buy, the busiest day and a 24-hour strip; the charts on
+  request.
+- **One freshness light:** "Prices 20 min old"; your scan and Blizzard's prices in its hover.
+- **Where your gold sits:** a donut on You > Holdings - where it is, or how liquid. Click a slice for just that.
+- **Session panel folds** to the gold and gold an hour.
+- **A reminder** in chat when a newer Wolf or prices companion is out.
+- **Gone:** the Pro chart, candles and averages, Market Makers, the stat cards, Search on AH, the second Wowhead and
+  Where to farm entries in menus, Chart buttons in popups, the old item window. Long hold is in the Watch menu.
+- **The Wolf network:** Wolf users in your guild and group share the prices that changed after a scan (taken at
+  once, no /reload), what sold ("Wolf users sold 5 this week at ~20s" on the item page), farm rates per mob ("Wolf
+  users: 0.33 a corpse") and watchlist deals (one chat line). A price far from what's known waits until a second
+  user agrees. Settings > Exchange.
+
 ## v0.41 - when it sells: its price by the hour
 
 - **Price by hour of the day** in When it sells: each hour's price against the item's usual, your clock, the

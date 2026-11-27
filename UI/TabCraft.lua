@@ -453,18 +453,20 @@ local function BuildDetail(p)
     d.btnSearch:FitText(24)
     d.btnSearch:SetPoint("BOTTOMLEFT", 12, 10)
     d.btnSearch:SetTip(L["Search on AH"], L["Searches the item and all its materials: in Auctionator's Shopping tab when it is installed, otherwise with Wolf's scanner. The auction house must be open; fresh prices and order books follow."])
+    d.btnSearch:Hide() -- v0.42: one way to each thing
     d.btnChart = UI.Button(d, L["Price chart"], 10, 24, "default", function()
         if d.r then FT.OpenItem(d.r.output) end
     end)
     d.btnChart:FitText(20)
-    d.btnChart:SetPoint("LEFT", d.btnSearch, "RIGHT", 8, 0)
+    d.btnChart:SetPoint("BOTTOMLEFT", 12, 10)
+    d.btnChart:Hide() -- v0.42: the recipe's name opens its page
     d.btnWatch = UI.Button(d, L["Watch"], 10, 24, "default", function()
         if d.r then
             FT.Market.ToggleWatch(d.r.output)
             T.ShowDetail()
         end
     end)
-    d.btnWatch:SetPoint("LEFT", d.btnChart, "RIGHT", 8, 0)
+    d.btnWatch:SetPoint("BOTTOMLEFT", 12, 10)
 
     d.empty = UI.EmptyState(d, L["Pick a recipe"], L["Its costs, profit and materials show here."])
     d.empty:SetPoint("CENTER")

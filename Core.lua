@@ -4,7 +4,7 @@ local L = FT.L
 
 -- The version being released: a copy straight from the repository (not packaged) has no version in its TOC yet
 -- (the packager puts the tag there) and shows this one. Set it with every release.
-local RELEASE = "v0.41"
+local RELEASE = "v0.42"
 local GetMeta = (C_AddOns and C_AddOns.GetAddOnMetadata) or GetAddOnMetadata
 FT.VERSION = (GetMeta and GetMeta(ADDON, "Version")) or RELEASE
 if FT.VERSION == "" or FT.VERSION:find("@", 1, true) then FT.VERSION = RELEASE end
@@ -137,7 +137,9 @@ FT.DEFAULTS = {
     useFeed = true,         -- the price feed shipped with the addon (Sources/Feed.lua)
     scanWithAuctionator = true, -- Full scan runs Auctionator's scan when it's installed (one scan feeds both)
     holdTrends = true,      -- a steady climb is held (HODL / sell half) rather than sold the day it's above average
-    meme = true,            -- the meme layer: TO THE MOON / RUG PULL banners, whale alerts, APE IN
+    net = true,             -- the Wolf network: live prices, sales, farm rates and deal calls with guild and group
+    netDeals = true,        -- deal calls of other Wolf users in chat
+    meme = false,           -- the meme layer (off since v0.42: the six verdicts): TO THE MOON / RUG PULL banners, whale alerts, APE IN
     simple = true,          -- Simple view: the key numbers only, one clean chart (after a reload)
     showCraft = false,      -- the Craft tab (after a reload)
     chartStyle = "simple",  -- simple (one line, green/red) / pro (candles, averages, the second chart)
@@ -288,7 +290,14 @@ local function InitDB()
     db.settings.autoMine = nil
     -- 1.4: the full scan at the auction house only when you press it (the setting starts switched off again)
     if (db.version or 1) < 5 then db.settings.autoFull = false end
-    db.version = 5
+    -- 0.42 (6): the six verdicts; meme words only when switched on (they used to start on); the simple chart only
+    if (db.version or 1) < 6 then
+        db.settings.meme = false
+        db.settings.chartStyle = "simple"
+        db.settings.showMA = false
+        if db.settings.chartTF == "1H" or db.settings.chartTF == "4H" then db.settings.chartTF = "1D" end
+    end
+    db.version = 6
     FT.db = db
     FT.S = db.settings
 end
@@ -303,7 +312,7 @@ end
 ---------------------------------------------------------------------------
 FT.HEX = {
     text = "eaecef", muted = "848e9c", dim = "5e6673", up = "0ecb81", down = "f6465d",
-    accent = "f0b90b", blue = "3b82f6", purple = "a78bfa", gold = "e8b923", silver = "c0c6cc", copper = "d9894a",
+    accent = "f0b90b", blue = "3b82f6", purple = "a78bfa", orange = "ff9a2e", gold = "e8b923", silver = "c0c6cc", copper = "d9894a",
 }
 
 function FT.C(hex, s)
@@ -367,7 +376,9 @@ function FT.Money(c, mode)
     local s = math.floor((c % 10000) / 100)
     local cp = c % 100
     local out
-    if mode == "short" then
+    if mode == "gold" and g >= 1 then
+        out = FT.Thousands(math.floor(c / 10000 + 0.5)) .. G_SUFFIX
+    elseif mode == "short" or mode == "gold" then
         if g >= 1000 then
             out = FT.Thousands(g) .. G_SUFFIX
         elseif g >= 1 then

@@ -1243,20 +1243,55 @@ function An.Trend(s)
     return "flat"
 end
 
-FT.SIGNAL_COLORS = {
-    SELL = "up", BUY = "up", CRAFT = "up", TRIM = "up",
-    HOLD = "accent", WATCH = "accent", EXPENSIVE = "accent", RISKY = "accent",
-    AVOID = "down", LOSS = "down",
-    FAIR = "muted", NODATA = "dim",
-    VENDOR = "up", RESELL = "blue", UNDERCUT = "down", HOUSES = "accent", DE = "blue",
+-- The six verdicts (v0.42): every signal, move and card says one of BUY, SELL, HOLD, WAIT, CRAFT, FARM, with one
+-- colour each everywhere; the reason goes on the line under it. With Settings > Meme mode on, the old words
+-- (CASH OUT, HODL, APE IN...) come back.
+local VERDICT = {
+    SELL = "SELL", TRIM = "SELL", VENDOR = "SELL",
+    BUY = "BUY", RESELL = "BUY", HOUSES = "BUY",
+    HOLD = "HOLD", FAIR = "HOLD",
+    WATCH = "WAIT", EXPENSIVE = "WAIT", RISKY = "WAIT", AVOID = "WAIT", LOSS = "WAIT", UNDERCUT = "WAIT", WAIT = "WAIT",
+    CRAFT = "CRAFT", DE = "CRAFT", RAIDCRAFT = "CRAFT",
+    FARM = "FARM",
+    -- the Eye's moves and the cards' labels
+    SLIDING = "SELL", FLIP = "BUY",
+    ["SELL NOW"] = "SELL", ["DROPPING"] = "SELL", ["VENDOR IT"] = "SELL", ["CASH OUT"] = "SELL", ["SELL HALF"] = "SELL",
+    ["BUY WINDOW"] = "BUY", ["BUY DIP"] = "BUY", ["BUY THE DIP"] = "BUY", ["FLIP IT"] = "BUY", ["AH TO AH"] = "BUY", ["APE IN"] = "BUY",
+    ["CRAFT IT"] = "CRAFT", ["CRAFT FOR RAID"] = "CRAFT", ["CRAFT + DE"] = "CRAFT", ["DE IT"] = "CRAFT",
+    ["GATHER"] = "FARM", ["FARM IT"] = "FARM",
+    ["HOLD FOR RAID"] = "HOLD", ["HODL"] = "HOLD", ["DIAMOND HANDS"] = "HOLD",
 }
+FT.VERDICTS = { "BUY", "SELL", "HOLD", "WAIT", "CRAFT", "FARM" }
+FT.VERDICT_COLOR = { BUY = "blue", SELL = "up", HOLD = "accent", WAIT = "muted", CRAFT = "purple", FARM = "orange", NODATA = "dim" }
 
+-- a signal kind or a card's label -> one of the six (nil: none, e.g. no data)
+function FT.Verdict(kind)
+    if not kind then return nil end
+    return VERDICT[kind] or VERDICT[(tostring(kind)):upper()]
+end
+
+-- the colour of a kind's verdict
+FT.SIGNAL_COLORS = setmetatable({}, { __index = function(t, kind)
+    if kind == nil then return "muted" end
+    local v = FT.Verdict(kind)
+    local c = v and FT.VERDICT_COLOR[v] or (kind == "NODATA" and "dim") or "muted"
+    rawset(t, kind, c) -- once per kind: every row of every list asks
+    return c
+end })
+
+-- the word a badge shows: the six, or with meme mode on the old ones
+local MEME = { SELL = "CASH OUT", TRIM = "SELL HALF", BUY = "BUY DIP", HOLD = "HODL", RESELL = "FLIP IT", WATCH = "WAIT",
+    EXPENSIVE = "OVERPRICED", AVOID = "STAY AWAY", LOSS = "LOSES GOLD", FAIR = "NORMAL", VENDOR = "TO VENDOR" }
 function FT.SignalText(kind)
-    local names = {
-        SELL = L["SELL"], TRIM = L["TRIM"], BUY = L["BUY"], CRAFT = L["CRAFT"], HOLD = L["HOLD"], WATCH = L["WATCH"],
-        EXPENSIVE = L["PRICEY"], RISKY = L["RISKY"], AVOID = L["AVOID"], LOSS = L["LOSS"], FAIR = L["FAIR"],
-        NODATA = L["NO DATA"], VENDOR = L["TO VENDOR"], RESELL = L["RESELL"], UNDERCUT = L["UNDERCUT"],
-        HOUSES = L["CARRY OVER"],
-    }
-    return names[kind] or kind
+    if kind == "NODATA" then return L["NO DATA"] end
+    if FT.S and FT.S.meme and MEME[kind] then return L[MEME[kind]] end
+    if FT.S and FT.S.meme and VERDICT[kind] == nil and type(kind) == "string" then return kind end
+    return L[FT.Verdict(kind) or kind]
+end
+
+-- a card's own label ("SELL NOW", "HOLD FOR RAID"): the verdict it means, or itself with meme mode on
+function FT.VerdictLabel(label)
+    if FT.S and FT.S.meme then return label end
+    local v = FT.Verdict(label)
+    return v and L[v] or label
 end

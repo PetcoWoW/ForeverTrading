@@ -18,24 +18,15 @@ local function Tab(key) return FT.Tabs[key] end
 -- the language is applied at start, after the files are read (a table made with them would keep the English)
 local STEPS
 local function MakeSteps() return {
-    { title = L["Where the prices come from"],
-      text = L["AH: your last auction house scan (scan in Auctionator: it's taken right away). API: Blizzard's prices, every hour, with each update. The lit one is what you see."],
-      target = function() return FT.MainRefs and FT.MainRefs.pill end },
-    { title = L["Which auction house"],
-      text = L["Your faction's auction house: the one Wolf follows. Blackwater, the neutral one, isn't tracked: its prices come too late to act on."],
-      target = function() return FT.MainRefs and FT.MainRefs.house end },
-    { title = L["Terminal"], tab = "market",
-      text = L["The market board: search any item, see its chart and what to do with it. Right-click an item to watch it."],
+    { title = L["Today"], tab = "today",
+      text = L["Start here: what everything you own is worth and what the last prices did to it, your top 3 moves (hover one for why), what's in your bags and what's going up and down today."],
+      target = function() return Tab("today").cards and Tab("today").cards[1] and Tab("today").cards[1]:GetParent() end },
+    { title = L["Market"], tab = "market",
+      text = L["Search any item. Its page says what to do first (BUY, SELL, HOLD, WAIT, CRAFT, FARM), then its chart and when it sells, what it's worth made into, where to farm it."],
       target = function() return Tab("market").listPanel end },
-    { title = L["Money"], tab = "signals", prep = function() Tab("signals").SetView("make") end,
-      text = L["Ways to make gold right now, best first: carry it to the other auction house, flip it, vendor it. Farm: what's worth gathering."],
-      target = function() return Tab("signals").viewSeg end },
-    { title = L["Portfolio"], tab = "portfolio", prep = function() Tab("portfolio").SetView("portfolio") end,
-      text = L["What everything you own is worth. Sell yours: what to do with each thing. Characters: your bank alt and alts."],
-      target = function() return Tab("portfolio").viewSeg end },
-    { title = L["Settings"],
-      text = L["Alerts, the meme layer, and this tour again (/wolf tour)."],
-      target = function() return FT.MainRefs and FT.MainRefs.gear end },
+    { title = L["Make gold and You"],
+      text = L["Make gold: flips, crafts, what to farm and raid prep. You: what you own and where your gold sits, your sessions and characters. The light beside the tabs says how fresh the prices are."],
+      target = function() return FT.MainRefs and FT.MainRefs.nav end },
 } end
 
 local overlay, shades, ring, note

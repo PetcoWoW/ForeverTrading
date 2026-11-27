@@ -788,8 +788,14 @@ function UI.WatchMenu(id, anchor)
         items[#items + 1] = { L["Remove from the watchlist"], function() M.Unwatch(id) end, "down" }
     end
     items[#items + 1] = { "-" }
-    if FT.Farm.IsRaw(id) then items[#items + 1] = { L["Where to farm"], function() FT.ShowFarm(id) end } end
-    items[#items + 1] = { L["Wowhead link"], function() FT.Farm.Wowhead(id) end }
+    -- a long hold: you know it'll be worth more later (a raid or phase coming) - it never says SELL until unmarked
+    local hold = FT.db.longHold and FT.db.longHold[id]
+    items[#items + 1] = { hold and L["Long hold: on (click to stop)"] or L["Long hold (never say SELL)"], function()
+        FT.db.longHold = FT.db.longHold or {}
+        FT.db.longHold[id] = (not FT.db.longHold[id]) or nil
+        FT.Fire("FT_SETTINGS_CHANGED")
+        FT.Fire("FT_WATCH_CHANGED", id)
+    end }
     FT.ShowMenu(anchor, items)
 end
 
@@ -845,6 +851,7 @@ local function BestUseWindow()
     end)
     d.chart:FitText(24)
     d.chart:SetPoint("RIGHT", d.close, "LEFT", -6, 0)
+    d.chart:Hide() -- v0.42: one way to each thing (the item's name opens its page)
     -- the order: the most each one of it brings, or what sells most (the gold a day it moves through that product)
     d.sort = UI.Segmented(d, { { "each", L["Most per one"] }, { "sells", L["Best sellers"] } }, function(v)
         d.sortBy = v
@@ -961,6 +968,7 @@ end
 -- day of the week (two weeks) - from the price robot's hourly looks at the whole auction house (FT.Feed.Hourly)
 ---------------------------------------------------------------------------
 local whenWin
+local WHEN_H, WHEN_H_SHORT = 790, 240 -- with the charts / the answers only
 
 -- a row of bars: values (nil: not watched, drawn faint), a label under some of them, the best ones in gold
 local function Bars(parent, n)
@@ -1044,11 +1052,51 @@ local function Window(tod)
     return bestAt, lowAt
 end
 
+-- the answer of When it sells, for the item page and the window (v0.42): nil while there are too few sales seen.
+-- { sell = "7p-10p" (priciest: post just before), buy = cheapest hours, busy = the hours it sells most, day = its
+--   busiest day, timed = the price moves enough through the day to time it, sellAt / buyAt / busyAt (hours), hr }
+local DAY_NAMES = { [0] = "Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday" }
+function FT.WhenSummary(itemID)
+    local hr = FT.Feed and FT.Feed.Hourly and FT.Feed.Hourly(itemID)
+    if not hr then return nil end
+    local out = { hr = hr }
+    local bestAt = Window(hr.tod)
+    if bestAt then out.busyAt, out.busy = bestAt, HourLabel(bestAt) .. "-" .. HourLabel(bestAt + 3) end
+    if hr.todPrice then
+        local dearAt, cheapAt = Window(hr.todPrice)
+        local function Avg(at)
+            if not at then return nil end
+            local sum = 0
+            for k = 0, 2 do sum = sum + hr.todPrice[(at + k) % 24] end
+            return sum / 3 - 1
+        end
+        local dp, cp = Avg(dearAt), Avg(cheapAt)
+        out.timed = dp and cp and (dp - cp) >= 0.02 or false
+        out.sellAt, out.buyAt, out.sellPct, out.buyPct = dearAt, cheapAt, dp, cp
+        if dearAt then out.sell = HourLabel(dearAt) .. "-" .. HourLabel(dearAt + 3) end
+        if cheapAt then out.buy = HourLabel(cheapAt) .. "-" .. HourLabel(cheapAt + 3) end
+    end
+    local days = FT.Feed.SoldDays and FT.Feed.SoldDays(itemID) or {}
+    local sum, cnt = {}, {}
+    for day, n in pairs(days) do
+        local wd = tonumber(date("!%w", day * 86400))
+        sum[wd] = (sum[wd] or 0) + n
+        cnt[wd] = (cnt[wd] or 0) + 1
+    end
+    local bestV
+    for wd = 0, 6 do
+        local v = cnt[wd] and sum[wd] / cnt[wd]
+        if v and (not bestV or v > bestV) then bestV, out.dayAt = v, wd end
+    end
+    if out.dayAt then out.day = L[DAY_NAMES[out.dayAt]] end
+    return out
+end
+
 local function WhenWindow()
     if whenWin then return whenWin end
     UI.ResolveFont()
     local d = CreateFrame("Frame", "WolfOfBootyBayWhenSells", UIParent)
-    d:SetSize(660, 630)
+    d:SetSize(660, WHEN_H)
     d:SetPoint("CENTER", 0, 40)
     d:SetFrameStrata("DIALOG")
     d:SetToplevel(true)
@@ -1084,31 +1132,65 @@ local function WhenWindow()
         sub:SetPoint("RIGHT", d, "RIGHT", -16, 0)
         return t, sub
     end
-    d.t1, d.s1 = Section(-84, L["The last 48 hours"])
+    d.t1, d.s1 = Section(-234, L["The last 48 hours"])
     d.hours = Bars(d, 48)
-    d.hours:SetPoint("TOPLEFT", 64, -104)
+    d.hours:SetPoint("TOPLEFT", 64, -254)
     d.hours:SetPoint("RIGHT", d, "RIGHT", -16, 0)
     d.hours:SetHeight(96)
-    d.t2, d.s2 = Section(-218, L["By hour of the day"])
+    d.t2, d.s2 = Section(-368, L["By hour of the day"])
     d.tod = Bars(d, 24)
-    d.tod:SetPoint("TOPLEFT", 64, -238)
+    d.tod:SetPoint("TOPLEFT", 64, -388)
     d.tod:SetPoint("RIGHT", d, "RIGHT", -16, 0)
     d.tod:SetHeight(96)
-    d.t4, d.s4 = Section(-352, L["Price by hour of the day"])
+    d.t4, d.s4 = Section(-502, L["Price by hour of the day"])
     d.price = Bars(d, 24)
-    d.price:SetPoint("TOPLEFT", 64, -372)
+    d.price:SetPoint("TOPLEFT", 64, -522)
     d.price:SetPoint("RIGHT", d, "RIGHT", -16, 0)
     d.price:SetHeight(96)
     d.priceNone = UI.Text(d, 11, "dim", "CENTER")
-    d.priceNone:SetPoint("TOPLEFT", 64, -398)
+    d.priceNone:SetPoint("TOPLEFT", 64, -548)
     d.priceNone:SetPoint("RIGHT", d, "RIGHT", -16, 0)
     if d.priceNone.SetWordWrap then d.priceNone:SetWordWrap(true) end
     d.priceNone:SetText(L["Its price by the hour comes with the next days of the price robot: it needs five looks at every hour of the day."])
-    d.t3, d.s3 = Section(-486, L["By day of the week"])
+    d.t3, d.s3 = Section(-636, L["By day of the week"])
     d.days = Bars(d, 7)
-    d.days:SetPoint("TOPLEFT", 64, -506)
+    d.days:SetPoint("TOPLEFT", 64, -656)
     d.days:SetPoint("RIGHT", d, "RIGHT", -280, 0)
     d.days:SetHeight(80)
+    -- v0.42, at a glance: when to sell, when to buy, the busiest day; one strip of the day's hours (blue cheaper,
+    -- gold pricier, now marked); the charts below only on "Show the charts"
+    d.answers = {}
+    for i = 1, 3 do
+        local r = UI.Panel(d, "bg2", "line")
+        r:SetPoint("TOPLEFT", 16, -60 - (i - 1) * 32)
+        r:SetPoint("RIGHT", d, "RIGHT", -16, 0)
+        r:SetHeight(28)
+        r.badge = UI.Badge(r, 58, 18)
+        r.badge:SetPoint("LEFT", 8, 0)
+        r.text = UI.Text(r, 13, "text")
+        r.text:SetPoint("LEFT", r.badge, "RIGHT", 10, 0)
+        r.text:SetPoint("RIGHT", -8, 0)
+        d.answers[i] = r
+    end
+    d.strip = CreateFrame("Frame", nil, d)
+    d.strip:SetPoint("TOPLEFT", 16, -162)
+    d.strip:SetPoint("RIGHT", d, "RIGHT", -16, 0)
+    d.strip:SetHeight(22)
+    d.cells = {}
+    for h = 1, 24 do d.cells[h] = d.strip:CreateTexture(nil, "ARTWORK") end
+    d.nowMark = UI.Tex(d.strip, "OVERLAY", "text", 0.9)
+    d.stripLabels = {}
+    for k = 1, 4 do d.stripLabels[k] = UI.Text(d, 10, "dim") end
+    d.toggle = UI.Button(d, L["Show the charts"], 10, 22, "default", function()
+        FT.db.ui = FT.db.ui or {}
+        FT.db.ui.whenCharts = not FT.db.ui.whenCharts or nil
+        if d.itemID then FT.ShowWhenSells(d.itemID) end
+    end)
+    d.toggle:FitText(24)
+    d.toggle:SetPoint("TOPLEFT", 16, -204)
+    -- the old summary lines: the three answers say it now
+    d.sum:Hide()
+    d.advice:Hide()
     d.empty = UI.Text(d, 12, "muted", "CENTER")
     d.empty:SetPoint("CENTER", 0, -20)
     d.empty:SetWidth(520)
@@ -1129,9 +1211,63 @@ function FT.ShowWhenSells(itemID)
     d:Raise()
     local hr = FT.Feed and FT.Feed.Hourly and FT.Feed.Hourly(itemID)
     local any = hr ~= nil
-    for _, x in ipairs({ d.t1, d.s1, d.hours, d.t2, d.s2, d.tod, d.t3, d.s3, d.days, d.t4, d.s4 }) do x:SetShown(any) end
-    d.price:SetShown(any and hr.todPrice ~= nil)
-    d.priceNone:SetShown(any and hr.todPrice == nil)
+    local charts = any and FT.db.ui and FT.db.ui.whenCharts and true or false
+    for _, x in ipairs({ d.t1, d.s1, d.hours, d.t2, d.s2, d.tod, d.t3, d.s3, d.days, d.t4, d.s4 }) do x:SetShown(charts) end
+    d.price:SetShown(charts and hr.todPrice ~= nil)
+    d.priceNone:SetShown(charts and hr.todPrice == nil)
+    for _, r in ipairs(d.answers) do r:SetShown(any) end
+    d.strip:SetShown(any)
+    for _, l in ipairs(d.stripLabels) do l:SetShown(any) end
+    d.toggle:SetShown(any)
+    d:SetHeight(charts and WHEN_H or WHEN_H_SHORT)
+    if any then
+        local w = FT.WhenSummary(itemID)
+        local a1, a2, a3 = d.answers[1], d.answers[2], d.answers[3]
+        a1.badge:Set("SELL")
+        a1.text:SetText(w.sell and (FT.C("text", w.sell) .. FT.C("muted", "  ·  " .. (w.sellPct and string.format(L["priciest (%s): post just before"], FT.Pct(w.sellPct)) or L["priciest: post just before"])))
+            or (w.busy and (FT.C("text", w.busy) .. FT.C("muted", "  ·  " .. L["sells most: post a little before"])) or FT.C("dim", L["its price by the hour comes in a few days"])))
+        a2.badge:Set("BUY")
+        a2.text:SetText(w.buy and (FT.C("text", w.buy) .. FT.C("muted", "  ·  " .. (w.buyPct and string.format(L["cheapest (%s)"], FT.Pct(w.buyPct)) or L["cheapest"])))
+            or FT.C("dim", L["its price by the hour comes in a few days"]))
+        a3.badge:Set("WAIT", L["DAY"])
+        a3.text:SetText(w.day and (FT.C("text", w.day) .. FT.C("muted", "  ·  " .. L["busiest day of the week"])) or FT.C("dim", L["two weeks of sales first"]))
+        -- the strip: its price by the hour when known (blue cheaper, gold pricier), else how much it sells
+        local vals = hr.todPrice or hr.tod
+        local lo, hi
+        for h = 0, 23 do local x = vals[h]; if x then lo, hi = math.min(lo or x, x), math.max(hi or x, x) end end
+        local sw = d.strip:GetWidth()
+        if not sw or sw <= 0 then sw = 628 end
+        local cw = (sw - 23 * 2) / 24
+        local blue, mid, gold = { UI.RGB("blue") }, { UI.RGB("bg3") }, { UI.RGB("accent") }
+        for h = 0, 23 do
+            local c = d.cells[h + 1]
+            c:ClearAllPoints()
+            c:SetPoint("TOPLEFT", d.strip, "TOPLEFT", h * (cw + 2), 0)
+            c:SetSize(cw, 22)
+            local x = vals[h]
+            local t = (x and hi and hi > lo) and (x - lo) / (hi - lo) or nil
+            if not t then c:SetColorTexture(0.2, 0.2, 0.2, 0.6)
+            elseif t < 0.45 then
+                local k = t / 0.45
+                c:SetColorTexture(blue[1] + (mid[1] - blue[1]) * k, blue[2] + (mid[2] - blue[2]) * k, blue[3] + (mid[3] - blue[3]) * k, 1)
+            else
+                local k = (t - 0.45) / 0.55
+                c:SetColorTexture(mid[1] + (gold[1] - mid[1]) * k, mid[2] + (gold[2] - mid[2]) * k, mid[3] + (gold[3] - mid[3]) * k, 1)
+            end
+        end
+        local nowH = tonumber(date("%H")) or 0
+        d.nowMark:ClearAllPoints()
+        d.nowMark:SetPoint("TOPLEFT", d.strip, "BOTTOMLEFT", nowH * (cw + 2), -1)
+        d.nowMark:SetSize(cw, 2)
+        for k, h in ipairs({ 0, 6, 12, 18 }) do
+            local l = d.stripLabels[k]
+            l:ClearAllPoints()
+            l:SetPoint("TOPLEFT", d.strip, "BOTTOMLEFT", h * (cw + 2), -4)
+            l:SetText(HourLabel(h))
+        end
+        d.toggle:SetLabel(charts and L["Hide the charts"] or L["Show the charts"])
+        d.toggle:FitText(24)
+    end
     if not hr then
         UI.FitBits(d.sum, "")
         UI.FitBits(d.advice, "")
@@ -1227,8 +1363,7 @@ function FT.ShowWhenSells(itemID)
     else
         adv[#adv + 1] = FT.C("dim", L["Post a little before the busy hours (its price by the hour comes in a few days)"])
     end
-    UI.FitBits(d.advice, table.concat(adv, FT.C("dim", "  ·  ")))
-    UI.FitBits(d.sum, table.concat(bits, FT.C("dim", "  ·  ")))
+    -- (the old summary lines stay hidden: the three answers say it)
 end
 
 ---------------------------------------------------------------------------
@@ -1264,6 +1399,8 @@ local function CraftWindow()
     d.close:FitText(24)
     d.close:SetPoint("TOPRIGHT", -14, -14)
     d.chart = UI.Button(d, L["Chart"], 10, 22, "default", function() if d.itemID then FT.OpenItem(d.itemID) end end)
+    d.chart.Show = d.chart.Hide -- v0.42: no Chart button in popups
+    d.chart:Hide()
     d.chart:FitText(24)
     d.chart:SetPoint("RIGHT", d.close, "LEFT", -6, 0)
     d.shop = UI.Button(d, L["Shopping list"], 10, 22, "default", function()
@@ -1366,7 +1503,13 @@ local function HudRows()
     return math.max(HUD_MIN, math.min(HUD_MAX, tonumber(n) or HUD_DEFAULT))
 end
 
-local function HudHeight(rows) return 92 + rows * ROW_H end
+-- folded (v0.42): the title line and the gold with gold an hour, nothing else
+local HUD_FOLDED_H = 48
+local function HudFolded() return FT.db and FT.db.ui and FT.db.ui.hudFolded and true or false end
+local function HudHeight(rows)
+    if HudFolded() then return HUD_FOLDED_H end
+    return 92 + rows * ROW_H
+end
 
 local function HudRowTip(self)
     local it = self.item
@@ -1413,8 +1556,15 @@ local function BuildHUD()
     h.bar = bar
     h.title = UI.Text(h, 11, "accent")
     h.title:SetPoint("TOPLEFT", 10, -8)
+    -- the fold: - leaves the gold and gold an hour, + brings the items back (kept after /reload)
+    h.fold = UI.Button(h, "-", 18, 16, "default", function()
+        FT.db.ui = FT.db.ui or {}
+        FT.db.ui.hudFolded = not FT.db.ui.hudFolded or nil
+        FT.UpdateHUD()
+    end)
+    h.fold:SetPoint("TOPRIGHT", -6, -5)
     h.time = UI.Text(h, 11, "muted", "RIGHT")
-    h.time:SetPoint("TOPRIGHT", -10, -8)
+    h.time:SetPoint("TOPRIGHT", -30, -8)
     h.worth = UI.Text(h, 15, "text")
     h.worth:SetPoint("TOPLEFT", 10, -24)
     h.rate = UI.Text(h, 12, "up", "RIGHT")
@@ -1557,6 +1707,16 @@ function FT.UpdateHUD()
     if #lines == 0 then lines[1] = { text = FT.C("dim", L["Loot something: it shows here."]), value = "" } end
     local rows = HudRows()
     if math.floor(h:GetHeight() + 0.5) ~= HudHeight(rows) then h:SetHeight(HudHeight(rows)) end
+    local folded = HudFolded()
+    h.fold:SetLabel(folded and "+" or "-")
+    h.fold:SetTip(folded and L["Show the items"] or L["Fold it"], folded and L["Brings back what you've found."] or L["Just the gold and gold an hour: takes less room."])
+    for _, x in ipairs({ h.just, h.pause, h.stop, h.open, h.grip }) do x:SetShown(not folded) end
+    if folded then
+        for _, r in ipairs(h.rows) do r:Hide() end
+        h.track:Hide()
+        h.thumb:Hide()
+        return
+    end
     h.total = #lines
     h.offset = math.max(0, math.min(h.offset or 0, #lines - rows))
     for i, r in ipairs(h.rows) do

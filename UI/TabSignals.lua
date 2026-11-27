@@ -253,7 +253,7 @@ local function BuildDeals(p)
             row.name:SetText(FT.ItemText(d.id, 40) .. (listed and FT.C("accent", "  [" .. L["in your list"] .. "]") or ""))
             row.reason:SetText(DealText(d))
             row.value:SetText(FT.C("up", "+" .. Money(d.profit)))
-            local label = (d.kind == "HOUSES" and L["AH TO AH"]) or (d.kind == "RESELL" and L["FLIP IT"]) or (d.kind == "VENDOR" and L["VENDOR IT"])
+            local label = (d.kind == "RESELL" and L["FLIP IT"]) or (d.kind == "VENDOR" and L["VENDOR IT"])
                 or (d.kind == "DE" and L["DE IT"]) or nil
             row.badge:Set(d.kind, label, d.noBook and 1 or 3)
         end,
@@ -456,6 +456,7 @@ function T.SetView(view)
     if view == "deals" or view == "HOUSES" or view == "RESELL" or view == "VENDOR" or view == "signals" then view = "make" end
     T.view = view
     if T.viewSeg then T.viewSeg:SetValue(view) end
+    if FT.GroupShows and (view == "make" or view == "craft" or view == "farm") then FT.GroupShows("make", view) end
     local deals = DEAL_VIEWS[view]
     if deals then dstate.kind = "all" end
     if dealsView then
@@ -749,14 +750,13 @@ end
 
 local function BuildFarmView(p)
     local f = ListView(p, function(x, button)
-        if button == "RightButton" then WowheadLink(x.id) return end
+        if button == "RightButton" then UI.WatchMenu(x.id) return end
         if UI.ItemClick(x.id) then return end
         FT.ShowFarm(x.id)
     end, function(row, x)
         UI.TipItem(row, x.id)
         GameTooltip:AddLine(" ")
-        GameTooltip:AddLine(L["Click: where to farm it for your level, and the mobs you got it from."], 0.6, 0.64, 0.7)
-        GameTooltip:AddLine(L["Right-click: its Wowhead page (a link to copy)."], 0.6, 0.64, 0.7)
+        GameTooltip:AddLine(L["Click: where to farm it || Right-click: watchlist"], 0.6, 0.64, 0.7)
         GameTooltip:Show()
     end)
     local items = {}
@@ -842,7 +842,7 @@ function T.Build(p)
     end)
     -- one way to make gold per view; Signals: the four columns
     T.view = T.view or "make"
-    T.viewSeg = UI.Segmented(head, { { "make", L["Make gold"] }, { "craft", L["Craft for profit"] }, { "farm", L["Raw mats"] } }, function(v) T.SetView(v) end, 22)
+    T.viewSeg = UI.GroupBar(head, "make")
     T.viewSeg:SetPoint("LEFT", T.searchBox, "RIGHT", 12, 0)
     T.viewSeg:SetValue(T.view)
     dealsView = BuildDeals(p)

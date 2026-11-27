@@ -200,6 +200,8 @@ FT.On("FT_LIVE_UPDATED", function(id)
     FT.Print(FT.C("accent", L["Watchlist"]) .. "  " .. string.format(L["%s: %s listed under %s, from %s (%s vs usual)"],
         FT.ItemText(id), FT.Num(d.n), FT.Money(d.under, "short"), FT.Money(d.low, "short"), FT.Pct(d.low / d.usual - 1))
         .. (link ~= "" and ("  " .. link) or ""))
+    -- the Wolf network: one line for the guild's and group's Wolf users too
+    if FT.Net then FT.Net.Deal(id, d.low, d.low / d.usual - 1) end
 end)
 FT.On("AUCTION_HOUSE_CLOSED", function() wipe(told) end)
 

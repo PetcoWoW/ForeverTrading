@@ -92,3 +92,40 @@ FT.On("CHAT_MSG_ADDON", function(prefix, text, channel, sender)
         Say("WHISPER", (sender:gsub("%-.*$", "")))
     end
 end)
+
+---------------------------------------------------------------------------
+-- The outdated reminder (v0.42): one chat line at login when a newer Wolf is out, or the prices companion is behind -
+-- from the price file the companion brings every hour (FT.FEED.release / .companion, written by the release robot).
+-- Once a day per version; never a pop-up.
+---------------------------------------------------------------------------
+local function MajMin(v)
+    local a, b = tostring(v or ""):match("^v?(%d+)%.(%d+)")
+    return tonumber(a), tonumber(b)
+end
+
+-- true when release (MAJ.MIN) is newer than what's installed
+function V.ReleaseNewer(release, mine)
+    local a1, b1 = MajMin(release)
+    local a2, b2 = MajMin(mine)
+    if not (a1 and a2) then return false end
+    return a1 > a2 or (a1 == a2 and b1 > b2)
+end
+
+function V.Remind()
+    if not (FT.db and FT.FEED) then return end
+    FT.db.told = FT.db.told or {}
+    local today = date("%Y%m%d")
+    local rel = FT.FEED.release
+    if rel and V.ReleaseNewer(rel, FT.VERSION) and FT.db.told.release ~= rel .. today then
+        FT.db.told.release = rel .. today
+        FT.Print(string.format(L["A newer Wolf is out: v%s (you have %s). Update it in the CurseForge app or WowUp."], rel, FT.VERSION_TEXT or FT.VERSION))
+    end
+    local want, have = FT.FEED.companion, FT.COMPANION and FT.COMPANION.version
+    if want and have and V.Newer(want, have) and FT.db.told.companion ~= want .. today then
+        FT.db.told.companion = want .. today
+        FT.Print(string.format(L["The prices companion is behind: %s (you have %s). It updates itself when it starts; or get it again: %s"], want, have,
+            FT.ChatLink and FT.ChatLink("get", L["Get it"], "/wolf companion") or "/wolf companion"))
+    end
+end
+
+FT.On("FT_READY", function() C_Timer.After(25, V.Remind) end)

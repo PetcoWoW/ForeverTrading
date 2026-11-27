@@ -132,20 +132,27 @@ end
 function T.Build(p)
     head = UI.Text(p, 16, "text")
     head:SetPoint("TOPLEFT", 12, -10 - SIGN_H)
-    head:SetText(L["Futures"])
+    head:SetText(L["Raid prep"])
     T.sign = Tape(p)
     T.sign:SetPoint("LEFT", head, "RIGHT", 10, 0)
+    T.sign:Hide() -- v0.42: Raid prep, a section of Make gold - no construction tape
     sub = UI.Text(p, 11, "dim")
-    sub:SetPoint("LEFT", T.sign, "RIGHT", 12, -1)
-    sub:SetPoint("RIGHT", p, "RIGHT", -230, 0)
-    if sub.SetWordWrap then sub:SetWordWrap(false) end
+    sub:SetPoint("TOPLEFT", head, "TOPRIGHT", 12, 1)
+    if sub.SetWordWrap then sub:SetWordWrap(true) end
+    if sub.SetMaxLines then sub:SetMaxLines(2) end
+    sub:SetJustifyV("TOP")
     seg = UI.Segmented(p, { { "consumables", L["Consumables"] }, { "gear", L["Gear"] } }, function(v)
         state.section = v
         T.Layout()
         T.Refresh()
     end, 22)
     T.seg = seg
-    seg:SetPoint("TOPRIGHT", -8, -8 - SIGN_H)
+    -- v0.42: Futures is Make gold's Raid prep; the group's bar on the right, its own two buttons beside it
+    T.bar = UI.GroupBar(p, "make")
+    T.bar:SetPoint("TOPRIGHT", -8, -8 - SIGN_H)
+    seg:SetPoint("RIGHT", T.bar, "LEFT", -12, 0)
+    sub:SetPoint("RIGHT", seg, "LEFT", -12, 0)
+    sub:SetHeight(UI.RowH(28))
     seg:SetValue(state.section)
 
     box = UI.Panel(p, "bg1", "line")

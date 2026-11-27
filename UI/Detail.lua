@@ -26,6 +26,8 @@ local function MoneyAxis(v) return FT.Money(v, "short") end
 -- the price chart's style (Settings and the chart's "Pro chart" box): "simple", one line green when it went up
 -- over the period and red when down, nothing else; "pro", candles and the averages
 function UI.ProChart()
+    -- v0.42: no Pro chart (Simple Wolf): always the one clean line
+    do return false end
     return FT.S.chartStyle == "pro"
 end
 

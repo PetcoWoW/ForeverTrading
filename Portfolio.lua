@@ -109,6 +109,69 @@ function P.Rows()
     return out, total, total7
 end
 
+---------------------------------------------------------------------------
+-- What you own, at every price update (v0.42): a snapshot each time new prices come in (Blizzard's with a reload,
+-- your scans, a guild member's scan). { t = the prices' time, v = items + gold, at = when it was taken }, the last
+-- 48 per side. Today shows what the last one did to your worth.
+---------------------------------------------------------------------------
+local SNAPS = 48
+
+local function PricesTime()
+    local scanT = FT.ScanTime and FT.ScanTime() or nil
+    local apiT = FT.Feed and FT.Feed.On() and FT.Feed.Time() or nil
+    local t = math.max(scanT or 0, apiT or 0)
+    return t > 0 and t or nil
+end
+
+function P.Worth()
+    local _, total = P.Rows()
+    return (total or 0) + P.Gold()
+end
+
+function P.Snaps()
+    if not FT.db then return {} end
+    FT.db.worthLog = FT.db.worthLog or {}
+    local key = FT.sideKey or "?"
+    FT.db.worthLog[key] = FT.db.worthLog[key] or {}
+    return FT.db.worthLog[key]
+end
+
+function P.Snapshot()
+    if not (FT.db and FT.sideKey) then return end
+    local t = PricesTime()
+    if not t then return end
+    local list = P.Snaps()
+    local last = list[#list]
+    local v = math.floor(P.Worth())
+    if v <= 0 then return end
+    -- the same prices again: the worth taken now (your bags changed), not a new update
+    if last and last.t == t then
+        last.v, last.at = v, time()
+    else
+        list[#list + 1] = { t = t, v = v, at = time() }
+        while #list > SNAPS do table.remove(list, 1) end
+    end
+    FT.Fire("FT_WORTH_CHANGED")
+end
+
+-- the last update's move, and the move since about a day ago (nil when there's nothing to compare)
+function P.WorthMoves()
+    local list = P.Snaps()
+    local n = #list
+    if n == 0 then return nil end
+    local now = list[n]
+    local lastMove = n >= 2 and (now.v - list[n - 1].v) or nil
+    local dayAgo
+    for i = n - 1, 1, -1 do
+        dayAgo = list[i]
+        if now.t - list[i].t >= 20 * 3600 then break end
+    end
+    return lastMove, dayAgo and (now.v - dayAgo.v) or nil, now
+end
+
+FT.On("FT_MARKET_READY", function() FT.Debounce("worthSnap", 3, P.Snapshot) end)
+FT.On("FT_SCAN_DONE", function() FT.Debounce("worthSnap", 3, P.Snapshot) end)
+
 -- worth of today's holdings on each of the last `days` days: { { t, value } }
 function P.History(days)
     days = days or 14

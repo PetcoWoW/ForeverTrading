@@ -154,7 +154,7 @@ function T.Build(p)
     Choice(bs, "textSize", L["Text size"], { { 0, L["Normal"] }, { 1, L["Large"] }, { 2, L["Larger"] } },
         L["Makes every text bigger without making the window bigger. Takes effect after a reload."],
         function() FT.AskReload(L["The new text size shows after the interface reloads. Reload now?"]) end)
-    Check(bs, "meme", L["Meme mode"], L["TO THE MOON / RUG PULL, WHALE ALERT, APE IN, DIAMOND HANDS."])
+    Check(bs, "meme", L["Meme mode"], L["CASH OUT, HODL and APE IN in place of SELL, HOLD and BUY; TO THE MOON / RUG PULL, WHALE ALERT, DIAMOND HANDS."])
     Check(bs, "tooltip", L["Lines in item tooltips"], L["Two lines on every item: what to do and its price, then its best use or craft profit. Hold Shift for more."])
     Check(bs, "ticker", L["Ticker tape under the header"], L["Your watchlist and the day's biggest movers, scrolling. Takes effect after /reload."],
         function() FT.AskReload() end)
@@ -185,9 +185,7 @@ function T.Build(p)
             end
             FT.Detail.Rescale(v)
         end)
-    Check(g, "simple", L["Simple view"],
-        L["The numbers that matter at a glance: four key numbers per item, what to do in one card, one clean chart. Off: every number and indicator. Takes effect after a reload."],
-        function() FT.AskReload() end)
+    -- (v0.42: no Simple view switch - Wolf is simple, no Pro chart or indicators)
     Check(g, "showCraft", L["Craft tab"],
         L["Recipes your characters know, with their profit. Takes effect after a reload."],
         function() FT.AskReload() end)
@@ -267,9 +265,12 @@ function T.Build(p)
     MoneyField(sg, "dealMin", L["Deals: minimum profit"], L["Deals that bring less are not shown (a vendor deal too)."])
 
     -- exchange
-    local ex = Section(right, L["Exchange"], 3)
+    local ex = Section(right, L["Exchange"], 5)
     Check(ex, "shareAuto", L["Ask guild and group for fresh prices"],
         L["When your prices of the whole market are more than an hour old, Wolf asks its users in your guild (then your group) who has fresher ones; the freshest sends its last full scan in the background. At most once an hour."])
+    Check(ex, "net", L["Wolf network"],
+        L["With Wolf users in your guild and group: the prices that changed after a scan (no /reload), what sold, farm rates per mob and watchlist deals. Hidden addon messages, never in a fight. Odd prices wait until two users agree."])
+    Check(ex, "netDeals", L["Their deals in chat"], L["A watchlist deal another Wolf user found: one line in chat (6 an hour at most)."])
     Check(ex, "shareSend", L["Share my scans"],
         L["When someone in your guild or group asks, your full scan (less than 3 days old and fresher than theirs) goes to them in the background: hidden addon messages, one a second, paused in a fight."])
     T.shareText = UI.Text(ex, 11, "dim")

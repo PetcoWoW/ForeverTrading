@@ -50,7 +50,7 @@ local FT = ...
 local function step(name, fn) mock.call("step " .. name, fn) end
 step("slash", function() SlashCmdList["WOLFOFBOOTYBAY"]("") end)
 mock.run(1)
-for _, tab in ipairs({ "market", "signals", "radar", "portfolio", "sessions", "sell", "settings", "craft" }) do
+for _, tab in ipairs({ "today", "market", "make", "you", "signals", "radar", "portfolio", "sessions", "sell", "settings", "craft" }) do
   step("tab " .. tab, function() FT.Show(tab) end)
   mock.run(1)
 end
@@ -668,7 +668,7 @@ step("farm", function()
   for _, t in ipairs(bt) do if t.cut then print(string.format("CUT [best crafts] %q", t.text:sub(1, 80))) end end
   bw.sortBy = "each"
   bw:Hide()
-  -- the right-click menu has Wowhead and Where to farm
+  -- v0.42: the watch menu has no Wowhead and no Where to farm (the item page has them), and has Long hold
   local shown
   local realMenu = FT.ShowMenu
   FT.ShowMenu = function(_, items) shown = items end
@@ -677,7 +677,7 @@ step("farm", function()
   local labels = {}
   for _, it in ipairs(shown or {}) do labels[#labels + 1] = it[1] end
   local all = table.concat(labels, "|")
-  assert(all:find("Wowhead link", 1, true) and all:find("Where to farm", 1, true), all)
+  assert(not all:find("Wowhead", 1, true) and not all:find("Where to farm", 1, true) and all:find("Long hold", 1, true), all)
 end)
 -- the sell / hold model: its trendline, the raids ahead, an endgame material in a young economy
 step("sell model", function()
@@ -761,9 +761,15 @@ step("when it sells", function()
   FT.ShowWhenSells(12360)
   local d = _G.WolfOfBootyBayWhenSells
   if d then
-    print("when it sells: " .. tostring(d.sum.__text):gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", ""))
-    print("when to buy and post: " .. tostring(d.advice.__text):gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", ""))
-    assert(not rawLine or tostring(d.advice.__text):find("buy then"), "the advice says when to buy")
+    -- v0.42: the three answers first (sell, buy, the busiest day)
+    for i, r in ipairs(d.answers) do print("when it sells " .. i .. ": " .. tostring(r.text.__text):gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "")) end
+    assert(not rawLine or tostring(d.answers[2].text.__text):find("cheapest"), "the window says when to buy")
+    assert(d:GetHeight() < 400 or (FT.db.ui and FT.db.ui.whenCharts), "the charts only on request")
+    if FT.Feed.Hourly(12360) then
+      FT.db.ui = FT.db.ui or {}; FT.db.ui.whenCharts = true; FT.ShowWhenSells(12360)
+      assert(d.tod:IsShown() and d:GetHeight() > 600, "Show the charts shows them")
+      FT.db.ui.whenCharts = nil; FT.ShowWhenSells(12360)
+    end
     mock.layout.Settle(d)
     local found, texts = mock.layout.Overlaps(d)
     for _, o in ipairs(found) do print(string.format("OVERLAP [when it sells] %q x %q  (%dx%d px)", o[1].text:sub(1, 50), o[2].text:sub(1, 50), o[3], o[4])) end
@@ -823,6 +829,13 @@ step("layout", function()
   local total, cuts = 0, 0
   FT.S.showCraft = true
   local pages = {
+    { "today", "today" },
+    { "make: raid prep", "radar", function() FT.ShowSub("make", "raid") end },
+    { "you: sessions", "sessions", function() FT.ShowSub("you", "sessions") end },
+    { "you: holdings, liquid", "portfolio", function() FT.ShowSub("you", "portfolio"); FT.Tabs.portfolio.donutBox.seg.buttons[2].onClick() end },
+    { "you: holdings, bank only", "portfolio", function() FT.Tabs.portfolio.donutBox.seg.buttons[1].onClick(); FT.Tabs.portfolio.donut:Pick("bank") end },
+    { "you: holdings, gold", "portfolio", function() FT.Tabs.portfolio.donut:Pick("gold") end },
+    { "you: holdings", "portfolio", function() FT.Tabs.portfolio.donut:Pick(nil) end },
     { "market", "market" }, { "market item", "market", function() FT.OpenItem(12363) end },
     { "market item: a flask", "market", function() FT.OpenItem(13510) end },
     { "market item: a raw mat", "market", function() FT.OpenItem(4338) end },
@@ -1159,6 +1172,64 @@ step("deals by kind", function()
   local h, label = FT.An.Health(s)
   local c = FT.An.Call(s, 0)
   print("item 12363:", label, "|", FT.An.TrendWord(s), "|", c.kind, c.text)
+end)
+-- the Wolf network: what we send after a scan, and what we take from others (the junk guard holds an odd price)
+step("network", function()
+  local N = FT.Net
+  FT.db.netSent = nil -- (the reload's pass: what the first one sent is remembered)
+  FT.S.net, FT.S.netDeals = true, true -- (the settings step before clicks every box)
+  -- a live price comes after a scan: newer than the hourly prices (the test's clock starts before the test feed)
+  mock.now = math.max(mock.now, (FT.Feed.Time() or 0), (FT.Hist.LastScan("full") or 0), (FT.ScanTime() or 0)) + 600
+  local realGuild = IsInGuild
+  IsInGuild = function() return true end
+  local id
+  for _, r in ipairs(FT.Market.Rows() or {}) do if r.price and r.price > 1000 then id = r.id break end end
+  assert(id, "an item with a price")
+  local n = N.SendLive(time())
+  assert(n > 0 and N.Queued() > 0, "changed prices are queued: " .. tostring(n))
+  -- 400 a round, the busiest first: the next rounds the rest, then nothing (the same prices aren't said twice)
+  local rounds = 1
+  while N.SendLive(time()) > 0 and rounds < 30 do rounds = rounds + 1 end
+  assert(rounds < 30 and N.SendLive(time()) == 0, "the same prices aren't said twice")
+  local enc = FT.Hist.Enc
+  local function Msg(sender, ...) mock.fire("CHAT_MSG_ADDON", "WOLFNET1", table.concat({ ... }, "\t"), "GUILD", sender) end
+  local wire = enc(time() + ((GetServerTime and GetServerTime() or time()) - time()))
+  -- a sane new price (10% over what it usually is): taken at once
+  local st = FT.An.Stats(id)
+  local usual = st.fair or st.avg or FT.Price(id)
+  local want = math.floor(usual * 1.1)
+  Msg("Friend-Realm", "L", "1", FT.houseKey, wire, enc(id) .. "," .. enc(want))
+  local after, _, src = FT.Price(id)
+  assert(src == "peer" and math.abs(after - want) <= 2, "a live price is taken: " .. tostring(want) .. " -> " .. tostring(after) .. " " .. tostring(src))
+  -- ten times what we know: held; a second user agrees: taken
+  local known = FT.An.Stats(id).fair or FT.An.Stats(id).avg or after
+  Msg("Friend-Realm", "L", "1", FT.houseKey, wire, enc(id) .. "," .. enc(math.floor(known * 10)))
+  local held = FT.Price(id)
+  assert(math.abs(held - known * 10) > known, "an odd price waits")
+  Msg("Other-Realm", "L", "1", FT.houseKey, wire, enc(id) .. "," .. enc(math.floor(known * 10.3)))
+  local agreed = FT.Price(id)
+  assert(math.abs(agreed - known * 10.15) <= known * 0.2, "two users agree: taken " .. tostring(agreed))
+  -- a joke: dropped
+  assert(N.Guard(id, known * 100, "X", time()) == "drop", "100x is dropped")
+  -- farm rates, sales, deals
+  Msg("Friend-Realm", "F", "1", enc(4440), "Southsea Pirate", enc(40), enc(id) .. ":" .. enc(14))
+  Msg("Other-Realm", "F", "1", enc(4440), "Southsea Pirate", enc(20), enc(id) .. ":" .. enc(6))
+  local ft = N.FarmText(id)
+  assert(ft and ft:find("0.33") and ft:find("60"), "pooled farm rate: " .. tostring(ft))
+  Msg("Friend-Realm", "S", "1", FT.houseKey, enc(id), enc(2000), enc(5), wire)
+  assert(N.SoldText(id) and N.SoldText(id):find("5"), "a sale heard")
+  -- (the reload's pass has the first pass's addon still listening in this fake game: count what the second call adds)
+  local said = #mock.prints
+  Msg("Friend-Realm", "G", "1", FT.houseKey, enc(id), enc(900), enc(25))
+  local afterFirst = #mock.prints
+  Msg("Friend-Realm", "G", "1", FT.houseKey, enc(id), enc(900), enc(25))
+  assert(afterFirst > said and mock.prints[afterFirst]:find("25% under usual", 1, true), "a deal call says it")
+  assert(#mock.prints == afterFirst, "the same deal again: nothing more")
+  -- another auction house's: nothing
+  Msg("Friend-Realm", "S", "1", "otherhouse", enc(id + 1), enc(2000), enc(5), wire)
+  assert(not N.SoldText(id + 1), "another house's sale isn't taken")
+  print("network: sent " .. n .. " changed prices; " .. ft:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "") .. "; " .. N.SoldText(id))
+  IsInGuild = realGuild
 end)
 step("logout", function() mock.fire("PLAYER_LOGOUT") end)
 '''

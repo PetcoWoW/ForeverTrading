@@ -5,13 +5,27 @@ local L = FT.L
 
 FT.Tabs = {}
 
--- the Radar last: it's still being built (its tab says so)
-local TAB_ORDER = { "market", "craft", "signals", "portfolio", "sessions", "radar", "settings" }
-local TAB_LABELS = { market = "Terminal", craft = "Craft", signals = "Money", radar = "Futures", portfolio = "Portfolio", sell = "Sell",
-    sessions = "Sessions", settings = "Settings" }
+-- v0.42: four tabs - Today, Market, Make gold, You (Settings behind the gear). Make gold and You are groups of
+-- pages, switched by one row of buttons on each of them (UI.GroupBar): Flip it / Craft it / Farm it / Raid prep, and
+-- Holdings / Sessions / Characters / Journal.
+local TAB_ORDER = { "today", "market", "craft", "make", "you", "settings" }
+local TAB_LABELS = { today = "Today", market = "Market", craft = "Craft", make = "Make gold", you = "You", signals = "Make gold",
+    radar = "Raid prep", portfolio = "You", sell = "Sell", sessions = "Sessions", settings = "Settings" }
+
+-- the groups: their sections in order { key, label, page, view (the page's own view, if it has views) }
+FT.GROUPS = {
+    make = { { "make", "Flip it", "signals", "make" }, { "craft", "Craft it", "signals", "craft" }, { "farm", "Farm it", "signals", "farm" },
+        { "raid", "Raid prep", "radar" } },
+    you = { { "portfolio", "Holdings", "portfolio", "portfolio" }, { "sessions", "Sessions", "sessions" },
+        { "chars", "Characters", "portfolio", "chars" }, { "journal", "Journal", "portfolio", "journal" } },
+}
+-- the group a page belongs to (the tab that lights up for it)
+local GROUP_OF = { signals = "make", radar = "make", portfolio = "you", sessions = "you", sell = "you" }
+local groupBars = { make = {}, you = {} }
+local groupLast = { make = "make", you = "portfolio" }
 
 local win, nav, content, ticker, statusLeft, statusRight, scanDot, scanText, sizeBox, gearBtn, brand
-local lastPage = "market"
+local lastPage = "today"
 local pages = {}
 
 -- three sizes instead of dragging a corner: compact, standard, the whole screen
@@ -169,7 +183,7 @@ local function BuildTicker(parent)
     end
     if t.SetClipsChildren then pcall(t.SetClipsChildren, t, true) end
     t.entries = {}
-    t.speed = 28
+    t.speed = 18 -- v0.42: slower (was 28)
     local fadeL = UI.Tex(t, "OVERLAY", "bg1", 1, 7)
     fadeL:SetPoint("TOPLEFT")
     fadeL:SetPoint("BOTTOMLEFT")
@@ -510,18 +524,18 @@ local function Build()
     for _, key in ipairs(TAB_ORDER) do
         -- the Craft tab only when it's on (Settings > General)
         if key ~= "settings" and (key ~= "craft" or FT.S.showCraft) then
-            local label = L[TAB_LABELS[key]]
-            if key == "radar" then label = label .. FT.C("accent", " " .. L["(wip)"]) end
-            items[#items + 1] = { key, label }
+            items[#items + 1] = { key, L[TAB_LABELS[key]] }
         end
     end
     local pill = FT.BuildAHPill(header)
     brand = { logo = logo, words = { brand1, brand2 }, pill = pill }
     FT.LayoutBrand()
+    -- v0.42: no house chip in the header (the light's hover names the auction house)
     local houseChip = FT.BuildHouseChip(header)
     houseChip:SetPoint("LEFT", pill, "RIGHT", 6, 0)
+    houseChip:Hide()
     nav = UI.NavTabs(header, items, function(key) FT.SelectTab(key) end)
-    nav:SetPoint("LEFT", houseChip, "RIGHT", 14, 0)
+    nav:SetPoint("LEFT", pill, "RIGHT", 14, 0)
 
     local close = UI.CloseButton(header, function() win:Hide() end)
     close:SetPoint("RIGHT", UI.Classic() and -4 or -8, 0)
@@ -655,14 +669,52 @@ local function Page(name)
     return p
 end
 
+-- a section of a group: its page, then its view; every bar of the group shows it
+function FT.ShowSub(group, key)
+    for _, e in ipairs(FT.GROUPS[group] or {}) do
+        if e[1] == key then
+            groupLast[group] = key
+            if FT.db then FT.db.ui = FT.db.ui or {}; FT.db.ui.groupLast = groupLast end
+            FT.SelectTab(e[3])
+            local tab = FT.Tabs[e[3]]
+            if e[4] and tab and tab.SetView then tab.SetView(e[4]) end
+            for _, b in ipairs(groupBars[group]) do b:SetValue(key) end
+            return
+        end
+    end
+end
+
+-- the row of section buttons of a group, for a page of it (its value follows whichever section shows)
+function UI.GroupBar(parent, group)
+    local opts = {}
+    for _, e in ipairs(FT.GROUPS[group]) do opts[#opts + 1] = { e[1], L[e[2]] } end
+    local bar = UI.Segmented(parent, opts, function(v) FT.ShowSub(group, v) end, 22)
+    bar:SetValue(groupLast[group])
+    table.insert(groupBars[group], bar)
+    return bar
+end
+
+-- a page's own view changed (from inside it): the group's bars follow
+function FT.GroupShows(group, key)
+    if not FT.GROUPS[group] then return end
+    groupLast[group] = key
+    for _, b in ipairs(groupBars[group]) do b:SetValue(key) end
+end
+
 function FT.SelectTab(name)
-    if not FT.Tabs[name] then name = "market" end
+    -- a group's tab: the section shown there last
+    if FT.GROUPS[name] then
+        local saved = FT.db and FT.db.ui and FT.db.ui.groupLast
+        if saved then for g, k in pairs(saved) do groupLast[g] = k end end
+        return FT.ShowSub(name, groupLast[name])
+    end
+    if not FT.Tabs[name] then name = "today" end
     FT.currentTab = name
     if name ~= "settings" then
         lastPage = name
         if FT.db then FT.db.ui = FT.db.ui or {}; FT.db.ui.lastTab = name end
     end
-    nav:SetValue(name)
+    nav:SetValue(GROUP_OF[name] or name)
     if gearBtn then gearBtn:Update() end
     local page = Page(name)
     for n, p in pairs(pages) do p:SetShown(n == name) end
@@ -685,7 +737,7 @@ function FT.Show(tab)
     else
         local last = FT.db and FT.db.ui and FT.db.ui.lastTab
         if last == "sell" or last == "settings" then last = nil end
-        FT.SelectTab(tab or FT.currentTab or last or "market")
+        FT.SelectTab(tab or FT.currentTab or last or "today")
     end
     -- once a version: what's new (or, on a first install, the tour)
     if FT.News then C_Timer.After(0.4, FT.News.OnWindow) end
@@ -858,17 +910,35 @@ local function PaintChip(c, label, t, lit, old)
     c:SetWidth(math.ceil(c.text:GetStringWidth()) + 28)
 end
 
+-- v0.42: one freshness light. "Prices 20 min old" for the newer of your scan and Blizzard's prices; its dot green
+-- under an hour, yellow under four, red older; "New prices: click" when the companion has newer ones waiting.
+-- The split (your scan / Blizzard's) is in its hover.
 function FT.UpdateAHPill()
     if not pill then return end
     local scanT = FT.ScanTime()
     local apiT = FT.Feed.On() and FT.Feed.Time() or nil
-    local apiOld = FT.Feed.Stale()
-    local scanOld = scanT and time() - scanT > 12 * 3600
-    local useScan = (scanT or 0) >= (apiT or 0) and scanT ~= nil
-    PaintChip(pill.ah, L["AH"], scanT, useScan, scanOld)
+    local t = math.max(scanT or 0, apiT or 0)
+    if t == 0 then t = nil end
     local fresh = FT.Companion and FT.Companion.FreshReady()
-    PaintChip(pill.api, fresh and L["API: new"] or L["API"], apiT, not useScan and apiT ~= nil, apiOld or fresh)
-    pill:SetWidth(pill.ah:GetWidth() + pill.api:GetWidth() + 4)
+    local c = pill.ah
+    local age = t and math.max(0, time() - t) or nil
+    local color = (not t and "dim") or (age < 3600 and "up") or (age < 4 * 3600 and "accent") or "down"
+    UI.SetTexColor(c.dot, fresh and "accent" or color, 1)
+    UI.SetTextColor(c.text, "text")
+    local text
+    if fresh then
+        text = L["New prices: click"]
+    elseif not t then
+        text = L["No prices yet"]
+    elseif FT.Compact() then
+        text = ShortAgo(t)
+    else
+        text = string.format(L["Prices %s old"], age < 3600 and string.format(L["%d min"], math.max(1, math.floor(age / 60))) or ShortAgo(t))
+    end
+    c.text:SetText(text)
+    c:SetWidth(math.ceil(c.text:GetStringWidth()) + 28)
+    pill.api:Hide()
+    pill:SetWidth(c:GetWidth())
 end
 
 local function SourceChip(parent)
@@ -897,21 +967,32 @@ function FT.BuildAHPill(header)
     pill.api:SetPoint("LEFT", pill.ah, "RIGHT", 4, 0)
     pill.ah:SetScript("OnEnter", function(self)
         UI.SetTexColor(self.bg, "bg3", 1)
-        local t, who = FT.ScanTime()
-        local text
-        if not t then
-            text = L["No scan of yours yet. Scan in Auctionator at the auction house: Wolf takes it."]
+        GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
+        GameTooltip:AddLine(L["How fresh the prices are"], 1, 1, 1)
+        local scanT, who = FT.ScanTime()
+        local apiT = FT.Feed.On() and FT.Feed.Time() or nil
+        GameTooltip:AddDoubleLine(who == "auctionator" and L["Your AH scan (Auctionator)"] or L["Your AH scan"],
+            scanT and FT.Ago(scanT) or L["none yet"], 0.87, 0.75, 0.42, 1, 1, 1)
+        GameTooltip:AddDoubleLine(L["Blizzard's prices"], apiT and (FT.TimeOfDay(apiT) .. " (" .. FT.Ago(apiT) .. ")") or (FT.Feed.WhyOff() or L["not loaded"]),
+            0.87, 0.75, 0.42, 1, 1, 1)
+        GameTooltip:AddLine(string.format(L["Auction house: %s"], FT.House.Name(FT.house)), 0.6, 0.64, 0.7)
+        GameTooltip:AddLine(" ")
+        if FT.Companion.FreshReady() then
+            GameTooltip:AddLine(L["Newer prices are in your addon folder (the prices companion fetched them). Click: load them (reloads the interface)."], 1, 0.82, 0, true)
+        elseif FT.Companion.Running() then
+            GameTooltip:AddLine(L["New prices come about every hour; the prices companion fetches them and chat says when they're ready."], 0.6, 0.64, 0.7, true)
         else
-            text = string.format(L["Your last auction house scan%s: %s. The freshest prices there are, the moment you scan."],
-                who == "auctionator" and (" (" .. L["Auctionator's"] .. ")") or "", FT.Ago(t))
-            if FT.Atr and FT.Atr.On() then text = text .. "\n\n" .. L["Click: take Auctionator's last scan again."] end
+            GameTooltip:AddLine(L["New prices come about every hour. The prices companion fetches them (Settings > About > Prices companion); a /reload loads them."], 0.6, 0.64, 0.7, true)
         end
-        if FT.ahOpen and ahHidden then text = text .. "\n\n" .. L["The game's auction house window is hidden behind Wolf: right-click shows it."] end
-        UI.TipText(self, L["AH: your scans"], text)
+        if FT.Atr and FT.Atr.On() then GameTooltip:AddLine(L["Click: take Auctionator's last scan again."], 0.58, 0.55, 0.5) end
+        if FT.ahOpen and ahHidden then GameTooltip:AddLine(L["Right-click: show the game's auction house window."], 0.58, 0.55, 0.5) end
+        GameTooltip:Show()
     end)
     pill.ah:RegisterForClicks("LeftButtonUp", "RightButtonUp")
     pill.ah:SetScript("OnClick", function(_, button)
         if button == "RightButton" then FT.ToggleAHWindow() return end
+        if FT.Companion.FreshReady() then ReloadUI() return end
+        if not (FT.Feed.On() and FT.Feed.Time()) and not FT.ScanTime() then FT.Show("settings") return end
         if FT.Atr and FT.Atr.TakeLatest then
             local n = FT.Atr.TakeLatest(true)
             if not n then FT.Print(L["Nothing newer from Auctionator: scan in Auctionator at the auction house."]) end

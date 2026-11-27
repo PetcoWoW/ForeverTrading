@@ -1120,13 +1120,14 @@ function UI.Badge(parent, w, h)
     f.text = UI.Text(f, 10, "muted", "CENTER")
     f.text:SetPoint("CENTER", 0, 0)
     function f:Set(kind, label, strength)
-        local color = FT.SIGNAL_COLORS[kind] or "muted"
+        -- one of the six verdicts and its colour (a label of a card counts by what it means)
+        local color = FT.SIGNAL_COLORS[label and FT.Verdict(label) and label or kind] or "muted"
         UI.SetTexColor(self.bg, color, (strength and strength >= 3) and 0.30 or 0.15)
         UI.SetTextColor(self.text, color)
-        if not label and strength and strength >= 3 and FT.S.meme ~= false then
+        if not label and strength and strength >= 3 and FT.S.meme then
             if kind == "BUY" then label = L["APE IN"] elseif kind == "HOLD" then label = L["DIAMOND HANDS"] end
         end
-        self.text:SetText(label or FT.SignalText(kind))
+        self.text:SetText(label and FT.VerdictLabel(label) or FT.SignalText(kind))
         -- a longer word (DIAMOND HANDS, Plain English) gets smaller type to fit, never a wider badge: a wider
         -- one spilled out of its column and past the window's edge
         self:SetWidth(self.baseW)

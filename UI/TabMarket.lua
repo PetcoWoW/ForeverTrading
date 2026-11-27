@@ -930,81 +930,25 @@ end
 
 -- Your top 3: the wolf's moves for you (what you hold, watch, can craft or gather - FT.Eye); short of three,
 -- today's market moves fill in: the best carry and flip, the best thing to farm (else a craft or vendor deal)
+-- (the old overview's moves: the same as Today's, FT.TopMoves - no more AH TO AH, Blackwater isn't followed)
 function T.FillMoves()
     if not overview then return end
-    local personal = {}
-    local okEye, moves = pcall(FT.Eye.Moves, 3)
-    if okEye then
-        for _, m in ipairs(moves) do
-            personal[#personal + 1] = { id = m.id, kind = m.label, gold = m.value or "", what = m.text, tip = m.why }
-        end
-    end
-    overview.movesTitle:SetText(#personal > 0 and L["Your top 3"] or L["Today's 3 moves"])
+    local cards, personal = FT.TopMoves()
+    overview.movesTitle:SetText(personal and L["Your top 3"] or L["Today's 3 moves"])
     local okSees, sees = pcall(FT.Eye.ProfileText)
     UI.FitBits(overview.sees, okSees and sees or "")
-    local best = {}
-    for _, d in ipairs(FT.Deals.List() or {}) do
-        local k = d.kind
-        if not best[k] or d.profit > best[k].profit then best[k] = d end
-    end
-    local H = FT.House
-    local cards = personal
-    local shown = {}
-    for _, c in ipairs(cards) do shown[c.id] = true end
-    local carry, flip = best.HOUSES, best.RESELL
-    if carry and shown[carry.id] then carry = nil end
-    if flip and shown[flip.id] then flip = nil end
-    if carry then
-        cards[#cards + 1] = { id = carry.id, kind = L["AH TO AH"], gold = "+" .. FT.Money(math.floor(carry.profit), "short"),
-            what = string.format(L["%s: buy here, sell at %s"], FT.ItemText(carry.id, 24), H.Name(carry.sellHouse)) }
-    end
-    if flip then
-        cards[#cards + 1] = { id = flip.id, kind = L["FLIP IT"], gold = "+" .. FT.Money(math.floor(flip.profit), "short"),
-            what = string.format(L["%s: under its usual price, sells every day"], FT.ItemText(flip.id, 24)) }
-    end
-    local farm = FT.Tabs.signals and FT.Tabs.signals.FarmRows and FT.Tabs.signals.FarmRows()
-    local f1 = farm and farm[1]
-    if f1 and not shown[f1.id] then
-        cards[#cards + 1] = { id = f1.id, kind = L["FARM IT"], gold = FT.Money(f1.price or 0, "short") .. FT.C("dim", " " .. L["each"]),
-            what = string.format(L["%s: sells ~%s a day"], FT.ItemText(f1.id, 24), FT.Num(math.floor((f1.perDay or 0) + 0.5))),
-            tip = string.format(L["One farmer selling a share of each day's sales makes about %s a day from it."], FT.Money(math.floor(f1.yours or 0), "short"))
-                .. "\n" .. L["Click: where to farm it for your level."], farm = true }
-    end
-    -- fewer than three: the best craft, buy-to-disenchant and vendor deals fill in
-    if #cards < 3 then
-        local crafts = FT.Craft.ProfitCrafts and FT.Craft.ProfitCrafts()
-        local c = crafts and crafts[1]
-        if c then
-            cards[#cards + 1] = { id = c.id, kind = c.mode == "de" and L["CRAFT + DE"] or L["CRAFT IT"],
-                gold = "+" .. FT.Money(math.floor(c.profit), "short"),
-                what = string.format(L["%s: %s"], FT.ItemText(c.id, 24), L[c.recipe.prof or "?"]) }
-        end
-    end
-    if #cards < 3 then
-        local de = FT.Enchant and FT.Enchant.Deals()
-        local d = de and de[1]
-        if d then
-            cards[#cards + 1] = { id = d.id, kind = L["DE IT"], gold = "+" .. FT.Money(math.floor(d.profit), "short"),
-                what = string.format(L["%s: buy it, disenchant it"], FT.ItemText(d.id, 24)) }
-        end
-    end
-    if #cards < 3 and best.VENDOR then
-        cards[#cards + 1] = { id = best.VENDOR.id, kind = L["VENDOR IT"], gold = "+" .. FT.Money(math.floor(best.VENDOR.profit), "short"),
-            what = string.format(L["%s: a vendor pays more than it costs"], FT.ItemText(best.VENDOR.id, 24)) }
-    end
     for i, c in ipairs(overview.moves) do
         local m = cards[i]
         c.itemID = m and m.id
         c.tip = m and m.tip
-        c.farm = m and m.farm
         c.icon:SetShown(m ~= nil)
         if m then c.icon:SetItem(m.id) end
-        c.kind:SetText(m and m.kind or "")
+        c.kind:SetText(m and FT.VerdictLabel(m.label or m.kind) or "")
         c.gold:SetText(m and m.gold or "")
         c.what:SetText(m and m.what or FT.C("dim", L["Nothing right now: new prices come every hour."]))
     end
 end
-FT.On("FT_DEALS_READY", function() if overview and overview:IsVisible() then T.FillMoves() end end)
+FT.On("FT_DEALS_READY", function() if overview and overview:IsVisible() then T.FillMoves() end end) -- (never: no overview)
 FT.On("FT_CRAFTS_READY", function() if overview and overview:IsVisible() then T.FillMoves() end end)
 
 ---------------------------------------------------------------------------
@@ -1029,11 +973,226 @@ local function Card(parent, title)
     return c
 end
 
+---------------------------------------------------------------------------
+-- The item page (v0.42): it reads top to bottom. The head (icon, name, price, its move), the verdict with its
+-- reason (the call), Watch / Wowhead / Share; then the one clean chart (7D / 30D / 90D) and beside it the sections
+-- that fit the item, sharing the column's height: When it sells, Market, Price history, then Best crafts (it's made
+-- into things), Craft it (it's made) and Where to farm (it's gathered). One text size per section.
+---------------------------------------------------------------------------
+local function SEC_W() return (FT.Compact() and 270 or 310) + 14 * (tonumber(FT.S and FT.S.textSize) or 0) end
+local SEC_TITLE = { when = L["When it sells"], market = L["Market"], history = L["Price history"], crafts = L["Best crafts"],
+    make = L["Craft it"], farm = L["Where to farm"] }
+-- the sections that are lists: every line one size
+local LIST_SECTION = { crafts = true, make = true, farm = true }
+
+local function SectionKeys(id)
+    local keys = { "when", "market", "history" }
+    if FT.Craft.UsedIn(id) then keys[#keys + 1] = "crafts" end
+    local rs = FT.Craft.ByOutput(id)
+    if rs and rs[1] then keys[#keys + 1] = "make" end
+    if FT.Farm.IsRaw(id) then keys[#keys + 1] = "farm" end
+    return keys
+end
+
+local function Signed(c)
+    if not c then return FT.C("dim", "—") end
+    return c >= 0 and FT.C("up", "+" .. FT.Money(c, "short")) or FT.C("down", FT.Money(c, "short"))
+end
+
+-- a section's answer, its extra lines, and a button { label, fn }
+local function SectionTexts(key, id, s)
+    if key == "when" then
+        local w = FT.WhenSummary and FT.WhenSummary(id)
+        if not w then
+            return FT.C("dim", L["Not enough sales seen yet"]), { L["The price robot needs 10 or more sold in four weeks."] },
+                { L["Hour by hour"], function() FT.ShowWhenSells(id) end }
+        end
+        local sum
+        if w.timed then
+            sum = string.format(L["Sell %s · buy %s"], w.sell, w.buy)
+        else
+            sum = w.busy and string.format(L["Sells most %s"], w.busy) or L["Sells through the day"]
+        end
+        local more = {}
+        if w.day then more[#more + 1] = string.format(L["Busiest day: %s"], w.day) end
+        if w.timed and w.busy then more[#more + 1] = string.format(L["Sells most %s"], w.busy) end
+        more[#more + 1] = L["Times on your clock."]
+        return sum, more, { L["Hour by hour"], function() FT.ShowWhenSells(id) end }
+    elseif key == "market" then
+        local _, healthLabel, healthColor, healthWhy = FT.An.Health(s)
+        local perDay = s.sales and s.sales.hours >= 12 and s.sales.perDay
+        local sum = FT.C(healthColor, healthLabel)
+        if perDay then sum = sum .. FT.C("text", "  ·  " .. string.format(L["sells ~%s a day"], perDay >= 10 and FT.Num(math.floor(perDay + 0.5)) or string.format("%.1f", perDay))) end
+        local more = {}
+        if s.listed then
+            local line = string.format(L["%s listed"], FT.Num(s.listed))
+            if perDay and perDay > 0 then
+                local clear = s.listed / perDay
+                line = line .. "  ·  " .. (clear < 1 and L["gone in a day"] or string.format(L["%s days to sell out"], FT.Num(math.floor(clear + 0.5))))
+            end
+            more[#more + 1] = line
+        end
+        if s.fair then more[#more + 1] = string.format(L["Normal price %s"], FT.Money(s.fair, "short")) end
+        local key2 = FT.An.Health(s)
+        if (key2 == "pumped" or key2 == "dumping") and healthWhy then more[#more + 1] = healthWhy end
+        if s.bait then more[#more + 1] = L["The cheapest one looks like bait: don't price off it."] end
+        local sold = FT.Net and FT.Net.SoldText and FT.Net.SoldText(id)
+        if sold then more[#more + 1] = sold end
+        return sum, more
+    elseif key == "history" then
+        local bits = {}
+        if s.ch7 then bits[#bits + 1] = L["7d"] .. " " .. FT.Pct(s.ch7) end
+        if s.ch30 then bits[#bits + 1] = L["30d"] .. " " .. FT.Pct(s.ch30) end
+        local word, wordColor = FT.An.TrendWord(s)
+        local more = { FT.C(wordColor, word) .. (s.dev and FT.C("muted", "  ·  " .. L["vs usual"] .. " ") .. FT.Pct(s.dev) or "") }
+        local b = s.behavior or {}
+        local rec
+        if (s.dev or 0) >= 0 and b.knowsHighs then rec = FT.An.HighRecord(b)
+        elseif b.knowsLows then rec = FT.An.LowRecord(b)
+        elseif b.knowsHighs then rec = FT.An.HighRecord(b) end
+        if rec then more[#more + 1] = rec:sub(1, 1):upper() .. rec:sub(2) .. "." end
+        return #bits > 0 and table.concat(bits, "  ·  ") or FT.C("dim", L["A few days of prices first"]), more
+    elseif key == "crafts" then
+        local uses, raw = FT.Craft.BestUse(id)
+        local out = {}
+        for _, x in ipairs(uses or {}) do
+            if x.each then
+                local gain = raw and (x.each - raw) or nil
+                out[#out + 1] = FT.ItemText(x.recipe.output, 26) .. ": " .. FT.Money(math.floor(x.each), "short") .. FT.C("dim", " " .. L["a use"])
+                    .. (gain and ("  " .. Signed(math.floor(gain))) or "")
+            end
+            if #out >= 4 then break end
+        end
+        if #out == 0 then
+            return FT.C("dim", L["Nothing made from it has a price yet"]), {}, { L["All"], function() FT.ShowBestUse(id) end }
+        end
+        local first = table.remove(out, 1)
+        return first, out, { L["All"], function() FT.ShowBestUse(id) end }
+    elseif key == "make" then
+        local rs = FT.Craft.ByOutput(id)
+        local r = FT.Craft.Best and FT.Craft.Best(id) or (rs and rs[1])
+        if r and r.recipe then r = r.recipe end
+        r = r or (rs and rs[1])
+        local e = r and FT.Craft.Eval(r)
+        if not e then return FT.C("dim", L["No price for its materials yet"]), {} end
+        local sum
+        if e.complete and e.revenue then
+            sum = string.format(L["Costs ~%s, sells %s"], FT.Money(math.floor(e.cost), "short"), FT.Money(math.floor(e.revenue), "short")) .. "  " .. Signed(math.floor(e.profit or 0))
+        else
+            sum = FT.C("dim", e.reason or L["No price for its materials yet"])
+        end
+        local more = {}
+        for _, part in ipairs(e.parts or {}) do
+            more[#more + 1] = part.qty .. " " .. FT.ItemText(part.itemID, 24) .. FT.C("dim", "  " .. (part.total and FT.Money(math.floor(part.total), "short") or "—"))
+            if #more >= 4 then break end
+        end
+        return sum, more, { L["Breakdown"], function() FT.ShowCraft(r) end }
+    else -- farm
+        local spots = FT.Farm.Spots(id)
+        local out = {}
+        for _, sp in ipairs(spots or {}) do
+            -- (parts apart with " · ": a line too long for the section drops its last part, never cut mid-word)
+            out[#out + 1] = FT.C("text", sp.zone) .. FT.C("dim", string.format("  ·  %d-%d", sp.lo, sp.hi) .. (sp.what and ("  ·  " .. sp.what) or ""))
+            if #out >= 3 then break end
+        end
+        local mob = FT.Farm.Mobs(id, 1)[1]
+        if mob then out[#out + 1] = FT.C("text", mob.name or "?") .. FT.C("dim", string.format("  " .. L["%s a corpse (your loot)"], string.format("%.2f", mob.per))) end
+        local pooled = FT.Net and FT.Net.FarmText and FT.Net.FarmText(id)
+        if pooled then out[#out + 1] = pooled end
+        if #out == 0 then return FT.C("dim", L["No spots written for it: its Wowhead page has every mob that drops it."]), {}, { L["Open"], function() FT.ShowFarm(id) end } end
+        local first = table.remove(out, 1)
+        return first, out, { L["Open"], function() FT.ShowFarm(id) end }
+    end
+end
+
+local function BuildSections(parent)
+    local box = UI.Panel(parent, "bg1", "line")
+    box.secs = {}
+    for i = 1, 6 do
+        local f = CreateFrame("Frame", nil, box)
+        f.title = UI.Text(f, 12, "muted")
+        f.title:SetPoint("TOPLEFT", 12, -9)
+        f.sum = UI.Text(f, 13, "text")
+        f.sum:SetPoint("TOPLEFT", f.title, "BOTTOMLEFT", 0, -5)
+        f.sum:SetPoint("RIGHT", -12, 0)
+        f.more = {}
+        for k = 1, 4 do
+            local t = UI.Text(f, 11, "muted")
+            t:SetPoint("TOPLEFT", f.sum, "BOTTOMLEFT", 0, -5 - (k - 1) * UI.RowH(16))
+            t:SetPoint("RIGHT", -12, 0)
+            f.more[k] = t
+        end
+        f.btn = UI.Button(f, "", 10, 18, "default", function(self) if self.fn then self.fn() end end)
+        f.btn:SetPoint("TOPRIGHT", -8, -5)
+        f.title:SetPoint("RIGHT", f.btn, "LEFT", -8, 0)
+        f.line = UI.HLine(f, "line", 0.5)
+        f.line:SetPoint("BOTTOMLEFT", 8, 0)
+        f.line:SetPoint("BOTTOMRIGHT", -8, 0)
+        box.secs[i] = f
+    end
+    function box:Lay(id, s)
+        if not id then return end
+        local keys = SectionKeys(id)
+        local n = #keys
+        local H = (self:GetHeight() or 400) - 8
+        local each = math.floor(H / math.max(1, n))
+        for i, f in ipairs(self.secs) do
+            local key = keys[i]
+            f:SetShown(key ~= nil)
+            if key then
+                local ok, sum, more, btn = pcall(SectionTexts, key, id, s)
+                if not ok then sum, more, btn = FT.C("dim", "—"), {}, nil end
+                f.title:SetText(SEC_TITLE[key])
+                f.btn:SetShown(btn ~= nil)
+                if btn then f.btn:SetLabel(btn[1]); f.btn.fn = btn[2]; f.btn:FitText(16) end
+                -- as many extra lines as its share of the height holds
+                local room = math.max(0, math.floor((each - UI.RowH(44)) / UI.RowH(16)))
+                local shown = {}
+                -- (a line fitted before remembers its text and fits it again on a resize: not an old item's)
+                f.sum.fitText = nil
+                for k, t in ipairs(f.more) do
+                    t.fitText = nil
+                    local line = (k <= room) and more and more[k] or nil
+                    t:SetShown(line ~= nil)
+                    if line then t:SetText(line); shown[#shown + 1] = t end
+                end
+                f.sum:SetText(sum or "")
+                -- one size per section: a list has every line the same size; whatever must shrink to fit shrinks
+                -- the whole section by the same step
+                local list = LIST_SECTION[key]
+                local sumSize, moreSize = list and 12 or 13, list and 12 or 11
+                local fits
+                for k = 0, 3 do
+                    f.sum:SetFont(UI.FONT, UI.Size(sumSize) - k, "")
+                    fits = (f.sum:GetStringWidth() or 0) <= (f.sum:GetWidth() or 0) + 0.5
+                    for _, t in ipairs(shown) do
+                        t:SetFont(UI.FONT, UI.Size(moreSize) - k, "")
+                        if (t:GetStringWidth() or 0) > (t:GetWidth() or 0) + 0.5 then fits = false end
+                    end
+                    if fits then break end
+                end
+                -- still too long at the smallest step: the long lines drop their last parts (after " · ")
+                if not fits then
+                    UI.FitBits(f.sum, f.sum:GetText() or "")
+                    for _, t in ipairs(shown) do UI.FitBits(t, t:GetText() or "") end
+                end
+                f.line:SetShown(i < n)
+                f:ClearAllPoints()
+                f:SetPoint("TOPLEFT", 4, -4 - (i - 1) * each)
+                f:SetPoint("RIGHT", -4, 0)
+                f:SetHeight(each)
+            end
+        end
+    end
+    box:HookScript("OnSizeChanged", function(self) if state.selected then self:Lay(state.selected, FT.An.Stats(state.selected)) end end)
+    return box
+end
+
 local function BuildItemView(parent)
     local v = CreateFrame("Frame", nil, parent)
     v:SetAllPoints()
 
-    -- head: icon, name, price, change
+    -- head: icon, name, the line under it; price, its move, how old
     v.icon = UI.Icon(v, 38)
     v.icon:SetPoint("TOPLEFT", 2, -4)
     v.icon:EnableMouse(true)
@@ -1043,216 +1202,69 @@ local function BuildItemView(parent)
     v.name:SetPoint("TOPLEFT", v.icon, "TOPRIGHT", 10, -1)
     v.sub = UI.Text(v, 11, "dim")
     v.sub:SetPoint("TOPLEFT", v.name, "BOTTOMLEFT", 0, -5)
-    v.back = UI.Button(v, "×", 24, 24, "ghost", function() T.ClearSelection() end)
-    v.back.label:SetFont(UI.FONT, UI.Size(16), "")
-    v.back:SetPoint("TOPRIGHT", 0, -2)
-    v.back:SetTip(L["Back to the market overview"])
     v.change = UI.Text(v, 14, "text", "RIGHT")
-    v.change:SetPoint("TOPRIGHT", -30, -6)
+    v.change:SetPoint("TOPRIGHT", -2, -6)
     v.price = UI.Text(v, 22, "text", "RIGHT")
     v.price:SetPoint("RIGHT", v.change, "LEFT", -12, -1)
     v.priceAge = UI.Text(v, 10, "dim", "RIGHT")
-    v.priceAge:SetPoint("TOPRIGHT", -30, -32)
-    -- the countdown to its next live search
+    v.priceAge:SetPoint("TOPRIGHT", -2, -32)
     v.ring = UI.LiveRingFor(v, 9, function() return state.selected end)
     v.ring:SetPoint("RIGHT", v.priceAge, "LEFT", -5, 0)
 
-    -- stats strip
-    v.strip = UI.Panel(v, "bg1", "line")
-    v.strip:SetPoint("TOPLEFT", 0, -50)
-    v.strip:SetPoint("TOPRIGHT", 0, -50)
-    v.strip:SetHeight(42)
-    local pairsDef = {
-        { "hi7", L["7d high"] }, { "lo7", L["7d low"] }, { "avg", L["Average"] }, { "hi30", L["30d high"] },
-        { "lo30", L["30d low"] }, { "listed", L["Listed"] }, { "auctions", L["Auctions"] }, { "sellers", L["Sellers"] },
-    }
-    -- Simple view: the four numbers that matter at a glance
-    if FT.S.simple ~= false then
-        pairsDef = {
-            { "fair", L["Normal price"] }, { "lo7", L["7d low"] }, { "listed", L["Listed"] }, { "sells", L["Sells a day"] },
-        }
-    end
-    v.pairs = {}
-    for i, d in ipairs(pairsDef) do
-        local p = StatPair(v.strip, d[2])
-        p.key = d[1]
-        v.pairs[i] = p
-    end
-    UI.OnSize(v.strip, function(self, w)
-        local cw = (w - 20) / #v.pairs
-        for i, p in ipairs(v.pairs) do
-            p:ClearAllPoints()
-            p:SetPoint("LEFT", 10 + (i - 1) * cw, 0)
-            p:SetWidth(cw - 6)
-        end
-    end)
+    -- the verdict first, then Watch / Wowhead / Share
+    v.share = UI.Button(v, L["Share"], 10, 24, "default", function() if state.selected then FT.ShareTip(state.selected) end end)
+    v.share:FitText(22)
+    v.share:SetPoint("TOPRIGHT", 0, -52)
+    v.share:SetTip(L["Share"], L["A line about this item for guild chat: its price today against usual. You send it yourself (Enter)."])
+    v.wowhead = UI.Button(v, L["Wowhead"], 10, 24, "default", function() if state.selected then FT.Farm.Wowhead(state.selected) end end)
+    v.wowhead:FitText(22)
+    v.wowhead:SetPoint("RIGHT", v.share, "LEFT", -6, 0)
+    v.wowhead:SetTip(L["Wowhead"], L["Its page on Wowhead (WoW Forever): a link to copy into your browser."])
+    v.watch = UI.Button(v, L["Watch"], 10, 24, "default", function(self) if state.selected then UI.WatchMenu(state.selected, self) end end)
+    v.watch:SetPoint("RIGHT", v.wowhead, "LEFT", -6, 0)
 
-    -- toolbar
-    v.tf = UI.Segmented(v, { { "1H", L["1H"] }, { "4H", L["4H"] }, { "1D", L["1D"] }, { "1W", L["1W"] } }, function(tf)
-        FT.S.chartTF = tf
-        T.DrawChart()
-    end)
-    v.tf:SetPoint("TOPLEFT", 0, -100)
-    -- the simple chart: 7D / 30D / 90D in the same place
-    v.range = UI.Segmented(v, UI.RANGES, function(r)
-        FT.S.chartRange = r
-        T.DrawChart()
-    end)
-    v.range:SetPoint("TOPLEFT", 0, -100)
-    v.pro = UI.Check(v, L["Pro chart"], function(on)
-        FT.S.chartStyle = on and "pro" or "simple"
-        T.ApplyChartStyle()
-        T.DrawChart()
-    end)
-    v.pro:SetPoint("LEFT", v.tf, "RIGHT", 16, 0)
-    -- (placed after whichever of the two shows: T.ApplyChartStyle)
-    v.pro:SetTip(L["Pro chart"], L["Candles (each period's open, high, low and close), the averages and a second chart of the price against its average. Off: one clean line, green when it went up, red when down."])
-    v.ma = UI.Check(v, L["Averages"], function(on)
-        FT.S.showMA = on
-        T.DrawChart(true)
-    end)
-    v.ma:SetPoint("LEFT", v.pro, "RIGHT", 16, 0)
-    v.ma:SetTip(L["Moving averages"], L["Two smoothed lines on the price chart: MA7 and MA25, the average price of the last 7 and 25 points (days on 1D). Until there are that many, of the points there are; MA25 shows once there are more than 7."])
-
-    v.search = UI.Button(v, L["Search on AH"], 10, 22, "default", function()
-        if state.selected then FT.SearchItems({ state.selected }) end
-    end)
-    v.search:FitText(20)
-    v.search:SetPoint("TOPRIGHT", 0, -100)
-    v.watch = UI.Button(v, "", 10, 22, "default", function(self)
-        if state.selected then UI.WatchMenu(state.selected, self) end
-    end)
-    v.watch:SetPoint("RIGHT", v.search, "LEFT", -6, 0)
-    v.bestUse = UI.Button(v, L["Best crafts"], 10, 22, "default", function()
-        if state.selected then FT.ShowBestUse(state.selected) end
-    end)
-    v.bestUse:FitText(20)
-    v.bestUse:SetPoint("RIGHT", v.watch, "LEFT", -6, 0)
-    v:HookScript("OnSizeChanged", function() T.FitBestUse() end)
-    v.bestUse:SetTip(L["Best crafts"], L["Every finished product made from it: by what one of it brings made into each, or by the best sellers."])
-
-    -- charts: the price on top, the profitability under it (zero in the middle)
-    v.chart = UI.Chart(v)
-    v.chart:SetPoint("TOPLEFT", 0, -128)
-    v.chart:SetPoint("TOPRIGHT", 0, -128)
-    UI.Border(v.chart, "line")
-    v.more = UI.MoreButton(v.chart, function() return state.selected end)
-    T.more = v.more
-    -- on the chart (made after it: a button made before its parent exists would belong to the whole screen)
-    v.when = UI.Button(v.chart, L["When it sells"], 10, 20, "default", function()
-        if state.selected then FT.ShowWhenSells(state.selected) end
-    end)
-    v.when:FitText(20)
-    v.when:SetTip(L["When it sells"], L["Hour by hour over the last two days, the time of day it sells most (your clock) and the best day of the week."])
-    v.when:SetFrameLevel(v.chart:GetFrameLevel() + 14)
-    v.when:SetPoint("RIGHT", v.more, "LEFT", -4, 0)
-    v.farm = UI.Button(v.chart, L["Where to farm"], 10, 20, "default", function()
-        if state.selected then FT.ShowFarm(state.selected) end
-    end)
-    v.farm:FitText(20)
-    v.farm:SetTip(L["Where to farm"], L["The spots for your level, the mobs you got it from, and its Wowhead page."])
-    v.farm:SetFrameLevel(v.chart:GetFrameLevel() + 14)
-    v.farm:SetPoint("RIGHT", v.when, "LEFT", -4, 0)
-    v.pchart = UI.Chart(v)
-    v.pchart:SetPoint("TOPLEFT", v.chart, "BOTTOMLEFT", 0, -6)
-    v.pchart:SetPoint("BOTTOMRIGHT", 0, CARDS_H)
-    UI.Border(v.pchart, "line")
-
-    -- the three answers under the chart: is the market healthy, where is the price going, what to do
-    v.health = Card(v, L["Market"])
-    v.trend = Card(v, L["Price"])
-    v.call = Card(v, L["The call"])
-    for _, c in ipairs({ v.health, v.trend, v.call }) do c:SetHeight(124) end
-    local function Big(card)
-        local t = UI.Text(card, 15, "text")
-        t:SetPoint("TOPLEFT", 10, -26)
-        t:SetPoint("RIGHT", card, "RIGHT", -10, 0)
-        return t
-    end
-    -- a line that wraps (up to `lines` lines) under `anchor`
-    local function Lines(card, anchor, gap, size, color, lines)
-        local t = UI.Text(card, size or 11, color or "muted")
-        t:SetPoint("TOPLEFT", anchor, "BOTTOMLEFT", 0, -(gap or 6))
-        t:SetPoint("RIGHT", card, "RIGHT", -10, 0)
-        if t.SetWordWrap then t:SetWordWrap(true) end
-        if t.SetMaxLines then t:SetMaxLines(lines or 2) end
-        t:SetJustifyV("TOP")
-        return t
-    end
-    v.healthWord = Big(v.health)
-    v.healthLine = Lines(v.health, v.healthWord, 8, 11, "muted", 2)
-    v.healthNote = Lines(v.health, v.healthLine, 6, 11, "dim", 2)
-    v.trendWord = Big(v.trend)
-    v.trendLine = Lines(v.trend, v.trendWord, 6, 11, "muted", 3)
-    v.trendNote = Lines(v.trend, v.trendLine, 4, 11, "dim", 2)
-
-    -- the call: its badge, the reason, how sure and its record, the other side; your buttons at the bottom
-    v.callBadge = UI.Badge(v.call, 104, 20)
-    v.callBadge:SetPoint("TOPLEFT", 10, -24)
-    v.callBadge:EnableMouse(true)
-    v.callBadge:SetScript("OnEnter", function(self)
+    v.call = UI.Panel(v, "bg2", "accent")
+    v.call:SetPoint("TOPLEFT", 0, -48)
+    v.call:SetPoint("RIGHT", v.watch, "LEFT", -10, 0)
+    v.call:SetHeight(UI.RowH(34))
+    v.call:EnableMouse(true)
+    v.callBadge = UI.Badge(v.call, 84, 22)
+    v.callBadge:SetPoint("LEFT", 10, 0)
+    v.callSure = UI.Text(v.call, 11, "dim", "RIGHT")
+    v.callSure:SetPoint("RIGHT", -10, 0)
+    v.callText = UI.Text(v.call, 13, "text")
+    v.callText:SetPoint("LEFT", v.callBadge, "RIGHT", 12, 0)
+    v.callText:SetPoint("RIGHT", v.callSure, "LEFT", -10, 0)
+    if v.callText.SetWordWrap then v.callText:SetWordWrap(true) end
+    if v.callText.SetMaxLines then v.callText:SetMaxLines(2) end
+    v.call:SetScript("OnEnter", function(self)
         if not v.callWhy then return end
-        GameTooltip:SetOwner(self, "ANCHOR_TOP")
+        GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
         GameTooltip:AddLine(L["The call"], 1, 1, 1)
         GameTooltip:AddLine(v.callWhy, 0.85, 0.87, 0.9, true)
+        if v.callOther then GameTooltip:AddLine(v.callOther, 0.6, 0.64, 0.7, true) end
         GameTooltip:AddLine(L["Sure: this item did it before. Likely: items like it did. Guess: little to go by yet."], 0.6, 0.64, 0.7, true)
         GameTooltip:Show()
     end)
-    v.callBadge:SetScript("OnLeave", function() GameTooltip:Hide() end)
-    v.callSure = UI.Text(v.call, 11, "dim")
-    v.callSure:SetPoint("LEFT", v.callBadge, "RIGHT", 10, 0)
-    v.callSure:SetPoint("RIGHT", v.call, "RIGHT", -10, 0)
-    v.callText = UI.Text(v.call, 12, "text")
-    v.callText:SetPoint("TOPLEFT", v.callBadge, "BOTTOMLEFT", 0, -8)
-    v.callText:SetPoint("RIGHT", v.call, "RIGHT", -10, 0)
-    if v.callText.SetWordWrap then v.callText:SetWordWrap(true) end
-    if v.callText.SetMaxLines then v.callText:SetMaxLines(2) end
-    v.callText:SetJustifyV("TOP")
-    v.callOther = Lines(v.call, v.callText, 4, 11, "muted", 1)
+    v.call:SetScript("OnLeave", function() GameTooltip:Hide() end)
 
-    v.longHold = UI.Button(v.call, L["Long hold"], 10, 20, "default", function()
-        local id = state.selected
-        if not id then return end
-        FT.db.longHold = FT.db.longHold or {}
-        FT.db.longHold[id] = (not FT.db.longHold[id]) or nil
-        FT.Fire("FT_SETTINGS_CHANGED")
-        T.UpdateWatchButton()
-        T.ShowItem(id, true)
-    end)
-    v.longHold:FitText(18)
-    v.longHold:SetPoint("BOTTOMLEFT", 10, 8)
-    v.longHold:SetTip(L["Long hold"], L["You know it'll be worth more later (a raid or phase coming): it never says CASH OUT until you unmark it."])
-    v.share = UI.Button(v.call, L["Share"], 10, 20, "default", function()
-        if state.selected then FT.ShareTip(state.selected) end
-    end)
-    v.share:FitText(18)
-    v.share:SetPoint("LEFT", v.longHold, "RIGHT", 6, 0)
-    v.share:SetTip(L["Share"], L["A line about this item for guild chat: its price today against usual. You send it yourself (Enter)."])
-    v.craft = UI.Button(v.call, L["Recipe"], 10, 20, "default", function()
-        local rs = FT.Craft.ByOutput(state.selected)
-        if rs and rs[1] then FT.OpenRecipe(rs[1].key) end
-    end)
-    v.craft:FitText(18)
-    v.craft:SetPoint("LEFT", v.share, "RIGHT", 6, 0)
-
-    UI.OnSize(v, function(self, w, h)
-        T.FitHeader()
-        local cards = self.compact and (self.reserve or 0) or CARDS_H
-        -- the simple chart has the room of both charts
-        local share = UI.ProChart() and 0.56 or 1
-        self.chart:SetHeight(math.max(80, math.floor((h - 128 - cards - 6) * share)))
-        -- market and price a quarter each, the call the rest
-        local small = math.floor((w - 16) * 0.28)
-        self.health:ClearAllPoints()
-        self.health:SetPoint("BOTTOMLEFT", 0, 0)
-        self.health:SetWidth(small)
-        self.trend:ClearAllPoints()
-        self.trend:SetPoint("BOTTOMLEFT", small + 8, 0)
-        self.trend:SetWidth(small)
-        self.call:ClearAllPoints()
-        self.call:SetPoint("BOTTOMLEFT", 2 * (small + 8), 0)
-        self.call:SetPoint("BOTTOMRIGHT", 0, 0)
-    end)
+    -- the sections on the right, the chart on the left
+    v.secs = BuildSections(v)
+    v.secs:SetPoint("TOPRIGHT", v.share, "BOTTOMRIGHT", 0, -10)
+    v.secs:SetPoint("BOTTOMRIGHT", 0, 0)
+    v.secs:SetWidth(SEC_W())
+    v.range = UI.Segmented(v, UI.RANGES, function(r)
+        FT.S.chartRange = r
+        T.DrawChart()
+    end, 20)
+    v.range:SetPoint("TOPLEFT", v.call, "BOTTOMLEFT", 0, -10)
+    v.chart = UI.Chart(v)
+    v.chart:SetPoint("TOPLEFT", v.range, "BOTTOMLEFT", 0, -6)
+    v.chart:SetPoint("BOTTOMRIGHT", v.secs, "BOTTOMLEFT", -10, 0)
+    UI.Border(v.chart, "line")
+    -- (kept for the code that asks after them: there is no second chart, no Pro chart, no stats strip any more)
+    v.pchart = CreateFrame("Frame", nil, v)
+    v.pchart:Hide()
     return v
 end
 
@@ -1262,80 +1274,36 @@ function T.FitHeader()
     local w = v and v:GetWidth()
     if not w or w <= 0 then return end
     local left = 2 + 38 + 10
-    local top = 30 + v.change:GetStringWidth() + 12 + v.price:GetStringWidth() + 14
-    local bottom = 30 + v.priceAge:GetStringWidth() + 5 + 9 + 14
+    local top = 2 + v.change:GetStringWidth() + 12 + v.price:GetStringWidth() + 14
+    local bottom = 2 + v.priceAge:GetStringWidth() + 5 + 9 + 14
     v.name:SetWidth(math.max(60, w - left - top))
     v.sub:SetWidth(math.max(60, w - left - bottom))
 end
 
--- Best crafts, or just Crafts when the chart's choices on the left come close (the larger text sizes)
-function T.FitBestUse()
-    local v = itemView
-    if not (v and v.bestUse and v.bestUse:IsShown()) then return end
-    v.bestUse:SetLabel(L["Best crafts"])
-    v.bestUse:FitText(20)
-    local left = v.pro and v.pro:IsShown() and v.pro:GetRight()
-    if v.ma and v.ma:IsShown() and v.ma:GetRight() then left = math.max(left or 0, v.ma:GetRight()) end
-    local at = v.bestUse:GetLeft()
-    if left and at and left + 10 > at then
-        v.bestUse:SetLabel(L["Crafts"])
-        v.bestUse:FitText(16)
-    end
-end
+function T.FitBestUse() end
 
 function T.UpdateWatchButton()
     local v = itemView
     if not (v and state.selected) then return end
-    if v.bestUse then v.bestUse:SetShown(FT.Craft.UsedIn(state.selected) ~= nil) end
-    if v.when then
-        -- on the chart, beside More
-        v.when:ClearAllPoints()
-        v.when:SetPoint("RIGHT", v.more, "LEFT", -4, 0)
-    end
-    if v.farm then
-        v.farm:SetShown(FT.Farm.IsRaw(state.selected))
-        v.farm:ClearAllPoints()
-        v.farm:SetPoint("RIGHT", v.when, "LEFT", -4, 0)
-    end
-    if v.longHold then
-        local on = FT.db.longHold and FT.db.longHold[state.selected]
-        v.longHold:SetLabel(on and L["Long hold: on"] or L["Long hold"])
-        v.longHold:SetActive(on and true or false)
-        v.longHold:FitText(18)
-    end
     local on = FT.Market.IsWatched(state.selected)
-    v.watch:SetLabel(on and L["In watchlist"] or L["Watch"])
+    local hold = FT.db.longHold and FT.db.longHold[state.selected]
+    v.watch:SetLabel((on and L["In watchlist"] or L["Watch"]) .. (hold and FT.C("accent", " *") or ""))
     v.watch:SetActive(on)
-    v.watch:FitText(20)    T.FitBestUse()
+    v.watch:FitText(20)
 end
 
--- Simple chart: one chart (the price) with the room of two, no averages box; Pro: both charts
 function T.ApplyChartStyle()
     local v = itemView
     if not v then return end
-    local pro = UI.ProChart()
-    v.pchart:SetShown(pro)
-    v.ma:SetShown(pro)
-    v.tf:SetShown(pro)
-    v.range:SetShown(not pro)
     v.range:SetValue(FT.S.chartRange or "30D")
-    v.pro:ClearAllPoints()
-    v.pro:SetPoint("LEFT", pro and v.tf or v.range, "RIGHT", 16, 0)
-    if T.FitBestUse then T.FitBestUse() end
-    local w, h = v:GetSize()
-    if w and w > 0 then
-        local cards = v.compact and (v.reserve or 0) or CARDS_H
-        v.chart:SetHeight(math.max(80, math.floor((h - 128 - cards - 6) * (pro and 0.56 or 1))))
-    end
 end
 
--- draw the charts of the chosen item (price; profit in money, zero in the middle); keepView: same zoom
 function T.DrawChart(keepView)
     local v = itemView
     local id = state.selected
     if not (v and id) then return end
-    v.chart:SetData(UI.PriceChartData(id, FT.S.chartTF, FT.S.showMA), keepView)
-    v.pchart:SetData(UI.ProfitChartData(id), keepView)
+    v.range:SetValue(FT.S.chartRange or "30D")
+    v.chart:SetData(UI.PriceChartData(id, FT.S.chartTF, false), keepView)
 end
 
 function T.ShowItem(id, keepView)
@@ -1353,89 +1321,33 @@ function T.ShowItem(id, keepView)
         local subName = GetSubClassInfo and sub and GetSubClassInfo(cls, sub)
         if subName and subName ~= "" and subName ~= parts[1] then parts[#parts + 1] = subName end
     end
-    local simple = FT.S.simple ~= false
-    if FT.Hist.Tracked(id) and not simple then parts[#parts + 1] = FT.C("accent", L["tracked intraday"]) end
-    local rs = FT.Craft.ByOutput(id)
-    if rs and rs[1] and (FT.S.showCraft or not simple) then parts[#parts + 1] = FT.C("up", L["you can craft it"]) end
     local own = FT.Port.Count(id)
     if own > 0 then parts[#parts + 1] = FT.C("text", string.format(L["you have %s"], FT.Num(own))) end
     local s = FT.An.Stats(id)
     local head = UI.RiskHead(s)
     for i = #head, 1, -1 do table.insert(parts, 1, head[i]) end
     UI.FitBits(v.sub, table.concat(parts, FT.C("dim", "  ||  ")))
-    v.price:SetText(s.price and FT.Money(s.price) or "—")
+    v.price:SetText(s.price and FT.Money(s.price, "short") or "—")
     v.change:SetText(FT.Pct(s.ch1) .. FT.C("dim", " " .. L["24h"]))
     v.priceAge:SetText(UI.PriceAgeText(id, s))
-
-    for _, p in ipairs(v.pairs) do
-        local val = s[p.key]
-        if p.key == "listed" or p.key == "auctions" or p.key == "sellers" then
-            p.value:SetText(UI.CountText(s, p.key))
-            if p.key == "auctions" then p.label:SetText(UI.AuctionsLabel(id)) end
-        elseif p.key == "sells" then
-            p.value:SetText(s.sales and FT.Sales.PerDayText(s.sales) or FT.C("dim", "—"))
-        else
-            p.value:SetText(val and FT.Money(val, "short") or "—")
-        end
-    end
-
-    v.tf:SetValue(FT.S.chartTF)
-    v.ma:SetChecked(FT.S.showMA)
-    v.pro:SetChecked(UI.ProChart())
-    T.ApplyChartStyle()
-    T.DrawChart(keepView)
-
-    -- the market: healthy or not, and why
-    local _, healthLabel, healthColor, healthWhy = FT.An.Health(s)
-    v.healthWord:SetText(FT.C(healthColor, healthLabel))
-    local hBits = {}
-    local perDay = s.sales and s.sales.hours >= 12 and s.sales.perDay
-    if perDay then hBits[#hBits + 1] = string.format(L["Sells %s a day"], perDay >= 10 and FT.Num(math.floor(perDay + 0.5)) or string.format("%.1f", perDay)) end
-    if s.listed then hBits[#hBits + 1] = string.format(L["%s listed"], FT.Num(s.listed)) end
-    if perDay and perDay > 0 and s.listed then
-        local clear = s.listed / perDay
-        hBits[#hBits + 1] = clear < 1 and L["gone in a day"] or string.format(L["%s days to sell out"], FT.Num(math.floor(clear + 0.5)))
-    end
-    v.healthLine:SetText(#hBits > 0 and table.concat(hBits, ", ") or FT.C("dim", L["Sales show after a day of prices."]))
-    local healthKey = FT.An.Health(s)
-    local notes = {}
-    if healthKey == "pumped" or healthKey == "dumping" then notes[#notes + 1] = healthWhy end
-    if s.crowd then notes[#notes + 1] = string.format(L["%d sellers (usually ~%d)"], s.sellersNow, math.floor(s.typicalS + 0.5)) end
-    if s.bait then notes[#notes + 1] = L["The cheapest one looks like bait: don't price off it."] end
-    local whale = FT.Whales.Of(id)
-    if whale then notes[#notes + 1] = string.format(L["Whale: %s has %s"], whale.n, FT.Whales.Whole(whale.s)) end
-    v.healthNote:SetText(table.concat(notes, " "))
-
-    -- the price: where it's going, against its weeks, and what it did before
-    local word, wordColor = FT.An.TrendWord(s)
-    v.trendWord:SetText(FT.C(wordColor, word))
-    -- a short line each (one line of three cut the last with "...")
-    local tBits = {}
-    if s.ch7 then tBits[#tBits + 1] = L["7 days"] .. "  " .. FT.Pct(s.ch7) end
-    if s.ch30 then tBits[#tBits + 1] = L["30 days"] .. "  " .. FT.Pct(s.ch30) end
-    if s.dev then tBits[#tBits + 1] = L["vs usual"] .. "  " .. FT.Pct(s.dev) end
-    v.trendLine:SetText(table.concat(tBits, "\n"))
-    -- the one record that matters now: what its jumps did when it's up, its dips when it's down
-    local b = s.behavior or {}
-    local rec
-    if (s.dev or 0) >= 0 and b.knowsHighs then rec = FT.An.HighRecord(b)
-    elseif b.knowsLows then rec = FT.An.LowRecord(b)
-    elseif b.knowsHighs then rec = FT.An.HighRecord(b) end
-    if rec then rec = rec:sub(1, 1):upper() .. rec:sub(2) .. "." end
-    if not rec and b.bestDay and (b.bestUp or 0) >= 0.03 then rec = string.format(L["Best day: %s (%s)."], FT.An.DayName(b.bestDay), FT.An.Pc(b.bestUp)) end
-    v.trendNote:SetText(rec or FT.C("dim", L["Its record shows after a few weeks of prices."]))
 
     -- the call: for you - selling if you have it, else buying - with how sure it is and its record
     local call = FT.An.Call(s, own)
     v.callBadge:Set(call.kind, nil, call.strength)
     local sure = call.conf and FT.An.ConfText(call.conf) or ""
-    if call.record then sure = sure .. ", " .. call.record end
+    if call.record then sure = sure .. (sure ~= "" and ", " or "") .. call.record end
     v.callSure:SetText(sure)
     v.callText:SetText(call.text or "")
-    v.callOther:SetText(call.other and FT.C("dim", call.other) or "")
+    -- a long reason takes a second line: the panel grows, the chart and the sections move down
+    local two = (v.callText:GetStringWidth() or 0) > ((v.callText:GetWidth() or 400) + 0.5)
+    v.call:SetHeight(UI.RowH(two and 46 or 34))
     v.callWhy = call.detail
-    v.craft:SetShown(rs ~= nil and rs[1] ~= nil)
+    v.callOther = call.other
 
+    T.ApplyChartStyle()
+    T.DrawChart(keepView)
+    v.secs:SetWidth(SEC_W())
+    v.secs:Lay(id, s)
     T.UpdateWatchButton()
     T.LayoutRight()
     T.FitHeader()
@@ -1449,71 +1361,29 @@ function T.Build(p)
     BuildList(p)
     center = CreateFrame("Frame", nil, p)
     overview = BuildOverview(center)
+    overview:Hide()
     itemView = BuildItemView(center)
     itemView:Hide()
-    -- a material clicked opens it here (the list stays as it is)
+    -- (the craft breakdown is the Craft it section now; the old panel stays built, out of sight)
     mats = UI.Materials(p, function(id) T.Select(id) end)
-    mats:SetPoint("BOTTOMRIGHT", -8, 8)
-    mats:SetWidth(RIGHT_W())
     mats:Hide()
     T.OnLayout()
 end
 
--- the craft breakdown of a crafted item: on the right of the chart; in the smallest window under the chart (where
--- the cards are in the others: the chart keeps its width). The chart takes the room when there's no recipe.
 function T.LayoutRight()
-    if not (mats and center) then return end
-    local compact = FT.Compact()
-    local pageH = page:GetHeight() or 400
-    local show, h = false, 0
-    if itemView:IsShown() and state.selected then
-        show, h = mats:SetItem(state.selected, compact and math.floor(pageH * 0.45) or pageH - 16)
-    end
-    mats:SetShown(show)
+    if not center then return end
     center:ClearAllPoints()
     center:SetPoint("TOPLEFT", LEFT_W + 18, -8)
-    itemView.reserve = nil
-    if show and compact then
-        center:SetPoint("BOTTOMRIGHT", -8, 8)
-        mats:ClearAllPoints()
-        mats:SetPoint("BOTTOMLEFT", center, "BOTTOMLEFT", 0, 0)
-        mats:SetPoint("BOTTOMRIGHT", center, "BOTTOMRIGHT", 0, 0)
-        mats:SetHeight(h)
-        mats:SetItem(state.selected, math.floor(pageH * 0.45)) -- again, at its width now
-        itemView.reserve = h + 8
-    elseif show then
-        mats:ClearAllPoints()
-        mats:SetPoint("TOPRIGHT", -8, -8)
-        mats:SetWidth(RIGHT_W())
-        mats:SetHeight(math.min(h, pageH - 16))
-        center:SetPoint("BOTTOMRIGHT", -(RIGHT_W() + 18), 8)
-    else
-        center:SetPoint("BOTTOMRIGHT", -8, 8)
-    end
-    T.SizeCharts()
+    center:SetPoint("BOTTOMRIGHT", -8, 8)
+    if mats then mats:Hide() end
 end
 
--- the charts' heights: what's left above the cards (or the breakdown, in the smallest window)
-function T.SizeCharts()
-    local v = itemView
-    if not v then return end
-    local below = v.compact and (v.reserve or 0) or CARDS_H
-    v.pchart:ClearAllPoints()
-    v.pchart:SetPoint("TOPLEFT", v.chart, "BOTTOMLEFT", 0, -6)
-    v.pchart:SetPoint("BOTTOMRIGHT", 0, below)
-    local h = v:GetHeight()
-    if h and h > 0 then
-        v.chart:SetHeight(math.max(80, math.floor((h - 128 - below - 6) * (UI.ProChart() and 0.56 or 1))))
-    end
-end
+function T.SizeCharts() end
 
--- the compact window: charts only - no cards under the charts ("More" has them)
 function T.OnLayout()
     if not page then return end
-    local compact = FT.Compact()
-    local v = itemView
-    v.compact = compact
-    for _, c in ipairs({ v.health, v.trend, v.call }) do c:SetShown(not compact) end
+    itemView.compact = FT.Compact()
+    if itemView.secs then itemView.secs:SetWidth(SEC_W()) end
     T.LayoutRight()
 end
 
@@ -1738,6 +1608,8 @@ function T.Select(id)
     if not id then return end
     if not page then FT.Show("market") end
     state.selected = id
+    FT.db.ui = FT.db.ui or {}
+    FT.db.ui.lastItem = id
     FT.Hist.Viewed(id)
     if list then list:Refresh() end
     T.ShowItem(id)
@@ -1782,6 +1654,13 @@ function T.Refresh()
 end
 
 function T.RefreshRight()
+    if not state.selected then
+        -- v0.42: no overview (Today has it): the item you opened last, else the first in the list
+        local last = FT.db.ui and FT.db.ui.lastItem
+        local first = list and list.items and list.items[1]
+        state.selected = (last and FT.Market.Row and FT.Market.Row(last) and last) or (first and first.id) or last
+        if list then list:Refresh() end
+    end
     if state.selected then
         T.ShowItem(state.selected, true)
     else
@@ -1803,9 +1682,11 @@ function T.Selected()
 end
 
 function T.ClearSelection()
+    -- v0.42: no overview to go back to: the item opened last (or the list's first) shows
     state.selected = nil
-    if list then list:Refresh() end
-    T.ShowOverview()
+    FT.db.ui = FT.db.ui or {}
+    FT.db.ui.lastItem = nil
+    T.RefreshRight()
 end
 
 -- the watchlist changed (a menu, another page): the Watch button and the list follow

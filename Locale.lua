@@ -21,16 +21,6 @@ function FT.ApplyLocale(words)
 end
 
 -- what to do: the signal badges (short: they sit in narrow columns)
-plain["SELL"] = "CASH OUT"
-plain["BUY"] = "BUY DIP"
-plain["HOLD"] = "HODL"
-plain["TRIM"] = "SELL HALF"
-plain["PRICEY"] = "OVERPRICED"
-plain["AVOID"] = "STAY AWAY"
-plain["LOSS"] = "LOSES GOLD"
-plain["FAIR"] = "NORMAL"
-plain["WATCH"] = "WAIT"
-plain["RESELL"] = "FLIP IT"
 plain["Resell"] = "Flip"
 plain["Sell now"] = "Cash out now"
 plain["Hold / avoid"] = "HODL / stay away"

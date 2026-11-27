@@ -409,7 +409,7 @@ local function FromDeals(out, p)
     end
     if best then
         out[#out + 1] = {
-            id = best.id, kind = "FLIP", label = best.kind == "HOUSES" and L["AH TO AH"] or L["FLIP IT"], gold = best.profit,
+            id = best.id, kind = "FLIP", label = L["FLIP IT"], gold = best.profit,
             text = string.format(L["Buy %s %s for %s, sell for +%s"], Thousand(best.qty or 1), Link(best.id),
                 FT.Money(math.floor(best.cost or 0), "short"), FT.Money(math.floor(best.profit), "short")),
             why = string.format(L["Your gold covers it. You flipped %d items in two weeks."], p.flips),

@@ -22,6 +22,7 @@ UI.LOOKS = {
         accent = { 0.941, 0.725, 0.043 },
         blue = { 0.231, 0.510, 0.965 },
         purple = { 0.655, 0.545, 0.980 },
+        orange = { 1, 0.604, 0.180 },
         black = { 0, 0, 0 },
         -- a row under the mouse, a chosen row (with its alpha: UI.SEL_A)
         hl = { 0.098, 0.114, 0.141 },
@@ -42,6 +43,7 @@ UI.LOOKS = {
         accent = { 1, 0.820, 0 },
         blue = { 0.300, 0.620, 1 },
         purple = { 0.640, 0.210, 0.930 },
+        orange = { 1, 0.604, 0.180 },
         black = { 0, 0, 0 },
         hl = { 0.300, 0.235, 0.110 },
         sel = { 1, 0.820, 0 },

@@ -5,6 +5,7 @@ local L = FT.L
 
 local T = {}
 FT.Tabs.portfolio = T
+local DONUT_W -- (below: the donut's width)
 
 local state = { sort = "value", desc = true, days = 30, view = "portfolio", period = 7 }
 local cards, chart, list, rangeSeg
@@ -49,7 +50,7 @@ function T.Build(p)
     sub:SetText(L["Bags, banks and mailboxes of your characters on this server, at auction house prices"])
 
     -- what you own, or what your trading brought (the deals journal)
-    T.viewSeg = UI.Segmented(p, { { "portfolio", L["Holdings"] }, { "sell", L["Sell yours"] }, { "chars", L["Characters"] }, { "journal", L["Journal"] } }, function(v) T.SetView(v) end, 22)
+    T.viewSeg = UI.GroupBar(p, "you")
     T.viewSeg:SetPoint("TOPRIGHT", -8, -8)
     T.viewSeg:SetValue(state.view)
     T.head, T.sub = head, sub
@@ -77,9 +78,7 @@ function T.Build(p)
         { key = "qty", title = L["Qty"], width = 64, justify = "RIGHT", sort = "qty" },
         { key = "price", title = L["Price"], width = 86, justify = "RIGHT", sort = "price" },
         { key = "value", title = L["Value"], width = 96, justify = "RIGHT", sort = "value" },
-        { key = "spark", title = "", width = 44, justify = "RIGHT", make = function(row) return UI.Sparkline(row, 40, 16) end, cellHeight = 16 },
         { key = "ch7", title = L["7d"], width = 60, justify = "RIGHT", sort = "ch7" },
-        { key = "share", title = L["Share"], width = 56, justify = "RIGHT", sort = "share" },
         { key = "signal", title = L["Signal"], width = 84, justify = "CENTER", make = function(row) return UI.Badge(row, 82, 18) end, cellHeight = 18 },
     }
     T.header = UI.Header(panel, cols, function(key)
@@ -107,10 +106,9 @@ function T.Build(p)
                 c.name.text:SetText(x.name .. FT.C("dim", "  ·  " .. string.format(x.n == 1 and L["%d item"] or L["%d items"], x.n)))
                 c.qty:SetText("")
                 c.price:SetText("")
-                c.value:SetText(FT.Money(x.value, "short"))
+                c.value:SetText(FT.Money(x.value, "gold"))
                 c.ch7:SetText("")
-                c.spark:SetValues(nil)
-                c.share:SetText(T.total and T.total > 0 and string.format("%.0f%%", x.value / T.total * 100) or "")
+                -- (no trend and share columns since v0.42)
                 c.signal:SetShown(x.toSell > 0)
                 if x.toSell > 0 then c.signal:Set("SELL", string.format(L["%d to sell"], x.toSell)) end
                 return
@@ -121,12 +119,10 @@ function T.Build(p)
             row.cells.name.text:SetText(FT.ItemText(x.id, 40))
             row.cells.qty:SetText(FT.Num(x.qty))
             row.cells.price:SetText(FT.Money(x.price, "short"))
-            row.cells.value:SetText(FT.Money(x.value, "short"))
+            row.cells.value:SetText(FT.Money(x.value, "gold"))
             row.cells.ch7:SetText(FT.Pct(x.ch7))
             local m = FT.Market.Row(x.id)
             local wk = x.ch7 or 0
-            row.cells.spark:SetValues(m and m.spark, wk > 0 and "up" or (wk < 0 and "down" or "muted"))
-            row.cells.share:SetText(T.total and T.total > 0 and string.format("%.1f%%", x.value / T.total * 100) or "")
             row.cells.signal:Set(x.signal, nil, x.strength)
         end,
         onClick = function(x)
@@ -171,30 +167,28 @@ function T.Build(p)
     list:SetPoint("TOPLEFT", T.header, "BOTTOMLEFT", 0, -2)
     list:SetPoint("BOTTOMRIGHT", -1, 4)
     list:SetEmptyText(L["Nothing priced yet. Open your bags and bank once per character."])
-    for _, c in ipairs(cards) do portfolioParts[#portfolioParts + 1] = c end
-    for _, x in ipairs({ chartTitle, rangeSeg, chart, panel }) do portfolioParts[#portfolioParts + 1] = x end
+    -- v0.42: the donut of where your gold sits takes the place of the four cards and the worth chart (Today shows
+    -- the worth and its moves); the table beside it shows what the chosen slice holds
+    for _, x in ipairs(cards) do x:Hide() end
+    for _, x in ipairs({ chartTitle, rangeSeg, chart }) do x:Hide() end
+    T.BuildDonut(p)
+    for _, x in ipairs({ T.donutBox, T.filter, T.showAll, panel }) do portfolioParts[#portfolioParts + 1] = x end
     T.BuildJournal(p)
     T.BuildChars(p)
     T.BuildSell(p)
 
     UI.OnSize(p, function(self, w, h)
-        local cw = (w - 16 - 3 * 8) / 4
-        for i, c in ipairs(cards) do
-            c:ClearAllPoints()
-            c:SetPoint("TOPLEFT", 8 + (i - 1) * (cw + 8), -38)
-            c:SetWidth(cw)
-        end
-        chartTitle:ClearAllPoints()
-        chartTitle:SetPoint("TOPLEFT", 12, -114)
-        rangeSeg:ClearAllPoints()
-        rangeSeg:SetPoint("TOPRIGHT", -8, -110)
-        local chartH = math.max(140, math.floor((h - 140) * 0.38))
-        chart:ClearAllPoints()
-        chart:SetPoint("TOPLEFT", 8, -136)
-        chart:SetPoint("TOPRIGHT", -8, -136)
-        chart:SetHeight(chartH)
+        T.donutBox:ClearAllPoints()
+        T.donutBox:SetPoint("TOPLEFT", 8, -38)
+        T.donutBox:SetPoint("BOTTOMLEFT", 8, 8)
+        T.donutBox:SetWidth(DONUT_W())
+        T.filter:ClearAllPoints()
+        T.filter:SetPoint("TOPLEFT", T.donutBox, "TOPRIGHT", 12, -6)
+        T.filter:SetPoint("RIGHT", T.showAll, "LEFT", -10, 0)
+        T.showAll:ClearAllPoints()
+        T.showAll:SetPoint("TOPRIGHT", -8, -38)
         panel:ClearAllPoints()
-        panel:SetPoint("TOPLEFT", 8, -136 - chartH - 8)
+        panel:SetPoint("TOPLEFT", T.donutBox, "TOPRIGHT", 10, -30)
         panel:SetPoint("BOTTOMRIGHT", -8, 8)
     end)
 end
@@ -206,6 +200,188 @@ local JSORT = {
     result = function(x) return x.result end, sold = function(x) return x.income end,
     bought = function(x) return x.spent end, expired = function(x) return x.expired + x.cancelled end,
 }
+
+---------------------------------------------------------------------------
+-- Where your gold sits (v0.42): a donut you hover and click. Where it is - gold on hand, bags, bank, mail, on the
+-- auction house - or how liquid it is - gold on hand, sells today, this week, slow to sell (a fifth of a day's sales
+-- is what one seller can move), listed. A click shows just that slice in the table; again: everything.
+---------------------------------------------------------------------------
+DONUT_W = function() return (FT.Compact() and 320 or 360) + 16 * (tonumber(FT.S and FT.S.textSize) or 0) end
+local WHERE = { { "gold", "Gold on hand", "accent" }, { "bags", "Bags", "blue" }, { "bank", "Bank", "up" },
+    { "mail", "Mail", "purple" }, { "ah", "On the AH", "muted" } }
+local LIQUID = { { "gold", "Gold on hand", "accent" }, { "today", "Sells today", "up" }, { "week", "Sells this week", "blue" },
+    { "slow", "Slow to sell", "orange" }, { "ah", "Listed on the AH", "muted" } }
+local LIQ_TIP = { today = "The market takes this many in a day.", week = "A few days of what the market takes.",
+    slow = "More than a week of what the market takes: gold tied up.", ah = "Waiting for a buyer.", gold = "Coins on your characters, in their mail too." }
+local donutView, donutPick = "where", nil
+
+local function Liquidity(id, qty)
+    local rate = FT.Sales.Rate(id)
+    local perDay = rate and rate.perDay or 0
+    local days = qty / math.max(0.2, perDay * 0.2)
+    if days <= 1 then return "today" elseif days <= 7 then return "week" end
+    return "slow"
+end
+
+-- every row of the table split by where it is (a part of an item in each place), and your listed auctions
+local function Pieces(rows)
+    local out = {}
+    for _, x in ipairs(rows) do
+        local per = { bags = 0, bank = 0, mail = 0 }
+        for _, c in pairs(x.chars or {}) do
+            per.bags = per.bags + (c.bags or 0)
+            per.bank = per.bank + (c.bank or 0)
+            per.mail = per.mail + (c.mail or 0) + (c.post or 0)
+        end
+        for loc, n in pairs(per) do
+            if n > 0 then out[#out + 1] = { row = x, loc = loc, qty = n, value = x.price * n } end
+        end
+    end
+    for _, b in ipairs((FT.Owned.List())) do
+        if b.itemID and not b.sold then
+            local s = FT.An.Stats(b.itemID)
+            if s.price then
+                out[#out + 1] = { id = b.itemID, loc = "ah", qty = b.qty or 1, value = s.price * (b.qty or 1), stats = s }
+            end
+        end
+    end
+    return out
+end
+
+local function SliceOf(piece)
+    if donutView == "where" then return piece.loc end
+    if piece.loc == "ah" then return "ah" end
+    return Liquidity(piece.row.id, piece.row.qty)
+end
+
+function T.BuildDonut(p)
+    local box = UI.Panel(p, "bg1", "line")
+    T.donutBox = box
+    box.seg = UI.Segmented(box, { { "where", L["Where it is"] }, { "liquid", L["How liquid"] } }, function(v)
+        donutView, donutPick = v, nil
+        if T.donut then T.donut.picked = nil end
+        T.FillDonut()
+        T.RefreshList()
+    end, 22)
+    box.seg:SetPoint("TOP", 0, -10)
+    box.seg:SetValue(donutView)
+    T.donut = UI.Donut(box, 104, 34, function(key)
+        donutPick = key
+        T.FillDonut()
+        T.RefreshList()
+    end)
+    T.donut:SetPoint("TOP", box.seg, "BOTTOM", 0, -6)
+    box.legend = {}
+    for i = 1, 5 do
+        local r = CreateFrame("Button", nil, box)
+        r:SetHeight(UI.RowH(22))
+        r:SetPoint("TOPLEFT", T.donut, "BOTTOMLEFT", -34, -4 - (i - 1) * UI.RowH(23))
+        r:SetPoint("TOPRIGHT", T.donut, "BOTTOMRIGHT", 34, -4 - (i - 1) * UI.RowH(23))
+        r.hover = UI.Tex(r, "BACKGROUND", "hl", 0.6)
+        r.hover:SetAllPoints()
+        r.hover:Hide()
+        r.sw = UI.Tex(r, "ARTWORK", "accent", 1)
+        r.sw:SetSize(10, 10)
+        r.sw:SetPoint("LEFT", 6, 0)
+        r.pct = UI.Text(r, 12, "muted", "RIGHT")
+        r.pct:SetPoint("RIGHT", -6, 0)
+        r.pct:SetWidth(38)
+        r.val = UI.Text(r, 12, "text", "RIGHT")
+        r.val:SetPoint("RIGHT", r.pct, "LEFT", -6, 0)
+        r.val:SetWidth(UI.RowH(70) + 6 * (tonumber(FT.S.textSize) or 0))
+        r.label = UI.Text(r, 12, "text")
+        r.label:SetPoint("LEFT", r.sw, "RIGHT", 8, 0)
+        r.label:SetPoint("RIGHT", r.val, "LEFT", -6, 0)
+        r:SetScript("OnEnter", function(self)
+            self.hover:Show()
+            if self.key then T.donut.hover = self.key; T.donut:Draw() end
+        end)
+        r:SetScript("OnLeave", function(self) self.hover:Hide(); T.donut.hover = nil; T.donut:Draw() end)
+        r:SetScript("OnClick", function(self) if self.key then T.donut:Pick(self.key) end end)
+        box.legend[i] = r
+    end
+    T.filter = UI.Text(p, 12, "text")
+    T.showAll = UI.Button(p, L["Show everything"], 10, 22, "default", function() T.donut:Pick(nil) end)
+    T.showAll:FitText(22)
+end
+
+function T.FillDonut()
+    if not T.donut then return end
+    local defs = donutView == "where" and WHERE or LIQUID
+    local sums = { gold = FT.Port.Gold() }
+    for _, piece in ipairs(Pieces(T.rows or {})) do
+        local k = SliceOf(piece)
+        sums[k] = (sums[k] or 0) + piece.value
+    end
+    local slices, total = {}, 0
+    for _, d in ipairs(defs) do
+        local v = sums[d[1]] or 0
+        if v > 0 then
+            slices[#slices + 1] = { key = d[1], label = L[d[2]], color = d[3], value = v, tip = LIQ_TIP[d[1]] and L[LIQ_TIP[d[1]]] }
+            total = total + v
+        end
+    end
+    local liquid = (sums.gold or 0) + (donutView == "liquid" and (sums.today or 0) or 0)
+    if donutView == "where" then
+        for _, piece in ipairs(Pieces(T.rows or {})) do
+            if piece.loc ~= "ah" and Liquidity(piece.row.id, piece.row.qty) == "today" then liquid = liquid + piece.value end
+        end
+    end
+    T.donut.picked = donutPick
+    T.donut:SetSlices(slices, FT.Money(total, "gold"), total > 0 and string.format(L["%d%% liquid"], math.floor(liquid / total * 100 + 0.5)) or "")
+    donutPick = T.donut.picked
+    for i, r in ipairs(T.donutBox.legend) do
+        local sl = slices[i]
+        r:SetShown(sl ~= nil)
+        if sl then
+            r.key = sl.key
+            local c = UI.C[sl.color] or UI.C.text
+            r.sw:SetColorTexture(c[1], c[2], c[3], 1)
+            r.label:SetText(sl.label)
+            UI.SetTextColor(r.label, donutPick == sl.key and "accent" or "text")
+            r.val:SetText(FT.Money(sl.value, "gold"))
+            r.pct:SetText(string.format("%d%%", math.floor(sl.share * 100 + 0.5)))
+        end
+    end
+    local sl = donutPick and T.donut.byKey[donutPick]
+    T.showAll:SetShown(sl ~= nil)
+    if sl and donutPick == "gold" then
+        T.filter:SetText(FT.C("accent", sl.label) .. "  " .. FT.Money(sl.value, "gold") .. FT.C("dim", "  ·  " .. L["coins on your characters (Characters has each)"]))
+    elseif sl then
+        T.filter:SetText(FT.C("accent", sl.label) .. "  " .. FT.Money(sl.value, "gold") .. FT.C("dim", string.format("  ·  %d%%", math.floor(sl.share * 100 + 0.5))))
+    else
+        T.filter:SetText(L["Everything"] .. FT.C("dim", "  ·  " .. L["click a slice to see just that"]))
+    end
+end
+
+-- the table's rows for the chosen slice: the part of each item that's there (nil: every row whole)
+function T.SliceRows(rows)
+    if not donutPick then return rows end
+    if donutPick == "gold" then return {} end
+    local out, byId = {}, {}
+    for _, piece in ipairs(Pieces(rows)) do
+        if SliceOf(piece) == donutPick then
+            local base = piece.row
+            if not base then
+                local s = piece.stats
+                local signal, strength, reason = FT.An.SellSignal(s)
+                base = { id = piece.id, price = s.price, ch7 = s.ch7, stats = s, signal = signal, strength = strength, reason = reason, chars = {} }
+            end
+            local key = base.id
+            local x = byId[key]
+            if not x then
+                x = {}
+                for k, v in pairs(base) do x[k] = v end
+                x.qty, x.value = 0, 0
+                byId[key] = x
+                out[#out + 1] = x
+            end
+            x.qty = x.qty + piece.qty
+            x.value = x.value + piece.value
+        end
+    end
+    return out
+end
 
 function T.BuildJournal(p)
     local f = CreateFrame("Frame", nil, p)
@@ -334,10 +510,10 @@ function T.SetView(view)
     state.view = view
     if T.viewSeg then T.viewSeg:SetValue(view) end
     if view == "sessions" then
-        -- Sessions has a tab of its own now
-        FT.Show("sessions")
+        FT.ShowSub("you", "sessions")
         return
     end
+    if FT.GroupShows and view ~= "sell" then FT.GroupShows("you", view) end
     local j, ch, sl = view == "journal", view == "chars", view == "sell"
     for _, x in ipairs(portfolioParts) do x:SetShown(not j and not ch and not sl) end
     if journal then journal:SetShown(j) end
@@ -435,7 +611,7 @@ function T.DrawChart()
 end
 
 function T.RefreshList()
-    local rows = T.rows or {}
+    local rows = T.SliceRows and T.SliceRows(T.rows or {}) or (T.rows or {})
     local get = SORT_GET[state.sort] or SORT_GET.value
     local missing = state.desc and -math.huge or math.huge
     table.sort(rows, function(a, b)
@@ -521,7 +697,7 @@ function T.Refresh()
         if x.signal == "SELL" or x.signal == "TRIM" then toSell = toSell + 1 end
     end
     cards[4]:Set(FT.Num(#rows), toSell > 0 and FT.C("up", string.format(L["%d worth selling now"], toSell)) or L["priced items"])
-    T.DrawChart()
+    T.FillDonut()
     T.RefreshList()
 end
 
@@ -548,6 +724,8 @@ function ST.Build(p)
     local sub = UI.Text(p, 11, "dim")
     sub:SetPoint("LEFT", head, "RIGHT", 12, -1)
     sub:SetText(L["Your farming runs: what you looted, what it's worth now, gold an hour"])
+    ST.bar = UI.GroupBar(p, "you")
+    ST.bar:SetPoint("TOPRIGHT", -8, -8)
     local f = CreateFrame("Frame", nil, p)
     f:SetPoint("TOPLEFT", 0, -30)
     f:SetPoint("BOTTOMRIGHT", 0, 0)
@@ -590,7 +768,7 @@ function ST.Build(p)
                 c.name:SetText("|T" .. mark .. ":14|t  " .. (s.name or s.zone or "?"))
                 c.when:SetText(FT.C("dim", FT.TimeOfDay(s.start or s.stop)))
                 c.time:SetText(FT.Duration(s.secs))
-                c.worth:SetText(FT.Money(s.worth or 0, "short"))
+                c.worth:SetText(FT.Money(s.worth or 0, "gold"))
                 c.rate:SetText(rate and FT.C("up", FT.Money(math.floor(rate), "short")) or "")
             elseif x.head then
                 -- the columns of what was found

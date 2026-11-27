@@ -12,6 +12,14 @@ FT.News = N
 -- start, after the files are read (a table made with them would keep the English)
 local function News()
     return {
+        ["v0.42"] = {
+            { L["Simple Wolf: four tabs"], L["Today, Market, Make gold, You. Today: what you own and what the last prices did to it, your top 3, your bags, what's going up and down."], function() FT.Show("today") end },
+            { L["Six verdicts"], L["BUY, SELL, HOLD, WAIT, CRAFT, FARM, one colour each everywhere. CASH OUT and HODL only with Settings > Meme mode on."], nil },
+            { L["Item pages read top to bottom"], L["The verdict first, one clean chart, and beside it when it sells, the market, its price, what it makes or costs to make, where to farm it."], function() FT.Show("market") end },
+            { L["Where your gold sits"], L["You > Holdings: a donut of where it is and how quickly it turns into gold. Click a slice to see just that."], function() FT.ShowSub("you", "portfolio") end },
+            { L["The Wolf network"], L["Wolf users in your guild and group share the prices that changed after a scan (no /reload), what sold, farm rates and deals."], nil },
+            { L["Session panel folds"], L["The - on the session panel leaves just the gold and gold an hour."], nil },
+        },
         ["v0.41"] = {
             { L["When it sells: its price by the hour"], L["The hours it's cheapest (buy then) and priciest (post just before): on an item's chart, When it sells."], nil },
         },

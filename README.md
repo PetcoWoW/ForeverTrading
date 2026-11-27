@@ -17,6 +17,17 @@ and the words and adds its own features. See `NOTICE`.
 
 Restart the game fully the first time (new addon files load at launch, not on `/reload`), then type `/wolf`.
 
+## The window (v0.42)
+
+Four tabs: **Today** (what you own and what the last prices did to it, your top 3, your bags, what's going up and
+down), **Market** (search any item: the verdict first, one chart, when it sells, what it makes or costs to make,
+where to farm it), **Make gold** (Flip it, Craft it, Farm it, Raid prep) and **You** (Holdings with a donut of where
+your gold sits, Sessions, Characters, Journal). Every call is one of six verdicts: BUY, SELL, HOLD, WAIT, CRAFT, FARM.
+
+**The Wolf network:** Wolf users in your guild and group share the prices that changed after a scan (no `/reload`),
+what sold, farm rates per mob and watchlist deals, in hidden addon messages; a price far from what's known waits
+until a second user agrees. Settings > Exchange.
+
 ## The Wolf prices companion (Windows)
 
 A small program by the clock that keeps the prices fresh: every 15 minutes it asks the price robot (this
@@ -52,13 +63,13 @@ Don't run ForeverTrading at the same time: two scanners do the same work twice.
 `Data/Recipes.lua` holds every crafting recipe of WoW Forever (about 2,300), read from the Blizzard API by
 `tools/recipes/build.mjs`. The `recipes` workflow refreshes it every Monday and commits it when something changed.
 It's what **Best use** ranks: every recipe a material goes into, and what one of it brings in each. You'll find it
-on the Farm Board (click), the item's Best use button on the Terminal, and a line in the material's tooltip.
+on an item's page (Best crafts) and in Where to farm.
 
 ## Settings that matter (Settings > General)
 
 - **Words**: Plain English (default) swaps trader terms for plain ones - "Hype meter" instead of RSI,
-  "How fast it sells" instead of liquidity, CASH OUT / BUY DIP / HODL instead of SELL / BUY / HOLD.
-  Trader terms brings the originals back.
+  "How fast it sells" instead of liquidity. Trader terms brings the originals back.
+- **Meme mode** (Settings > Alerts, off to start): CASH OUT / HODL / APE IN in place of SELL / HOLD / BUY.
 - **Font**: the game's own wide font (default) or the narrow condensed one.
 - **Text size** and **Window scale** (up to 150%).
 
