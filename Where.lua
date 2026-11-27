@@ -27,7 +27,7 @@ local function Obj(id)
     local s = FT.SRC_O and FT.SRC_O[id]
     if not s then return nil end
     local p = Split(s, "|")
-    return { id = id, name = p[1], zones = p[2] ~= "" and p[2] or nil }
+    return { id = id, name = p[1], zones = p[2] ~= "" and p[2] or nil, chest = p[3] == "c" }
 end
 
 local function Quest(id)
@@ -104,7 +104,9 @@ function W.Farmable(id)
     local g = W.Get(id)
     local crafted = FT.Craft and FT.Craft.ByOutputAll and FT.Craft.ByOutputAll(id)
     local best = 0
-    for _, x in ipairs(g.nodes) do best = math.max(best, x.chance > 0 and x.chance or 1000) end
+    for _, x in ipairs(g.nodes) do
+        if not (x.who and x.who.chest) then best = math.max(best, x.chance > 0 and x.chance or 1000) end
+    end
     for _, x in ipairs(g.skin) do best = math.max(best, x.chance > 0 and x.chance or 1000) end
     for _, x in ipairs(g.drops) do best = math.max(best, x.chance) end
     if crafted then return best >= 500 end -- made, and also found often enough (5% a corpse or node)
@@ -136,7 +138,9 @@ function W.Needs(id)
     for _, x in ipairs(g.drops) do if x.chance >= 300 then dropped = true end end
     if dropped or #g.vendors > 0 or #g.favor > 0 or (FT.FarmSpots and FT.FarmSpots[id]) then return nil end
     if #g.skin > 0 then return "Skinning" end
-    if #g.nodes > 0 then
+    local gathered = false
+    for _, x in ipairs(g.nodes) do if not (x.who and x.who.chest) then gathered = true end end
+    if gathered then
         local row = FT.Market and FT.Market.Row and FT.Market.Row(id)
         if row and row.cls == 7 and row.sub == 7 then return "Mining" end
         if row and row.cls == 7 and row.sub == 9 then return "Herbalism" end
@@ -159,9 +163,15 @@ end
 -- Favor, containers, quests, world drop
 function W.Lines(id, max)
     max = max or 6
-    local out = {}
+    local out, spare = {}, {}
     local function Add(text) if #out < max then out[#out + 1] = text end end
+    local function Spare(text) spare[#spare + 1] = text end
     local g = W.Get(id)
+    -- (v0.51) crafted: its drops only when worth farming (5%+); gear: the world drop first, then only real farms
+    local crafted = FT.Craft and FT.Craft.ByOutputAll and FT.Craft.ByOutputAll(id)
+    local _, _, _, _, _, classID = FT.GetItemInfoInstant(id)
+    local gear = classID == 2 or classID == 4
+    local dropMin = crafted and 500 or (gear and 200 or 0)
     local mob = FT.Farm and FT.Farm.Mobs and FT.Farm.Mobs(id, 1)[1]
     if mob then
         Add(FT.C("text", mob.name or "?") .. FT.C("dim", "  ·  " .. string.format(L["%s a corpse (your loot)"], string.format("%.2f", mob.per))
@@ -177,41 +187,64 @@ function W.Lines(id, max)
     pooled = FT.Net and FT.Net.LootText and FT.Net.LootText(id)
     if pooled then Add(pooled) end
     if g.note then Add(FT.C("text", g.note)) end
-    for _, x in ipairs(g.nodes) do
-        if x.who then
-            Add(FT.C("text", x.who.name) .. FT.C("dim", (Pct(x.chance) and ("  ·  " .. Pct(x.chance)) or "") .. (x.who.zones and ("  ·  " .. x.who.zones) or "")))
+    if gear and g.world then
+        Add(FT.C("text", L["World drop"]) .. FT.C("dim", "  ·  " .. string.format(L["level %d and up"], g.world) .. "  ·  " .. L["Wowhead has where it drops most"]))
+    end
+    -- a vendor: first for what isn't gathered; after the nodes and skinning for what is (a Faire vendor's few)
+    local function Vendors()
+        local n = 0
+        for _, v in ipairs(g.vendors) do
+            if ForYou(v.fac) and v.zones and n < 2 then
+                n = n + 1
+                Add(FT.C("text", L["Vendor"] .. ": " .. v.name) .. FT.C("dim", "  ·  " .. v.zones))
+            end
         end
     end
-    for _, x in ipairs(g.skin) do
+    local gathered = #g.skin > 0
+    for _, x in ipairs(g.nodes) do if x.who and not x.who.chest then gathered = true end end
+    if not gathered then Vendors() end
+    for _, v in ipairs(g.favor) do
+        if ForYou(v.camp) then
+            Add(FT.C("accent", L["Merchant's Favor"]) .. FT.C("dim", "  ·  " .. v.name .. "  ·  "
+                .. (v.camp == "H" and L["west of the Crossroads, the Barrens"] or L["Three Corners, Redridge"])))
+        end
+    end
+    local n = 0
+    for _, x in ipairs(g.nodes) do
         if x.who then
+            local line = FT.C("text", x.who.name) .. FT.C("dim", (Pct(x.chance) and ("  ·  " .. Pct(x.chance)) or "") .. (x.who.zones and ("  ·  " .. x.who.zones) or ""))
+            if x.who.chest then Spare(line) elseif n < 2 then n = n + 1; Add(line) end
+        end
+    end
+    n = 0
+    for _, x in ipairs(g.skin) do
+        if x.who and n < 2 then
+            n = n + 1
             Add(FT.C("text", L["Skinning"] .. ": " .. x.who.name) .. FT.C("dim", (Pct(x.chance) and ("  ·  " .. Pct(x.chance)) or "")
                 .. (x.who.zones and ("  ·  " .. x.who.zones) or "") .. (x.who.lv and ("  ·  " .. x.who.lv) or "")))
         end
     end
+    if gathered then Vendors() end
+    n = 0
     for _, x in ipairs(g.drops) do
-        if x.who then
+        if x.who and n < 2 and x.chance >= dropMin then
+            n = n + 1
             Add(FT.C("text", x.who.name) .. FT.C("dim", (Pct(x.chance) and ("  ·  " .. Pct(x.chance)) or "")
                 .. (x.who.zones and ("  ·  " .. x.who.zones) or "") .. (x.who.lv and ("  ·  " .. x.who.lv) or "")))
         end
     end
-    for _, n in ipairs(g.favor) do
-        if ForYou(n.camp) then
-            Add(FT.C("accent", L["Merchant's Favor"]) .. FT.C("dim", "  ·  " .. n.name .. "  ·  "
-                .. (n.camp == "H" and L["west of the Crossroads, the Barrens"] or L["Three Corners, Redridge"])))
-        end
-    end
-    for _, n in ipairs(g.vendors) do
-        if ForYou(n.fac) then
-            Add(FT.C("text", L["Vendor"] .. ": " .. n.name) .. FT.C("dim", n.zones and ("  ·  " .. n.zones) or ""))
-        end
-    end
     for _, x in ipairs(g.boxes) do
-        Add(FT.C("text", FT.ItemText(x.itemID, 26)) .. FT.C("dim", Pct(x.chance) and ("  ·  " .. Pct(x.chance)) or ""))
+        Spare(FT.C("text", FT.ItemText(x.itemID, 26)) .. FT.C("dim", Pct(x.chance) and ("  ·  " .. Pct(x.chance)) or ""))
     end
-    for _, q in ipairs(g.quests) do
+    if g.quests[1] then
+        local q = g.quests[1]
         Add(FT.C("text", L["Quest"] .. ": " .. q.name) .. FT.C("dim", q.lv and ("  ·  " .. q.lv) or ""))
     end
-    if g.world then Add(FT.C("text", L["World drop"]) .. FT.C("dim", "  ·  " .. string.format(L["creatures of level %d and up"], g.world))) end
+    if g.world and not gear then Add(FT.C("text", L["World drop"]) .. FT.C("dim", "  ·  " .. string.format(L["creatures of level %d and up"], g.world))) end
+    -- chests, boxes and containers: only when nothing else gives it
+    if #out == 0 then
+        for _, line in ipairs(spare) do Add(line) end
+    end
     return out
 end
 

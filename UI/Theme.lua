@@ -701,6 +701,34 @@ local function Fit(fs)
     end
 end
 
+-- Two lines from one too long for fs at its size (v0.51: a source line wraps rather than ending in "..."): split
+-- at the last space that fits; the colour that was on carries over. Returns the text whole when it fits.
+function UI.SplitLine(fs, text)
+    local w = fs:GetWidth()
+    fs:SetText(text)
+    if not w or w <= 0 or (fs:GetStringWidth() or 0) <= w + 0.5 then return text end
+    local cut
+    local from = 1
+    while true do
+        local a = text:find(" ", from, true)
+        if not a then break end
+        fs:SetText(text:sub(1, a - 1))
+        if (fs:GetStringWidth() or 0) > w + 0.5 then break end
+        cut, from = a, a + 1
+    end
+    if not cut then return text end
+    local first, rest = text:sub(1, cut - 1), text:sub(cut + 1):gsub("^[%s·]+", "")
+    -- the colour on at the cut
+    local colour
+    for c, close in first:gmatch("(|c%x%x%x%x%x%x%x%x)()") do colour = c end
+    local lastClose = 0
+    for p in first:gmatch("()|r") do lastClose = p end
+    local lastOpen = 0
+    for p in first:gmatch("()|c%x%x%x%x%x%x%x%x") do lastOpen = p end
+    if colour and lastOpen > lastClose then rest = colour .. rest end
+    return first, rest
+end
+
 function UI.FitBits(fs, text)
     fs.fitText = text or ""
     if fs.SetWordWrap then fs:SetWordWrap(false) end

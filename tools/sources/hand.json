@@ -353,12 +353,22 @@
   },
   "5379": {
    "text": "No database has a source for it yet: Wolf's loot log names it as soon as a Wolf user loots one."
+  },
+  "3776": {
+   "kind": "made",
+   "text": "Made by rogues (Poisons, from the rogue trainer).",
+   "src": "Classic: rogue poisons are a rogue craft"
+  },
+  "9186": {
+   "kind": "made",
+   "text": "Made by rogues (Poisons, from the rogue trainer).",
+   "src": "Classic: rogue poisons are a rogue craft"
   }
  },
  "rules": [
   {
    "name": "^Craftsman's Writ: ",
-   "text": "Opened from a Sealed Journeyman's, Expert's or Artisan's Writ (enemies, treasure chests and dungeons drop them). Deliver the item it asks for: supply-faction reputation.",
+   "text": "From a Sealed Journeyman's, Expert's or Artisan's Writ (mobs, chests, dungeons). Deliver its item for supply-faction rep.",
    "src": "icy-veins.com sealed writs; conquestcapped.com writs guide"
   },
   {
@@ -479,5 +489,23 @@
     "Thorium Bar"
    ]
   }
+ },
+ "npcZones": {
+  "_about": "creatures with no spawn in ForeverDB: the instance they're in (raid bosses spawned by events)",
+  "11502": "Molten Core",
+  "12056": "Molten Core",
+  "12057": "Molten Core",
+  "11982": "Molten Core",
+  "11988": "Molten Core",
+  "12098": "Molten Core",
+  "12259": "Molten Core",
+  "12264": "Molten Core",
+  "11583": "Blackwing Lair",
+  "10184": "Onyxia's Lair",
+  "15727": "Temple of Ahn'Qiraj",
+  "15339": "Ruins of Ahn'Qiraj",
+  "14834": "Zul'Gurub",
+  "16011": "Naxxramas",
+  "15990": "Naxxramas"
  }
 }

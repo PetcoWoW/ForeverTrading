@@ -48,12 +48,31 @@ def item_name(i):
     v = item.get(i)
     return v.get(1) if v else None
 
+# ---- the hand table: Forever knowledge the databases don't have -------------------------------------------
+hand = json.load(open(HAND)) if os.path.exists(HAND) else {}
+
 umap = {int(k): T(v).get(1) for k, v in D.umap.items()}
+# the instances (their map ids): ForeverDB's zone positions (spz) stop at the door, its spawns (spw) don't
+INSTANCE = {30: "Alterac Valley", 33: "Shadowfang Keep", 34: "The Stockade", 36: "The Deadmines", 43: "Wailing Caverns",
+    47: "Razorfen Kraul", 48: "Blackfathom Deeps", 70: "Uldaman", 90: "Gnomeregan", 109: "Sunken Temple",
+    129: "Razorfen Downs", 189: "Scarlet Monastery", 209: "Zul'Farrak", 229: "Blackrock Spire", 230: "Blackrock Depths",
+    249: "Onyxia's Lair", 289: "Scholomance", 309: "Zul'Gurub", 329: "Stratholme", 349: "Maraudon", 369: "Deeprun Tram",
+    389: "Ragefire Chasm", 409: "Molten Core", 429: "Dire Maul", 469: "Blackwing Lair", 489: "Warsong Gulch",
+    509: "Ruins of Ahn'Qiraj", 529: "Arathi Basin", 531: "Temple of Ahn'Qiraj", 533: "Naxxramas"}
 def zones(key, n=2):
-    """the zones a creature (c) or object (o) is found in, most spots first"""
+    """the zones a creature (c) or object (o) is found in, most spots first (an instance by its spawns)"""
     z = F.spz[key] if F.spz else None
     if z is None:
-        return []
+        sp = D.spw[key] if D.spw else None
+        out = []
+        for _, pt in (sp.items() if sp is not None else []):
+            name = INSTANCE.get(T(pt).get(1))
+            if name and name not in out:
+                out.append(name)
+        hz = hand.get("npcZones", {}).get(key[1:]) if key.startswith("c") else None
+        if not out and hz:
+            out.append(hz)
+        return out[:n]
     counts = []
     for m, pts in z.items():
         name = umap.get(int(m))
@@ -70,9 +89,6 @@ def zones(key, n=2):
     return out
 
 nfac = {int(k): v for k, v in D.nfac.items()}
-
-# ---- the hand table: Forever knowledge the databases don't have -------------------------------------------
-hand = json.load(open(HAND)) if os.path.exists(HAND) else {}
 MF = {int(k): v for k, v in hand.get("merchantsFavor", {}).items()}   # vendor npc -> camp
 
 # ---- Wolf's recipes: what's crafted, from what ----------------------------------------------------------
@@ -115,20 +131,39 @@ def npc_ref(n):
             lv = str(v[3]) if v.get(3) == v.get(4) or not v.get(4) else "%s-%s" % (v[3], v[4])
         npcs[n] = "|".join([v.get(1) or "?", ",".join(zones("c%d" % n)), lv, nfac.get(n, "")])
     return n
+# a chest, box or crate (not a node you gather): Wolf shows these only when nothing else gives the item
+CHESTY = re.compile(r"(?i)chest|box|crate|cache|strongbox|footlocker|coffer|trunk|basket|barrel|sack|\bbag\b|locker|stash|bundle|cask|urn\b|reliquary|container|treasure|supplies|pile of")
 def obj_ref(o):
     if o not in objs:
         v = T(D.obj[o]) or {}
-        objs[o] = "|".join([v.get(1) or "?", ",".join(zones("o%d" % o, 3))])
+        name = v.get(1) or "?"
+        objs[o] = "|".join([name, ",".join(zones("o%d" % o, 3))] + (["c"] if CHESTY.search(name) else []))
     return o
+
+# a vendor that's somewhere in the world: test and unused NPCs (no spawn anywhere) sell nothing
+def vendor_real(n):
+    v = T(D.npc[n]) or {}
+    name = v.get(1) or ""
+    if not name or re.search(r"\[UNUSED\]|TEST|Chest$|Repair Bot|Reagent Bot", name):
+        return False
+    return bool(zones("c%d" % n)) or n in MF
 def quest_ref(q):
     if q not in quests:
         v = T(D.quest[q]) or {}
         quests[q] = "%s|%s" % ((v.get(1) or "?").replace("|", "/"), v.get(2) or "")
     return q
 
-def best(rows, ref):
-    """the best sources: known chances first, highest first; unknown rates (0) after"""
+def spawned(n):
+    """a creature somewhere in the world (a zone, an instance): summoned dummies and test NPCs aren't"""
+    return bool(zones("c%d" % n))
+
+def best(rows, ref, fake_ok=False):
+    """the best sources: known chances first, highest first; unknown rates (0) after. Creatures that spawn
+    nowhere (an engineer's target dummy) only when nothing else gives it"""
     rows = [(s, c) for s, c in rows if s]
+    if ref is npc_ref:
+        real_rows = [(s, c) for s, c in rows if spawned(s)]
+        rows = real_rows or (rows if fake_ok else [])
     rows.sort(key=lambda r: (r[1] == 0, -r[1]))
     return ["%d:%d" % (ref(s), c) for s, c in rows[:TOP]]
 
@@ -150,13 +185,19 @@ for i in sorted(want):
     if vend:
         # Merchant's Favor first (its own line), then the vendor of your side
         mf = [n for n in vend if n in MF]
-        rest = [n for n in vend if n not in MF]
+        rest = [n for n in vend if n not in MF and vendor_real(n)]
         if mf: parts.append("f=" + ",".join(str(npc_ref(n)) for n in mf[:2]))
         if rest: parts.append("v=" + ",".join(str(npc_ref(n)) for n in rest[:6]))
     r = [int(x) for x in (T(D.rew[i]) or {}).values()]
     if r: parts.append("q=" + ",".join(str(quest_ref(q)) for q in r[:2]))
     w = D.world[i]
     if w is not None: parts.append("w=%d" % w)
+    if not parts:
+        # nothing else gives it: the creatures that spawn nowhere, rather than no line
+        d = best(pairs_list(D.drop[i]), npc_ref, True)
+        if not d and F.drop and F.drop[i] is not None:
+            d = best(pairs_list(F.drop[i]), npc_ref, True)
+        if d: parts.append("d=" + ",".join(d))
     if parts:
         lines[i] = ";".join(parts)
         for p in parts: kinds[p[0]] += 1

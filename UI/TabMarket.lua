@@ -1000,6 +1000,29 @@ local function SectionKeys(id)
     return keys
 end
 
+-- the recipe line of the Craft it section (v0.51): "Recipe: known by Jay", "Recipe: Engineering trainer",
+-- "Recipe: Gearcutter Cogspinner (vendor) · Ironforge · AH 2g"
+function T.RecipeText(r, known)
+    local head = FT.C("accent", L["Recipe"] .. ": ")
+    if known and r and r.knownBy and next(r.knownBy) then
+        return head .. FT.C("up", string.format(L["known by %s"], FT.Craft.KnownByText(r)))
+    end
+    local src = r and FT.Craft.RecipeSource(r)
+    if not src then return head .. FT.C("dim", L["not in Wolf's sources yet"]) end
+    local bits = {}
+    if src.trainer then
+        bits[#bits + 1] = string.format(L["%s trainer"], L[r.prof] or r.prof or "?")
+    elseif src.line then
+        bits[#bits + 1] = src.line
+    elseif src.vendor then
+        bits[#bits + 1] = string.format(L["%s (vendor)  ·  %s"], src.vendor.n or "?", src.vendor.z or "?")
+    else
+        bits[#bits + 1] = FT.C("dim", L["not in Wolf's sources yet"])
+    end
+    if src.ah then bits[#bits + 1] = string.format(L["AH %s"], FT.Money(src.ah.price, "short")) end
+    return head .. FT.C("text", table.concat(bits, "  ·  "))
+end
+
 local function Signed(c)
     if not c then return FT.C("dim", "—") end
     return c >= 0 and FT.C("up", "+" .. FT.Money(c, "short")) or FT.C("down", FT.Money(c, "short"))
@@ -1098,6 +1121,9 @@ local function SectionTexts(key, id, s)
             sum = FT.C("dim", e.reason or L["No price for its materials yet"])
         end
         local more = {}
+        -- (v0.51) how to learn it, first: who knows it, else where the recipe is (a trainer, a vendor, a drop) and its
+        -- price on the auction house
+        more[#more + 1] = T.RecipeText(r, known)
         -- a timer bites where it is: on the craft itself, or on a material it needs (Cured Rugged Hide: the salt)
         local days, how = FT.Craft.TimerOf(id)
         local function Every(n) return n == 1 and L["once a day"] or string.format(L["every %d days"], n) end
@@ -1112,7 +1138,6 @@ local function SectionTexts(key, id, s)
             more[#more + 1] = part.qty .. " " .. FT.ItemText(part.itemID, 24) .. FT.C("dim", "  " .. (part.total and FT.Money(math.floor(part.total), "short") or "—"))
             if #more >= 5 then break end
         end
-        if not known then more[#more + 1] = FT.C("dim", L["None of your characters knows it  ·  Breakdown: where the recipe is"]) end
         return sum, more, { L["Breakdown"], function() FT.ShowCraft(r) end }
     else -- farm: where it comes from
         local spots = FT.Farm.Spots(id)
@@ -1128,6 +1153,9 @@ local function SectionTexts(key, id, s)
             out[#out + 1] = line
         end
         local button = FT.Farm.IsRaw(id) and { L["Open"], function() FT.ShowFarm(id) end } or nil
+        -- (v0.51) a world drop: Wowhead has where it drops most
+        local g = FT.Where and FT.Where.Get(id)
+        if not button and g and g.world then button = { L["Wowhead"], function() FT.Farm.Wowhead(id) end } end
         if #out == 0 then return FT.C("dim", L["Not in Wolf's sources yet: the loot log fills it in when a Wolf user loots one."]), {}, button end
         local first = table.remove(out, 1)
         return first, out, button
@@ -1154,6 +1182,16 @@ local function BuildSections(parent)
         f.btn = UI.Button(f, "", 10, 18, "default", function(self) if self.fn then self.fn() end end)
         f.btn:SetPoint("TOPRIGHT", -8, -5)
         f.title:SetPoint("RIGHT", f.btn, "LEFT", -8, 0)
+        -- (v0.51) the hover: every line of a list section in full
+        f:EnableMouse(true)
+        f:SetScript("OnEnter", function(self)
+            if not self.full then return end
+            GameTooltip:SetOwner(self, "ANCHOR_LEFT")
+            GameTooltip:AddLine(self.title:GetText() or "", 1, 0.82, 0)
+            for _, line in ipairs(self.full) do if line then GameTooltip:AddLine(line, 0.85, 0.87, 0.9, true) end end
+            GameTooltip:Show()
+        end)
+        f:SetScript("OnLeave", function() GameTooltip:Hide() end)
         f.line = UI.HLine(f, "line", 0.5)
         f.line:SetPoint("BOTTOMLEFT", 8, 0)
         f.line:SetPoint("BOTTOMRIGHT", -8, 0)
@@ -1168,6 +1206,7 @@ local function BuildSections(parent)
         for i, f in ipairs(self.secs) do
             local key = keys[i]
             f:SetShown(key ~= nil)
+            f.full = nil
             if key then
                 local ok, sum, more, btn = pcall(SectionTexts, key, id, s)
                 if not ok then sum, more, btn = FT.C("dim", "—"), {}, nil end
@@ -1176,6 +1215,26 @@ local function BuildSections(parent)
                 if btn then f.btn:SetLabel(btn[1]); f.btn.fn = btn[2]; f.btn:FitText(16) end
                 -- as many extra lines as its share of the height holds
                 local room = math.max(0, math.floor((each - UI.RowH(44)) / UI.RowH(16)))
+                -- (v0.51) a list's long line takes two lines rather than ending in "...", room allowing
+                if LIST_SECTION[key] then
+                    more = more or {}
+                    f.full = { sum, unpack(more) }
+                    f.sum:SetFont(UI.FONT, UI.Size(12), "")
+                    local a, b = UI.SplitLine(f.sum, sum or "")
+                    local lines = {}
+                    if b then sum = a; lines[1] = "   " .. b end
+                    for _, line in ipairs(more) do lines[#lines + 1] = line end
+                    local probe = f.more[1]
+                    probe:SetFont(UI.FONT, UI.Size(12), "")
+                    local wrapped = {}
+                    for i, line in ipairs(lines) do
+                        local x, y = UI.SplitLine(probe, line)
+                        wrapped[#wrapped + 1] = x
+                        -- (a second line only while the lines after it still fit)
+                        if y and #wrapped + 1 + (#lines - i) <= room then wrapped[#wrapped + 1] = "   " .. y end
+                    end
+                    more = wrapped
+                end
                 local shown = {}
                 -- (a line fitted before remembers its text and fits it again on a resize: not an old item's)
                 f.sum.fitText = nil
