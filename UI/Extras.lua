@@ -787,6 +787,9 @@ function UI.WatchMenu(id, anchor)
         items[#items + 1] = { "-" }
         items[#items + 1] = { L["Remove from the watchlist"], function() M.Unwatch(id) end, "down" }
     end
+    items[#items + 1] = { "-" }
+    if FT.Farm.IsRaw(id) then items[#items + 1] = { L["Where to farm"], function() FT.ShowFarm(id) end } end
+    items[#items + 1] = { L["Wowhead link"], function() FT.Farm.Wowhead(id) end }
     FT.ShowMenu(anchor, items)
 end
 

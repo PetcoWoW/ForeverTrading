@@ -565,10 +565,7 @@ local FARM_KINDS = {
     { "all", "All" }, { "ore", "Ore & stone" }, { "herb", "Herbs" }, { "leather", "Leather" }, { "cloth", "Cloth" },
     { "elemental", "Elemental" }, { "gem", "Gems" },
 }
--- the item classes and subclasses of each (Trade Goods: 5 cloth, 6 leather, 7 metal & stone, 9 herb, 10 elemental)
-local FARM_CLASS = {
-    ore = { 7, 7 }, herb = { 7, 9 }, leather = { 7, 6 }, cloth = { 7, 5 }, elemental = { 7, 10 }, gem = { 3 },
-}
+local FARM_CLASS = FT.Farm.CLASS -- the item classes and subclasses of each (FT.Farm)
 local farmKind = "all"
 
 local function FarmKindOf(r)
@@ -655,10 +652,7 @@ local function FarmRows()
     return farmCache
 end
 
-local function WowheadLink(id)
-    FT.ShowLink(FT.ItemText(id), L["Where to get it: copy the link and open it in your browser."],
-        "https://www.wowhead.com/classic/item=" .. id)
-end
+local function WowheadLink(id) FT.Farm.Wowhead(id) end
 
 T.ListView, T.SellYours = ListView, SellYours
 
@@ -757,12 +751,12 @@ local function BuildFarmView(p)
     local f = ListView(p, function(x, button)
         if button == "RightButton" then WowheadLink(x.id) return end
         if UI.ItemClick(x.id) then return end
-        if FT.Craft.UsedIn(x.id) then FT.ShowBestUse(x.id) else FT.OpenItem(x.id) end
+        FT.ShowFarm(x.id)
     end, function(row, x)
         UI.TipItem(row, x.id)
         GameTooltip:AddLine(" ")
-        if FT.Craft.UsedIn(x.id) then GameTooltip:AddLine(L["Click: its best use, every recipe it goes into."], 0.6, 0.64, 0.7) end
-        GameTooltip:AddLine(L["Right-click: a Wowhead link for where to get it."], 0.6, 0.64, 0.7)
+        GameTooltip:AddLine(L["Click: where to farm it for your level, and the mobs you got it from."], 0.6, 0.64, 0.7)
+        GameTooltip:AddLine(L["Right-click: its Wowhead page (a link to copy)."], 0.6, 0.64, 0.7)
         GameTooltip:Show()
     end)
     local items = {}
@@ -773,7 +767,7 @@ local function BuildFarmView(p)
     end, 22)
     f.kind:SetPoint("TOPLEFT", 0, -1)
     f.kind:SetValue(farmKind)
-    f.hint:SetText(L["What each sells for and how many sell a day, best first for one farmer (a share of the day's sales). Click for its best use; right-click for where to get it."])
+    f.hint:SetText(L["Raw materials by what one farmer could sell of them a day, best first. Click one: where to farm it for your level."])
     f.list:SetEmptyText(L["No sales seen yet: the price feed fills this over a few hours."])
     return f
 end
@@ -848,7 +842,7 @@ function T.Build(p)
     end)
     -- one way to make gold per view; Signals: the four columns
     T.view = T.view or "make"
-    T.viewSeg = UI.Segmented(head, { { "make", L["Make gold"] }, { "craft", L["Craft for profit"] }, { "farm", L["Farm"] } }, function(v) T.SetView(v) end, 22)
+    T.viewSeg = UI.Segmented(head, { { "make", L["Make gold"] }, { "craft", L["Craft for profit"] }, { "farm", L["Raw mats"] } }, function(v) T.SetView(v) end, 22)
     T.viewSeg:SetPoint("LEFT", T.searchBox, "RIGHT", 12, 0)
     T.viewSeg:SetValue(T.view)
     dealsView = BuildDeals(p)

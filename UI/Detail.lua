@@ -372,11 +372,17 @@ local function New(index)
         if w.id then UI.WatchMenu(w.id, self) end
     end)
     w.watch:SetPoint("RIGHT", w.market, "LEFT", -6, 0)
+    w.wowhead = UI.Button(header, L["Wowhead"], 10, 24, "default", function()
+        if w.id then FT.Farm.Wowhead(w.id) end
+    end)
+    w.wowhead:FitText(16)
+    w.wowhead:SetTip(L["Wowhead"], L["Its page on Wowhead (WoW Forever): a link to copy into your browser."])
+    w.wowhead:SetPoint("RIGHT", w.watch, "LEFT", -6, 0)
     w.search = UI.Button(header, L["Search on AH"], 10, 24, "primary", function()
         if w.id then FT.SearchItems({ w.id }) end
     end)
     w.search:FitText(20)
-    w.search:SetPoint("RIGHT", w.watch, "LEFT", -6, 0)
+    w.search:SetPoint("RIGHT", w.wowhead, "LEFT", -6, 0)
 
     w.change = UI.Text(header, 14, "text", "RIGHT")
     w.price = UI.Text(header, 22, "text", "RIGHT")
@@ -479,6 +485,7 @@ Layout = function(w)
     end
     w.market:SetShown(not c)
     w.watch:SetShown(not c)
+    w.wowhead:SetShown(not c)
     w.search:SetShown(not c)
     -- the price: on the right of the header (standard), under the name (compact: no room beside it)
     w.change:ClearAllPoints()
@@ -585,7 +592,7 @@ FitHeader = function(w)
         w.priceAge:SetWidth(math.max(60, hw - left - 12 - 14 - 12))
         return
     end
-    right = right - 10 - w.market:GetWidth() - 6 - w.watch:GetWidth() - 6 - w.search:GetWidth() - 20
+    right = right - 10 - w.market:GetWidth() - 6 - w.watch:GetWidth() - 6 - w.wowhead:GetWidth() - 6 - w.search:GetWidth() - 20
     w.name:SetWidth(math.max(60, right - w.change:GetStringWidth() - 12 - w.price:GetStringWidth() - 14 - left))
     w.sub:SetWidth(math.max(60, right - w.priceAge:GetStringWidth() - 5 - 9 - 14 - left))
 end

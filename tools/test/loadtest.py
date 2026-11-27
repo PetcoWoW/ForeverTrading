@@ -509,6 +509,8 @@ step("ms test", function()
   Check("futures: consumables", 20, function() FT.Futures.Consumables() end)
   Check("futures: key materials", 20, function() FT.Futures.Materials(10) end)
   Check("craft breakdown (flask)", 10, function() FT.UI.RecipeOf(13510); FT.Craft.Eval(FT.UI.RecipeOf(13510)) end)
+  Check("where to farm (window)", 15, function() FT.ShowFarm(4338); _G.WolfOfBootyBayFarm:Hide() end)
+  Check("farm tip (looking)", 10, function() FT.Farm.BestTip(42) end)
   Check("when it sells (window)", 15, function() FT.ShowWhenSells(12360); _G.WolfOfBootyBayWhenSells:Hide() end)
   local ah = FT.SnipePanel.Get(UIParent)
   ah:SetSize(800, 440); ah:Show()
@@ -558,6 +560,103 @@ step("nothing loose on the screen", function()
   end
   for _, t in ipairs(loose) do print("LOOSE button on the screen: " .. t) end
   assert(#loose == 0, #loose .. " buttons on the screen with no window")
+end)
+-- farming: the farm log from loot windows, the spots for your level, the window, the tip, Wowhead links
+step("farm", function()
+  local F = FT.Farm
+  FT.db.farm, FT.db.farmTip = nil, nil
+  assert(F.WowheadURL("item", 4338) == "https://www.wowhead.com/forever/item=4338", F.WowheadURL("item", 4338))
+  assert(F.WowheadURL("search", "Arathi Highlands") == "https://www.wowhead.com/forever/search?q=Arathi%20Highlands")
+  assert(F.KindOf(4338) == "cloth" and F.KindOf(3858) == "ore" and F.IsRaw(14047))
+  -- level 42: Stranglethorn / Badlands first for mageweave, not Zul'Farrak (44+) nor Arathi (36-40)
+  local spots = F.Spots(4338, 42)
+  print("mageweave at 42: " .. spots[1].zone .. ", " .. spots[2].zone .. ", " .. spots[3].zone)
+  assert(spots[1].fit == 0, "the first spot fits level 42")
+  local names = F.ForYou(4338, 42, 3)
+  assert(#names == 3, "three zones for 42")
+  -- 12 corpses of one mob in Arathi: 9 mageweave (5 corpses had 1, 2 had 2) and one corpse skinned twice
+  mock.zone = "Arathi Highlands"
+  local t0 = mock.now
+  for k = 1, 12 do
+    local guid = "Creature-0-1-2-3-2588-" .. string.format("%08X", t0 % 100000 * 100 + k) -- new corpses each run
+    mock.target = { guid = guid, name = "Syndicate Prowler", level = 38 }
+    mock.loot = {}
+    if k <= 5 then mock.loot[1] = { id = 4338, qty = 1, sources = { guid, 1 } }
+    elseif k <= 7 then mock.loot[1] = { id = 4338, qty = 2, sources = { guid, 2 } }
+    else mock.loot[1] = { id = 4306, qty = 1, sources = { guid, 1 } } end
+    mock.fire("LOOT_READY", true)
+    mock.fire("LOOT_CLOSED")
+    if k == 12 then -- skinned: the same corpse again
+      mock.loot = { { id = 4234, qty = 1, sources = { guid, 1 } } }
+      mock.fire("LOOT_READY", true)
+      mock.fire("LOOT_CLOSED")
+    end
+    mock.now = mock.now + 30
+  end
+  mock.target, mock.loot = nil, {}
+  local mobs = F.Mobs(4338)
+  assert(#mobs == 1 and mobs[1].corpses == 12 and mobs[1].n == 9, "12 corpses, 9 mageweave: " .. tostring(mobs[1] and mobs[1].corpses) .. "/" .. tostring(mobs[1] and mobs[1].n))
+  assert(mobs[1].name == "Syndicate Prowler" and mobs[1].lv == 38)
+  local z = FT.db.farm.zones["Arathi Highlands"]
+  print(string.format("farm log: Arathi %d corpses, %d s looting, mageweave %d", z.corpses, z.secs, z.items[4338] or 0))
+  assert(z.corpses == 12 and z.secs >= 300)
+  local y = F.ZoneFor("Arathi Highlands", 4338)
+  assert(y and y.perHour > 0, "your mageweave an hour in Arathi")
+  -- the window, at level 42 and at 60
+  for _, lv in ipairs({ 42, 60 }) do
+    mock.level = lv
+    FT.ShowFarm(4338)
+    local d = _G.WolfOfBootyBayFarm
+    mock.layout.Settle(d)
+    local found, texts = mock.layout.Overlaps(d)
+    for _, o in ipairs(found) do print(string.format("OVERLAP [where to farm @%d] %q x %q  (%dx%d px)", lv, o[1].text:sub(1, 50), o[2].text:sub(1, 50), o[3], o[4])) end
+    for _, t in ipairs(texts) do if t.cut then print(string.format("CUT [where to farm @%d] %q", lv, t.text:sub(1, 80))) end end
+    print(string.format("where to farm @%d: %d spots, %d mobs; first %s", lv, #d.spots.items, #d.mobs.items, d.spots.items[1].zone))
+    assert(#d.mobs.items == 1)
+    d:Hide()
+  end
+  mock.level = 60
+  FT.ShowFarm(3858) -- ore: zones and the skill
+  assert(_G.WolfOfBootyBayFarm.sum.fitText:find("Mining 175"), "ore shows its Mining")
+  _G.WolfOfBootyBayFarm:Hide()
+  -- the tip: mageweave up this week, selling every day, at 42
+  local r = FT.Market.Row(4338)
+  if r then
+    local ch7, price = r.ch7, r.price
+    r.ch7, r.price = 0.34, r.price or 12000
+    local real = FT.Sales.Rate
+    FT.Sales.Rate = function(id) if id == 4338 then return { perDay = 400, sold = 2800, hours = 168 } end return real(id) end
+    mock.level = 42
+    -- no professions seen: cloth only (the real feed's herbs may be up more)
+    local c = FT.db.chars[FT.charKey]
+    local profs = c.profs
+    c.profs = nil
+    local t = F.BestTip(42)
+    assert(t and FT.FarmSpots[t.id].kind ~= "herb" and FT.FarmSpots[t.id].kind ~= "ore", "no gathering tip without the profession")
+    c.profs = { Herbalism = 100 }
+    local t2 = F.BestTip(42)
+    assert(not (t2 and FT.FarmSpots[t2.id].kind == "herb" and FT.FarmSpots[t2.id].skill > 100), "no herb above your skill")
+    c.profs = profs
+    print("farm tip: " .. F.TipText(t, 42):gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", ""):gsub("|H[^|]*|h", ""):gsub("|h", ""))
+    FT.db.farmTip = nil
+    local said = F.MaybeTip()
+    assert(said, "said once")
+    assert(not F.MaybeTip(), "not twice in two hours")
+    FT.Sales.Rate, r.ch7, r.price = real, ch7, price
+    mock.level = 60
+  else
+    print("farm tip: no mageweave row in this feed")
+  end
+  -- the right-click menu has Wowhead and Where to farm
+  local shown
+  local realMenu = FT.ShowMenu
+  FT.ShowMenu = function(_, items) shown = items end
+  FT.UI.WatchMenu(4338, UIParent)
+  FT.ShowMenu = realMenu
+  local labels = {}
+  for _, it in ipairs(shown or {}) do labels[#labels + 1] = it[1] end
+  local all = table.concat(labels, "|")
+  assert(all:find("Wowhead link", 1, true) and all:find("Where to farm", 1, true), all)
 end)
 step("when it sells", function()
   local hr = FT.Feed.Hourly(12360)
@@ -627,6 +726,7 @@ step("layout", function()
   local pages = {
     { "market", "market" }, { "market item", "market", function() FT.OpenItem(12363) end },
     { "market item: a flask", "market", function() FT.OpenItem(13510) end },
+    { "market item: a raw mat", "market", function() FT.OpenItem(4338) end },
     { "market: watchlist", "market", function() FT.Tabs.market.ClearSelection(); FT.Tabs.market.SetFilter("fav") end },
     { "market item: a craft of yours", "market", function() FT.OpenItem(18405) end },
     { "money: make", "signals", function() FT.Tabs.signals.SetView("make") end },

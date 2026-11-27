@@ -239,11 +239,34 @@ Constants = setmetatable({}, { __index = function(t, k) local s = {} rawset(t, k
 
 -- the player and the world
 mock.money = 12345678
-function UnitName(u) if u == "player" then return "Jay" end return nil end
-function UnitGUID(u) if u == "player" then return "Player-366-0ABCDEF1" end return nil end
+-- mock.target = { guid, name, level }: what you have targeted (the farm log names a corpse by it)
+mock.level = 60
+function UnitName(u)
+    if u == "player" then return "Jay" end
+    if u == "target" and mock.target then return mock.target.name end
+    return nil
+end
+function UnitGUID(u)
+    if u == "player" then return "Player-366-0ABCDEF1" end
+    if u == "target" and mock.target then return mock.target.guid end
+    return nil
+end
 function UnitFactionGroup() return "Alliance", "Alliance" end
 function UnitClass() return "Rogue", "ROGUE", 4 end
-function UnitLevel() return 60 end
+function UnitLevel(u)
+    if u == "target" and mock.target then return mock.target.level end
+    return mock.level
+end
+-- the zone, and a loot window: mock.loot = { { id, qty, sources = { guid, qty, ... } }, ... }
+mock.zone = "Arathi Highlands"
+function GetRealZoneText() return mock.zone end
+function GetZoneText() return mock.zone end
+mock.loot = {}
+function GetNumLootItems() return #mock.loot end
+function GetLootSlotLink(i) local x = mock.loot[i] return x and ("|cffffffff|Hitem:" .. x.id .. "::::::::60:::::|h[Item " .. x.id .. "]|h|r") end
+function GetLootSlotInfo(i) local x = mock.loot[i] if not x then return nil end return 134400, "Item " .. x.id, x.qty, nil, 1, false end
+function GetLootSourceInfo(i) local x = mock.loot[i] if not x then return nil end return unpack(x.sources or {}) end
+function IsFishingLoot() return false end
 function UnitExists(u) return u == "player" end
 function UnitIsPlayer() return true end
 function UnitIsConnected() return true end

@@ -1,5 +1,24 @@
 # Wolf
 
+## v0.39 - where to farm
+
+- **Raw mats** (Money page, was Farm): raw materials by what one farmer could sell of them a day. Click one for
+  **Where to farm**: its price and how it sells, the spots for your level first (cloth from humanoids of the
+  level with the thick camps named, leather from skinning beasts of the level, herbs and ore by zone with the
+  skill they need, fire and earth elementals), your own numbers in each spot, the mobs you looted it from (per
+  corpse, 5 corpses or more), and a Wowhead button. Click a spot or a mob for its Wowhead page.
+- **Wolf learns your farming.** Every loot window is noted: the zone, what dropped, and the mob or node it came
+  from (a skinned corpse isn't counted twice). Your time in a zone counts while you loot. Where to farm shows
+  how many an hour you got there and your gold an hour, at today's prices.
+- **Farm tips in chat** (Settings > Alerts, on): when a raw material for your level sells well (up 15%+ this
+  week, 20+ sold a day) and you can get it (herbs, ore and leather only with the profession at its skill): one
+  line with the zones and [Where to farm]. One tip in two hours at most, never in a dungeon, the same item not
+  again for a day.
+- **Wowhead links** to WoW Forever's pages (they were Classic's, which miss Forever's own items): a Wowhead button
+  on the item window, Wowhead link in the right-click menu, Where to farm on a raw material's chart and on the
+  overview's FARM IT card.
+- The spots are how Classic hands materials out; Forever may differ, so what you loot yourself shows beside them.
+
 ## v0.38 - smarter lists, sharper charts, faster
 
 - **Junk stays out.** Grey items, and white weapons, armor and odds and ends, no longer show in the Market list

@@ -12,6 +12,11 @@ FT.News = N
 -- start, after the files are read (a table made with them would keep the English)
 local function News()
     return {
+        ["v0.39"] = {
+            { L["Where to farm"], L["Money > Raw mats: click a material for the spots for your level, the mobs you got it from and its Wowhead page."], function() FT.Show("signals"); FT.Tabs.signals.SetView("farm") end },
+            { L["Farm tips in chat"], L["A raw material for your level selling well: one line in chat with where to get it (Settings > Alerts)."], nil },
+            { L["Wowhead links"], L["On the item window and in the right-click menu, to WoW Forever's pages."], nil },
+        },
         ["v0.38"] = {
             { L["Smarter lists"], L["Grey items and white gear stay out of the lists unless you search them; TO THE MOON needs real sales behind a move."], nil },
             { L["Faster"], L["Opening an item, the market and the watchlist take a few milliseconds now; new prices load in the background."], nil },

@@ -792,7 +792,9 @@ local function BuildOverview(parent)
         if c.what.SetWordWrap then c.what:SetWordWrap(true) end
         if c.what.SetMaxLines then c.what:SetMaxLines(2) end
         c:SetScript("OnClick", function(self)
-            if self.itemID then FT.OpenItem(self.itemID) end
+            if not self.itemID then return end
+            -- a farm card: where to farm it; the others: the item
+            if self.farm then FT.ShowFarm(self.itemID) else FT.OpenItem(self.itemID) end
         end)
         c:SetScript("OnEnter", function(self)
             if not self.itemID then return end
@@ -965,7 +967,8 @@ function T.FillMoves()
     if f1 and not shown[f1.id] then
         cards[#cards + 1] = { id = f1.id, kind = L["FARM IT"], gold = FT.Money(f1.price or 0, "short") .. FT.C("dim", " " .. L["each"]),
             what = string.format(L["%s: sells ~%s a day"], FT.ItemText(f1.id, 24), FT.Num(math.floor((f1.perDay or 0) + 0.5))),
-            tip = string.format(L["One farmer selling a share of each day's sales makes about %s a day from it."], FT.Money(math.floor(f1.yours or 0), "short")) }
+            tip = string.format(L["One farmer selling a share of each day's sales makes about %s a day from it."], FT.Money(math.floor(f1.yours or 0), "short"))
+                .. "\n" .. L["Click: where to farm it for your level."], farm = true }
     end
     -- fewer than three: the best craft, buy-to-disenchant and vendor deals fill in
     if #cards < 3 then
@@ -993,6 +996,7 @@ function T.FillMoves()
         local m = cards[i]
         c.itemID = m and m.id
         c.tip = m and m.tip
+        c.farm = m and m.farm
         c.icon:SetShown(m ~= nil)
         if m then c.icon:SetItem(m.id) end
         c.kind:SetText(m and m.kind or "")
@@ -1141,6 +1145,13 @@ local function BuildItemView(parent)
     v.when:SetTip(L["When it sells"], L["Hour by hour over the last two days, the time of day it sells most (your clock) and the best day of the week."])
     v.when:SetFrameLevel(v.chart:GetFrameLevel() + 14)
     v.when:SetPoint("RIGHT", v.more, "LEFT", -4, 0)
+    v.farm = UI.Button(v.chart, L["Where to farm"], 10, 20, "default", function()
+        if state.selected then FT.ShowFarm(state.selected) end
+    end)
+    v.farm:FitText(20)
+    v.farm:SetTip(L["Where to farm"], L["The spots for your level, the mobs you got it from, and its Wowhead page."])
+    v.farm:SetFrameLevel(v.chart:GetFrameLevel() + 14)
+    v.farm:SetPoint("RIGHT", v.when, "LEFT", -4, 0)
     v.pchart = UI.Chart(v)
     v.pchart:SetPoint("TOPLEFT", v.chart, "BOTTOMLEFT", 0, -6)
     v.pchart:SetPoint("BOTTOMRIGHT", 0, CARDS_H)
@@ -1264,6 +1275,11 @@ function T.UpdateWatchButton()
         -- on the chart, beside More
         v.when:ClearAllPoints()
         v.when:SetPoint("RIGHT", v.more, "LEFT", -4, 0)
+    end
+    if v.farm then
+        v.farm:SetShown(FT.Farm.IsRaw(state.selected))
+        v.farm:ClearAllPoints()
+        v.farm:SetPoint("RIGHT", v.when, "LEFT", -4, 0)
     end
     if v.longHold then
         local on = FT.db.longHold and FT.db.longHold[state.selected]

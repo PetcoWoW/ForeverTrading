@@ -233,7 +233,7 @@ function T.Build(p)
         L["Bars from ore, cloth bolts from cloth...: when one of your characters knows the recipe and it costs less than buying."])
 
     -- alerts
-    local al = Section(left, L["Alerts"], 5)
+    local al = Section(left, L["Alerts"], 6)
     Check(al, "eyeChat", L["The wolf's notes in chat"], L["At login and /reload: your portfolio, what moved in what you hold most and watch since you were last told, and up to three moves (sell, buy, craft, gather). After a scan of yours: what moved. Only what matters; never anything on screen."])
     Check(al, "sessionPanel", L["Session panel"], L["The small panel on screen while a session runs: time, worth, gold an hour, your best loot."],
         function() FT.UpdateHUD() end)
@@ -241,6 +241,8 @@ function T.Build(p)
         L["TO THE MOON and RUG PULL names on the Terminal, WHALE ALERT when one seller holds most of an item, APE IN on the strongest buys."])
     Check(al, "watchLive", L["Watchlist deals at the auction house"],
         L["While the auction house is open, your watched items take turns in the live searches; one listed 15% or more under its usual price is said in chat, with how many and [Buy them]."])
+    Check(al, "farmTips", L["Farm tips in chat"],
+        L["When a raw material for your level sells well (up 15% or more this week, 20+ sold a day): one line in chat with the zones for it and [Where to farm]. At most one in two hours; never in a dungeon."])
     Check(al, "undercutAlert", L["Say in chat when you are undercut"],
         L["At the auction house: when an auction of yours is no longer the cheapest (your own other lots aside) - once per auction and price. Sell > My auctions tells whether to wait or post it again."])
 
