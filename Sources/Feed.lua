@@ -36,6 +36,7 @@ local REALM_RULESET = {
 }
 
 local parsed = {} -- house id -> { t, items = { [itemID] = entry } }
+local reading = {} -- house id -> a read under way in the background (F.Warm)
 local region     -- the feed's data of this client's region
 
 local function Dec(s)
@@ -159,12 +160,43 @@ local function Decode(rest)
 end
 F.Decode = Decode
 
-local function Parse(h)
-    local raw, n = {}, 0
-    for id, rest in h.data:gmatch("(%d+)=([^;]*);") do
-        raw[tonumber(id)] = rest
-        n = n + 1
+-- Reading a house's feed: one pass over its text keeps each item's part (h.raw). That pass is ~15 ms for 7,000+
+-- items - done in the background a little each frame right after login (Warm), so nothing waits for it in one
+-- frame; whatever asks before it's done finishes the rest at once.
+local FIELDS = { "data", "sold", "hourly" }
+local function NewRead(h)
+    return { h = h, field = 1, pos = 1, n = 0, raw = {}, sold = {}, hourly = {} }
+end
+
+-- read on until done (true) or the clock passes stopAt (false)
+local function ReadOn(st, stopAt)
+    local clock = FT.Clock
+    while st.field <= #FIELDS do
+        local key = FIELDS[st.field]
+        local text = st.h[key]
+        local into = key == "data" and st.raw or st[key]
+        if type(text) == "string" then
+            local pos, k = st.pos, 0
+            while true do
+                local _, b, id, rest = text:find("(%d+)=([^;]*);", pos)
+                if not b then break end
+                into[tonumber(id)] = rest
+                if key == "data" then st.n = st.n + 1 end
+                pos = b + 1
+                k = k + 1
+                if stopAt and k % 250 == 0 and clock() >= stopAt then
+                    st.pos = pos
+                    return false
+                end
+            end
+        end
+        st.field, st.pos = st.field + 1, 1
     end
+    return true
+end
+
+local function Finish(st)
+    local h, raw = st.h, st.raw
     local items = setmetatable({}, {
         __mode = "v",
         __index = function(t, id)
@@ -178,19 +210,18 @@ local function Parse(h)
     -- the UTC days the house was really downloaded on (older feeds don't say: none counted)
     local seen = {}
     for d in (type(h.seen) == "string" and h.seen or ""):gmatch("(%d+)") do seen[#seen + 1] = tonumber(d) end
-    -- what sold each day (the Radar): kept as text, an item read when asked for (F.SoldDays)
-    local soldRaw = {}
-    if type(h.sold) == "string" then
-        for id, rest in h.sold:gmatch("(%d+)=([^;]*);") do soldRaw[tonumber(id)] = rest end
-    end
-    -- what sold hour by hour (the item page's timeline): kept as text too (F.Hourly)
-    local hourRaw = {}
-    if type(h.hourly) == "string" then
-        for id, rest in h.hourly:gmatch("(%d+)=([^;]*);") do hourRaw[tonumber(id)] = rest end
-    end
-    return { t = h.t, firstDay = h.firstDay, items = items, raw = raw, count = n, seen = seen,
-        soldRaw = soldRaw, soldFirst = h.soldFirst, hourRaw = hourRaw, hourFirst = h.hourFirst }
+    -- what sold each day (the Radar) and hour by hour (the item page's timeline): kept as text, an item read
+    -- when asked for (F.SoldDays, F.Hourly)
+    return { t = h.t, firstDay = h.firstDay, items = items, raw = raw, count = st.n, seen = seen,
+        soldRaw = st.sold, soldFirst = h.soldFirst, hourRaw = st.hourly, hourFirst = h.hourFirst }
 end
+
+local function Parse(h, st)
+    st = st or NewRead(h)
+    ReadOn(st)
+    return Finish(st)
+end
+F.Parse = Parse
 
 -- your clock against UTC, in whole hours (Pacific: -8)
 function F.UTCOffsetHours()
@@ -247,10 +278,44 @@ function F.House(house)
     local p = parsed[hid]
     if p == nil then
         local h = r.houses and r.houses[hid]
-        p = (type(h) == "table" and type(h.data) == "string") and Parse(h) or false
+        local st = reading[hid]
+        if st and st.h ~= h then st = nil end
+        reading[hid] = nil
+        p = (type(h) == "table" and type(h.data) == "string") and Parse(h, st) or false
         parsed[hid] = p
     end
     return p or nil
+end
+
+-- the houses you'll look at, read in the background (a few ms a frame) before anything asks
+function F.Warm()
+    if not F.On() then return end
+    local r = Region()
+    if not r then return end
+    for _, side in ipairs({ FT.house, "neutral" }) do
+        local hid = F.HouseID(side)
+        local h = hid and r.houses and r.houses[hid]
+        if hid and parsed[hid] == nil and not reading[hid] and type(h) == "table" and type(h.data) == "string" then
+            local st = NewRead(h)
+            reading[hid] = st
+            local ticker
+            local spent, frames, worst, began = 0, 0, 0, GetTime()
+            ticker = C_Timer.NewTicker(0, function()
+                -- asked for meanwhile (F.House finished it), or the sources changed: nothing left to do
+                if reading[hid] ~= st then ticker:Cancel() return end
+                local t0 = FT.Clock()
+                local done = ReadOn(st, t0 + 3)
+                if done then
+                    ticker:Cancel()
+                    reading[hid] = nil
+                    if parsed[hid] == nil then parsed[hid] = Finish(st) end
+                end
+                local d = FT.Clock() - t0
+                spent, frames, worst = spent + d, frames + 1, math.max(worst, d)
+                if done then FT.PerfNote("feed:warm", st.n, spent, frames, worst, GetTime() - began) end
+            end)
+        end
+    end
 end
 
 -- when the feed's prices of a house were taken (nil: no feed for it)
@@ -337,8 +402,9 @@ end
 
 FT.On("FT_READY", function() C_Timer.After(2, F.Take) end)
 FT.On("FT_HOUSE_CHANGED", function() C_Timer.After(0.5, F.Take) end)
-FT.On("FT_SOURCES_CHANGED", function() wipe(parsed); region = nil end)
-FT.On("FT_SETTINGS_CHANGED", function() wipe(parsed); region = nil end)
+FT.On("FT_SOURCES_CHANGED", function() wipe(parsed); wipe(reading); region = nil end)
+FT.On("FT_SETTINGS_CHANGED", function() wipe(parsed); wipe(reading); region = nil end)
+FT.On("FT_READY", function() F.Warm() end)
 -- not on: said once a login, with what to do
 FT.On("FT_READY", function()
     C_Timer.After(6, function()

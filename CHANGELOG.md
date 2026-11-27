@@ -1,5 +1,24 @@
 # Wolf
 
+## v0.38 - smarter lists, sharper charts, faster
+
+- **Junk stays out.** Grey items, and white weapons, armor and odds and ends, no longer show in the Market list
+  (All, Rising, Falling), the busiest list, the market mood or the most valuable listings. Search one by name, or
+  watch or own it, and it's there.
+- **TO THE MOON / RUG PULL need real sales.** A move counts only when the item sells: gear (the green items people
+  list at random prices to test) needs 3+ listed, 4+ sales seen, about one sold every two days, and no more than
+  double in a day; goods need 5+ listed and 3+ sold a day.
+- **Charts:** crisp price labels that never run past the chart's edge or onto each other (at every text size), the
+  high and low on small plates, no "-0".
+- **Nothing cut short.** Long lines (the Market header, an item's tags, its sales line, the AH visit, When it
+  sells) drop whole parts that don't fit instead of ending in "...". At the larger text sizes the side panel is a
+  little wider and a material's name shrinks a point or two before it's ever cut. Tested at every size and look.
+- **Faster.** Opening an item went from ~0.5 s to under 10 ms (the list no longer looks through all 7,000 items
+  for the one you clicked, and draws once, not twice); the Market page ~1 s to ~10 ms; the watchlist ~0.3 s to a
+  few ms. The sorted list, the market mood, your top 3 and the farm list are kept until something they're made of
+  changes; new prices are read in the background a few ms a frame, and the list and overview redraw in separate
+  frames. A millisecond test now times every page and job and fails anything over its budget.
+
 ## v0.37 - fix
 
 - The "When it sells" button stayed on the screen after closing Wolf: it now belongs to the item's chart. The

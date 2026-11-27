@@ -891,7 +891,7 @@ function An.ScoreDay()
     -- the busiest markets: the most gold listed (cheap to sort; no sales lookups for 7,000 items)
     local busy = {}
     for _, r in ipairs(FT.Market.Rows() or {}) do
-        if r.price and (r.qty or 0) >= 5 then busy[#busy + 1] = r end
+        if r.price and (r.qty or 0) >= 5 and not FT.Market.Junk(r) then busy[#busy + 1] = r end
     end
     table.sort(busy, function(a, b) return a.price * a.qty > b.price * b.qty end)
     for _, r in ipairs(busy) do

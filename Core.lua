@@ -4,7 +4,7 @@ local L = FT.L
 
 -- The version being released: a copy straight from the repository (not packaged) has no version in its TOC yet
 -- (the packager puts the tag there) and shows this one. Set it with every release.
-local RELEASE = "v0.37"
+local RELEASE = "v0.38"
 local GetMeta = (C_AddOns and C_AddOns.GetAddOnMetadata) or GetAddOnMetadata
 FT.VERSION = (GetMeta and GetMeta(ADDON, "Version")) or RELEASE
 if FT.VERSION == "" or FT.VERSION:find("@", 1, true) then FT.VERSION = RELEASE end
@@ -517,6 +517,19 @@ end
 -- A search as typed: "name" in quotes is that name exactly; anything else, word by word, each word a part of the
 -- name in any order ("thor ore" finds Thorium Ore, "ore thor" too; "lotus bl" Black Lotus).
 -- Returns a test fn(itemID) -> true when the item's name matches (nil: an empty search, everything matches).
+-- a search looks at every item's name: each folded once, not on every keystroke
+local folded = {}
+local foldedN = 0
+local function FoldedName(name)
+    local f = folded[name]
+    if f then return f end
+    f = FT.Fold(name)
+    foldedN = foldedN + 1
+    if foldedN > 40000 then folded, foldedN = {}, 0 end
+    folded[name] = f
+    return f
+end
+
 function FT.NameMatcher(text)
     local q = FT.Fold(text or ""):gsub("^%s+", ""):gsub("%s+$", "")
     if q == "" then return nil end
@@ -529,7 +542,7 @@ function FT.NameMatcher(text)
     return function(itemID)
         local name = FT.Name(itemID)
         if not name then return false end
-        name = FT.Fold(name)
+        name = FoldedName(name)
         if exact then return name == exact end
         for _, w in ipairs(words) do
             if not name:find(w, 1, true) then return false end

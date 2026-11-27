@@ -435,6 +435,113 @@ step("ah visit", function()
   FT.SnipePanel.SetView("past")
   FT.SnipePanel.Get():Hide()
 end)
+-- The millisecond test: what the heavy things cost in one go. Over its budget: an error - a hitch you'd feel.
+-- The rules: a click answers within 50 ms (it feels instant); what happens on its own while you look (new prices)
+-- within two frames (33 ms at 60 fps), and is rare; work spread over frames never past one frame (16 ms).
+if os.getenv("WOLF_PROF") then step("profile", function()
+  local counts = {}
+  local function Hook()
+    for lvl = 2, 12 do
+      local info = debug.getinfo(lvl, "Sl")
+      if not info then break end
+      local k = info.short_src:match("[^/]*$") .. ":" .. (info.linedefined or 0)
+      counts[k] = (counts[k] or 0) + 1
+    end
+  end
+  if mock.layout.Live then mock.layout.Live(true) end
+  debug.sethook(Hook, "", 1000)
+  local which = os.getenv("WOLF_PROF")
+  if which == "rl" then
+    FT.Tabs.market.ClearSelection(); FT.Tabs.market.SetFilter("all")
+    counts = {}
+    debug.sethook(function()
+      local info = debug.getinfo(2, "Sl")
+      if info then local k = info.short_src:match("[^/]*$") .. ":" .. (info.currentline or 0); counts[k] = (counts[k] or 0) + 1 end
+    end, "", 100)
+    for _ = 1, 5 do FT.Tabs.market.RefreshList() end
+  elseif which == "ready" then
+    debug.sethook()
+    FT.Show("market"); FT.Tabs.market.ClearSelection()
+    local function Again() FT.Fire("FT_MARKET_READY"); FT.Fire("FT_SCAN_DONE", "feed") end
+    Again()
+    counts = {}
+    debug.sethook(Hook, "", 1000)
+    for _ = 1, 5 do Again(); FT.Tabs.market.Refresh() end
+  elseif which == "item" then FT.OpenItem(13510) elseif which == "fav" then for _ = 1, 5 do FT.Tabs.market.ClearSelection(); FT.Tabs.market.SetFilter("fav") end else for _ = 1, 5 do FT.Show("market"); FT.Tabs.market.Refresh() end end
+  debug.sethook()
+  mock.layout.Live(false)
+  local arr = {}
+  for k, v in pairs(counts) do arr[#arr + 1] = { k, v } end
+  table.sort(arr, function(a, b) return a[2] > b[2] end)
+  for i = 1, math.min(25, #arr) do print("PROF", arr[i][1], arr[i][2]) end
+end) end
+step("ms test", function()
+  local function T(f) local t0 = os.clock(); f(); return (os.clock() - t0) * 1000 end
+  -- the usual cost: the middle of five (one run can catch the computer busy, or the garbage collector)
+  local function Worst(f)
+    local t = {}
+    for i = 1, 5 do collectgarbage("collect"); t[i] = T(f) end
+    table.sort(t)
+    return t[3]
+  end
+  local over, lines = {}, {}
+  if mock.layout and mock.layout.Live then mock.layout.Live(true) end
+  local function Check(name, budget, f)
+    local ok, ms = pcall(Worst, f)
+    if not ok then over[#over + 1] = name .. " failed: " .. tostring(ms); return end
+    lines[#lines + 1] = string.format("%-34s %6.1f ms  (budget %d)", name, ms, budget)
+    if ms > budget then over[#over + 1] = string.format("%s %.1f ms > %d", name, ms, budget) end
+  end
+  for _, key in ipairs({ "market", "signals", "portfolio", "sessions", "radar", "settings" }) do
+    Check("open page: " .. key, 50, function() FT.Show(key); if FT.Tabs[key].Refresh then FT.Tabs[key].Refresh() end end)
+  end
+  Check("open an item (chart, breakdown)", 40, function() FT.OpenItem(13510) end)
+  Check("market list: watchlist groups", 25, function() FT.Tabs.market.ClearSelection(); FT.Tabs.market.SetFilter("fav") end)
+  Check("market list: rising, then all", 50, function() FT.Tabs.market.SetFilter("up"); FT.Tabs.market.SetFilter("all") end)
+  -- new prices while you look: the list one frame, the overview the next (T.RefreshSoft)
+  Check("new prices: the list (a frame)", 33, function() FT.Tabs.market.ListChanged(); FT.Tabs.market.RefreshList(true) end)
+  Check("new prices: the overview (next)", 16, function() FT.Tabs.market.RefreshRight() end)
+  Check("the list again, nothing changed", 8, function() FT.Tabs.market.RefreshList(true) end)
+  Check("movers (both ways)", 8, function() FT.Market.Movers(20, "ch1", true); FT.Market.Movers(20, "ch1", false) end)
+  Check("portfolio rows", 15, function() FT.Port.Rows() end)
+  Check("wolf: moves", 25, function() FT.Eye.Moves(6) end)
+  Check("wolf: login note", 35, function() FT.db.eyeSaid = nil; FT.Eye.LoginNote() end)
+  Check("futures: consumables", 20, function() FT.Futures.Consumables() end)
+  Check("futures: key materials", 20, function() FT.Futures.Materials(10) end)
+  Check("craft breakdown (flask)", 10, function() FT.UI.RecipeOf(13510); FT.Craft.Eval(FT.UI.RecipeOf(13510)) end)
+  Check("when it sells (window)", 15, function() FT.ShowWhenSells(12360); _G.WolfOfBootyBayWhenSells:Hide() end)
+  local ah = FT.SnipePanel.Get(UIParent)
+  ah:SetSize(800, 440); ah:Show()
+  for _, view in ipairs({ "visit", "watch", "deals", "past" }) do
+    Check("ah tab: " .. view, 20, function() FT.SnipePanel.SetView(view) end)
+  end
+  ah:Hide()
+  -- the jobs spread over frames, run again now with the garbage collector paused (this test's world is far bigger
+  -- than the game's, and its collection pauses would be counted as the addon's): their longest frame
+  collectgarbage("collect")
+  collectgarbage("stop")
+  FT.perf = {}
+  FT.Market.Rebuild()
+  FT.An.LearnKinds(true)
+  FT.Deals.Build()
+  if FT.Craft.ProfitCrafts then FT.Craft.ProfitCrafts() end
+  FT.Market.PrepareMovers()
+  mock.run(40)
+  collectgarbage("restart")
+  collectgarbage("collect")
+  for k, v in pairs(FT.perf or {}) do
+    if (v.worst or 0) > 0 then lines[#lines + 1] = string.format("%-34s %6.1f ms  (longest frame of %d)", "job: " .. k, v.worst, v.frames or 1) end
+    -- a job spread over frames: none past a frame (16 ms). A task done at once, later, is timed once here (one
+    -- busy moment of this computer shows): two frames at most - the redraw it usually is is timed above
+    local cap = k:find("^delayed:") and 40 or 16
+    if (v.worst or 0) > cap then over[#over + 1] = string.format("job %s: a %.1f ms frame (budget %d)", k, v.worst, cap) end
+  end
+  table.sort(lines)
+  for _, l in ipairs(lines) do print("MS " .. l) end
+  for _, o in ipairs(over) do print("MS OVER " .. o) end
+  if mock.layout and mock.layout.Live then mock.layout.Live(false) end
+  assert(#over == 0, #over .. " over budget: " .. table.concat(over, "; "))
+end)
 step("nothing loose on the screen", function()
   -- frames made by the pages' code with no parent end up on UIParent: they'd stay when the window closes
   local loose = {}
@@ -549,6 +656,12 @@ step("layout", function()
     mock.layout.Settle(WolfOfBootyBayFrame)
     local found, texts = mock.layout.Overlaps(WolfOfBootyBayFrame)
     for _, t in ipairs(texts) do
+      if t.out and not seen["out|" .. t.text] then
+        seen["out|" .. t.text] = true
+        cuts = cuts + 1
+        local r, pr = t.ink, mock.layout.Rect(t.f.__parent)
+        print(string.format("OUT [%s] %q runs past its frame (%d..%d in %d..%d)  in %s", key, t.text:sub(1, 60), r[1], r[2], pr[1], pr[2], mock.layout.Where(t.f)))
+      end
       if t.spill and not seen["spill|" .. t.text] then
         seen["spill|" .. t.text] = true
         cuts = cuts + 1

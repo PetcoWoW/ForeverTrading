@@ -66,7 +66,9 @@ local function PassFilters(id)
     return true
 end
 local page, list, countText, overview, itemView, center, mats
-local LEFT_W, RIGHT_W = 372, 280
+local LEFT_W = 372
+-- the right side (craft breakdown): a little wider with the larger text sizes, so names fit
+local function RIGHT_W() return 280 + 10 * (tonumber(FT.S and FT.S.textSize) or 0) end
 local CARDS_H = 132 -- the market, price and call cards under the charts (124 high, 8 above them)
 
 local GetClassInfo = (C_Item and C_Item.GetItemClassInfo) or GetItemClassInfo
@@ -120,59 +122,103 @@ local SORTS = {
     qty = function(r) return r.qty end,
 }
 
+-- The sorted list kept for the next draw, until the market, your items, names or the list's choices change
+local baseKey, baseRows
+local listVersion = 0
+local function ListChanged() listVersion = listVersion + 1 end
+for _, ev in ipairs({ "FT_MARKET_READY", "FT_LIVE_UPDATED", "FT_WATCH_CHANGED", "FT_OWNED_CHANGED", "FT_INVENTORY_CHANGED",
+    "FT_ITEMS_LOADED", "FT_RECIPES_CHANGED", "FT_SETTINGS_CHANGED", "FT_HOUSE_CHANGED", "FT_SCAN_DONE", "FT_PRICES_CHANGED",
+    "FT_ITEMS_DROPPED", "FT_DATA_CLEARED" }) do
+    FT.On(ev, ListChanged)
+end
+T.ListChanged = ListChanged
+local function BaseKey(rows)
+    local q = {}
+    for _, k in ipairs(QUALITIES) do q[#q + 1] = filt.quality[k] == false and "0" or "1" end
+    return table.concat({ tostring(rows), listVersion, state.filter, tostring(state.cls), tostring(state.sub), state.search or "",
+        tostring(state.sort), tostring(state.desc), tostring(filt.min), tostring(filt.max), tostring(filt.usable),
+        tostring(filt.uncollected), table.concat(q), tostring(UnitLevel and UnitLevel("player")) }, "|")
+end
+
 local function Filtered()
     local rows = FT.Market.Rows()
     if not rows then return nil end
-    local out = {}
-    -- "name" in quotes: that name exactly (not the recipes for it and such); otherwise a part of the name
-    local matches = FT.NameMatcher(state.search)
-    local mine = state.filter == "mine" and RecipeOutputs() or nil
-    local filtersOn = FiltersOn()
-    local holdings = state.filter == "bags" and FT.Port.Holdings() or nil
-    for _, r in ipairs(rows) do
-        local ok = true
-        local f = state.filter
-        if f == "fav" then
-            ok = FT.db.watch[r.id] ~= nil
-        elseif f == "mine" then
-            ok = mine[r.id] == true
-        elseif f == "bags" then
-            ok = holdings[r.id] ~= nil
-        elseif f == "up" then
-            ok = r.ch1 ~= nil and r.ch1 > 0.001
-        elseif f == "down" then
-            ok = r.ch1 ~= nil and r.ch1 < -0.001
-        end
-        if ok and state.cls ~= "all" then
-            if state.cls == "other" then ok = not KNOWN[r.cls] else ok = r.cls == state.cls end
-        end
-        if ok and state.sub ~= "all" then ok = r.sub == state.sub end
-        if ok and filtersOn then ok = PassFilters(r.id) end
-        if ok and matches then ok = matches(r.id) end
-        if ok then out[#out + 1] = r end
+    -- one item opened (its name in the search box, nothing else changed): just its row, no look through them all
+    if state.only and state.search == state.onlySearch and state.filter == "all" and state.cls == "all" and state.sub == "all" and not FiltersOn() then
+        local r = FT.Market.Row(state.only)
+        if r then return { r }, 1 end
     end
-    local key, desc = state.sort, state.desc
-    if key == "name" then
-        local names = {}
-        for _, r in ipairs(out) do names[r.id] = FT.Fold(FT.Name(r.id) or "~") end
-        table.sort(out, function(a, b)
-            if names[a.id] ~= names[b.id] then
-                if desc then return names[a.id] > names[b.id] end
-                return names[a.id] < names[b.id]
-            end
-            return a.id < b.id
-        end)
+    state.only = nil
+    -- the same list as last time (nothing in it or about it changed): no look through them all, no sort
+    local cacheKey = BaseKey(rows)
+    local mine = state.filter == "mine" and RecipeOutputs() or nil
+    local out
+    if baseKey == cacheKey and baseRows then
+        out = {}
+        for i, r in ipairs(baseRows) do out[i] = r end
     else
-        local get = SORTS[key] or SORTS.cap
-        local missing = desc and -math.huge or math.huge
-        table.sort(out, function(a, b)
-            local va, vb = get(a) or missing, get(b) or missing
-            if va ~= vb then
-                if desc then return va > vb end
-                return va < vb
+        out = {}
+        -- "name" in quotes: that name exactly (not the recipes for it and such); otherwise a part of the name
+        local matches = FT.NameMatcher(state.search)
+        local filtersOn = FiltersOn()
+        local holdings = state.filter == "bags" and FT.Port.Holdings() or nil
+        for _, r in ipairs(rows) do
+            local ok = true
+            local f = state.filter
+            if f == "fav" then
+                ok = FT.db.watch[r.id] ~= nil
+            elseif f == "mine" then
+                ok = mine[r.id] == true
+            elseif f == "bags" then
+                ok = holdings[r.id] ~= nil
+            elseif f == "up" then
+                ok = r.ch1 ~= nil and r.ch1 > 0.001
+            elseif f == "down" then
+                ok = r.ch1 ~= nil and r.ch1 < -0.001
             end
-            return a.id < b.id
-        end)
+            if ok and state.cls ~= "all" then
+                if state.cls == "other" then ok = not KNOWN[r.cls] else ok = r.cls == state.cls end
+            end
+            if ok and state.sub ~= "all" then ok = r.sub == state.sub end
+            if ok and filtersOn then ok = PassFilters(r.id) end
+            if ok and matches then ok = matches(r.id) end
+            -- grey items and white gear: left out of the lists unless you search them by name (or watch / own them)
+            if ok and not matches and (f == "all" or f == "up" or f == "down") and FT.Market.Junk(r) then ok = false end
+            if ok then out[#out + 1] = r end
+        end
+        local key, desc = state.sort, state.desc
+        if key == "name" then
+            local names = {}
+            for _, r in ipairs(out) do names[r.id] = FT.Fold(FT.Name(r.id) or "~") end
+            table.sort(out, function(a, b)
+                if names[a.id] ~= names[b.id] then
+                    if desc then return names[a.id] > names[b.id] end
+                    return names[a.id] < names[b.id]
+                end
+                return a.id < b.id
+            end)
+        else
+            local get = SORTS[key] or SORTS.cap
+            local missing = desc and -math.huge or math.huge
+            -- each row's value worked out once (not twice per comparison: ~13 times each for 7,000 rows)
+            local val = {}
+            for _, r in ipairs(out) do val[r] = get(r) or missing end
+            if desc then
+                table.sort(out, function(a, b)
+                    local va, vb = val[a], val[b]
+                    if va ~= vb then return va > vb end
+                    return a.id < b.id
+                end)
+            else
+                table.sort(out, function(a, b)
+                    local va, vb = val[a], val[b]
+                    if va ~= vb then return va < vb end
+                    return a.id < b.id
+                end)
+            end
+        end
+        baseKey, baseRows = cacheKey, {}
+        for i, r in ipairs(out) do baseRows[i] = r end
     end
     -- My recipes: the open item's materials under it
     local count = #out
@@ -259,6 +305,7 @@ end)
 
 -- names arrived: the rows on screen show them; a search takes the new matches in now and then
 function T.OnItems()
+    ListChanged() -- names came in: a search or the name sort can differ
     -- an item opened from elsewhere before the game had its name: now it goes in the search box
     local id = state.focusFor
     local name = id and state.search == "" and FT.Name(id)
@@ -697,6 +744,7 @@ local function BuildOverview(parent)
     v.title:SetText(L["Market overview"])
     v.hint = UI.Text(v, 11, "dim")
     v.hint:SetPoint("LEFT", v.title, "RIGHT", 12, -1)
+    v.hint:SetPoint("RIGHT", v, "RIGHT", -4, 0)
     v.hint:SetText(L["Pick an item on the left to see its chart"])
 
     v.cards = {}
@@ -862,7 +910,7 @@ function T.ShowOverview()
         (pch and (FT.Pct(pch) .. FT.C("dim", " " .. L["today"])) or L["items and gold"]))
     T.FillMoves()
     local week = FT.An.WeekText and FT.An.WeekText()
-    overview.hint:SetText(week and (FT.C("accent", L["This week"]) .. ":  " .. week) or L["Pick an item on the left to see its chart"])
+    UI.FitBits(overview.hint, week and (FT.C("accent", L["This week"]) .. ":  " .. week) or L["Pick an item on the left to see its chart"])
 
     local points = {}
     for _, s in ipairs(scans) do
@@ -891,7 +939,7 @@ function T.FillMoves()
     end
     overview.movesTitle:SetText(#personal > 0 and L["Your top 3"] or L["Today's 3 moves"])
     local okSees, sees = pcall(FT.Eye.ProfileText)
-    overview.sees:SetText(okSees and sees or "")
+    UI.FitBits(overview.sees, okSees and sees or "")
     local best = {}
     for _, d in ipairs(FT.Deals.List() or {}) do
         local k = d.kind
@@ -1281,7 +1329,7 @@ function T.ShowItem(id, keepView)
     local s = FT.An.Stats(id)
     local head = UI.RiskHead(s)
     for i = #head, 1, -1 do table.insert(parts, 1, head[i]) end
-    v.sub:SetText(table.concat(parts, FT.C("dim", "  ||  ")))
+    UI.FitBits(v.sub, table.concat(parts, FT.C("dim", "  ||  ")))
     v.price:SetText(s.price and FT.Money(s.price) or "—")
     v.change:SetText(FT.Pct(s.ch1) .. FT.C("dim", " " .. L["24h"]))
     v.priceAge:SetText(UI.PriceAgeText(id, s))
@@ -1373,7 +1421,7 @@ function T.Build(p)
     -- a material clicked opens it here (the list stays as it is)
     mats = UI.Materials(p, function(id) T.Select(id) end)
     mats:SetPoint("BOTTOMRIGHT", -8, 8)
-    mats:SetWidth(RIGHT_W)
+    mats:SetWidth(RIGHT_W())
     mats:Hide()
     T.OnLayout()
 end
@@ -1403,9 +1451,9 @@ function T.LayoutRight()
     elseif show then
         mats:ClearAllPoints()
         mats:SetPoint("TOPRIGHT", -8, -8)
-        mats:SetWidth(RIGHT_W)
+        mats:SetWidth(RIGHT_W())
         mats:SetHeight(math.min(h, pageH - 16))
-        center:SetPoint("BOTTOMRIGHT", -(RIGHT_W + 18), 8)
+        center:SetPoint("BOTTOMRIGHT", -(RIGHT_W() + 18), 8)
     else
         center:SetPoint("BOTTOMRIGHT", -8, 8)
     end
@@ -1647,6 +1695,7 @@ function T.Focus(id)
     -- no name yet: the search box gets it when it arrives
     state.focusFor = not name and id or nil
     state.search = name and ('"' .. name .. '"') or ""
+    state.only, state.onlySearch = name and id or nil, state.search
     if T.searchBox then T.searchBox:SetValue(state.search) end
     T.RefreshList()
     T.Select(id)
@@ -1689,16 +1738,29 @@ end
 
 function T.OnShow()
     FT.Market.EnsureFresh()
+    -- an item about to open: it draws the list once itself (not twice)
+    if T.opening then return end
     T.Refresh()
 end
 
 function T.Refresh()
     T.RefreshList(true)
+    T.RefreshRight()
+end
+
+function T.RefreshRight()
     if state.selected then
         T.ShowItem(state.selected, true)
     else
         T.ShowOverview()
     end
+end
+
+-- new data while you look (not a click): the list this frame, the overview or the item the next - two short
+-- frames, not one long one
+function T.RefreshSoft()
+    T.RefreshList(true)
+    C_Timer.After(0, function() if page and page:IsVisible() then T.RefreshRight() end end)
 end
 
 -- Escape-like: back to the overview

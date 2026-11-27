@@ -673,6 +673,56 @@ function UI.Size(size)
     return (size or 12) + bump
 end
 
+-- A line of "a · b · c" (or "a || b") that keeps only the parts that fit whole, instead of cutting the last one with "...";
+-- again when its frame changes size
+local function Fit(fs)
+    local text = fs.fitText or ""
+    fs:SetText(text)
+    local w = fs:GetWidth()
+    if not w or w <= 0 or (fs:GetStringWidth() or 0) <= w + 0.5 then return end
+    -- the places it can end: before each " · " or " || " (from the last one back)
+    local cuts = {}
+    for _, sep in ipairs({ "·", "||" }) do
+        local from = 1
+        while true do
+            local a = text:find(sep, from, true)
+            if not a then break end
+            cuts[#cuts + 1] = a
+            from = a + #sep
+        end
+    end
+    table.sort(cuts)
+    for k = #cuts, 1, -1 do
+        local part = text:sub(1, cuts[k] - 1):gsub("|c%x%x%x%x%x%x%x%x%s*$", ""):gsub("%s+$", "")
+        fs:SetText(part)
+        if (fs:GetStringWidth() or 0) <= w + 0.5 then return end
+    end
+end
+
+function UI.FitBits(fs, text)
+    fs.fitText = text or ""
+    if fs.SetWordWrap then fs:SetWordWrap(false) end
+    if not fs.fitHooked then
+        fs.fitHooked = true
+        local p = fs:GetParent()
+        if p and p.HookScript then p:HookScript("OnSizeChanged", function() if fs.fitText then Fit(fs) end end) end
+    end
+    Fit(fs)
+end
+
+-- A text that shrinks (up to `less` points, 2 by default) before it would be cut short: a name in a narrow column
+function UI.FitSize(fs, text, size, less)
+    local full = UI.Size(size or 12)
+    fs:SetFont(UI.FONT, full, "")
+    fs:SetText(text or "")
+    local w = fs:GetWidth()
+    if not w or w <= 0 then return end
+    for s = full - 1, full - (less or 2), -1 do
+        if (fs:GetStringWidth() or 0) <= w + 0.5 then return end
+        fs:SetFont(UI.FONT, s, "")
+    end
+end
+
 -- a two-line row's height: a little more with the larger text sizes
 function UI.RowH(base)
     return base + 3 * (FT.S and tonumber(FT.S.textSize) or 0)

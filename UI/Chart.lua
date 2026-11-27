@@ -23,6 +23,8 @@ local function Col(name)
 end
 
 function UI.Chart(parent)
+    -- the price axis: wider with the larger text sizes (a whole session has one)
+    AXIS_W = 64 + 7 * (tonumber(FT.S and FT.S.textSize) or 0)
     local ch = CreateFrame("Frame", nil, parent)
     UI.Fill(ch, "bg1")
 
@@ -40,8 +42,23 @@ function UI.Chart(parent)
     ch.dashes = UI.Pool(ch.plot, function(o) return o:CreateTexture(nil, "OVERLAY") end)
     ch.bars = UI.Pool(ch.lower, function(o) return o:CreateTexture(nil, "ARTWORK") end)
     ch.lgrid = UI.Pool(ch.lower, function(o) return o:CreateTexture(nil, "BACKGROUND", nil, 2) end)
-    ch.ylabels = UI.Pool(ch, function(o) return UI.Text(o, 10, "muted", "LEFT") end)
-    ch.tlabels = UI.Pool(ch, function(o) return UI.Text(o, 10, "dim", "CENTER") end)
+    -- the numbers: a size up, and no drop shadow (at this size a shadow doubles the letters and looks blurry)
+    local function Crisp(fs)
+        fs:SetShadowOffset(0, 0)
+        return fs
+    end
+    ch.ylabels = UI.Pool(ch, function(o) return Crisp(UI.Text(o, 11, "muted", "LEFT")) end)
+    ch.tlabels = UI.Pool(ch, function(o) return Crisp(UI.Text(o, 11, "dim", "CENTER")) end)
+    -- the high and the low: their number on a small dark plate, so the line never runs through it
+    ch.marks = UI.Pool(ch, function(o)
+        local m = CreateFrame("Frame", nil, o)
+        m:SetFrameLevel(ch.mouse:GetFrameLevel() - 1)
+        m.bg = UI.RoundTex(m, "BACKGROUND", "bg0", 0.82)
+        m.bg:SetAllPoints()
+        m.text = Crisp(UI.Text(m, 11, "text", "CENTER"))
+        m.text:SetPoint("CENTER", 0, 0)
+        return m
+    end)
 
     ch.title = UI.Text(ch, 11, "text")
     ch.title:SetPoint("TOPLEFT", 8, -5)
@@ -55,10 +72,10 @@ function UI.Chart(parent)
     -- last price tag on the axis
     ch.tag = CreateFrame("Frame", nil, ch)
     ch.tag:SetFrameLevel(ch.mouse:GetFrameLevel() + 1)
-    ch.tag:SetSize(AXIS_W - 2, 16)
+    ch.tag:SetSize(AXIS_W - 2, 18)
     ch.tag.bg = UI.RoundTex(ch.tag, "BACKGROUND", "up", 1)
     ch.tag.bg:SetAllPoints()
-    ch.tag.text = UI.Text(ch.tag, 10, "black", "CENTER")
+    ch.tag.text = UI.Text(ch.tag, 11, "black", "CENTER")
     ch.tag.text:SetPoint("CENTER")
     ch.tag.text:SetShadowOffset(0, 0)
 
@@ -69,17 +86,17 @@ function UI.Chart(parent)
     ch.cy:SetHeight(1)
     ch.cyTag = CreateFrame("Frame", nil, ch)
     ch.cyTag:SetFrameLevel(ch.mouse:GetFrameLevel() + 2)
-    ch.cyTag:SetSize(AXIS_W - 2, 16)
+    ch.cyTag:SetSize(AXIS_W - 2, 18)
     ch.cyTag.bg = UI.RoundTex(ch.cyTag, "BACKGROUND", "bg3", 1)
     ch.cyTag.bg:SetAllPoints()
-    ch.cyTag.text = UI.Text(ch.cyTag, 10, "text", "CENTER")
+    ch.cyTag.text = Crisp(UI.Text(ch.cyTag, 11, "text", "CENTER"))
     ch.cyTag.text:SetPoint("CENTER")
     ch.cxTag = CreateFrame("Frame", nil, ch)
     ch.cxTag:SetFrameLevel(ch.mouse:GetFrameLevel() + 2)
     ch.cxTag:SetSize(80, TIME_H - 2)
     ch.cxTag.bg = UI.RoundTex(ch.cxTag, "BACKGROUND", "bg3", 1)
     ch.cxTag.bg:SetAllPoints()
-    ch.cxTag.text = UI.Text(ch.cxTag, 10, "text", "CENTER")
+    ch.cxTag.text = Crisp(UI.Text(ch.cxTag, 11, "text", "CENTER"))
     ch.cxTag.text:SetPoint("CENTER")
     ch.cx:Hide(); ch.cy:Hide(); ch.cyTag:Hide(); ch.cxTag:Hide()
     ch.hdot = UI.Dot(ch.mouse, 9, "up", 1, "OVERLAY")
@@ -122,7 +139,9 @@ function UI.Chart(parent)
     end
 
     local function Fmt(d, v)
-        return (d.fmt or FT.GoldNumber)(v)
+        local t = (d.fmt or FT.GoldNumber)(v)
+        if type(t) == "string" then t = t:gsub("^%-(0[%.,]?0*)$", "%1") end
+        return t
     end
 
     -- dates the American way: 11/25/26, 11/25 3 pm
@@ -135,7 +154,7 @@ function UI.Chart(parent)
 
     function ch:Render()
         self.grid:Reset(); self.fills:Reset(); self.rects:Reset(); self.lines:Reset(); self.dashes:Reset()
-        self.bars:Reset(); self.lgrid:Reset(); self.ylabels:Reset(); self.tlabels:Reset()
+        self.bars:Reset(); self.lgrid:Reset(); self.ylabels:Reset(); self.tlabels:Reset(); self.marks:Reset()
         local d = self.data
         local candles = d and d.candles or {}
         local n = #candles
@@ -150,7 +169,7 @@ function UI.Chart(parent)
             self.lowerText:SetText("")
             self.tag:Hide()
             self.grid:HideRest(); self.fills:HideRest(); self.rects:HideRest(); self.lines:HideRest()
-            self.dashes:HideRest(); self.bars:HideRest(); self.lgrid:HideRest(); self.ylabels:HideRest()
+            self.dashes:HideRest(); self.bars:HideRest(); self.lgrid:HideRest(); self.ylabels:HideRest(); self.marks:HideRest()
             self.tlabels:HideRest()
             return
         end
@@ -205,6 +224,9 @@ function UI.Chart(parent)
         -- horizontal grid and price labels (a label where the last price's tag sits is left out: the tag says it)
         local tagY = (candles[n].c >= lo and candles[n].c <= hi) and Y(candles[n].c) or nil
         local lastLabelY
+        -- labels apart by at least their own height (the larger text sizes too), and clear of the price tag
+        local labelGap = math.ceil(UI.Size(11) * 1.2) + 2
+        local tagGap = 9 + labelGap / 2
         local step = NiceStep((hi - lo) / 4)
         local g = math.ceil(lo / step) * step
         local guard = 0
@@ -217,11 +239,14 @@ function UI.Chart(parent)
             t:SetPoint("BOTTOMRIGHT", self.plot, "BOTTOMRIGHT", 0, y)
             t:SetHeight(1)
             t:Show()
-            if not (tagY and math.abs(y - tagY) < 14) and not (lastLabelY and math.abs(y - lastLabelY) < 14) then
+            if math.abs(g) < step * 1e-6 then g = 0 end -- never "-0"
+            if not (tagY and math.abs(y - tagY) < tagGap) and not (lastLabelY and math.abs(y - lastLabelY) < labelGap) then
                 lastLabelY = y
                 local fs = self.ylabels:Get()
                 fs:ClearAllPoints()
-                fs:SetPoint("LEFT", self.plot, "BOTTOMRIGHT", 6, y)
+                -- in the axis, right-aligned to the chart's edge: a long number never runs past it
+                fs:SetPoint("RIGHT", self.plot, "BOTTOMRIGHT", AXIS_W - 4, y)
+                fs:SetJustifyH("RIGHT")
                 fs:SetText(Fmt(d, g))
                 fs:Show()
             end
@@ -245,9 +270,12 @@ function UI.Chart(parent)
                     t:Show()
                 end
                 local fs = self.tlabels:Get()
-                fs:ClearAllPoints()
-                fs:SetPoint("CENTER", self, "BOTTOMLEFT", x, TIME_H / 2)
                 fs:SetText(d.hourly and Hour(candles[i].t) or date("%m/%d", candles[i].t))
+                -- never past the chart's edges
+                local half = (fs:GetStringWidth() or 0) / 2 + 2
+                local cx = math.max(half, math.min((self:GetWidth() or W) - AXIS_W - half, x))
+                fs:ClearAllPoints()
+                fs:SetPoint("CENTER", self, "BOTTOMLEFT", cx, TIME_H / 2)
                 fs:Show()
             end
         end
@@ -362,12 +390,15 @@ function UI.Chart(parent)
                     dot:SetPoint("CENTER", self.plot, "BOTTOMLEFT", X(i), Y(candles[i].c))
                     dot:SetSize(6, 6)
                     dot:Show()
-                    local fs = self.ylabels:Get()
-                    fs:ClearAllPoints()
-                    fs:SetPoint(side > 0 and "BOTTOM" or "TOP", self.plot, "BOTTOMLEFT",
-                        math.max(30, math.min(W - 30, X(i))), Y(candles[i].c) + side * 6)
-                    fs:SetText(FT.C("dim", tag .. " ") .. Fmt(d, candles[i].c))
-                    fs:Show()
+                    local m = self.marks:Get()
+                    m.text:SetText(FT.C("muted", tag .. " ") .. Fmt(d, candles[i].c))
+                    local mw = math.ceil((m.text:GetStringWidth() or 60) + 10)
+                    m:SetSize(mw, UI.Size(11) + 6)
+                    -- inside the plot whatever the point: a plate wholly between its edges
+                    local mx = math.max(mw / 2 + 1, math.min(W - mw / 2 - 1, X(i)))
+                    m:ClearAllPoints()
+                    m:SetPoint(side > 0 and "BOTTOM" or "TOP", self.plot, "BOTTOMLEFT", mx, Y(candles[i].c) + side * 7)
+                    m:Show()
                 end
             end
         else
@@ -496,7 +527,7 @@ function UI.Chart(parent)
         end
 
         self.grid:HideRest(); self.fills:HideRest(); self.rects:HideRest(); self.lines:HideRest()
-        self.dashes:HideRest(); self.bars:HideRest(); self.lgrid:HideRest(); self.ylabels:HideRest()
+        self.dashes:HideRest(); self.bars:HideRest(); self.lgrid:HideRest(); self.ylabels:HideRest(); self.marks:HideRest()
         self.tlabels:HideRest()
         self:UpdateLegend(self.hoverIndex or last)
     end

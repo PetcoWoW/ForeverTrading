@@ -379,10 +379,10 @@ function P.Refresh()
         for i = #(v and v.events or {}), 1, -1 do events[#events + 1] = v.events[i] end
         panel.views.visit.list:SetItems(events, true)
         if not v then
-            panel.sub:SetText(L["Open the auction house: this visit starts then."])
+            UI.FitBits(panel.sub, L["Open the auction house: this visit starts then."])
         else
             local when = P.shownVisit and date("%a %m/%d %H:%M", v.start) or string.format(L["Since %s"], date("%H:%M", v.start))
-            panel.sub:SetText(when .. FT.C("dim", ":  ") .. SumText(FT.AHVisit.Sum(v), v))
+            UI.FitBits(panel.sub, when .. FT.C("dim", ":  ") .. SumText(FT.AHVisit.Sum(v), v))
         end
         return
     elseif P.view == "watch" then
@@ -390,17 +390,17 @@ function P.Refresh()
         panel.views.watch.list:SetItems(rows, true)
         local deals = 0
         for _, x in ipairs(rows) do if x.deal then deals = deals + 1 end end
-        panel.sub:SetText(FT.ahOpen and (deals > 0 and string.format(L["%d of your watched items listed well under usual: Buy."], deals)
+        UI.FitBits(panel.sub, FT.ahOpen and (deals > 0 and string.format(L["%d of your watched items listed well under usual: Buy."], deals)
             or L["Your watched items, searched live while you're here. A deal is said in chat."]) or L["Open the auction house to search them live."])
         return
     elseif P.view == "past" then
         panel.views.past.list:SetItems(FT.AHVisit.Past(), true)
-        panel.sub:SetText(L["Your last auction house visits: click one for what you did."])
+        UI.FitBits(panel.sub, L["Your last auction house visits: click one for what you did."])
         return
     end
     local list, at, busy = FT.Snipe.Now()
     local scan = FT.ScanTime and FT.ScanTime()
-    panel.sub:SetText(busy and L["Looking..."] or (scan and string.format(L["From your scan %s: buy what's under its price, the surest first."], FT.Ago(scan))
+    UI.FitBits(panel.sub, busy and L["Looking..."] or (scan and string.format(L["From your scan %s: buy what's under its price, the surest first."], FT.Ago(scan))
         or L["Scan the auction house first."]))
     panel.now.list:SetItems(list, true)
     panel.now.count:SetText(#list > 0 and tostring(#list) or "")

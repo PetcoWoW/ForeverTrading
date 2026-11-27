@@ -471,7 +471,22 @@ local function FromFutures(out, p)
 end
 
 -- the moves, the most gold to you first, one per item
+-- the overview draws often: the moves kept until something they're made from changes
+local movesCache = {}
+for _, ev in ipairs({ "FT_MARKET_READY", "FT_OWNED_CHANGED", "FT_INVENTORY_CHANGED", "FT_WATCH_CHANGED", "FT_DEALS_READY",
+    "FT_CRAFTS_READY", "FT_RECIPES_CHANGED", "FT_SCAN_DONE", "FT_HOUSE_CHANGED", "FT_SETTINGS_CHANGED", "FT_LIVE_UPDATED" }) do
+    FT.On(ev, function() movesCache = {} end)
+end
 function E.Moves(n)
+    local key = n or 0
+    local c = movesCache[key]
+    if c and GetTime() - c.at < 60 then return c.list end
+    local list = E.MovesNow(n)
+    movesCache[key] = { list = list, at = GetTime() }
+    return list
+end
+
+function E.MovesNow(n)
     local p = E.Profile()
     local out = {}
     for _, f in ipairs({ FromHoldings, FromWatch, FromCrafts, FromGathering, FromDeals, FromFutures }) do

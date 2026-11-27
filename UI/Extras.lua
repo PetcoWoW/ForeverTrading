@@ -1078,7 +1078,7 @@ function FT.ShowWhenSells(itemID)
     local any = hr ~= nil
     for _, x in ipairs({ d.t1, d.s1, d.hours, d.t2, d.s2, d.tod, d.t3, d.s3, d.days }) do x:SetShown(any) end
     if not hr then
-        d.sum:SetText("")
+        UI.FitBits(d.sum, "")
         d.empty:SetText(L["Not enough sales seen yet for an hour-by-hour picture: the price robot needs 10 or more sold in four weeks. It looks at the whole auction house every hour."])
         d.empty:Show()
         return
@@ -1132,7 +1132,7 @@ function FT.ShowWhenSells(itemID)
     if lowAt then bits[#bits + 1] = string.format(L["quietest %s-%s"], HourLabel(lowAt), HourLabel(lowAt + 3)) end
     if bestDay then bits[#bits + 1] = string.format(L["best day: %s"], dl[bestDay]) end
     bits[#bits + 1] = L["post a little before the busy hours"]
-    d.sum:SetText(table.concat(bits, FT.C("dim", "  ·  ")))
+    UI.FitBits(d.sum, table.concat(bits, FT.C("dim", "  ·  ")))
 end
 
 ---------------------------------------------------------------------------

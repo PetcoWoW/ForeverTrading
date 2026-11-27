@@ -594,30 +594,65 @@ local function FarmRank(price, perDay)
 end
 T.FarmYours = FarmYours
 
-local function FarmRows()
-    local out = {}
-    for _, r in ipairs(FT.Market.Rows() or {}) do
-        local kind = r.price and FarmKindOf(r)
-        if kind and (farmKind == "all" or farmKind == kind) and not r.gone then
-            local rate = FT.Sales.Rate(r.id)
-            local perDay = rate and rate.perDay or 0
-            local yours = FarmYours(r.price, perDay)
-            local bits = {}
-            if rate then bits[#bits + 1] = FT.Sales.PerDayText(rate) else bits[#bits + 1] = L["sales not seen yet"] end
-            if r.ch7 then bits[#bits + 1] = FT.Pct(r.ch7) .. " " .. L["this week"] end
-            if yours > 0 then bits[#bits + 1] = string.format(L["you could sell ~%s a day"], FT.Money(math.floor(yours), "short")) end
-            out[#out + 1] = {
-                id = r.id, reason = table.concat(bits, FT.C("dim", "  ·  ")), sortV = FarmRank(r.price, perDay), yours = yours,
-                price = r.price, perDay = perDay,
-                value = FT.C("up", FT.Money(r.price, "short")) .. FT.C("dim", " " .. L["each"]),
-                signal = (r.ch7 or 0) >= 0.1 and "SELL" or ((r.ch7 or 0) <= -0.1 and "BUY" or "HOLD"),
-                label = ((r.ch7 or 0) >= 0.1 and L["HOT"]) or ((r.ch7 or 0) <= -0.1 and L["COOLING"]) or L["STEADY"],
-            }
-        end
-    end
+-- One item's line on the farm list (nil: not something you farm, or not the kind chosen)
+local function FarmEntry(r)
+    local kind = r.price and FarmKindOf(r)
+    if not (kind and (farmKind == "all" or farmKind == kind) and not r.gone) then return nil end
+    local rate = FT.Sales.Rate(r.id)
+    local perDay = rate and rate.perDay or 0
+    local yours = FarmYours(r.price, perDay)
+    local bits = {}
+    if rate then bits[#bits + 1] = FT.Sales.PerDayText(rate) else bits[#bits + 1] = L["sales not seen yet"] end
+    if r.ch7 then bits[#bits + 1] = FT.Pct(r.ch7) .. " " .. L["this week"] end
+    if yours > 0 then bits[#bits + 1] = string.format(L["you could sell ~%s a day"], FT.Money(math.floor(yours), "short")) end
+    return {
+        id = r.id, reason = table.concat(bits, FT.C("dim", "  ·  ")), sortV = FarmRank(r.price, perDay), yours = yours,
+        price = r.price, perDay = perDay,
+        value = FT.C("up", FT.Money(r.price, "short")) .. FT.C("dim", " " .. L["each"]),
+        signal = (r.ch7 or 0) >= 0.1 and "SELL" or ((r.ch7 or 0) <= -0.1 and "BUY" or "HOLD"),
+        label = ((r.ch7 or 0) >= 0.1 and L["HOT"]) or ((r.ch7 or 0) <= -0.1 and L["COOLING"]) or L["STEADY"],
+    }
+end
+
+local function FarmSort(out)
     table.sort(out, function(a, b) return a.sortV > b.sortV end)
     while #out > 80 do table.remove(out) end
     return out
+end
+
+-- Made once per market list and farm choice (the overview asks every time it draws). New prices: the last list
+-- stays until the new one is worked out in the background, a few ms a frame - not all of it in one frame.
+local farmCache, farmFor, farmKindFor, farmJob, farmStale
+local function FarmLater()
+    local rows = FT.Market.Rows()
+    if not rows or not farmCache then farmCache, farmStale = nil, false return end
+    if farmJob then farmJob.Cancel() end
+    local kindNow, out = farmKind, {}
+    farmJob = FT.Job("farm", #rows, function(k)
+        if FT.Market.Rows() ~= rows then return false end
+        local e = FarmEntry(rows[k])
+        if e then out[#out + 1] = e end
+    end, function()
+        farmJob, farmStale = nil, false
+        if farmKind ~= kindNow then return end
+        farmCache, farmFor, farmKindFor = FarmSort(out), rows, kindNow
+        if T.RefreshFarm then T.RefreshFarm() end
+    end, 3)
+end
+local function Stale() farmStale = farmCache ~= nil; FT.Debounce("farmList", 0.5, FarmLater) end
+FT.On("FT_MARKET_READY", Stale)
+FT.On("FT_SCAN_DONE", Stale)
+local function FarmRows()
+    local rowsNow = FT.Market.Rows()
+    -- the same list, or the last one while the new one is worked out
+    if farmCache and farmKindFor == farmKind and (farmFor == rowsNow or farmJob or farmStale) then return farmCache end
+    local out = {}
+    for _, r in ipairs(rowsNow or {}) do
+        local e = FarmEntry(r)
+        if e then out[#out + 1] = e end
+    end
+    farmCache, farmFor, farmKindFor = FarmSort(out), rowsNow, farmKind
+    return farmCache
 end
 
 local function WowheadLink(id)

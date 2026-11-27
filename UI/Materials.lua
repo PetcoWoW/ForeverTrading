@@ -163,7 +163,7 @@ function UI.Materials(parent, onPick)
             UI.SetTextColor(c.star.text, FT.Market.IsWatched(part.itemID) and "accent" or "dim")
             c.icon:SetItem(part.itemID)
             -- how many first: the name may be cut short in the narrow column
-            c.text:SetText(FT.C("dim", part.qty .. "x ") .. FT.ItemText(part.itemID))
+            UI.FitSize(c.text, FT.C("dim", part.qty .. "x ") .. FT.ItemText(part.itemID), 11)
             local total = part.total or (part.unit and part.unit * part.qty)
             row.cells.total:SetText(total and FT.Money(math.floor(total), "short") or FT.C("down", L["no price"]))
             row.cells.ch:SetText(part.source == "vendor" and FT.C("dim", L["vendor"]) or FT.Pct(Ch7(part.itemID)))

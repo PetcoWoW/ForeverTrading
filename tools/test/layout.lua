@@ -162,6 +162,13 @@ function M.Rect(f)
     return rect
 end
 function M.Reset() cache = {} end
+-- like the game: sizes remembered until something moves (the ms test - it measures the addon, not this solver)
+local live = false
+function M.Live(on) live, caching, cache = on, on, {} end
+for _, k in ipairs({ "SetPoint", "ClearAllPoints", "SetAllPoints", "SetWidth", "SetHeight", "SetSize", "SetParent", "SetText", "SetFormattedText", "Show", "Hide" }) do
+    local fn = M[k]
+    if fn then M[k] = function(...) if live then cache = {} end return fn(...) end end
+end
 
 -- what the addon asks of a frame's size and place: the layout's answers
 M.GetWidth = function(self) local r = M.Rect(self) return r[2] - r[1] end
@@ -251,7 +258,14 @@ function M.Texts(root)
                         local pr = M.Rect(p)
                         spill = ink[4] < pr[4] - 2 or ink[3] > pr[3] + 2
                     end
-                    out[#out + 1] = { f = f, text = vis, ink = ink, cut = cut, spill = spill }
+                    -- letters past the left or right side of the frame it's in (its window's edge, a panel's border)
+                    local out_ = false
+                    local pf = f.__parent
+                    if pf and pf ~= UIParent and f.__kind == "FontString" then
+                        local pr = M.Rect(pf)
+                        out_ = ink[2] > pr[2] + 3 or ink[1] < pr[1] - 3
+                    end
+                    out[#out + 1] = { f = f, text = vis, ink = ink, cut = cut, spill = spill, out = out_ }
                 end
             end
         end

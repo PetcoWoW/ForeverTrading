@@ -250,16 +250,41 @@ local function Liquid(r)
     return r.days >= needDays and r.price >= 100 and (r.qty == nil or r.qty >= 3)
 end
 
+-- What's not worth showing or following: grey (poor) items, and white (common) gear and odds and ends - white
+-- trade goods, consumables, reagents, bags and the like are kept: plenty of them matter. The quality is the game's
+-- (known once the item's name is loaded; until then the item counts).
+local GetQuality = (C_Item and C_Item.GetItemQualityByID) or function(id) return select(3, GetItemInfo(id)) end
+local WHITE_JUNK = { [2] = true, [4] = true, [15] = true } -- weapons, armor, miscellaneous
+function M.Quality(r)
+    if r.q == nil then
+        local ok, q = pcall(GetQuality, r.id)
+        if ok and type(q) == "number" then r.q = q end
+    end
+    return r.q
+end
+function M.Junk(r)
+    local q = M.Quality(r)
+    if q == 0 then return true end
+    return q == 1 and WHITE_JUNK[r.cls] == true
+end
+local Junk = M.Junk
+local function Gear(r) return r.cls == 2 or r.cls == 4 end
+
 -- A real market, for the biggest moves and the banners: it sells 3+ a day, 1g+ a day changes hands and 5+ are
 -- up. A 4-silver item with one sale a day "up 300%" (1c to 4c), or a 5g item "down 90%" after one 50g listing,
 -- is noise. Known sales come from the price feed and your scans; with none known, a market isn't counted solid.
 local function Solid(r)
-    if not Liquid(r) or (r.qty or 0) < 5 then return false end
+    if Junk(r) or not Liquid(r) then return false end
+    local gear = Gear(r)
+    -- gear: 3+ listed and some sold (a few a week); goods: 5+ listed and 3+ sold a day
+    if (r.qty or 0) < (gear and 3 or 5) then return false end
     if r.perDay == nil then
         local s = FT.Sales.Rate(r.id)
-        r.perDay = (s and (s.sold or 0) >= 5) and s.perDay or false
+        r.perDay = (s and (s.sold or 0) >= (gear and 4 or 5)) and s.perDay or false
     end
-    if not (r.perDay and r.perDay >= 3 and r.price * r.perDay >= 10000) then return false end
+    if not (r.perDay and r.perDay >= (gear and 0.5 or 3) and r.price * r.perDay >= 10000) then return false end
+    -- gear's lowest price jumps when a few odd listings are all there is: a move that big isn't the market
+    if gear and math.abs(r.ch1 or 0) > 1 then return false end
     -- yesterday's close must look like the days before it (within 50% of their median): a move "down 85%" from
     -- one overpriced day is no move
     if r.sane == nil then
@@ -287,7 +312,7 @@ M.Solid = Solid
 function M.TopByValue(n)
     local list = {}
     for _, r in ipairs(rows or {}) do
-        if r.qty and r.price >= 100 then list[#list + 1] = r end
+        if r.qty and r.price >= 100 and not Junk(r) then list[#list + 1] = r end
     end
     table.sort(list, function(a, b)
         local va, vb = a.price * a.qty, b.price * b.qty
@@ -312,13 +337,17 @@ end
 -- ready, the cheap tests alone.
 local moversCache = setmetatable({}, { __mode = "k" })
 local MOVERS_KEPT = 40
+-- the last movers worked out: shown until the new ones are ready (a few seconds), not worked out again in one go
+local lastMovers
+FT.On("FT_HOUSE_CHANGED", function() lastMovers = nil end)
 function M.ForgetMovers() if rows then moversCache[rows] = nil end end
 
 local function Candidates(field, descending)
     local list = {}
     for _, r in ipairs(rows or {}) do
         local v = r[field]
-        if v and ((descending and v > 0) or (not descending and v < 0)) and Plausible(v) and Liquid(r) and (r.qty or 0) >= 5 then
+        if v and ((descending and v > 0) or (not descending and v < 0)) and Plausible(v) and Liquid(r) and (r.qty or 0) >= 5
+            and not Junk(r) then
             list[#list + 1] = r
         end
     end
@@ -382,6 +411,7 @@ function M.PrepareMovers()
         local byRows = {}
         for _, set in ipairs(sets) do byRows[set.key] = set.top end
         moversCache[forRows] = byRows
+        lastMovers = byRows
         FT.Fire("FT_MOVERS_READY")
     end
     C_Timer.After(0.2, Finish)
@@ -389,18 +419,26 @@ end
 FT.On("FT_MARKET_READY", function() M.ForgetMovers(); C_Timer.After(0.5, M.PrepareMovers) end)
 
 function M.Movers(n, field, descending)
-    local byRows = rows and moversCache[rows]
+    local byRows = rows and (moversCache[rows] or lastMovers)
     local top = byRows and byRows[field .. (descending and "+" or "-")]
     local out = {}
     if top and #top > 0 then
-        for i = 1, math.min(n, #top) do out[i] = top[i] end
-        return out
+        -- (the last ones, while new ones are worked out: only those still moving that way)
+        for _, r in ipairs(top) do
+            if #out >= n then break end
+            local v = r[field]
+            if v and ((descending and v > 0) or (not descending and v < 0)) then out[#out + 1] = r end
+        end
+        if #out > 0 then return out end
     end
-    -- not worked out yet (a moment after login), or nothing passed the strict checks: the cheap tests only, so
-    -- the lists are never empty while something moved
+    -- not worked out yet (a moment after login), or nothing passed the strict checks: the cheap tests, and only
+    -- what's known to sell (a move with no sales behind it is someone's odd listing, not the market)
+    local looked = 0
     for _, r in ipairs(Candidates(field, descending)) do
-        if #out >= n then break end
-        out[#out + 1] = r
+        if #out >= n or looked >= 4 * n then break end
+        looked = looked + 1
+        local s = FT.Sales.Rate(r.id)
+        if s and (s.sold or 0) >= 5 and (s.perDay or 0) >= (Gear(r) and 0.5 or 2) then out[#out + 1] = r end
     end
     return out
 end
@@ -416,10 +454,20 @@ function M.Depth()
 end
 
 -- the market's mood: share of liquid items that went up this week (0-100), and how many were counted
+-- worked out once per market list (the overview asks every time it draws)
+local moodFor, moodV, moodN
+FT.On("FT_MARKET_READY", function() moodFor = nil end)
 function M.Mood()
+    if moodFor and moodFor == rows then return moodV, moodN end
+    moodFor = rows
+    moodV, moodN = M.MoodNow()
+    return moodV, moodN
+end
+
+function M.MoodNow()
     local up, total = 0, 0
     for _, r in ipairs(rows or {}) do
-        if r.ch7 and Liquid(r) then
+        if r.ch7 and Liquid(r) and not Junk(r) then
             total = total + 1
             if r.ch7 > 0 then up = up + 1 end
         end

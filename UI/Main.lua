@@ -709,8 +709,11 @@ end
 
 -- open an item on the Market page: its list shows just that item (× in the search box: all again)
 function FT.OpenItem(itemID)
-    FT.Show("market")
     local T = FT.Tabs.market
+    T.opening = T.Focus ~= nil
+    local ok, err = pcall(FT.Show, "market")
+    T.opening = nil
+    if not ok then geterrorhandler()(err) end
     if T.Focus then T.Focus(itemID) elseif T.Select then T.Select(itemID) end
 end
 
@@ -727,7 +730,7 @@ local function RefreshVisible()
     local tab = FT.Tabs[FT.currentTab]
     local page = pages[FT.currentTab]
     if tab and tab.Refresh and page then
-        local ok, err = pcall(tab.Refresh, page)
+        local ok, err = pcall(tab.RefreshSoft or tab.Refresh, page)
         if not ok then geterrorhandler()(err) end
     end
 end

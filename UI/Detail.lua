@@ -10,7 +10,8 @@ local D = {}
 FT.Detail = D
 
 local W, H = 1000, 620
-local BOOK_W = 280
+-- the side (order book, breakdown): a little wider with the larger text sizes, so names fit
+local function BOOK_W() return 280 + 10 * (tonumber(FT.S and FT.S.textSize) or 0) end
 local BOOK_MIN_H = 290 -- the order book: its header, a few rows and its buy box
 
 local GetClassInfo = (C_Item and C_Item.GetItemClassInfo) or GetItemClassInfo
@@ -390,11 +391,11 @@ local function New(index)
     body:SetPoint("BOTTOMRIGHT", -UI.INSET - 8, UI.INSET + 8)
 
     w.book = UI.OrderBook(body)
-    w.book:SetWidth(BOOK_W)
+    w.book:SetWidth(BOOK_W())
     -- under it the materials of one craft (a material clicked opens in this window)
     w.mats = UI.Materials(body, function(id) FT.ShowDetail(id, w) end)
     w.mats:SetPoint("BOTTOMRIGHT", 0, 0)
-    w.mats:SetWidth(BOOK_W)
+    w.mats:SetWidth(BOOK_W())
     w.mats:Hide()
 
     w.left = CreateFrame("Frame", nil, body)
@@ -508,7 +509,7 @@ Layout = function(w)
     if c then w.mats:Hide() end
     w.left:ClearAllPoints()
     w.left:SetPoint("TOPLEFT", 0, 0)
-    w.left:SetPoint("BOTTOMRIGHT", c and 0 or -(BOOK_W + 10), 0)
+    w.left:SetPoint("BOTTOMRIGHT", c and 0 or -(BOOK_W() + 10), 0)
     -- the numbers, the toolbar (and the indicators on their own line when narrow), the charts
     local stripH = c and 76 or 42
     w.strip:SetHeight(stripH)
@@ -621,7 +622,7 @@ local function RefreshIn(w, keepView)
     local s = FT.An.Stats(id)
     local head = UI.RiskHead(s)
     for i = #head, 1, -1 do table.insert(parts, 1, head[i]) end
-    w.sub:SetText(table.concat(parts, FT.C("dim", "  ||  ")))
+    UI.FitBits(w.sub, table.concat(parts, FT.C("dim", "  ||  ")))
 
     w.price:SetText(s.price and FT.Money(s.price) or "—")
     w.change:SetText(FT.Pct(s.ch1) .. (w.compact and "" or FT.C("dim", " " .. L["24h"])))
@@ -641,7 +642,7 @@ local function RefreshIn(w, keepView)
     local ind = {}
     ind[#ind + 1] = UI.SalesText(s)
     if s.dev then ind[#ind + 1] = L["vs average"] .. " " .. FT.Pct(s.dev) end
-    w.ind:SetText(table.concat(ind, FT.C("dim", "  ·  ")))
+    UI.FitBits(w.ind, table.concat(ind, FT.C("dim", "  ·  ")))
 
     w.tf:SetValue(FT.S.chartTF)
     w.range:SetValue(FT.S.chartRange or "30D")
@@ -658,7 +659,7 @@ local function RefreshIn(w, keepView)
         w.mats:SetShown(show)
         w.book:ClearAllPoints()
         w.book:SetPoint("TOPRIGHT", 0, 0)
-        w.book:SetWidth(BOOK_W)
+        w.book:SetWidth(BOOK_W())
         if show then
             w.mats:SetHeight(h)
             w.book:SetPoint("BOTTOMRIGHT", w.mats, "TOPRIGHT", 0, 8)
