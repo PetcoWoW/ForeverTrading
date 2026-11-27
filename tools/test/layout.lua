@@ -10,7 +10,8 @@ local function kids(p) if not p then return nil end p.__kids = p.__kids or {} re
 local CF = CreateFrame
 CreateFrame = function(kind, name, parent, template)
     local f = CF(kind, name, parent, template)
-    local k = kids(parent); if k then k[#k + 1] = f end
+    -- no parent: the game puts it on the screen itself
+    local k = kids(parent or UIParent); if k then k[#k + 1] = f end
     return f
 end
 local M = {}

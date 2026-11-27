@@ -1,5 +1,10 @@
 # Wolf
 
+## v0.37 - fix
+
+- The "When it sells" button stayed on the screen after closing Wolf: it now belongs to the item's chart. The
+  tests now look for any button left loose on the screen.
+
 ## v0.36 - watchlist groups, the AH visit, when it sells
 
 - **Watchlist groups.** Watched items are grouped on the Market list's Watchlist: your own groups first (make,

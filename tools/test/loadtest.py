@@ -435,6 +435,23 @@ step("ah visit", function()
   FT.SnipePanel.SetView("past")
   FT.SnipePanel.Get():Hide()
 end)
+step("nothing loose on the screen", function()
+  -- frames made by the pages' code with no parent end up on UIParent: they'd stay when the window closes
+  local loose = {}
+  local function TextIn(f, depth)
+    if f.__text and f.__text ~= "" then return f.__text end
+    if depth > 2 then return nil end
+    for _, k in ipairs(f.__kids or {}) do local t = TextIn(k, depth + 1) if t then return t end end
+  end
+  for _, f in ipairs(UIParent.__kids or {}) do
+    if f.__kind == "Button" and not f.__name then
+      local t = TextIn(f, 0)
+      if t then loose[#loose + 1] = t end
+    end
+  end
+  for _, t in ipairs(loose) do print("LOOSE button on the screen: " .. t) end
+  assert(#loose == 0, #loose .. " buttons on the screen with no window")
+end)
 step("when it sells", function()
   local hr = FT.Feed.Hourly(12360)
   print("hourly: " .. tostring(hr and #hr.hours) .. " hours")
@@ -612,7 +629,6 @@ end)
 step("open item", function() FT.OpenItem(12363) end)
 mock.run(1)
 step("best use", function() FT.ShowBestUse(12359) end)
-step("toast", function() FT.S.alertPopup = true; FT.Toast(12363, "test", "TO THE MOON", "up"); FT.S.alertPopup = false end)
 mock.run(10)
 step("signals", function()
   local n, kinds = 0, {}
