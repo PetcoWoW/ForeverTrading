@@ -1,15 +1,28 @@
-The Wolf of Booty Bay
+Wolf (formerly The Wolf of Booty Bay)
 Copyright 2026 PetcoWoW
 
-This addon is a modified version of ForeverTrading by thewoolfi
-(https://github.com/thewoolfi/ForeverTrading), licensed under the
-Apache License, Version 2.0 (see LICENSE).
+Wolf is free software: you can redistribute it and/or modify it under the terms of the GNU General Public
+License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any
+later version (see LICENSE). Since v0.50; earlier versions were released under the Apache License 2.0.
 
-Changes from ForeverTrading include: a new name and saved data, removal of
-the Russian translation, the light and classic styles and the Mastercraft
-integration, larger text options, plain-English labels, and new features.
-Files changed from the original carry "built on ForeverTrading" in their
-first line.
+Built on ForeverTrading by thewoolfi (https://github.com/thewoolfi/ForeverTrading), licensed under the Apache
+License, Version 2.0 (see LICENSE-APACHE). Changes from ForeverTrading include: a new name and saved data,
+removal of the Russian translation, the light and classic styles and the Mastercraft integration, larger text
+options, plain-English labels, and new features. Files changed from the original carry "built on
+ForeverTrading" in their first line.
 
-The Sofia Sans Condensed font in media/ is licensed under the SIL Open Font
-License 1.1 (media/SofiaSansCondensed-OFL.txt).
+Where items come from (Data/Sources.lua) is built from ForeverDB (https://github.com/foreverfraddons/forever-db,
+GNU GPL v3), which merges, with their own licences:
+  - QuestieDB (https://github.com/Questie/QuestieDB), GNU GPL v3
+  - VMaNGOS (https://github.com/vmangos/core), GNU GPL v2 or later
+  - cMaNGOS classic-db (https://github.com/cmangos/classic-db), GNU GPL v3
+  - AllTheThings (https://github.com/ATTWoWAddon/AllTheThings), MIT
+  - pfQuest (https://github.com/shagu/pfQuest), MIT, copyright (c) 2017-2021 Eric Mauser (Shagu)
+  - Drop Tables contributors, https://github.com/valcheffnet/DropTables, data under CC BY-SA 4.0
+    (https://creativecommons.org/licenses/by-sa/4.0/): the drop and skinning counts in Data/Sources.lua are
+    shared under the same licence.
+  - the WoW Forever client tables (Blizzard Entertainment's game data, exported by wago.tools)
+Wolf's own Forever notes (tools/sources/hand.json) name the guides and wikis they were checked against.
+
+The Sofia Sans Condensed font in media/ is licensed under the SIL Open Font License 1.1
+(media/SofiaSansCondensed-OFL.txt).

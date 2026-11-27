@@ -3,7 +3,10 @@
 The WoW Forever auction house as a stock market: a ticker tape, 7-day trend lines, gainers and losers, charts, plain-English
 "what to do" signals, deals and your net worth across every character.
 
-Built on [ForeverTrading](https://github.com/thewoolfi/ForeverTrading) by thewoolfi (Apache License 2.0).
+Free software under the GNU GPL v3 (since v0.50). Built on [ForeverTrading](https://github.com/thewoolfi/ForeverTrading)
+by thewoolfi (Apache License 2.0). Where items come from is built from [ForeverDB](https://github.com/foreverfraddons/forever-db)
+(QuestieDB, VMaNGOS, cMaNGOS, AllTheThings, pfQuest and the [Drop Tables](https://github.com/valcheffnet/DropTables)
+contributors, CC BY-SA 4.0). Full credits in NOTICE.
 His scanner, price history, price exchange and trading tools are the engine; this addon reworks the look
 and the words and adds its own features. See `NOTICE`.
 

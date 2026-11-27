@@ -1814,9 +1814,9 @@ FT.On("FT_SESSION_CHANGED", function() FT.UpdateHUD() end)
 FT.On("FT_SESSION_LOOT", function() FT.Debounce("hud", 0.3, FT.UpdateHUD) end)
 FT.On("FT_READY", function() C_Timer.After(2, FT.UpdateHUD) end)
 
--- /wolf credits: where the code began (the license's notice; NOTICE and LICENSE ship in the addon's folder)
+-- /wolf credits: where the code began and where its data comes from (NOTICE and the licenses ship in its folder)
 function FT.ShowSupport()
-    FT.ShowLink(L["Credits"], L["Wolf is a modified version of an addon by thewoolfi, under the Apache License 2.0 (see NOTICE in the addon's folder). The original:"],
+    FT.ShowLink(L["Credits"], L["Wolf is free software under the GNU GPL v3, built on ForeverTrading by thewoolfi (Apache 2.0). Where items come from: ForeverDB, with QuestieDB, VMaNGOS, cMaNGOS, AllTheThings, pfQuest and the Drop Tables contributors (CC BY-SA 4.0). All in NOTICE, in Wolf's folder. The original addon:"],
         FT.URL_SUPPORT)
 end
 

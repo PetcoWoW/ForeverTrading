@@ -1,0 +1,417 @@
+{
+ "_about": "Forever knowledge the databases don't carry. Each item: kind (gather/scarce/disenchant/workshop/made/special), text shown in Wolf, and src (where it was checked).",
+ "merchantsFavor": {
+  "256729": "A",
+  "256730": "A",
+  "256731": "A",
+  "256732": "A",
+  "256733": "A",
+  "256734": "A",
+  "256735": "A",
+  "248196": "H",
+  "248197": "H",
+  "248198": "H",
+  "248199": "H",
+  "248200": "H",
+  "248201": "H",
+  "248202": "H"
+ },
+ "items": {
+  "10939": {
+   "text": "Disenchanting gear of item level 31-35 (Greater Magic Essence)."
+  },
+  "10978": {
+   "text": "Disenchanting rare gear of item level 21-25."
+  },
+  "10998": {
+   "text": "Disenchanting gear of item level 36-40."
+  },
+  "11082": {
+   "text": "Disenchanting gear of item level 36-40."
+  },
+  "11083": {
+   "text": "Disenchanting gear of item level 36-45."
+  },
+  "11084": {
+   "text": "Disenchanting rare gear of item level 31-35."
+  },
+  "11134": {
+   "text": "Disenchanting gear of item level 41-45."
+  },
+  "11135": {
+   "text": "Disenchanting gear of item level 46-50."
+  },
+  "11137": {
+   "text": "Disenchanting gear of item level 46-55."
+  },
+  "11138": {
+   "text": "Disenchanting rare gear of item level 36-40."
+  },
+  "11139": {
+   "text": "Disenchanting rare gear of item level 41-45."
+  },
+  "11174": {
+   "text": "Disenchanting gear of item level 51-55."
+  },
+  "11175": {
+   "text": "Disenchanting gear of item level 56-60."
+  },
+  "11176": {
+   "text": "Disenchanting gear of item level 56-60."
+  },
+  "11177": {
+   "text": "Disenchanting rare gear of item level 46-50."
+  },
+  "11178": {
+   "text": "Disenchanting rare gear of item level 51-55."
+  },
+  "14343": {
+   "text": "Disenchanting rare gear of item level 56-60."
+  },
+  "14344": {
+   "text": "Disenchanting rare gear of item level 61+."
+  },
+  "16202": {
+   "text": "Disenchanting gear of item level 61-65."
+  },
+  "16203": {
+   "text": "Disenchanting gear of item level 61+."
+  },
+  "20725": {
+   "text": "Disenchanting epic gear of item level 56+ (and some rare high-level gear)."
+  },
+  "274030": {
+   "text": "Disenchanting items from Hyjal Summit or Barrow Deeps, nothing else.",
+   "kind": "disenchant",
+   "src": "its item text (Blizzard)"
+  },
+  "8171": {
+   "text": "Skinning beasts level 50-60: a rare extra beside Rugged Leather (Leatherworking cures it with Refined Deeprock Salt)."
+  },
+  "8368": {
+   "text": "Skinning wolves: a rare extra."
+  },
+  "15415": {
+   "text": "Skinning blue dragonkin (Azshara, Winterspring)."
+  },
+  "15409": {
+   "text": "Made with a Salt Shaker (Leatherworking 250) from Deeprock Salt, once every 3 days.",
+   "kind": "made",
+   "made": {
+    "by": 15846,
+    "from": 8150,
+    "days": 3
+   }
+  },
+  "6291": {
+   "text": "Fishing in the starting zones' waters (skill 1+)."
+  },
+  "12238": {
+   "text": "Fishing off Darkshore's coast."
+  },
+  "13754": {
+   "text": "Fishing in level 45-60 zones' open water (Feralas, Tanaris, Azshara, Stranglethorn's coast)."
+  },
+  "13755": {
+   "text": "Fishing in the winter months, level 45-60 zones' open water."
+  },
+  "13757": {
+   "text": "Fishing in level 45-60 zones' open water."
+  },
+  "13758": {
+   "text": "Fishing in level 35-55 zones' open water."
+  },
+  "13759": {
+   "text": "Fishing at night in level 45-60 zones."
+  },
+  "13760": {
+   "text": "Fishing by day in level 45-60 zones."
+  },
+  "13888": {
+   "text": "Fishing off level 45-60 coasts (Feralas, Tanaris, Azshara)."
+  },
+  "13889": {
+   "text": "Fishing in level 45-60 zones' rivers and lakes."
+  },
+  "13893": {
+   "text": "Fishing off level 45-60 coasts (Tanaris, Azshara, Feralas)."
+  },
+  "13890": {
+   "text": "Fishing: a rare catch."
+  },
+  "273295": {
+   "text": "Fishing: a Forever seasonal catch.",
+   "src": "item data"
+  },
+  "4365": {
+   "text": "Engineering made it in Classic; Forever replaced it with the SAF-T and EZ-Thro line, so only old stock."
+  },
+  "4374": {
+   "text": "Engineering made it in Classic; Forever replaced it with the SAF-T and EZ-Thro line, so only old stock."
+  },
+  "6714": {
+   "text": "Its schematic is a world drop (enemies of level 9-37 and Message in a Bottle)."
+  },
+  "6951": {
+   "text": "Rogues make it (Poisons)."
+  },
+  "2887": {
+   "text": "Drops from wolves: grey, worth its vendor price."
+  },
+  "238645": {
+   "text": "Reward of the quest Main Course (New Avalon, Eastern Plaguelands).",
+   "src": "warcraft.wiki.gg Main Course"
+  },
+  "8350": {
+   "text": "An old Classic item: no longer obtainable."
+  },
+  "9718": {
+   "text": "Quest item: the Blade of Heroes chain."
+  },
+  "11602": {
+   "text": "A key from Blackrock Depths."
+  },
+  "9147": {
+   "text": "An old Classic item: no longer obtainable."
+  },
+  "1339": {
+   "text": "An old Classic item: no longer obtainable."
+  },
+  "23712": {
+   "text": "Pet: from a code card (not in game)."
+  },
+  "23713": {
+   "text": "Pet: from a code card (not in game)."
+  },
+  "268502": {
+   "text": "A Forever companion pet. New in Forever and not documented anywhere yet: Wolf's loot log names its source as soon as a Wolf user loots one."
+  },
+  "274964": {
+   "text": "New in Forever and not documented anywhere yet: Wolf's loot log names its source as soon as a Wolf user loots one."
+  },
+  "247884": {
+   "text": "An Enchanting material new in Forever. New in Forever and not documented anywhere yet: Wolf's loot log names its source as soon as a Wolf user loots one."
+  },
+  "260629": {
+   "text": "A Forever drink. New in Forever and not documented anywhere yet: Wolf's loot log names its source as soon as a Wolf user loots one."
+  },
+  "260632": {
+   "text": "A Forever drink. New in Forever and not documented anywhere yet: Wolf's loot log names its source as soon as a Wolf user loots one."
+  },
+  "260633": {
+   "text": "A Forever drink. New in Forever and not documented anywhere yet: Wolf's loot log names its source as soon as a Wolf user loots one."
+  },
+  "279277": {
+   "text": "Used at a Fathom Stone to call the guardian of the Mathystral Ruins. New in Forever and not documented anywhere yet: Wolf's loot log names its source as soon as a Wolf user loots one.",
+   "src": "metaforge.app item page"
+  },
+  "279938": {
+   "text": "A camp object: a Skinner makes it from a Blueprint (Forever camping; it needs a campfire nearby).",
+   "src": "wow-professions.com camping guide; warcrafttavern.com camping objects"
+  },
+  "276101": {
+   "text": "Quest item (Zizplink)."
+  },
+  "287966": {
+   "text": "Forever's own version of the Minor Healing Potion (Forever moved the healing potions)."
+  },
+  "289302": {
+   "text": "Quest reward (Quel'Serrar's quest)."
+  },
+  "289303": {
+   "text": "Quest reward (the Hunter epic quest)."
+  },
+  "286640": {
+   "text": "New in Forever and not documented anywhere yet: Wolf's loot log names its source as soon as a Wolf user loots one."
+  },
+  "286641": {
+   "text": "New in Forever and not documented anywhere yet: Wolf's loot log names its source as soon as a Wolf user loots one."
+  },
+  "249399": {
+   "text": "Scarce: a rare bonus while picking tier-1 herbs (Earthroot, Mageroyal, Briarthorn, Bruiseweed: about 1 in 10-12). Alchemists make Cerulean Dye from it.",
+   "kind": "scarce",
+   "src": "forevergoldguide.com scarce materials; conquestcapped.com Cerulean Dye; mmonster.co Pristine Leather"
+  },
+  "249424": {
+   "text": "Scarce: a rare bonus while picking tier-2 herbs (level 45 zones). Alchemists make Magenta Dye from it.",
+   "kind": "scarce",
+   "src": "forevergoldguide.com scarce materials; conquestcapped.com Cerulean Dye; mmonster.co Pristine Leather"
+  },
+  "249274": {
+   "text": "Scarce: a rare bonus while picking tier-3 herbs (level 60 zones). Alchemists make Viridian Dye from it.",
+   "kind": "scarce",
+   "src": "forevergoldguide.com scarce materials; conquestcapped.com Cerulean Dye; mmonster.co Pristine Leather"
+  },
+  "249391": {
+   "text": "Scarce: a rare bonus while mining tier-1 veins. Alchemists make Sulfuric Acid from it.",
+   "kind": "scarce",
+   "src": "forevergoldguide.com scarce materials; conquestcapped.com Cerulean Dye; mmonster.co Pristine Leather"
+  },
+  "249425": {
+   "text": "Scarce: a rare bonus while mining tier-2 veins (level 45 zones). Engineers make Sandpaper from it.",
+   "kind": "scarce",
+   "src": "forevergoldguide.com scarce materials; conquestcapped.com Cerulean Dye; mmonster.co Pristine Leather"
+  },
+  "249426": {
+   "text": "Scarce: a rare bonus while mining tier-3 veins (level 60 zones). Miners smelt it with Coal into Azerothium Bar (Mining 275).",
+   "kind": "scarce",
+   "src": "forevergoldguide.com scarce materials; conquestcapped.com Cerulean Dye; mmonster.co Pristine Leather"
+  },
+  "249427": {
+   "text": "Scarce: a rare bonus while skinning beasts of level 10-26 (the Barrens gave the most in the beta).",
+   "kind": "scarce",
+   "src": "forevergoldguide.com scarce materials; conquestcapped.com Cerulean Dye; mmonster.co Pristine Leather"
+  },
+  "249428": {
+   "text": "Scarce: a rare bonus while skinning beasts of mid levels (tier 2, level 45 items).",
+   "kind": "scarce",
+   "src": "forevergoldguide.com scarce materials; conquestcapped.com Cerulean Dye; mmonster.co Pristine Leather"
+  },
+  "249429": {
+   "text": "Scarce: a rare bonus while skinning level 50-60 beasts (tier 3).",
+   "kind": "scarce",
+   "src": "forevergoldguide.com scarce materials; conquestcapped.com Cerulean Dye; mmonster.co Pristine Leather"
+  },
+  "248822": {
+   "text": "Mount Hyjal: a bonus while picking herbs there (not its own node, so herb tracking won't show it).",
+   "src": "gamewave.fr Death Lotus"
+  },
+  "248815": {
+   "text": "Heavy Thorium Veins in Mount Hyjal's Scourge area.",
+   "src": "wow-professions.com Forever mining"
+  },
+  "279947": {
+   "text": "A camp object: an Herbalist makes it from a Blueprint (Forever camping; it needs a campfire nearby).",
+   "src": "wow-professions.com camping guide; warcrafttavern.com camping objects"
+  },
+  "279962": {
+   "text": "A camp object: an Herbalist makes it from a Blueprint (Forever camping; it needs a campfire nearby).",
+   "src": "wow-professions.com camping guide; warcrafttavern.com camping objects"
+  },
+  "279964": {
+   "text": "A camp object: an Herbalist makes it from a Blueprint (Forever camping; it needs a campfire nearby). Its Blueprint drops from Shadetooth (Excavation Site, Wetlands).",
+   "src": "wow-professions.com camping guide; warcrafttavern.com camping objects"
+  },
+  "279965": {
+   "text": "A camp object: a Fisher makes it from a Blueprint (Forever camping; it needs a campfire nearby).",
+   "src": "wow-professions.com camping guide; warcrafttavern.com camping objects"
+  },
+  "279966": {
+   "text": "A camp object: a Fisher makes it from a Blueprint (Forever camping; it needs a campfire nearby).",
+   "src": "wow-professions.com camping guide; warcrafttavern.com camping objects"
+  },
+  "279967": {
+   "text": "A camp object: a Fisher makes it from a Blueprint (Forever camping; it needs a campfire nearby).",
+   "src": "wow-professions.com camping guide; warcrafttavern.com camping objects"
+  },
+  "279969": {
+   "text": "A camp object: a Skinner makes it from a Blueprint (Forever camping; it needs a campfire nearby).",
+   "src": "wow-professions.com camping guide; warcrafttavern.com camping objects"
+  },
+  "279979": {
+   "text": "A camp object: a Skinner makes it from a Blueprint (Forever camping; it needs a campfire nearby).",
+   "src": "wow-professions.com camping guide; warcrafttavern.com camping objects"
+  },
+  "6360": {
+   "text": "Fishing: a rare catch."
+  },
+  "280399": {
+   "text": "New in Forever and not documented anywhere yet: Wolf's loot log names its source as soon as a Wolf user loots one."
+  },
+  "281599": {
+   "text": "New in Forever and not documented anywhere yet: Wolf's loot log names its source as soon as a Wolf user loots one."
+  },
+  "282023": {
+   "text": "New in Forever and not documented anywhere yet: Wolf's loot log names its source as soon as a Wolf user loots one."
+  },
+  "282029": {
+   "text": "New in Forever and not documented anywhere yet: Wolf's loot log names its source as soon as a Wolf user loots one."
+  },
+  "284066": {
+   "text": "New in Forever and not documented anywhere yet: Wolf's loot log names its source as soon as a Wolf user loots one."
+  },
+  "284161": {
+   "text": "New in Forever and not documented anywhere yet: Wolf's loot log names its source as soon as a Wolf user loots one."
+  },
+  "284587": {
+   "text": "New in Forever and not documented anywhere yet: Wolf's loot log names its source as soon as a Wolf user loots one."
+  },
+  "284699": {
+   "text": "New in Forever and not documented anywhere yet: Wolf's loot log names its source as soon as a Wolf user loots one."
+  },
+  "284848": {
+   "text": "New in Forever and not documented anywhere yet: Wolf's loot log names its source as soon as a Wolf user loots one."
+  },
+  "286609": {
+   "text": "New in Forever and not documented anywhere yet: Wolf's loot log names its source as soon as a Wolf user loots one."
+  },
+  "286612": {
+   "text": "New in Forever and not documented anywhere yet: Wolf's loot log names its source as soon as a Wolf user loots one."
+  },
+  "287042": {
+   "text": "New in Forever and not documented anywhere yet: Wolf's loot log names its source as soon as a Wolf user loots one."
+  },
+  "5379": {
+   "text": "No database has a source for it yet: Wolf's loot log names it as soon as a Wolf user loots one."
+  }
+ },
+ "rules": [
+  {
+   "name": "^Craftsman's Writ: ",
+   "text": "Opened from a Sealed Journeyman's, Expert's or Artisan's Writ (enemies, treasure chests and dungeons drop them). Deliver the item it asks for: supply-faction reputation.",
+   "src": "icy-veins.com sealed writs; conquestcapped.com writs guide"
+  },
+  {
+   "name": "^Sealed (Journeyman|Expert|Artisan)'s Writ",
+   "text": "Drops from enemies, treasure chests and dungeons; opens into one Craftsman's Writ of its rank.",
+   "src": "icy-veins.com sealed writs"
+  },
+  {
+   "name": "^Scroll of (Imbue|Cryoblast|Greater Cryoblast|Frog Familiar|Cat Familiar|Rat Familiar|Khadgar|Minor Evocation|Confuse Beast|the Saber|Polymorph)",
+   "text": "A Mage deciphers it (Comprehend Scroll) from the undeciphered scrolls enemies drop anywhere; also in a Bundle of Scrolls (library Research).",
+   "src": "warcrafttavern.com mage scrolls; method.gg comprehension guide"
+  },
+  {
+   "name": "^(Thendal|Grove Scoundrel)",
+   "text": "Starting gear of a new Skyborne character (Zephras Isle).",
+   "src": "warcraft.wiki.gg Zephras Isle storyline; metaforge armor list"
+  },
+  {
+   "name": "^(Recruit|Squire|Footpad|Neophyte|Apprentice|Acolyte|Novice|Thug|Brawler|Rugged Trapper|Primitive|Deprecated|OLD)['s ]",
+   "class": "4",
+   "text": "Starting gear of a new character: only from players who kept theirs.",
+   "src": "warcraft.wiki.gg Category:Starting items"
+  },
+  {
+   "name": "^(Worn|Bent|Battleworn|Handcrafted) (Shortsword|Staff|Mace|Axe|Dagger|Hammer|Wooden Buckler|Wooden Shield|Battleaxe)",
+   "text": "Starting weapon of a new character: only from players who kept theirs.",
+   "src": "warcraft.wiki.gg Category:Starting items"
+  },
+  {
+   "name": "^Monster - ",
+   "text": "A creature's weapon model that reached players: a rarity, not obtainable.",
+   "src": "item data (Monster - items are creature models)"
+  },
+  {
+   "name": "^\\d+ Pound ",
+   "text": "Fishing: a rare heavy catch, worth its vendor price.",
+   "src": "Classic fishing"
+  },
+  {
+   "name": "^(Huge Quartz Gem|Silver Necklace|Gold Nugget|Bent Spoon|Piece of Coral|Scallop Shell|Shiny Dinglehopper|Primitive Rock Tool|Empty Sea Snail Shell|Old Teamster's Skull)$",
+   "text": "Drops from creatures and containers: grey, worth its vendor price.",
+   "src": "item data (junk quality)"
+  },
+  {
+   "class": "12",
+   "text": "A quest item: it comes from its quest, and only someone doing that quest needs it.",
+   "src": "item data (quest class)"
+  },
+  {
+   "class": "7.12",
+   "name": "(Dust|Essence|Shard|Crystal|Residue)$",
+   "text": "Disenchanting (Enchanting): from uncommon and better gear of its level.",
+   "src": "Classic enchanting"
+  }
+ ]
+}

@@ -18,6 +18,7 @@ House.lua
 Data\Vendor.lua
 Data\Feed.lua
 Data\Recipes.lua
+Data\Sources.lua
 Data\Futures.lua
 Data\FarmSpots.lua
 Data\Companion.lua
