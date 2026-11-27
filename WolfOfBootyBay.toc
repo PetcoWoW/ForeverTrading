@@ -41,6 +41,7 @@ Futures.lua
 Companion.lua
 AHSession.lua
 Farm.lua
+Where.lua
 Queue.lua
 Sources\Share.lua
 Sources\Net.lua

@@ -986,7 +986,7 @@ end
 ---------------------------------------------------------------------------
 local function SEC_W() return (FT.Compact() and 270 or 310) + 14 * (tonumber(FT.S and FT.S.textSize) or 0) end
 local SEC_TITLE = { when = L["When it sells"], market = L["Market"], history = L["Price history"], crafts = L["Best crafts"],
-    make = L["Craft it"], farm = L["Where to farm"] }
+    make = L["Craft it"], farm = L["Where to get it"] }
 -- the sections that are lists: every line one size
 local LIST_SECTION = { crafts = true, make = true, farm = true }
 
@@ -995,7 +995,8 @@ local function SectionKeys(id)
     if FT.Craft.UsedIn(id) then keys[#keys + 1] = "crafts" end
     -- a recipe of yours, else the game's (v0.43: the materials show for anything craftable, known or not)
     if UI.RecipeOf and UI.RecipeOf(id) then keys[#keys + 1] = "make" end
-    if FT.Farm.IsRaw(id) then keys[#keys + 1] = "farm" end
+    -- where it comes from: anything farmed, and anything not crafted that has a source (a vendor, a drop, a quest)
+    if FT.Farm.IsRaw(id) or (keys[#keys] ~= "make" and FT.Where and #FT.Where.Lines(id, 1) > 0) then keys[#keys + 1] = "farm" end
     return keys
 end
 
@@ -1089,27 +1090,39 @@ local function SectionTexts(key, id, s)
             sum = FT.C("dim", e.reason or L["No price for its materials yet"])
         end
         local more = {}
+        -- a timer bites where it is: on the craft itself, or on a material it needs (Cured Rugged Hide: the salt)
+        local days, how = FT.Craft.TimerOf(id)
+        local function Every(n) return n == 1 and L["once a day"] or string.format(L["every %d days"], n) end
+        if days then more[#more + 1] = FT.C("accent", L["Timer"] .. ": " .. Every(days)) .. FT.C("dim", how and ("  ·  " .. L[how]) or "") end
+        for _, part in ipairs(e.parts or {}) do
+            local pd, ph = FT.Craft.TimerOf(part.itemID)
+            if pd and #more < 4 then
+                more[#more + 1] = FT.C("accent", string.format(L["needs %s"], FT.ItemText(part.itemID, 22)) .. ": " .. Every(pd)) .. FT.C("dim", ph and ("  ·  " .. L[ph]) or "")
+            end
+        end
         for _, part in ipairs(e.parts or {}) do
             more[#more + 1] = part.qty .. " " .. FT.ItemText(part.itemID, 24) .. FT.C("dim", "  " .. (part.total and FT.Money(math.floor(part.total), "short") or "—"))
-            if #more >= 4 then break end
+            if #more >= 5 then break end
         end
         if not known then more[#more + 1] = FT.C("dim", L["None of your characters knows it  ·  Breakdown: where the recipe is"]) end
         return sum, more, { L["Breakdown"], function() FT.ShowCraft(r) end }
-    else -- farm
+    else -- farm: where it comes from
         local spots = FT.Farm.Spots(id)
         local out = {}
         for _, sp in ipairs(spots or {}) do
             -- (parts apart with " · ": a line too long for the section drops its last part, never cut mid-word)
             out[#out + 1] = FT.C("text", sp.zone) .. FT.C("dim", string.format("  ·  %d-%d", sp.lo, sp.hi) .. (sp.what and ("  ·  " .. sp.what) or ""))
-            if #out >= 3 then break end
+            if #out >= 2 then break end
         end
-        local mob = FT.Farm.Mobs(id, 1)[1]
-        if mob then out[#out + 1] = FT.C("text", mob.name or "?") .. FT.C("dim", string.format("  " .. L["%s a corpse (your loot)"], string.format("%.2f", mob.per))) end
-        local pooled = FT.Net and FT.Net.FarmText and FT.Net.FarmText(id)
-        if pooled then out[#out + 1] = pooled end
-        if #out == 0 then return FT.C("dim", L["No spots written for it: its Wowhead page has every mob that drops it."]), {}, { L["Open"], function() FT.ShowFarm(id) end } end
+        -- your loot, Wolf users' loot, Wolf's note, then ForeverDB: nodes, skinning, drops, vendors, quests
+        for _, line in ipairs(FT.Where and FT.Where.Lines(id, 6) or {}) do
+            if #out >= 6 then break end
+            out[#out + 1] = line
+        end
+        local button = FT.Farm.IsRaw(id) and { L["Open"], function() FT.ShowFarm(id) end } or nil
+        if #out == 0 then return FT.C("dim", L["Not in Wolf's sources yet: the loot log fills it in when a Wolf user loots one."]), {}, button end
         local first = table.remove(out, 1)
-        return first, out, { L["Open"], function() FT.ShowFarm(id) end }
+        return first, out, button
     end
 end
 

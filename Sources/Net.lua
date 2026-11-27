@@ -6,6 +6,7 @@
 --   S  sale prices: what sold of yours (the auction house mail) - "Wolf users sold N lately at ~X"
 --   G  deal calls: a watchlist deal you found at the auction house - one chat line for the others
 --   V  recipe merchants (v0.43): a vendor selling a recipe, where it stands - the craft window says it
+--   O  nodes and chests (v0.50): which one gave what - with F, Wolf's own Forever loot table
 -- The junk guard: a price far from what we know (3x or more either way) is held until a second user agrees (within
 -- 10%, inside two hours); anything 50x off is dropped. Only guild and group: Forever refuses addon messages in chat
 -- channels. Nothing is sent in a fight; at most a message a second, queued.
@@ -199,6 +200,62 @@ function N.SendFarm(force)
     return n
 end
 
+-- O (v0.50): the same for nodes and chests - which one gave what, so Forever's new things find their source
+function N.SendObjects(force)
+    if not On() or #Channels() == 0 then return 0 end
+    local objs = FT.db.farm and FT.db.farm.objs or {}
+    FT.db.netObjSent = FT.db.netObjSent or {}
+    local n = 0
+    for obj, o in pairs(objs) do
+        if (o.c or 0) >= 3 and (force or FT.db.netObjSent[obj] ~= o.c) then
+            local items = {}
+            for id, got in pairs(o.items or {}) do
+                items[#items + 1] = Enc(id) .. ":" .. Enc(got)
+                if #items >= 12 then break end
+            end
+            if #items > 0 then
+                local zone = (o.z or "?"):gsub("[\t;:,]", " "):sub(1, 30)
+                Push("O", PROTO, Enc(tonumber(obj) or 0), zone, Enc(o.c), table.concat(items, ","))
+                FT.db.netObjSent[obj] = o.c
+                n = n + 1
+                if n >= 20 then break end
+            end
+        end
+    end
+    return n
+end
+
+local function OnObjects(sender, objText, zone, cText, itemsText)
+    local obj, c = Dec(objText), Dec(cText)
+    if not (obj and c and c > 0 and c < 1e6 and type(itemsText) == "string") then return end
+    FT.db.netObj = FT.db.netObj or {}
+    local o = FT.db.netObj[obj] or { by = {} }
+    o.z = zone
+    local items = {}
+    for a, b in itemsText:gmatch("(%w+):(%w+)") do
+        local id, got = Dec(a), Dec(b)
+        if id and got and got >= 0 and got <= c * 20 then items[id] = got end
+    end
+    o.by[Short(sender)] = { c = c, items = items, t = time() }
+    FT.db.netObj[obj] = o
+end
+
+-- the best node or chest for an item, pooled: "Wolf users: <node> 0.12 a node (340 nodes) · <zone>"
+function N.LootText(id)
+    local best, bestPer, bestC, bestObj
+    for obj, o in pairs(FT.db and FT.db.netObj or {}) do
+        local c, got = 0, 0
+        for _, b in pairs(o.by or {}) do
+            if b.items and b.items[id] then c, got = c + b.c, got + b.items[id] end
+        end
+        if c >= 10 and got > 0 and (not bestPer or got / c > bestPer) then best, bestPer, bestC, bestObj = o, got / c, c, obj end
+    end
+    if not best then return nil end
+    local name = FT.SRC_O and FT.SRC_O[bestObj] and FT.SRC_O[bestObj]:match("^([^|]*)") or L["a node"]
+    return FT.C("text", name) .. FT.C("dim", "  ·  " .. string.format(L["Wolf users: %s a node (%s nodes)"], string.format("%.2f", bestPer), FT.Num(bestC))
+        .. (best.z and ("  ·  " .. best.z) or ""))
+end
+
 local function OnFarm(sender, npcText, name, cText, itemsText)
     local npc, c = Dec(npcText), Dec(cText)
     if not (npc and c and c > 0 and c < 1e6 and type(itemsText) == "string") then return end
@@ -323,6 +380,7 @@ FT.On("CHAT_MSG_ADDON", function(prefix, text, channel, sender)
     if FT.Share and FT.Share.Met then FT.Share.Met(sender) end
     if kind == "L" then OnLive(sender, a, b, c)
     elseif kind == "F" then OnFarm(sender, a, b, c, d)
+    elseif kind == "O" then OnObjects(sender, a, b, c, d)
     elseif kind == "S" then OnSold(sender, a, b, c, d, e)
     elseif kind == "G" then OnDeal(sender, a, b, c, d)
     elseif kind == "V" then OnVendor(sender, a, b, c, d, e, select(8, strsplit("\t", text)))
@@ -335,6 +393,6 @@ end)
 
 FT.On("FT_READY", function()
     C_Timer.NewTicker(SEND_EVERY, Pump)
-    C_Timer.After(90, function() N.SendFarm(false) end)
-    C_Timer.NewTicker(FARM_EVERY, function() N.SendFarm(false) end)
+    C_Timer.After(90, function() N.SendFarm(false); N.SendObjects(false) end)
+    C_Timer.NewTicker(FARM_EVERY, function() N.SendFarm(false); N.SendObjects(false) end)
 end)

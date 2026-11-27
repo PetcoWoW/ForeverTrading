@@ -572,6 +572,8 @@ local FARM_CLASS = FT.Farm.CLASS -- the item classes and subclasses of each (FT.
 local farmKind = "all"
 
 local function FarmKindOf(r)
+    -- (v0.50: crafted materials - bars, bolts, cured hides, transmutes - aren't farmed)
+    if FT.Where and r.id and not FT.Where.Farmable(r.id) then return nil end
     for k, c in pairs(FARM_CLASS) do
         if r.cls == c[1] and (c[2] == nil or r.sub == c[2]) then return k end
     end

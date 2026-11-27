@@ -108,7 +108,7 @@ local function Win()
     d.spots:SetPoint("TOPLEFT", d.t1, "BOTTOMLEFT", -4, -6)
     d.spots:SetPoint("RIGHT", d, "RIGHT", -12, 0)
     d.spots:SetHeight(SPOT_ROWS * spotH)
-    d.spots:SetEmptyText(L["No spots written for it: its Wowhead page has every mob that drops it."])
+    d.spots:SetEmptyText("")
 
     -- the mobs you looted it from
     d.t2, d.s2 = Section(d, 0, L["From your loot"])
@@ -187,6 +187,10 @@ function FT.ShowFarm(itemID)
             table.insert(spots, 1, { zone = y.zone, lo = level, hi = level, fit = 0, own = true, what = L["where you looted it"], yours = y })
         end
     end
+    -- no spots written for it: where the sources say it comes from (nodes, skinning, drops, vendors...)
+    local lines = FT.Where and FT.Where.Lines(itemID, SPOT_ROWS) or {}
+    d.spots:SetEmptyText(#lines > 0 and table.concat(lines, "\n")
+        or L["Not in Wolf's sources yet: the loot log fills it in when a Wolf user loots one."])
     d.spots:SetItems(spots)
     d.mobs:SetItems(FT.Farm.Mobs(itemID, 10))
     d:Show()

@@ -48,9 +48,12 @@ function F.KindOf(id)
     return F.KindOfRow(FT.Market.Row(id))
 end
 
--- a raw material: something you farm (the Where to farm button shows for it)
+-- a raw material: something you farm (the Where to farm button shows for it). v0.50: by where it comes from,
+-- not its category - a crafted material (a bar, a bolt, a cured hide) isn't farmed unless it's also gathered
 function F.IsRaw(id)
-    return id ~= nil and F.KindOf(id) ~= nil
+    if id == nil then return false end
+    if FT.Where then return FT.Where.Farmable(id) end
+    return F.KindOf(id) ~= nil
 end
 
 ---------------------------------------------------------------------------
@@ -189,10 +192,21 @@ function F.OnLoot()
                             if name then m.n, m.lv = name, lv end
                         end
                         m.items[id] = (m.items[id] or 0) + n
-                    elseif kind == "GameObject" and not opened[guid] then
-                        opened[guid] = true
-                        openedN = openedN + 1
-                        z.nodes = z.nodes + 1
+                    elseif kind == "GameObject" and npc then
+                        -- a node, a chest (v0.50: which one, so Wolf learns where Forever's new things come from)
+                        d.objs = d.objs or {}
+                        local o = d.objs[npc]
+                        if not o then
+                            o = { c = 0, items = {}, z = zname }
+                            d.objs[npc] = o
+                        end
+                        if not opened[guid] then
+                            opened[guid] = true
+                            openedN = openedN + 1
+                            z.nodes = z.nodes + 1
+                            o.c = o.c + 1
+                        end
+                        o.items[id] = (o.items[id] or 0) + n
                     end
                 end
             end
@@ -246,6 +260,21 @@ function F.Mobs(id, n)
         if a.per ~= b.per then return a.per > b.per end
         return a.corpses > b.corpses
     end)
+    while #out > (n or 6) do table.remove(out) end
+    return out
+end
+
+-- the nodes and chests YOU looted it from: { { obj, name, zone, opened, n, per } }, most per node first
+function F.Objects(id, n)
+    local out = {}
+    for obj, o in pairs(FT.db and FT.db.farm and FT.db.farm.objs or {}) do
+        local got = o.items[id]
+        if got and (o.c or 0) >= 3 then
+            local name = FT.SRC_O and FT.SRC_O[obj] and FT.SRC_O[obj]:match("^([^|]*)")
+            out[#out + 1] = { obj = obj, name = name, zone = o.z, opened = o.c, n = got, per = got / o.c }
+        end
+    end
+    table.sort(out, function(a, b) return a.per > b.per end)
     while #out > (n or 6) do table.remove(out) end
     return out
 end

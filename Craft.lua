@@ -278,6 +278,8 @@ function C.RecipeSource(r)
     local vendors = FT.db and FT.db.recipeVendors
     for _, id in ipairs(ids) do
         if vendors and vendors[id] and not out.vendor then out.vendor = vendors[id] end
+        -- v0.50: where the recipe item comes from (Merchant's Favor, a vendor, a drop, a quest), from the sources
+        if not out.line and FT.Where then out.line, out.how = FT.Where.RecipeLine(id) end
         local st = FT.An and FT.An.Stats(id)
         if st and st.price then
             local listed = st.listed or 0
@@ -369,6 +371,7 @@ C.PROF_NAMES = PROF_NAMES
 local byReagent -- [materialID] = { recipe, ... } (recipes shaped like C.List()'s)
 local allRecipes -- every recipe once: the ones your characters know, then the rest of WoW Forever's
 
+local byOutputAll
 local function BuildUses()
     byReagent = {}
     allRecipes = {}
@@ -388,9 +391,14 @@ local function BuildUses()
         outputs[r.output .. ":" .. tostring(r.name)] = true
         Index(r)
     end
+    byOutputAll = {}
+    for _, r in ipairs(C.List()) do byOutputAll[r.output] = true end
     for id, d in pairs(FT.RECIPE_DB or {}) do
         local prof, output, qty, name = d[1], d[2], d[3], d[4]
-        if not outputs[output .. ":" .. tostring(name)] then
+        -- (v0.50: a recipe whose items aren't in Forever - Season of Discovery leftovers - is no recipe at all)
+        local dead = FT.Where and FT.Where.Dead(id)
+        if not dead then byOutputAll[output] = true end
+        if not dead and not outputs[output .. ":" .. tostring(name)] then
             local reagents = {}
             for k = 5, #d - 1, 2 do reagents[#reagents + 1] = { itemID = d[k], qty = d[k + 1] } end
             Index({ key = "db:" .. id, id = id, name = name, prof = PROF_NAMES[prof] or "?", output = output,
@@ -398,7 +406,13 @@ local function BuildUses()
         end
     end
 end
-FT.On("FT_RECIPES_CHANGED", function() byReagent = nil; allRecipes = nil end)
+FT.On("FT_RECIPES_CHANGED", function() byReagent = nil; allRecipes = nil; byOutputAll = nil end)
+
+-- true when some recipe (yours or the game's) makes it
+function C.ByOutputAll(id)
+    if not byOutputAll then BuildUses() end
+    return id and byOutputAll[id] or false
+end
 
 function C.AllRecipes()
     if not allRecipes then BuildUses() end
@@ -419,6 +433,17 @@ function C.CooldownDays(r)
     if type(r.name) == "string" and r.name:find("^Transmute") then return 1 end
     return nil
 end
+-- a material with a timer: { days, how } - Mooncloth (Tailoring), Arcanite Bar (a transmute), Refined Deeprock Salt
+-- (a Salt Shaker), and anything a transmute makes; nil when it has none
+local TIMER_HOW = { [14342] = "Tailoring", [12360] = "Alchemy transmute", [15409] = "Salt Shaker" }
+function C.TimerOf(itemID)
+    if not itemID then return nil end
+    if COOLDOWN_ITEMS[itemID] then return COOLDOWN_ITEMS[itemID], TIMER_HOW[itemID] end
+    local r = FT.Futures and FT.Futures.Recipe and FT.Futures.Recipe(itemID)
+    if r and type(r.name) == "string" and r.name:find("^Transmute") then return 1, "Alchemy transmute" end
+    return nil
+end
+
 FT.On("FT_SCAN_DONE", function() profitList = nil end)
 FT.On("FT_PRICES_CHANGED", function(source) if source ~= "live" then profitList = nil end end)
 

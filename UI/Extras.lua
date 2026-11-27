@@ -1437,9 +1437,10 @@ local function CraftWindow()
                 GameTooltip:AddLine(string.format(L["Sold by %s in %s"], v.n or "?", v.z or "?"), 1, 0.82, 0, true)
                 if v.p then GameTooltip:AddLine(string.format(L["for %s"], FT.Money(v.p, "short")) .. (v.l and ("  ·  " .. L["limited stock: it comes back over time"]) or ""), 0.75, 0.78, 0.82, true) end
                 GameTooltip:AddLine(v.by and string.format(L["Seen by %s (Wolf network)"], v.by) or L["Seen by you"], 0.58, 0.55, 0.5)
-            else
-                GameTooltip:AddLine(L["No Wolf user has seen a merchant sell it: a drop or a quest. Wowhead (on its Market page) has where."], 0.75, 0.78, 0.82, true)
             end
+            if src.line then GameTooltip:AddLine(src.line, 0.75, 0.78, 0.82, true) end
+            local lines = FT.Where and src.items[1] and FT.Where.Lines(src.items[1], 5) or {}
+            for i = 2, #lines do GameTooltip:AddLine(lines[i], 0.75, 0.78, 0.82, true) end
             GameTooltip:AddLine(" ")
             GameTooltip:AddLine(L["Click: the recipe on the Market page."], 0.58, 0.55, 0.5)
         end
@@ -1517,10 +1518,14 @@ function FT.ShowCraft(r)
         local from
         if src.trainer then
             from = L["a trainer"]
+        elseif src.line and src.how ~= "drop" and src.how ~= "world" and src.how ~= "box" then
+            from = src.line -- Merchant's Favor, a vendor, a quest, Wolf's note: what the sources say
         elseif src.vendor then
             from = string.format(L["%s (vendor), %s"], src.vendor.n or "?", src.vendor.z or "?")
+        elseif src.line then
+            from = src.line
         else
-            from = L["a drop or quest"]
+            from = L["not in Wolf's sources yet"]
         end
         parts[1] = FT.C("accent", L["Recipe:"]) .. " " .. from
         if not src.trainer then

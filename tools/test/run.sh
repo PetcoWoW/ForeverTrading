@@ -13,6 +13,9 @@ line() { printf '%-28s %s\n' "$1" "$2"; }
 node tools/test/luacheck.js . >"$T/lc.txt" 2>&1 && line "lua syntax" ok || { line "lua syntax" FAIL; cat "$T/lc.txt"; fail=1; }
 node tools/test/audit.js . >"$T/au.txt" 2>&1 && line "audit" ok || { line "audit" FAIL; tail -5 "$T/au.txt"; fail=1; }
 node --test tools/feed/build.test.mjs >"$T/fd.txt" 2>&1 && line "price robot" ok || { line "price robot" FAIL; grep -E "not ok|error:" "$T/fd.txt"; fail=1; }
+# every item that trades has a source (tools/sources/build.py writes the list of the ones it can't place)
+g=$(head -1 tools/sources/gaps.txt 2>/dev/null | grep -oE "[0-9]+$")
+if [[ "$g" == "0" ]]; then line "item sources: no gaps" ok; else line "item sources: no gaps" FAIL; sed -n 2,20p tools/sources/gaps.txt; fail=1; fi
 load() { # look text feed label
   WOLF_LOOK=$1 WOLF_TEXT=$2 python3 tools/test/loadtest.py . "$3" >"$T/lt.txt" 2>&1
   local e l
