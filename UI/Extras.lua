@@ -813,7 +813,8 @@ local function BestUseWindow()
     if bestUse then return bestUse end
     UI.ResolveFont()
     local d = CreateFrame("Frame", "WolfOfBootyBayBestUse", UIParent)
-    d:SetSize(640, 440)
+    local ts = tonumber(FT.S and FT.S.textSize) or 0
+    d:SetSize(720 + 30 * ts, 460)
     d:SetPoint("CENTER", 0, 60)
     d:SetFrameStrata("DIALOG")
     d:SetToplevel(true)
@@ -844,15 +845,24 @@ local function BestUseWindow()
     end)
     d.chart:FitText(24)
     d.chart:SetPoint("RIGHT", d.close, "LEFT", -6, 0)
+    -- the order: the most each one of it brings, or what sells most (the gold a day it moves through that product)
+    d.sort = UI.Segmented(d, { { "each", L["Most per one"] }, { "sells", L["Best sellers"] } }, function(v)
+        d.sortBy = v
+        if d.itemID then FT.ShowBestUse(d.itemID) end
+    end, 22)
+    d.sort:SetPoint("TOPLEFT", 16, -62)
+    d.sortBy = "each"
+    d.sort:SetValue("each")
     local panel = UI.Panel(d, "bg0", "line")
-    panel:SetPoint("TOPLEFT", 12, -60)
+    panel:SetPoint("TOPLEFT", 12, -92)
     panel:SetPoint("BOTTOMRIGHT", -12, 30)
     local cols = {
         { key = "name", title = L["Makes"], width = "fill" },
-        { key = "prof", title = L["Profession"], width = 110 },
-        { key = "need", title = L["Uses"], width = 44, justify = "RIGHT" },
-        { key = "each", title = L["Worth each"], width = 96, justify = "RIGHT" },
-        { key = "vs", title = L["vs selling it"], width = 90, justify = "RIGHT" },
+        { key = "prof", title = L["Profession"], width = 104 + 8 * ts },
+        { key = "need", title = L["Uses"], width = 40 + 4 * ts, justify = "RIGHT" },
+        { key = "each", title = L["Worth each"], width = 90 + 8 * ts, justify = "RIGHT" },
+        { key = "sold", title = L["Sold a day"], width = 76 + 8 * ts, justify = "RIGHT" },
+        { key = "vs", title = L["vs selling it"], width = 84 + 8 * ts, justify = "RIGHT" },
     }
     d.header = UI.Header(panel, cols, function() end)
     d.header:SetPoint("TOPLEFT", 1, -1)
@@ -865,6 +875,7 @@ local function BestUseWindow()
                 .. ((not x.sells and x.each) and FT.C("down", "  " .. L["hardly sells"]) or ""))
             row.cells.prof:SetText(FT.C("dim", L[r.prof or "?"]))
             row.cells.need:SetText(FT.Num(x.need))
+            row.cells.sold:SetText(x.perDay and FT.Num(math.floor(x.perDay + 0.5)) or FT.C("dim", "-"))
             if x.each then
                 row.cells.each:SetText(FT.C(x.each > 0 and "text" or "down", FT.Money(math.floor(x.each), "short")))
                 row.cells.vs:SetText(d.raw_ and d.raw_ > 0 and FT.Pct(x.each / d.raw_ - 1) or "")
@@ -901,7 +912,7 @@ local function BestUseWindow()
     d.foot = UI.Text(d, 10, "dim")
     d.foot:SetPoint("BOTTOMLEFT", 16, 10)
     d.foot:SetPoint("RIGHT", d, "RIGHT", -16, 0)
-    d.foot:SetText(L["Worth each: what the product sells for, minus the other materials, per one of this. Before your time and the recipe."])
+    d.foot:SetText(L["Worth each: what the product sells for, minus the other materials, per one of this. Best sellers: that times how many sell a day."])
     tinsert(UISpecialFrames, "WolfOfBootyBayBestUse")
     d:Hide()
     bestUse = d
@@ -913,8 +924,18 @@ function FT.ShowBestUse(itemID)
     local d = BestUseWindow()
     d.itemID = itemID
     d.icon:SetItem(itemID)
-    d.title:SetText(L["Best use of"] .. " " .. FT.ItemText(itemID, 40))
+    d.title:SetText(L["Best crafts from"] .. " " .. FT.ItemText(itemID, 40))
     local list, raw, via = FT.Craft.BestUse(itemID)
+    if d.sortBy == "sells" then
+        -- best sellers: what this material is worth through each product, times how many of it sell a day
+        list = { unpack(list) }
+        local function V(x) return (x.each and x.perDay) and x.each * x.need * x.perDay or -1 end
+        table.sort(list, function(a, b)
+            local va, vb = V(a), V(b)
+            if va ~= vb then return va > vb end
+            return (a.recipe.name or "") < (b.recipe.name or "")
+        end)
+    end
     d.raw_ = raw
     local best = list[1] and list[1].sells and list[1].each
     local line

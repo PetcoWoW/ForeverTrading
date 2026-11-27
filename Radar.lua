@@ -46,6 +46,7 @@ local function EventPull(id, ev)
     if kind and ev.kinds and ev.kinds[kind] then return L["raid consumable"] end
     return nil
 end
+R.Pull = EventPull
 
 -- recent (last 3 days with sales seen) and before (the 7 days before them) - a day's worth each, averaged
 local function Speeds(days, today)

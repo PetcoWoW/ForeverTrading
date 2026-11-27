@@ -1,5 +1,26 @@
 # Wolf
 
+## v0.40 - smarter sell or hold, Best crafts, Wowhead on the chart
+
+- **Sell or hold reads history now.** In a weeks-old economy a steady climber always looked "higher than usual",
+  so Wolf said sell. Now:
+  - **Its climb:** a line through its daily prices. A new high where the line says it should be: HOLD ("On its
+    climb, +15% a week for 20 days: let it ride"). Above even its climb: TRIM, sell a third, keep the rest. A climb
+    that cracks (it fell, floods, stops selling): sell, as before.
+  - **The raids ahead:** what the pre-raid list needs, what it's made of and what that's made of (Arcane Crystal ->
+    Arcanite Bar -> the crafted raid gear). High before the raids: HOLD, sell into the run-up (Dec 5-8); in raid
+    week: SELL into the demand.
+  - **Endgame or leveling material:** in a young economy endgame materials (thorium, arcane crystals, runecloth,
+    the high herbs) climb as more players reach 60 - sell a third, hold the rest; leveling materials fall as
+    everyone levels past them - sell.
+  - Each new rule is graded like the others (the price 5-9 days later) and switches itself off if it's wrong more
+    often than right.
+- **Best crafts** (was Best use): every finished product a material goes into, by what one of it brings or by the
+  **best sellers** (what it's worth through the product times how many sell a day), with a Sold a day column.
+  From an item's chart (Crafts when the row is tight) and from Where to farm.
+- **Wowhead on the chart** where More was. The item popup showed nothing the Market page doesn't, so every item
+  now opens on the Market page.
+
 ## v0.39 - where to farm
 
 - **Raw mats** (Money page, was Farm): raw materials by what one farmer could sell of them a day. Click one for

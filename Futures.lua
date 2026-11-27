@@ -30,6 +30,44 @@ F.Recipe = Recipe
 
 local function Known(r) return r and next(r.knownBy or {}) ~= nil end
 
+-- What the raids will pull on: the study's consumables and crafted gear, what they're made of, and what that is made
+-- of (two steps: Arcane Crystal -> Arcanite Bar -> Lionheart Helm). id -> { into = the list item it ends up in,
+-- n = how many of the list need it }. Made once per recipe change.
+local demand
+FT.On("FT_RECIPES_CHANGED", function() demand = nil end)
+local function Demand()
+    if demand then return demand end
+    demand = {}
+    local function Mark(id, into, depth, seen)
+        if not id or seen[id] or (FT.VENDOR_REAGENTS and FT.VENDOR_REAGENTS[id]) then return end
+        seen[id] = true
+        local d = demand[id]
+        if not d then
+            d = { into = into, n = 0 }
+            demand[id] = d
+        end
+        d.n = d.n + 1
+        if depth >= 2 then return end
+        local r = Recipe(id)
+        for _, rg in ipairs(r and r.reagents or {}) do Mark(rg.itemID, into, depth + 1, seen) end
+    end
+    for _, list in ipairs({ FT.FUTURES and FT.FUTURES.consumables or {}, FT.FUTURES and FT.FUTURES.gear or {} }) do
+        for _, c in ipairs(list) do Mark(c.id, c.id, 0, {}) end
+    end
+    return demand
+end
+
+-- An item the raids ahead will pull on: { into (a list item it goes into, or itself), n, days, t (the opening),
+-- name }; nil when it isn't, or nothing is coming in the next four weeks
+function F.DemandAhead(id)
+    local days, ev = F.Days()
+    if not days or not id then return nil end
+    local d = Demand()[id]
+    local pull = FT.Radar and FT.Radar.Pull and FT.Radar.Pull(id, ev)
+    if not d and not pull then return nil end
+    return { into = d and d.into or id, n = d and d.n or 1, days = days, t = ev.t, name = ev.name, pull = pull }
+end
+
 -- days until the raids open (nil: open already, or nothing announced)
 function F.Days()
     local ev = FT.Radar and FT.Radar.Next and FT.Radar.Next()

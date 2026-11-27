@@ -164,6 +164,8 @@ Ore({ 2776 }, 155, { { "Arathi Highlands", 30, 40 }, { "Stranglethorn Vale", 30,
 Ore({ 3858, 7912 }, 175, { { "Badlands", 35, 45 }, { "Searing Gorge", 43, 50 }, { "The Hinterlands", 40, 50 }, { "Tanaris", 40, 50 }, { "Felwood", 48, 55 }, { "Azshara", 45, 55 }, { "Un'Goro Crater", 48, 55 } })
 Ore({ 7911 }, 230, { { "Searing Gorge", 43, 50 }, { "Badlands", 35, 45 }, { "Tanaris", 40, 50 }, { "Un'Goro Crater", 48, 55 }, { "Felwood", 48, 55 } })
 Ore({ 10620, 12365 }, 245, { { "Un'Goro Crater", 48, 55 }, { "Winterspring", 53, 60 }, { "Burning Steppes", 50, 58 }, { "Eastern Plaguelands", 53, 60 }, { "Silithus", 55, 60 }, { "Azshara", 45, 55 } })
+-- Arcane Crystal: a rare find in thorium veins (the more you mine, the more you see)
+Ore({ 12363 }, 245, { { "Un'Goro Crater", 48, 55 }, { "Winterspring", 53, 60 }, { "Burning Steppes", 50, 58 }, { "Eastern Plaguelands", 53, 60 }, { "Silithus", 55, 60 } })
 Ore({ 11370 }, 230, { { "Blackrock Depths", 52, 60 }, { "Burning Steppes", 50, 58 } })
 
 -- elementals: kill them

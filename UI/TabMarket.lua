@@ -1123,12 +1123,13 @@ local function BuildItemView(parent)
         if state.selected then UI.WatchMenu(state.selected, self) end
     end)
     v.watch:SetPoint("RIGHT", v.search, "LEFT", -6, 0)
-    v.bestUse = UI.Button(v, L["Best use"], 10, 22, "default", function()
+    v.bestUse = UI.Button(v, L["Best crafts"], 10, 22, "default", function()
         if state.selected then FT.ShowBestUse(state.selected) end
     end)
     v.bestUse:FitText(20)
     v.bestUse:SetPoint("RIGHT", v.watch, "LEFT", -6, 0)
-    v.bestUse:SetTip(L["Best use"], L["Every recipe this goes into, ranked by what one of it brings made into each."])
+    v:HookScript("OnSizeChanged", function() T.FitBestUse() end)
+    v.bestUse:SetTip(L["Best crafts"], L["Every finished product made from it: by what one of it brings made into each, or by the best sellers."])
 
     -- charts: the price on top, the profitability under it (zero in the middle)
     v.chart = UI.Chart(v)
@@ -1267,6 +1268,21 @@ function T.FitHeader()
     v.sub:SetWidth(math.max(60, w - left - bottom))
 end
 
+-- Best crafts, or just Crafts when the chart's choices on the left come close (the larger text sizes)
+function T.FitBestUse()
+    local v = itemView
+    if not (v and v.bestUse and v.bestUse:IsShown()) then return end
+    v.bestUse:SetLabel(L["Best crafts"])
+    v.bestUse:FitText(20)
+    local left = v.pro and v.pro:IsShown() and v.pro:GetRight()
+    if v.ma and v.ma:IsShown() and v.ma:GetRight() then left = math.max(left or 0, v.ma:GetRight()) end
+    local at = v.bestUse:GetLeft()
+    if left and at and left + 10 > at then
+        v.bestUse:SetLabel(L["Crafts"])
+        v.bestUse:FitText(16)
+    end
+end
+
 function T.UpdateWatchButton()
     local v = itemView
     if not (v and state.selected) then return end
@@ -1290,7 +1306,7 @@ function T.UpdateWatchButton()
     local on = FT.Market.IsWatched(state.selected)
     v.watch:SetLabel(on and L["In watchlist"] or L["Watch"])
     v.watch:SetActive(on)
-    v.watch:FitText(20)
+    v.watch:FitText(20)    T.FitBestUse()
 end
 
 -- Simple chart: one chart (the price) with the room of two, no averages box; Pro: both charts
@@ -1305,6 +1321,7 @@ function T.ApplyChartStyle()
     v.range:SetValue(FT.S.chartRange or "30D")
     v.pro:ClearAllPoints()
     v.pro:SetPoint("LEFT", pro and v.tf or v.range, "RIGHT", 16, 0)
+    if T.FitBestUse then T.FitBestUse() end
     local w, h = v:GetSize()
     if w and w > 0 then
         local cards = v.compact and (v.reserve or 0) or CARDS_H

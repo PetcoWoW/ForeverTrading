@@ -12,6 +12,11 @@ FT.News = N
 -- start, after the files are read (a table made with them would keep the English)
 local function News()
     return {
+        ["v0.40"] = {
+            { L["Smarter sell or hold"], L["Wolf now reads an item's climb, the raids ahead and whether it's an endgame material: hold, sell a third, or sell into the run-up."], nil },
+            { L["Best crafts"], L["What a material makes, by what one of it brings or the best sellers: from an item's chart or Where to farm."], nil },
+            { L["Wowhead on the chart"], L["The chart's More button is now Wowhead: every item opens on the Market page."], nil },
+        },
         ["v0.39"] = {
             { L["Where to farm"], L["Money > Raw mats: click a material for the spots for your level, the mobs you got it from and its Wowhead page."], function() FT.Show("signals"); FT.Tabs.signals.SetView("farm") end },
             { L["Farm tips in chat"], L["A raw material for your level selling well: one line in chat with where to get it (Settings > Alerts)."], nil },

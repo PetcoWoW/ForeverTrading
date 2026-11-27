@@ -647,6 +647,27 @@ step("farm", function()
   else
     print("farm tip: no mageweave row in this feed")
   end
+  -- Best crafts from mageweave: both orders, and nothing overlapping
+  FT.ShowBestUse(4338)
+  local bw = _G.WolfOfBootyBayBestUse
+  local first = bw.list.items[1] and bw.list.items[1].recipe.output
+  bw.sortBy = "sells"
+  FT.ShowBestUse(4338)
+  local top = bw.list.items[1]
+  print(string.format("best crafts from mageweave: %d products; most per one %s, best seller %s (%s a day)", #bw.list.items,
+    FT.ItemText(first or 0):gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", ""), FT.ItemText(top.recipe.output):gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", ""), tostring(top.perDay and math.floor(top.perDay))))
+  for i = 2, #bw.list.items do
+    local a, b = bw.list.items[i - 1], bw.list.items[i]
+    local va = (a.each and a.perDay) and a.each * a.need * a.perDay or -1
+    local vb = (b.each and b.perDay) and b.each * b.need * b.perDay or -1
+    assert(va >= vb, "best sellers in order")
+  end
+  mock.layout.Settle(bw)
+  local bf, bt = mock.layout.Overlaps(bw)
+  for _, o in ipairs(bf) do print(string.format("OVERLAP [best crafts] %q x %q  (%dx%d px)", o[1].text:sub(1, 50), o[2].text:sub(1, 50), o[3], o[4])) end
+  for _, t in ipairs(bt) do if t.cut then print(string.format("CUT [best crafts] %q", t.text:sub(1, 80))) end end
+  bw.sortBy = "each"
+  bw:Hide()
   -- the right-click menu has Wowhead and Where to farm
   local shown
   local realMenu = FT.ShowMenu
@@ -657,6 +678,64 @@ step("farm", function()
   for _, it in ipairs(shown or {}) do labels[#labels + 1] = it[1] end
   local all = table.concat(labels, "|")
   assert(all:find("Wowhead link", 1, true) and all:find("Where to farm", 1, true), all)
+end)
+-- the sell / hold model: its trendline, the raids ahead, an endgame material in a young economy
+step("sell model", function()
+  local An = FT.An
+  -- 20 days climbing 2% a day: on its line
+  local daily, today = {}, FT.Day()
+  for k = 1, 20 do daily[k] = { day = today - 21 + k, c = math.floor(10000 * 1.02 ^ k), o = 1, h = 1, l = 1 } end
+  local tr = An.TrendLine(daily, today, math.floor(10000 * 1.02 ^ 21))
+  print(string.format("trend: %+.1f%% a week, r2 %.2f, above %+.1f%%, band %.0f%%, climbing %s", tr.perWeek * 100, tr.r2, tr.above * 100, tr.band * 100, tostring(tr.climbing)))
+  assert(tr.climbing and math.abs(tr.above) < 0.03)
+  -- where each item stands
+  assert(An.Lifecycle(14047) == "endgame", "runecloth: endgame")
+  assert(An.Lifecycle(2589) == "leveling", "linen: leveling")
+  assert(An.Lifecycle(12363) == "endgame", "arcane crystal: endgame")
+  -- the raids pull on arcane crystals: through Arcanite Bar into the Lionheart Helm on the pre-raid list
+  local dem = FT.Futures.DemandAhead(12363)
+  print("arcane crystal demand: " .. tostring(dem and FT.ItemText(dem.into)) .. ", raids in " .. tostring(dem and dem.days) .. " days")
+  assert(dem and dem.days and dem.days > 4, "the raids ahead pull on arcane crystals")
+  -- a made-up item high above its average, to see each rule decide
+  local function S(over)
+    local s = { id = 999001, price = 14000, avg = 10000, dev = 0.4, rsi = 60, days = 14, span = 20, avgN = 10,
+      behavior = {}, closes = {}, daily = daily, fair = 14000 }
+    for k, v in pairs(over or {}) do s[k] = v end
+    return s
+  end
+  local realDem, realLife, realEnough = FT.Futures.DemandAhead, An.Lifecycle, nil
+  FT.Futures.DemandAhead = function() return nil end
+  An.Lifecycle = function() return nil end
+  local k, _, why = An.SellSignal(S())
+  print("plain high: " .. k .. " - " .. tostring(why))
+  local k1, _, w1 = An.SellSignal(S({ trend = { climbing = true, perWeek = 0.15, r2 = 0.9, n = 20, above = 0.02, band = 0.08 } }))
+  print("on its climb: " .. k1 .. " - " .. w1)
+  assert(k1 == "HOLD", "on its climb: hold")
+  local k2, _, w2 = An.SellSignal(S({ trend = { climbing = true, perWeek = 0.15, r2 = 0.9, n = 20, above = 0.2, band = 0.08 } }))
+  print("over its climb: " .. k2 .. " - " .. w2)
+  assert(k2 == "TRIM", "over its climb: a third")
+  local k3 = An.SellSignal(S({ dropped = true, trend = { climbing = true, perWeek = 0.15, r2 = 0.9, n = 20, above = 0.02, band = 0.08 } }))
+  assert(k3 == "SELL", "a climb that cracks: sell")
+  FT.Futures.DemandAhead = function() return { into = 12640, n = 1, days = 12, t = time() + 12 * 86400, name = "raids" } end
+  local k4, _, w4 = An.SellSignal(S())
+  print("raids ahead: " .. k4 .. " - " .. w4)
+  assert(k4 == "HOLD")
+  FT.Futures.DemandAhead = function() return { into = 12640, n = 1, days = 3, t = time() + 3 * 86400, name = "raids" } end
+  local k5, _, w5 = An.SellSignal(S())
+  print("raid week: " .. k5 .. " - " .. w5)
+  assert(k5 == "SELL")
+  FT.Futures.DemandAhead = function() return nil end
+  An.Lifecycle = function() return "endgame" end
+  local k6, _, w6 = An.SellSignal(S())
+  print("endgame, young economy: " .. k6 .. " - " .. w6)
+  assert(k6 == "TRIM")
+  An.Lifecycle = function() return "leveling" end
+  local k7, _, w7 = An.SellSignal(S())
+  print("leveling: " .. k7 .. " - " .. w7)
+  assert(k7 == "SELL")
+  FT.Futures.DemandAhead, An.Lifecycle = realDem, realLife
+  -- the new rules are graded like the others: holding was right when it didn't fall
+  assert(An.Right("trend", 100, 110) == true and An.Right("demand", 100, 90) == false and An.Right("endgame", 100, 98) == true)
 end)
 step("when it sells", function()
   local hr = FT.Feed.Hourly(12360)
@@ -816,7 +895,7 @@ step("layout", function()
   mock.fire("AUCTION_HOUSE_CLOSED")
   ah:Hide()
   -- the item window (More), on a flask, standard size
-  FT.ShowDetail(13510)
+  FT.ShowItemWindow(13510)
   mock.run(1)
   for _, name in ipairs({ "WolfOfBootyBayDetail1", "WolfOfBootyBayDetail" }) do
     local win = _G[name]

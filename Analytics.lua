@@ -475,6 +475,75 @@ function An.DayName(wd) return wd and L[WEEKDAYS[wd]] or "" end
 --   auctionsNow, sellersNow (of the newest measurement), typicalN, typicalS (usual auctions, sellers),
 --   prev (the check half an hour or more before: t, p, q, n, sl), sinceP (price change since, a fraction),
 --   sinceQ, sinceN, sinceS (listed, auctions, sellers: more (+) or fewer (-) since), flood, crowd, dropped }
+-- The line its price has been climbing (or falling) along: a straight line through the logs of its daily closes
+-- (today left out), up to 60 days. { perWeek (its change a week), r2 (how well the days sit on it: 1 = exactly),
+-- n (days), expect (where the line is today), above (today against the line), band (how far days usually stray
+-- from it: twice their spread, 8% at least) }; nil under 7 days. A climber's new high on schedule is ON its line -
+-- against its plain average it would always look "higher than usual".
+function An.TrendLine(daily, today, price)
+    local xs, ys = {}, {}
+    for _, c in ipairs(daily or {}) do
+        if c.day < today and c.c and c.c > 0 then xs[#xs + 1], ys[#ys + 1] = c.day - today, math.log(c.c) end
+    end
+    local n = #xs
+    if n < 7 then return nil end
+    local mx, my = 0, 0
+    for i = 1, n do mx, my = mx + xs[i], my + ys[i] end
+    mx, my = mx / n, my / n
+    local sxx, sxy, syy = 0, 0, 0
+    for i = 1, n do
+        local dx, dy = xs[i] - mx, ys[i] - my
+        sxx, sxy, syy = sxx + dx * dx, sxy + dx * dy, syy + dy * dy
+    end
+    if sxx <= 0 then return nil end
+    local slope = sxy / sxx
+    local icpt = my - slope * mx
+    local res = 0
+    for i = 1, n do
+        local e = ys[i] - (icpt + slope * xs[i])
+        res = res + e * e
+    end
+    local r2 = syy > 0 and (1 - res / syy) or 0
+    local sd = math.sqrt(res / math.max(1, n - 2))
+    local expect = math.exp(icpt) -- x = 0: today
+    local t = { perWeek = math.exp(slope * 7) - 1, r2 = r2, n = n, expect = expect, band = math.max(0.08, 2 * (math.exp(sd) - 1)) }
+    t.above = price and price > 0 and (price / expect - 1) or nil
+    -- climbing: up 3%+ a week, the days close to the line, over a week and a half or more
+    t.climbing = t.perWeek >= 0.03 and r2 >= 0.5 and n >= 10
+    return t
+end
+
+-- Where an item stands in a new economy (Classic's pattern): "endgame" - gathered or made for level 50+ (more
+-- players reach 60 and raid every week: these climb for months), "leveling" - for the levels on the way (they fall
+-- as everyone levels past them), or nil. From where it's farmed (Data/FarmSpots.lua) and what it goes into.
+local lifecycle = {}
+FT.On("FT_RECIPES_CHANGED", function() lifecycle = {} end)
+function An.Lifecycle(id)
+    if not id then return nil end
+    local v = lifecycle[id]
+    if v ~= nil then return v or nil end
+    local spots = FT.FarmSpots and FT.FarmSpots[id]
+    if spots and spots.spots and #spots.spots > 0 then
+        local lo, hi = 99, 0
+        for _, sp in ipairs(spots.spots) do lo, hi = math.min(lo, sp[2]), math.max(hi, sp[3]) end
+        if lo >= 43 or (spots.skill or 0) >= 230 then v = "endgame" elseif hi <= 45 then v = "leveling" end
+    end
+    if not v and FT.Craft and FT.Craft.UsedIn then
+        -- what it goes into: most of it for level 50+ (the level the game says each product needs)
+        local high, all = 0, 0
+        for _, r in ipairs(FT.Craft.UsedIn(id) or {}) do
+            local _, lvl = FT.ItemFacts(r.output)
+            if lvl and lvl > 0 then
+                all = all + 1
+                if lvl >= 50 then high = high + 1 end
+            end
+        end
+        if all >= 3 then v = (high / all >= 0.5) and "endgame" or ((high / all <= 0.15) and "leveling" or nil) end
+    end
+    lifecycle[id] = v or false
+    return v
+end
+
 function An.Stats(itemID)
     local s = cache[itemID]
     if s and GetTime() - s.countedAt < STATS_FRESH then return s end
@@ -526,6 +595,7 @@ function An.Stats(itemID)
     s.rising = (wN >= 4 and pN >= 7 and s.avgWeek >= s.avgBefore * 1.05 and (s.ch30 or 0) >= 0.15
         and lo7 ~= nil and loOld ~= nil and lo7 > loOld) and true or false
     s.hi7, s.lo7, s.hi30, s.lo30 = hi7, lo7, hi30, lo30
+    s.trend = An.TrendLine(daily, today, s.price)
     s.behavior = An.Behavior(daily, itemID)
     s.days = days14
     -- how many days this item has history at all (liquidity can't be judged on a day or two)
@@ -787,7 +857,11 @@ local function BelowText(s, dev) return string.format(L["Cheaper than usual (%s)
 -- there are graded calls, the market's own history stands in (what jumps and dips did, all items together).
 ---------------------------------------------------------------------------
 local Allowed, RuleConf
-local OPTIONAL = { stick = true, rising = true, week = true, comeback = true, nowait = true, buyback = true }
+local OPTIONAL = { stick = true, rising = true, week = true, comeback = true, nowait = true, buyback = true,
+    trend = true, demand = true, endgame = true }
+
+local RUNUP = 4        -- days before an event: sell into its run-up
+local YOUNG_DAYS = 45  -- an item's prices younger than this: a young economy
 
 local function Score()
     FT.db.score = FT.db.score or { rules = {}, pending = {} }
@@ -826,10 +900,12 @@ end
 
 -- was a call right? p: the price called at, later: the close 5-9 days on
 local SELL_RULES = { spike = true, crack = true, fade = true, high = true, hype = true }
-local HOLD_UP = { rising = true, stick = true, week = true }
+local HOLD_UP = { rising = true, stick = true, week = true, trend = true, demand = true }
 local function Right(rule, p, later)
     if SELL_RULES[rule] then return later <= p end
     if rule == "trim" then return later <= p * 1.05 end
+    -- sell a third, hold the rest (an endgame material, a young economy): right when holding the rest didn't lose
+    if rule == "endgame" then return later >= p * 0.97 end
     if HOLD_UP[rule] then return later >= p end
     if rule == "comeback" or rule == "waitdip" then return later >= p * 1.05 end
     if rule == "nowait" then return later <= p * 1.02 end
@@ -987,6 +1063,57 @@ function An.SellSignal(s)
         s.conf = "sure"
         return "HOLD", 3, L["Your long hold: HODL until you unmark it"], (dev >= th) and AboveText(s, dev) or nil
     end
+    -- the climb, cracking: fell since the last check, under its fair price, more listed or sellers than usual, or
+    -- not selling - take the gains while they're there (before any reason to hold)
+    local function Crack()
+        if s.dropped then return L["it just fell"] end
+        if s.falling then return L["it's under its price of the last hours"] end
+        if s.flood then return L["far more listed than usual"] end
+        if s.crowd then return L["more sellers than usual"] end
+        if s.slow then return L["it's hardly selling"] end
+        return nil
+    end
+    local tr = s.trend
+    -- the raids ahead pull on it (Futures: the study's list and what it's made of): hold for the run-up, then sell
+    -- into it. Way over even its climb: a third now.
+    local dem = learn and FT.Futures and FT.Futures.DemandAhead and FT.Futures.DemandAhead(s.id)
+    s.demand = dem
+    if dem and (dev >= th or hot) and Allowed("demand") then
+        local why = Crack()
+        local into = dem.into ~= s.id and FT.ItemText(dem.into, 24) or nil
+        local a, b = dem.t - RUNUP * 86400, dem.t - 86400
+        local runup = date("%b", a) == date("%b", b)
+            and string.format("%s %d-%d", date("%b", a), tonumber(date("%d", a)), tonumber(date("%d", b)))
+            or string.format("%s %d - %s %d", date("%b", a), tonumber(date("%d", a)), date("%b", b), tonumber(date("%d", b)))
+        local detail = into and string.format(L["the raids need it: %s"], into) or L["the raids need it"]
+        if dem.days <= RUNUP then
+            s.conf, s.rule = "likely", "high"
+            return "SELL", 3, string.format(L["Raid week: sell into the demand (the raids open in %d days)"], dem.days), detail
+        end
+        if not why then
+            if tr and tr.above and tr.above > tr.band * 2 then
+                s.conf, s.rule = "likely", "trim"
+                return "TRIM", 2, string.format(L["Way over even its climb: sell a third now, hold the rest for the raid run-up (%s)"], runup), detail
+            end
+            s.conf, s.rule = RuleConf("demand") or "likely", "demand"
+            return "HOLD", 3, string.format(L["Raid demand ahead: hold, sell into the run-up (%s)"], runup), detail
+        end
+    end
+    -- climbing along a steady line: a new high on schedule is no reason to sell; above even its climb, sell a third
+    if (dev >= th or hot) and learn and tr and tr.climbing and Allowed("trend") then
+        local why = Crack()
+        local climb = string.format(L["%s a week for %d days"], Pc(tr.perWeek), tr.n)
+        if why then
+            s.conf, s.rule = Conf(s, true, false), "crack"
+            return "SELL", 3, string.format(L["Was climbing, now slipping (%s): sell"], why), climb
+        end
+        if tr.above and tr.above > tr.band then
+            s.conf, s.rule = Conf(s, true, false), "trim"
+            return "TRIM", 2, string.format(L["Above even its climb (%s over its line): sell a third, keep the rest"], Pc(tr.above)), climb
+        end
+        s.conf, s.rule = RuleConf("trend") or Conf(s, true, false), "trend"
+        return "HOLD", 3, string.format(L["On its climb (%s): where its trend says, let it ride"], climb), record
+    end
     if (dev >= th or hot) and learn and ((s.rising and Allowed("rising")) or (sticky and Allowed("stick"))) then
         local up = s.rising and string.format(L["%s this month"], Pc(s.ch30 or 0)) or nil
         s.conf = Conf(s, ownHighs or s.rising, kindHighs)
@@ -1032,6 +1159,17 @@ function An.SellSignal(s)
         if fades then
             s.conf, s.rule = RuleConf("fade") or Conf(s, ownHighs, kindHighs), "fade"
             return "SELL", 3, L["Higher than usual, and jumps like this fade fast: sell now"], detail .. "; " .. record
+        end
+        -- a young economy (under 45 days of prices): endgame materials keep climbing as more players reach 60 -
+        -- bank a third, hold the rest; leveling materials fall as everyone levels past them - sell
+        local life = learn and (s.span or 0) < YOUNG_DAYS and An.Lifecycle(s.id)
+        if life == "endgame" and not s.dropped and not s.flood and Allowed("endgame") then
+            s.conf, s.rule = RuleConf("endgame") or "guess", "endgame"
+            return "TRIM", 2, L["Endgame material in a young economy: these climb as more players reach 60 - sell a third, hold the rest"], detail
+        end
+        if life == "leveling" and dev >= th then
+            s.conf, s.rule = RuleConf("high") or Conf(s, false, false), "high"
+            return "SELL", strength, string.format(L["Higher than usual (%s), and leveling materials fall as players level past them: sell"], Pc(dev)), nil
         end
         if dev >= th then
             s.conf, s.rule = RuleConf("high") or Conf(s, false, false), "high"

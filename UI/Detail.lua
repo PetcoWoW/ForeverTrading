@@ -163,18 +163,20 @@ function UI.RiskHead(s)
 end
 
 -- "More" in the corner of a chart: the item in its own window
+-- on a chart's top bar, at the right: the item's Wowhead page (was More: the item window, which showed nothing new)
 function UI.MoreButton(chart, getID)
-    local b = UI.Button(chart, L["More"], 10, 18, "default", function()
+    local b = UI.Button(chart, L["Wowhead"], 10, 18, "default", function()
         local id = getID()
-        if id then FT.ShowDetail(id) end
+        if id then FT.Farm.Wowhead(id) end
     end)
     b.label:SetFont(UI.FONT, UI.Size(11), "")
     b:FitText(14)
     b:SetPoint("TOPRIGHT", -3, -2)
     b:SetFrameLevel(chart:GetFrameLevel() + 14)
-    b:SetTip(L["More"], L["The item in its own window: large charts and its order book. With the auction house open they stay live."])
+    b:SetTip(L["Wowhead"], L["Its page on Wowhead (WoW Forever): a link to copy into your browser."])
     return b
 end
+UI.WowheadButton = UI.MoreButton
 
 ---------------------------------------------------------------------------
 -- The windows: up to MAX_WINDOWS at once (two items side by side), each compact or standard - compact: no order
@@ -399,7 +401,7 @@ local function New(index)
     w.book = UI.OrderBook(body)
     w.book:SetWidth(BOOK_W())
     -- under it the materials of one craft (a material clicked opens in this window)
-    w.mats = UI.Materials(body, function(id) FT.ShowDetail(id, w) end)
+    w.mats = UI.Materials(body, function(id) FT.ShowItemWindow(id, w) end)
     w.mats:SetPoint("BOTTOMRIGHT", 0, 0)
     w.mats:SetWidth(BOOK_W())
     w.mats:Hide()
@@ -716,9 +718,15 @@ function D.Items()
     return #out > 0 and out or nil
 end
 
+-- An item, opened: on the Market page (its own window showed nothing the Market's item view doesn't - one view
+-- of an item, not two). FT.ShowItemWindow still opens the window itself (kept for its order book).
+function FT.ShowDetail(id)
+    if id then FT.OpenItem(id) end
+end
+
 -- open an item in a window of its own: the window that has it, else one not on the screen, else a new one (up to
 -- MAX_WINDOWS), else the one looked at longest ago; `into`: that window (a material clicked in it)
-function FT.ShowDetail(id, into)
+function FT.ShowItemWindow(id, into)
     if not id then return end
     local w = into
     if not w then
