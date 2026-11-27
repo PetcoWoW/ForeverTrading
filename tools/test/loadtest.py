@@ -1282,6 +1282,17 @@ step("v0.43", function()
   assert(not qs:IsShown(), "the top search hides on Market")
   FT.Show("today")
   assert(qs:IsShown(), "and comes back elsewhere")
+  -- Market: an item, then "< Market" back to its home (the overview); the tab itself opens on the home
+  FT.OpenItem(12363)
+  local ov, iv = FT.Tabs.market.Views()
+  assert(iv:IsShown() and not ov:IsShown() and iv.back, "an item page with a way back")
+  local click = iv.back:GetScript("OnClick")
+  if click then click(iv.back, "LeftButton") else FT.Tabs.market.Home() end
+  assert(ov:IsShown() and not iv:IsShown() and FT.Tabs.market.Selected() == nil, "back on the market's home")
+  FT.OpenItem(12363)
+  FT.Show("today")
+  FT.Tabs.market.Home(); FT.SelectTab("market")
+  assert(ov:IsShown(), "the Market tab opens on its home")
   -- picked up: ten more of something priced, at today's price; Today says it
   local P = FT.Port
   P.TrackPlay()

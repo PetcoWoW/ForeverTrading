@@ -12,7 +12,8 @@
 - **Where a recipe comes from:** a craft's window says if the recipe is from a trainer, a merchant (name and zone,
   seen by you or a Wolf user in your guild or group) or a drop or quest, and whether it's on the auction house now and
   at what price. Click it for the recipe's Market page.
-- **Market:** the "I own" filter is "Owned".
+- **Market has its home back:** the Market tab opens on the overview (market mood, value listed, the week, top
+  gainers and losers), and "< Market" on an item page goes back to it. The "I own" filter is "Owned".
 - **Fixed:** a two-line verdict on an item page ran under When it sells. An item's Craft it section (its materials)
   shows again for anything craftable, not only recipes your characters know.
 

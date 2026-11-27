@@ -543,7 +543,11 @@ local function Build()
     local houseChip = FT.BuildHouseChip(header)
     houseChip:SetPoint("LEFT", pill, "RIGHT", 6, 0)
     houseChip:Hide()
-    nav = UI.NavTabs(header, items, function(key) FT.SelectTab(key) end)
+    nav = UI.NavTabs(header, items, function(key)
+        -- Market from the tabs: its home, the overview (an item opened from elsewhere goes straight to the item)
+        if key == "market" and FT.Tabs.market and FT.Tabs.market.Home then FT.Tabs.market.Home() end
+        FT.SelectTab(key)
+    end)
     nav:SetPoint("LEFT", pill, "RIGHT", 14, 0)
 
     local close = UI.CloseButton(header, function() win:Hide() end)

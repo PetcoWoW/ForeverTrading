@@ -10,7 +10,8 @@ FT.Tabs.market = T
 -- open: under "My recipes", the item whose materials are shown under it
 -- the height of a move card: two lines of its sentence, at the chosen text size
 local function MOVE_H() return 60 + 9 * (tonumber(FT.S and FT.S.textSize) or 0) end
-local state = { filter = "all", cls = "all", sub = "all", sort = "cap", desc = true, search = "", selected = nil, open = nil }
+local state = { filter = "all", cls = "all", sub = "all", sort = "cap", desc = true, search = "", selected = nil, open = nil,
+    home = true } -- home: the market overview on the right (v0.43: Market opens on it; "< Market" on an item goes back)
 -- the auction house's own filters: required level, usable, not collected, quality
 local QUALITIES = { 0, 1, 2, 3, 4, 5 }
 local filt = { min = nil, max = nil, usable = false, uncollected = false, quality = {} }
@@ -852,8 +853,12 @@ local function BuildOverview(parent)
             c:SetPoint("TOPLEFT", (i - 1) * (mw + 8), -movesY)
             c:SetWidth(mw)
         end
+        -- (v0.43: Your top 3 is Today's; the market's home skips it and the chart takes the room)
+        self.movesTitle:Hide()
+        self.sees:Hide()
+        for _, c in ipairs(self.moves) do c:Hide() end
         self.chartTitle:ClearAllPoints()
-        local below = movesY + MOVE_H() + 10
+        local below = movesY - 18
         self.chartTitle:SetPoint("TOPLEFT", 4, -below)
         self.chart:ClearAllPoints()
         self.chart:SetPoint("TOPLEFT", 0, -below - 18)
@@ -910,7 +915,6 @@ function T.ShowOverview()
     local pch = pvalue1 > 0 and (ptotal / pvalue1 - 1) or nil
     overview.cards[4]:Set(FT.Money(math.floor((ptotal or 0) + FT.Port.Gold()), "short"),
         (pch and (FT.Pct(pch) .. FT.C("dim", " " .. L["today"])) or L["items and gold"]))
-    T.FillMoves()
     local week = FT.An.WeekText and FT.An.WeekText()
     UI.FitBits(overview.hint, week and (FT.C("accent", L["This week"]) .. ":  " .. week) or L["Pick an item on the left to see its chart"])
 
@@ -932,7 +936,8 @@ end
 -- today's market moves fill in: the best carry and flip, the best thing to farm (else a craft or vendor deal)
 -- (the old overview's moves: the same as Today's, FT.TopMoves - no more AH TO AH, Blackwater isn't followed)
 function T.FillMoves()
-    if not overview then return end
+    -- (v0.43: the market's home has no moves row - Today's Your top 3 is the one)
+    if not overview or not overview.moves[1]:IsShown() then return end
     local cards, personal = FT.TopMoves()
     overview.movesTitle:SetText(personal and L["Your top 3"] or L["Today's 3 moves"])
     local okSees, sees = pcall(FT.Eye.ProfileText)
@@ -1195,9 +1200,13 @@ local function BuildItemView(parent)
     local v = CreateFrame("Frame", nil, parent)
     v:SetAllPoints()
 
-    -- head: icon, name, the line under it; price, its move, how old
+    -- head: back to the market's home, icon, name, the line under it; price, its move, how old
+    v.back = UI.Button(v, "< " .. L["Market"], 10, 22, "default", function() T.Home() end)
+    v.back:FitText(18)
+    v.back:SetPoint("TOPLEFT", 0, -12)
+    v.back:SetTip(L["Market"], L["Back to the market's home: its mood, the value listed, the week, what's moving."])
     v.icon = UI.Icon(v, 38)
-    v.icon:SetPoint("TOPLEFT", 2, -4)
+    v.icon:SetPoint("TOPLEFT", v.back, "TOPRIGHT", 10, 8)
     v.icon:EnableMouse(true)
     v.icon:SetScript("OnEnter", function(self) UI.TipItem(self, state.selected) end)
     v.icon:SetScript("OnLeave", function() GameTooltip:Hide() end)
@@ -1277,7 +1286,7 @@ function T.FitHeader()
     local v = itemView
     local w = v and v:GetWidth()
     if not w or w <= 0 then return end
-    local left = 2 + 38 + 10
+    local left = (v.back:GetWidth() or 0) + 10 + 38 + 10
     local top = 2 + v.change:GetStringWidth() + 12 + v.price:GetStringWidth() + 14
     local bottom = 2 + v.priceAge:GetStringWidth() + 5 + 9 + 14
     v.name:SetWidth(math.max(60, w - left - top))
@@ -1634,7 +1643,7 @@ end
 function T.Select(id)
     if not id then return end
     if not page then FT.Show("market") end
-    state.selected = id
+    state.selected, state.home = id, false
     FT.db.ui = FT.db.ui or {}
     FT.db.ui.lastItem = id
     FT.Hist.Viewed(id)
@@ -1681,6 +1690,7 @@ function T.Refresh()
 end
 
 function T.RefreshRight()
+    if state.home and not state.selected then return T.ShowOverview() end
     if not state.selected then
         -- v0.42: no overview (Today has it): the item you opened last, else the first in the list
         local last = FT.db.ui and FT.db.ui.lastItem
@@ -1708,12 +1718,18 @@ function T.Selected()
     return state.selected
 end
 
+-- (for the tests) the market's home and the item page
+function T.Views() return overview, itemView end
+
 function T.ClearSelection()
-    -- v0.42: no overview to go back to: the item opened last (or the list's first) shows
-    state.selected = nil
-    FT.db.ui = FT.db.ui or {}
-    FT.db.ui.lastItem = nil
-    T.RefreshRight()
+    T.Home()
+end
+
+-- back to the market's home: the overview (mood, listed value, the week, what's moving)
+function T.Home()
+    state.selected, state.home = nil, true
+    if list then list:Refresh() end
+    if page and page:IsVisible() then T.ShowOverview() end
 end
 
 -- the watchlist changed (a menu, another page): the Watch button and the list follow
