@@ -10,7 +10,8 @@ local D = {}
 FT.Detail = D
 
 local W, H = 1000, 620
-local BOOK_W = 250
+local BOOK_W = 280
+local BOOK_MIN_H = 290 -- the order book: its header, a few rows and its buy box
 
 local GetClassInfo = (C_Item and C_Item.GetItemClassInfo) or GetItemClassInfo
 local GetSubClassInfo = (C_Item and C_Item.GetItemSubClassInfo) or GetItemSubClassInfo
@@ -320,8 +321,10 @@ local function New(index)
         w.edge:SetPoint("BOTTOMRIGHT", -1, 1)
         UI.Border(w.edge, "accent", 0.55, nil, UI.RADIUS - 1)
     else
-        -- the game's dialog: its stone-and-gold edge stands out on its own
+        -- the game's dialog: its stone-and-gold edge stands out on its own; solid behind, so a window under it
+        -- (the main one) doesn't show through
         UI.Skin(w, "window", "bg0")
+        if w.bg then w.bg:SetAlpha(0.92) end
     end
     table.insert(UISpecialFrames, w:GetName())
 
@@ -636,17 +639,12 @@ local function RefreshIn(w, keepView)
         end
     end
 
+    -- one line that fits: how it sells and where it is against its normal price (the Market card under the
+    -- chart has how fast it sells, the Pro chart its hype)
     local ind = {}
-    if s.rsi then
-        local color = (s.rsi >= 70 and "down") or (s.rsi <= 30 and "up") or "text"
-        ind[#ind + 1] = L["RSI"] .. " " .. FT.C(color, string.format("%.0f", s.rsi))
-    end
-    if s.dev then ind[#ind + 1] = L["vs average"] .. " " .. FT.Pct(s.dev) end
-    if s.vol then ind[#ind + 1] = L["Daily volatility"] .. " " .. FT.C("text", string.format("%.1f%%", s.vol * 100)) end
-    local liq = FT.An.Liquidity(s)
-    ind[#ind + 1] = L["Liquidity"] .. " " .. FT.C(LIQ_COLORS[liq], L[LIQ_NAMES[liq]])
     ind[#ind + 1] = UI.SalesText(s)
-    w.ind:SetText(table.concat(ind, FT.C("dim", "   ||   ")))
+    if s.dev then ind[#ind + 1] = L["vs average"] .. " " .. FT.Pct(s.dev) end
+    w.ind:SetText(table.concat(ind, FT.C("dim", "  ·  ")))
 
     w.tf:SetValue(FT.S.chartTF)
     w.range:SetValue(FT.S.chartRange or "30D")
@@ -657,7 +655,9 @@ local function RefreshIn(w, keepView)
     DrawIn(w, keepView)
     if not w.compact then
         w.book:SetItem(id)
-        local show, h = w.mats:SetItem(id)
+        local room = (w.book:GetParent():GetHeight() or 0) - BOOK_MIN_H - 8
+        local show, h = w.mats:SetItem(id, room > 120 and room or nil)
+        if show and room <= 120 then show = false end
         w.mats:SetShown(show)
         w.book:ClearAllPoints()
         w.book:SetPoint("TOPRIGHT", 0, 0)

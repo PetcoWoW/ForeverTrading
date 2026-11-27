@@ -47,8 +47,8 @@ plain["Sell: %d%% above the %d-day average or RSI 70+.  Buy: %d%% below or RSI 3
 
 -- the other numbers
 plain["Indicators"] = "The numbers"
-plain["vs average"] = "vs normal price"
-plain["Daily volatility"] = "Price swings a day"
+plain["vs average"] = "vs normal"
+plain["Daily volatility"] = "Daily swing"
 plain["Liquidity"] = "How fast it sells"
 plain["liquidity"] = "how fast it sells"
 plain["liq:high"] = "fast"

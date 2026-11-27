@@ -455,8 +455,7 @@ step("layout", function()
     { "settings: all", "settings", function() FT.S.showAdvanced = true; FT.Tabs.settings.Layout() end },
   }
   for _, size in ipairs({ "std", "min" }) do
-  FT.db.frame.size = size
-  FT.ResetWindow()
+  FT.SetWindowSize(size)
   for _, pg in ipairs(pages) do
     local key = pg[1] .. " @" .. size
     FT.Show(pg[2])
@@ -499,8 +498,26 @@ step("layout", function()
   FT.S.showAdvanced = false
   FT.Tabs.radar.SetSection("consumables")
   end
-  FT.db.frame.size = nil
-  FT.ResetWindow()
+  -- the item window (More), on a flask, standard size
+  FT.ShowDetail(13510)
+  mock.run(1)
+  for _, name in ipairs({ "WolfOfBootyBayDetail1", "WolfOfBootyBayDetail" }) do
+    local win = _G[name]
+    if win and win.__shown ~= false then
+      mock.layout.Settle(win)
+      local found, texts = mock.layout.Overlaps(win)
+      for _, o in ipairs(found) do
+        total = total + 1
+        print(string.format("OVERLAP [item window] %q x %q  (%dx%d px)", o[1].text:sub(1, 50), o[2].text:sub(1, 50), o[3], o[4]))
+      end
+      for _, t in ipairs(texts) do
+        if t.cut then cuts = cuts + 1; local r = mock.layout.Rect(t.f); print(string.format("CUT [item window] %q  box %d text %d", t.text:sub(1, 120), r[2] - r[1], mock.layout.TextWidth(t.f))) end
+        if t.spill then cuts = cuts + 1; print(string.format("SPILL [item window] %q", t.text:sub(1, 60))) end
+      end
+      print("item window checked: " .. #texts .. " texts")
+    end
+  end
+  FT.SetWindowSize("std")
   print("layout: " .. total .. " overlapping text pairs, " .. cuts .. " texts cut short")
   for id, n in pairs(held) do inv.bags[id] = n end
   FT.Fire("FT_INVENTORY_CHANGED")

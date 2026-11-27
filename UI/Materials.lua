@@ -218,7 +218,7 @@ function UI.Materials(parent, onPick)
     end
 
     -- the item's recipe: true and the height the panel wants when there is one (nil: nothing to show)
-    function f:SetItem(id)
+    function f:SetItem(id, maxH)
         local r, known = nil, false
         if id then r, known = RecipeOf(id) end
         self.r = r
@@ -248,11 +248,22 @@ function UI.Materials(parent, onPick)
             self.sum[3].value:SetText(FT.C("dim", "—"))
         end
         local n = math.min(MAX_ROWS, math.max(1, #(e.parts or {})))
-        return true, Place(n, table.concat(Advice(id, r, e, known), "\n"))
+        local advice = Advice(id, r, e, known)
+        local h = Place(n, table.concat(advice, "\n"))
+        -- too tall for the room: the last advice lines go (the verdict stays), then fewer rows (the list scrolls)
+        while maxH and h > maxH and #advice > 1 do
+            advice[#advice] = nil
+            h = Place(n, table.concat(advice, "\n"))
+        end
+        while maxH and h > maxH and n > 2 do
+            n = n - 1
+            h = Place(n, table.concat(advice, "\n"))
+        end
+        return true, h
     end
     -- the house its prices are of: an item window's own (nil: the one on)
     local setItem = f.SetItem
-    function f:SetItem(id) return FT.House.With(self.house, setItem, self, id) end
+    function f:SetItem(id, maxH) return FT.House.With(self.house, setItem, self, id, maxH) end
 
     -- one of its materials
     function f:Has(id)

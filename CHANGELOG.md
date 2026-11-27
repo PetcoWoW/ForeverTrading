@@ -1,5 +1,13 @@
 # Wolf
 
+## v0.35 - the breakdown beside the chart
+
+- The craft breakdown shows on the item's page in every window size: beside the chart, or under it in the
+  smallest window (where it used to take a click on More).
+- The More window: solid, so the window under it no longer shows through its text; the breakdown gets the room
+  it needs under the order book (or drops its last tips when there isn't any); wider, so material names fit;
+  the line under the price is shorter and fits.
+
 ## v0.34 - the craft breakdown
 
 - An item's page (click it in Futures, Market or anywhere) now has a **Craft breakdown** beside the chart for

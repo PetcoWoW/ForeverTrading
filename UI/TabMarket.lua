@@ -1101,7 +1101,7 @@ local function BuildItemView(parent)
 
     UI.OnSize(v, function(self, w, h)
         T.FitHeader()
-        local cards = self.compact and 0 or CARDS_H
+        local cards = self.compact and (self.reserve or 0) or CARDS_H
         -- the simple chart has the room of both charts
         local share = UI.ProChart() and 0.56 or 1
         self.chart:SetHeight(math.max(80, math.floor((h - 128 - cards - 6) * share)))
@@ -1162,7 +1162,7 @@ function T.ApplyChartStyle()
     v.pro:SetPoint("LEFT", pro and v.tf or v.range, "RIGHT", 16, 0)
     local w, h = v:GetSize()
     if w and w > 0 then
-        local cards = v.compact and 0 or CARDS_H
+        local cards = v.compact and (v.reserve or 0) or CARDS_H
         v.chart:SetHeight(math.max(80, math.floor((h - 128 - cards - 6) * (pro and 0.56 or 1))))
     end
 end
@@ -1297,23 +1297,52 @@ function T.Build(p)
     T.OnLayout()
 end
 
--- the right side: the materials of one craft when you can make the item (the chart takes the room otherwise)
+-- the craft breakdown of a crafted item: on the right of the chart; in the smallest window under the chart (where
+-- the cards are in the others: the chart keeps its width). The chart takes the room when there's no recipe.
 function T.LayoutRight()
     if not (mats and center) then return end
+    local compact = FT.Compact()
+    local pageH = page:GetHeight() or 400
     local show, h = false, 0
-    if not FT.Compact() and itemView:IsShown() and state.selected then
-        show, h = mats:SetItem(state.selected)
+    if itemView:IsShown() and state.selected then
+        show, h = mats:SetItem(state.selected, compact and math.floor(pageH * 0.45) or pageH - 16)
     end
     mats:SetShown(show)
-    if show then
+    center:ClearAllPoints()
+    center:SetPoint("TOPLEFT", LEFT_W + 18, -8)
+    itemView.reserve = nil
+    if show and compact then
+        center:SetPoint("BOTTOMRIGHT", -8, 8)
+        mats:ClearAllPoints()
+        mats:SetPoint("BOTTOMLEFT", center, "BOTTOMLEFT", 0, 0)
+        mats:SetPoint("BOTTOMRIGHT", center, "BOTTOMRIGHT", 0, 0)
+        mats:SetHeight(h)
+        mats:SetItem(state.selected, math.floor(pageH * 0.45)) -- again, at its width now
+        itemView.reserve = h + 8
+    elseif show then
         mats:ClearAllPoints()
         mats:SetPoint("TOPRIGHT", -8, -8)
         mats:SetWidth(RIGHT_W)
-        mats:SetHeight(math.min(h, (page:GetHeight() or 400) - 16))
+        mats:SetHeight(math.min(h, pageH - 16))
+        center:SetPoint("BOTTOMRIGHT", -(RIGHT_W + 18), 8)
+    else
+        center:SetPoint("BOTTOMRIGHT", -8, 8)
     end
-    center:ClearAllPoints()
-    center:SetPoint("TOPLEFT", LEFT_W + 18, -8)
-    center:SetPoint("BOTTOMRIGHT", show and -(RIGHT_W + 18) or -8, 8)
+    T.SizeCharts()
+end
+
+-- the charts' heights: what's left above the cards (or the breakdown, in the smallest window)
+function T.SizeCharts()
+    local v = itemView
+    if not v then return end
+    local below = v.compact and (v.reserve or 0) or CARDS_H
+    v.pchart:ClearAllPoints()
+    v.pchart:SetPoint("TOPLEFT", v.chart, "BOTTOMLEFT", 0, -6)
+    v.pchart:SetPoint("BOTTOMRIGHT", 0, below)
+    local h = v:GetHeight()
+    if h and h > 0 then
+        v.chart:SetHeight(math.max(80, math.floor((h - 128 - below - 6) * (UI.ProChart() and 0.56 or 1))))
+    end
 end
 
 -- the compact window: charts only - no cards under the charts ("More" has them)
@@ -1323,13 +1352,6 @@ function T.OnLayout()
     local v = itemView
     v.compact = compact
     for _, c in ipairs({ v.health, v.trend, v.call }) do c:SetShown(not compact) end
-    v.pchart:ClearAllPoints()
-    v.pchart:SetPoint("TOPLEFT", v.chart, "BOTTOMLEFT", 0, -6)
-    v.pchart:SetPoint("BOTTOMRIGHT", 0, compact and 0 or CARDS_H)
-    local h = v:GetHeight()
-    if h and h > 0 then
-        v.chart:SetHeight(math.max(80, math.floor((h - 128 - (compact and 0 or CARDS_H) - 6) * (UI.ProChart() and 0.56 or 1))))
-    end
     T.LayoutRight()
 end
 
