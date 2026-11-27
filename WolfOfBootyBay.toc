@@ -42,6 +42,7 @@ Companion.lua
 AHSession.lua
 Farm.lua
 Where.lua
+Ahead.lua
 Queue.lua
 Sources\Share.lua
 Sources\Net.lua
@@ -64,6 +65,7 @@ UI\TabPortfolio.lua
 UI\TabSell.lua
 UI\TabSettings.lua
 UI\TabRadar.lua
+UI\TabComing.lua
 UI\Extras.lua
 UI\Farm.lua
 UI\Snipe.lua

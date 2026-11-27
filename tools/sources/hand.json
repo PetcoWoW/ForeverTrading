@@ -413,5 +413,71 @@
    "text": "Disenchanting (Enchanting): from uncommon and better gear of its level.",
    "src": "Classic enchanting"
   }
- ]
+ ],
+ "lists": {
+  "_about": "Item lists by name (the robot finds their ids): what each event pulls",
+  "faire": {
+   "src": "method.gg Darkmoon Faire in WoW Forever; warcrafttavern.com Classic Darkmoon Faire",
+   "names": [
+    "Small Furry Paw",
+    "Torn Bear Pelt",
+    "Soft Bushy Tail",
+    "Vibrant Plume",
+    "Evil Bat Eye",
+    "Glowing Scorpid Blood",
+    "Copper Modulator",
+    "Whirring Bronze Gizmo",
+    "Green Firework",
+    "Mechanical Repair Kit",
+    "Thorium Widget",
+    "Coarse Weightstone",
+    "Heavy Grinding Stone",
+    "Big Black Mace",
+    "Dense Grinding Stone",
+    "Embossed Leather Boots",
+    "Toughened Leather Armor"
+   ]
+  },
+  "pvp": {
+   "src": "the PvP study (build doc): Blizzard item data, foreverbattlegrounds.com, overgear.com",
+   "names": [
+    "Free Action Potion",
+    "Limited Invulnerability Potion",
+    "Swiftness Potion",
+    "Restorative Potion",
+    "Greater Stoneshield Potion",
+    "Heavy Runecloth Bandage",
+    "Mighty Rage Potion",
+    "Noggenfogger Elixir",
+    "Major Healing Potion",
+    "Major Mana Potion",
+    "Goblin Sapper Charge",
+    "Thorium Grenade",
+    "Dense Dynamite",
+    "EZ-Thro Dark Bomb",
+    "EZ-Thro Thorium Grenade",
+    "SAF-T Bomb",
+    "Tru-Trigger Frag Bomb",
+    "EZ-Thro Mana Bomb",
+    "SAF-T Teleport",
+    "SAF-T Nitro Boosts",
+    "EZ-Thro Magnetic Displacer",
+    "Stealthman 52",
+    "Ultrasafe Rechargeable Battery"
+   ]
+  },
+  "pvpMats": {
+   "src": "Wolf's recipes (what the PvP kit is made of)",
+   "names": [
+    "EZ-Thro Shell",
+    "SAF-T Tube",
+    "Pristine Scale",
+    "Azerothium Bar",
+    "Dense Blasting Powder",
+    "Thorium Widget",
+    "Runecloth",
+    "Thorium Bar"
+   ]
+  }
+ }
 }

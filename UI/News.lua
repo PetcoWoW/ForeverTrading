@@ -51,7 +51,7 @@ local function News()
             { L["The breakdown beside the chart"], L["The craft breakdown is on the item's page in every window size, and the More window is solid and tidy."], nil },
         },
         ["v0.34"] = {
-            { L["The craft breakdown"], L["Click a crafted item (a flask in Futures): every material's cost and move, the profit of a craft, and whether to craft, hold or sell."], function() FT.Show("radar") end },
+            { L["The craft breakdown"], L["Click a crafted item (a flask in Futures): every material's cost and move, the profit of a craft, and whether to craft, hold or sell."], function() FT.ShowSub("make", "coming") end },
         },
         ["v0.33"] = {
             { L["The notes follow what's yours"], L["At login and /reload: your portfolio, then what moved in what you hold most and watch since last time. After a scan of yours: what moved."], nil },
@@ -70,10 +70,10 @@ local function News()
             { L["Your faction's auction house only"], L["Blackwater, the neutral house, isn't tracked any more: its prices came too late to act on. No more AH TO AH deals."], nil },
         },
         ["v0.27"] = {
-            { L["Buy the dip"], L["Futures now says BUY THE DIP when a raid consumable or its herbs fell this week with the raids ahead."], function() FT.Show("radar") end },
+            { L["Buy the dip"], L["Futures now says BUY THE DIP when a raid consumable or its herbs fell this week with the raids ahead."], function() FT.ShowSub("make", "coming") end },
         },
         ["v0.26"] = {
-            { L["Futures: what raiders will need"], L["The Radar became Futures: the consumables every class will burn, ranked, with the herbs behind them and your move on each."], function() FT.Show("radar") end },
+            { L["Futures: what raiders will need"], L["The Radar became Futures: the consumables every class will burn, ranked, with the herbs behind them and your move on each."], function() FT.ShowSub("make", "coming") end },
         },
         ["v0.25"] = {
             { L["The wolf knows what you've got"], L["Your top 3 on the Terminal now come from what you hold, watch, can craft and gather. Hover one for why."], function() FT.Show("market") end },
@@ -90,7 +90,7 @@ local function News()
         },
         ["v0.22"] = {
             { L["Radar"], L["A new page: what's starting to sell faster before its price moves, what a rising craft is made of, what's cooling off, and the next raid opening. It grades its own calls."],
-                function() FT.Show("radar") end },
+                function() FT.ShowSub("make", "coming") end },
             { L["Snipe at the auction house"], L["The Wolf tab at the auction house is Snipe now: after a scan, what's listed under its price with how sure (Safe, Good, Gamble) and Buy, plus the items worth searching again and again."] },
             { L["A cleaner chart"], L["One smooth line with its high and low, 7D / 30D / 90D, dates as 11/25. Pro chart keeps the candles."],
                 function() FT.Show("market") end },

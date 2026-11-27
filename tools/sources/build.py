@@ -184,6 +184,73 @@ for i in sorted((ah | mats_of | recipe_items) & set(item)):
 placed = set(lines) | crafted | set(notes)
 gaps = sorted(i for i in ah if i in item and real(i) and i not in placed)
 
+# ---- item lists by name (events and PvP): the id that trades, else the first real one ----------------------
+by_name = collections.defaultdict(list)
+for i, v in item.items():
+    if v.get(1):
+        by_name[v[1].lower()].append(i)
+lists = {}
+for key, spec in hand.get("lists", {}).items():
+    if key.startswith("_"):
+        continue
+    ids = []
+    for nm in spec["names"]:
+        cands = sorted(by_name.get(nm.lower(), []))
+        traded = [i for i in cands if i in ah]
+        pick = (traded or cands)[:1]
+        if not pick:
+            print("list %s: no item named %r" % (key, nm))
+        ids.extend(pick)
+    lists[key] = ids
+
+# ---- events: Forever's calendar (ForeverDB's holiday table), the next 400 days ---------------------------------
+import datetime
+from zoneinfo import ZoneInfo
+PT = ZoneInfo("America/Los_Angeles")  # the realms' clock (US)
+def unpack(p):
+    mi, h, d, mo, y = p & 63, (p >> 6) & 31, ((p >> 14) & 63) + 1, ((p >> 20) & 15) + 1, ((p >> 24) & 31) + 2000
+    return y, mo, d, h, mi
+now = datetime.datetime.now(PT)
+until = now + datetime.timedelta(days=400)
+EVENT = {  # ForeverDB holiday id -> (key, Wolf's name, where)
+    263: ("faire", "Darkmoon Faire", "Elwynn Forest"), 264: ("faire", "Darkmoon Faire", "Mulgore"),
+    1840: ("bg", "Call to Arms: Darkspear Islands", ""), 1841: ("bg", "Call to Arms: Arathi Basin", ""),
+    1842: ("bg", "Call to Arms: Warsong Gulch", ""), 141: ("veil", "Feast of Winter Veil", ""),
+    327: ("lunar", "Lunar Festival", ""), 335: ("love", "Love is in the Air", ""), 181: ("noble", "Noblegarden", ""),
+    341: ("midsummer", "Midsummer Fire Festival", ""), 324: ("hallow", "Hallow's End", ""), 321: ("harvest", "Harvest Festival", ""),
+    201: ("children", "Children's Week", ""),
+}
+events = []
+for hid, (key, name, where) in EVENT.items():
+    v = T(D.hol[hid])
+    if not v:
+        continue
+    durs = [int(x) for x in (T(v.get(7)) or {}).values()]
+    dates = [unpack(int(x)) for x in (T(v.get(8)) or {}).values()]
+    hours = durs[0] if durs else 168
+    starts = []
+    for (y, mo, d, h, mi) in dates:
+        if mo > 12 or d > 31:
+            continue
+        if y >= 2031:  # a yearly template: every year on that day
+            for yy in range(now.year - 1, now.year + 2):
+                try: starts.append(datetime.datetime(yy, mo, d, h, mi, tzinfo=PT))
+                except ValueError: pass
+        else:
+            try: starts.append(datetime.datetime(y, mo, d, h, mi, tzinfo=PT))
+            except ValueError: pass
+    if len(durs) >= 2 and starts:  # on for durs[0] hours, then off for durs[1]: a rotation
+        period = datetime.timedelta(hours=durs[0] + durs[1])
+        t = min(starts)
+        while t < until:
+            starts.append(t)
+            t += period
+    for t in sorted(set(starts)):
+        end = t + datetime.timedelta(hours=hours)
+        if end >= now - datetime.timedelta(days=1) and t <= until:
+            events.append((int(t.timestamp()), hours, key, name, where))
+events.sort()
+
 def lstr(s):
     return '"' + s.replace("\\", "\\\\").replace('"', '\\"') + '"'
 out = []
@@ -210,6 +277,12 @@ out.append("}")
 out.append("-- Wolf's own notes (tools/sources/hand.json): Forever knowledge, and what no database places")
 out.append("FT.SRC_H = {")
 out.extend("[%d]=%s," % (i, lstr(t)) for i, t in sorted(notes.items()))
+out.append("}")
+for key, ids in sorted(lists.items()):
+    out.append("FT.SRC_LIST_%s = {%s}" % (key.upper(), ",".join(str(i) for i in ids)))
+out.append("-- Forever's calendar: { start (unix), hours, kind, name, where }")
+out.append("FT.SRC_EVENTS = {")
+out.extend("{%d,%d,%s,%s,%s}," % (t, h, lstr(k), lstr(n), lstr(w)) for t, h, k, n, w in events)
 out.append("}")
 out.append("-- recipes that can't be made in Forever: an item they make or use isn't in the game")
 out.append("FT.SRC_DEAD = {" + ",".join("[%d]=true" % r for r in dead) + "}")

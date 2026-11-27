@@ -826,12 +826,13 @@ function T.Build(p)
     head:SetPoint("TOPLEFT", 8, -8)
     head:SetPoint("TOPRIGHT", -8, -8)
     head:SetHeight(40)
+    -- v0.50: the section bar in the same spot on every Make gold and You page (top left); the line under it
     T.title = UI.Text(head, 16, "text")
-    T.title:SetPoint("TOPLEFT", 4, -2)
     T.title:SetText(L["Money"])
+    T.title:Hide()
     T.rules = UI.Text(head, 11, "dim")
-    T.rules:SetPoint("TOPLEFT", 4, -24)
-    T.rules:SetPoint("RIGHT", head, "RIGHT", -150, 0)
+    T.rules:SetPoint("TOPLEFT", 4, -28)
+    T.rules:SetPoint("RIGHT", head, "RIGHT", -8, 0)
 
     -- the search, next to the title: every column keeps only what matches ("name" in quotes: that name exactly)
     T.search = ""
@@ -839,7 +840,7 @@ function T.Build(p)
         T.search = text or ""
         FT.Debounce("signalsSearch", 0.25, T.Refresh)
     end)
-    T.searchBox:SetPoint("LEFT", T.title, "RIGHT", 16, 0)
+    T.searchBox:SetPoint("TOPRIGHT", head, "TOPRIGHT", -4, 0)
     UI.ClearButton(T.searchBox, function()
         T.search = ""
         T.Refresh()
@@ -847,14 +848,14 @@ function T.Build(p)
     -- one way to make gold per view; Signals: the four columns
     T.view = T.view or "make"
     T.viewSeg = UI.GroupBar(head, "make")
-    T.viewSeg:SetPoint("LEFT", T.searchBox, "RIGHT", 12, 0)
+    T.viewSeg:SetPoint("TOPLEFT", head, "TOPLEFT", 4, 0)
     T.viewSeg:SetValue(T.view)
     dealsView = BuildDeals(p)
     farmView = BuildFarmView(p)
     craftView = BuildCraftView(p)
     -- the deals are looked for again on new prices only while they are on the screen (Sell yours and the
     -- line under the title use them too)
-    FT.Deals.watching = function() return dealsView:IsVisible() or (T.title and T.title:IsVisible()) end
+    FT.Deals.watching = function() return dealsView:IsVisible() or (T.rules and T.rules:IsVisible()) end
 end
 
 function T.Refresh()

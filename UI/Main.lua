@@ -15,12 +15,12 @@ local TAB_LABELS = { today = "Today", market = "Market", craft = "Craft", make =
 -- the groups: their sections in order { key, label, page, view (the page's own view, if it has views) }
 FT.GROUPS = {
     make = { { "make", "Flip it", "signals", "make" }, { "craft", "Craft it", "signals", "craft" }, { "farm", "Farm it", "signals", "farm" },
-        { "raid", "Raid prep", "radar" } },
+        { "coming", "Coming up", "coming" } },
     you = { { "portfolio", "Holdings", "portfolio", "portfolio" }, { "sessions", "Sessions", "sessions" },
         { "chars", "Characters", "portfolio", "chars" }, { "journal", "Journal", "portfolio", "journal" } },
 }
 -- the group a page belongs to (the tab that lights up for it)
-local GROUP_OF = { signals = "make", radar = "make", portfolio = "you", sessions = "you", sell = "you" }
+local GROUP_OF = { signals = "make", radar = "make", coming = "make", portfolio = "you", sessions = "you", sell = "you" }
 local groupBars = { make = {}, you = {} }
 local groupLast = { make = "make", you = "portfolio" }
 
@@ -729,7 +729,7 @@ function FT.SelectTab(name)
     -- a group's tab: the section shown there last
     if FT.GROUPS[name] then
         local saved = FT.db and FT.db.ui and FT.db.ui.groupLast
-        if saved then for g, k in pairs(saved) do groupLast[g] = k end end
+        if saved then for g, k in pairs(saved) do groupLast[g] = (k == "raid") and "coming" or k end end
         return FT.ShowSub(name, groupLast[name])
     end
     if not FT.Tabs[name] then name = "today" end

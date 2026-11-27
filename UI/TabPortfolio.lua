@@ -42,16 +42,17 @@ local SORT_GET = {
 }
 
 function T.Build(p)
-    local head = UI.Text(p, 16, "text")
-    head:SetPoint("TOPLEFT", 12, -10)
-    head:SetText(L["Portfolio"])
-    local sub = UI.Text(p, 11, "dim")
-    sub:SetPoint("LEFT", head, "RIGHT", 12, -1)
-    sub:SetText(L["Bags, banks and mailboxes of your characters on this server, at auction house prices"])
-
-    -- what you own, or what your trading brought (the deals journal)
+    -- v0.50: the section bar top left, as on every Make gold and You page; the page's line beside it
     T.viewSeg = UI.GroupBar(p, "you")
-    T.viewSeg:SetPoint("TOPRIGHT", -8, -8)
+    T.viewSeg:SetPoint("TOPLEFT", 12, -8)
+    local head = UI.Text(p, 16, "text")
+    head:SetText(L["Portfolio"])
+    head:Hide()
+    local sub = UI.Text(p, 11, "dim")
+    sub:SetPoint("LEFT", T.viewSeg, "RIGHT", 14, 0)
+    sub:SetPoint("RIGHT", p, "RIGHT", -12, 0)
+    if sub.SetWordWrap then sub:SetWordWrap(false) end
+    sub:SetText(L["Bags, banks and mailboxes of your characters on this server, at auction house prices"])
     T.viewSeg:SetValue(state.view)
     T.head, T.sub = head, sub
 
@@ -520,10 +521,10 @@ function T.SetView(view)
     if charsView then charsView:SetShown(ch) end
     if sellView then sellView:SetShown(sl) end
     T.head:SetText((j and L["Journal"]) or (ch and L["Characters"]) or (sl and L["Sell yours"]) or L["Portfolio"])
-    T.sub:SetText((j and L["What you bought and sold at the auction house, and what it brought"])
+    UI.FitSize(T.sub, (j and L["What you bought and sold at the auction house, and what it brought"])
         or (ch and L["Every character on this server: gold, what it holds, when it was last seen"])
         or (sl and L["Everything you own and the best way to turn each into gold"])
-        or L["Bags, banks and mailboxes of your characters on this server, at auction house prices"])
+        or L["Bags, banks and mailboxes of your characters on this server, at auction house prices"], 11, 2)
     T.Refresh()
 end
 
@@ -726,14 +727,14 @@ FT.Tabs.sessions = ST
 local sessView
 
 function ST.Build(p)
-    local head = UI.Text(p, 16, "text")
-    head:SetPoint("TOPLEFT", 12, -10)
-    head:SetText(L["Sessions"])
-    local sub = UI.Text(p, 11, "dim")
-    sub:SetPoint("LEFT", head, "RIGHT", 12, -1)
-    sub:SetText(L["Your farming runs: what you looted, what it's worth now, gold an hour"])
+    -- v0.50: the section bar top left, as on every Make gold and You page
     ST.bar = UI.GroupBar(p, "you")
-    ST.bar:SetPoint("TOPRIGHT", -8, -8)
+    ST.bar:SetPoint("TOPLEFT", 12, -8)
+    local sub = UI.Text(p, 11, "dim")
+    sub:SetPoint("LEFT", ST.bar, "RIGHT", 14, 0)
+    sub:SetPoint("RIGHT", p, "RIGHT", -12, 0)
+    if sub.SetWordWrap then sub:SetWordWrap(false) end
+    sub:SetText(L["Your farming runs: what you looted, what it's worth now, gold an hour"])
     local f = CreateFrame("Frame", nil, p)
     f:SetPoint("TOPLEFT", 0, -30)
     f:SetPoint("BOTTOMRIGHT", 0, 0)
