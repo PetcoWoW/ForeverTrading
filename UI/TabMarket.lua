@@ -496,7 +496,7 @@ local function BuildList(parent)
         return c
     end
     local row1 = { Chip("all", L["All"]), Chip("fav", L["Watchlist"]), Chip("mine", L["My recipes"]),
-        Chip("bags", L["I own"]) }
+        Chip("bags", L["Owned"]) }
     -- another page asks for a list: the Watchlist, say
     function T.SetFilter(key)
         state.filter = key
@@ -1250,7 +1250,8 @@ local function BuildItemView(parent)
 
     -- the sections on the right, the chart on the left
     v.secs = BuildSections(v)
-    v.secs:SetPoint("TOPRIGHT", v.share, "BOTTOMRIGHT", 0, -10)
+    -- below the verdict (it can take two lines), level with the chart's range buttons
+    v.secs:SetPoint("TOPRIGHT", v, "TOPRIGHT", 0, -(48 + UI.RowH(34) + 10))
     v.secs:SetPoint("BOTTOMRIGHT", 0, 0)
     v.secs:SetWidth(SEC_W())
     v.range = UI.Segmented(v, UI.RANGES, function(r)
@@ -1341,6 +1342,7 @@ function T.ShowItem(id, keepView)
     -- a long reason takes a second line: the panel grows, the chart and the sections move down
     local two = (v.callText:GetStringWidth() or 0) > ((v.callText:GetWidth() or 400) + 0.5)
     v.call:SetHeight(UI.RowH(two and 46 or 34))
+    v.secs:SetPoint("TOPRIGHT", v, "TOPRIGHT", 0, -(48 + UI.RowH(two and 46 or 34) + 10))
     v.callWhy = call.detail
     v.callOther = call.other
 
@@ -1602,6 +1604,28 @@ function T.Focus(id)
     if T.searchBox then T.searchBox:SetValue(state.search) end
     T.RefreshList()
     T.Select(id)
+end
+
+-- typing began in the search box at the top of the window (another page): the list searches it, from all items,
+-- and the typing goes on in Market's own box
+function T.TypeIn(text)
+    state.filter, state.cls, state.sub = "all", "all", "all"
+    if FiltersOn() then
+        T.ResetFilters()
+        T.SyncFilters()
+    end
+    if T.chips then
+        for _, c in ipairs(T.chips) do c:SetOn(c.key == "all") end
+    end
+    if T.clsDD then T.clsDD:SetValue("all") end
+    state.search, state.focusFor, state.only = text or "", nil, nil
+    if T.searchBox then
+        T.searchBox:SetValue(state.search)
+        T.searchBox:SetFocus()
+        if T.searchBox.SetCursorPosition then T.searchBox:SetCursorPosition(#state.search) end
+    end
+    T.RefreshList()
+    if state.search ~= "" then T.LoadMissingNames() end
 end
 
 function T.Select(id)

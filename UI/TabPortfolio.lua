@@ -689,7 +689,7 @@ function T.Refresh()
     T.rows, T.total = rows, total
     local gold = FT.Port.Gold()
     local ch = total7 > 0 and (total / total7 - 1) or nil
-    cards[1]:Set(FT.Money(total + gold, "short"), L["items and gold"])
+    cards[1]:Set(FT.Money(FT.Port.Worth(), "short"), L["items, listings and gold"])
     cards[2]:Set(FT.Money(total, "short"), FT.Pct(ch) .. FT.C("dim", " " .. L["in 7 days"]))
     cards[3]:Set(FT.Money(gold, "short"), L["all characters on this server"])
     local toSell = 0
@@ -702,6 +702,14 @@ function T.Refresh()
 end
 
 T.OnShow = T.Refresh
+
+-- loot, mail, a buy, a listing, gold: Holdings follows while it's open (once things settle: crafting holds it off)
+local function Follow()
+    if list and list:IsVisible() and state.view == "portfolio" then FT.Debounce("youFollow", 1, T.Refresh) end
+end
+FT.On("FT_INVENTORY_CHANGED", Follow)
+FT.On("FT_OWNED_CHANGED", Follow)
+FT.On("PLAYER_MONEY", Follow)
 
 -- item names and colours arrived: the rows on screen show them
 function T.OnItems()

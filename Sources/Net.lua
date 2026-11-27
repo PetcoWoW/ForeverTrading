@@ -5,6 +5,7 @@
 --   F  farm rates: what your farm log saw per mob (corpses, items) - pooled into Forever's real drops
 --   S  sale prices: what sold of yours (the auction house mail) - "Wolf users sold N lately at ~X"
 --   G  deal calls: a watchlist deal you found at the auction house - one chat line for the others
+--   V  recipe merchants (v0.43): a vendor selling a recipe, where it stands - the craft window says it
 -- The junk guard: a price far from what we know (3x or more either way) is held until a second user agrees (within
 -- 10%, inside two hours); anything 50x off is dropped. Only guild and group: Forever refuses addon messages in chat
 -- channels. Nothing is sent in a fight; at most a message a second, queued.
@@ -291,6 +292,27 @@ local function OnDeal(sender, side, a, b, c)
 end
 
 ---------------------------------------------------------------------------
+-- V: a merchant that sells a recipe (v0.43)
+---------------------------------------------------------------------------
+local function Clean(t) return (tostring(t or ""):gsub("[\t|]", " "):sub(1, 40)) end
+function N.RecipeVendor(id, npc, zone, price, limited)
+    if not (id and npc) then return end
+    Push("V", PROTO, FT.houseKey or "?", Enc(id), Clean(npc), Clean(zone), Enc(price or 0), limited and "1" or "0")
+end
+
+local function OnVendor(sender, side, a, npc, zone, b, lim)
+    local id = Dec(a)
+    if not (id and npc and npc ~= "") then return end
+    local _, _, _, _, _, classID = FT.GetItemInfoInstant(id)
+    if classID and classID ~= 9 then return end
+    FT.db.recipeVendors = FT.db.recipeVendors or {}
+    if FT.db.recipeVendors[id] then return end -- your own sighting (or the first one heard) stays
+    local price = Dec(b)
+    FT.db.recipeVendors[id] = { n = Clean(npc), z = Clean(zone), p = (price and price > 0) and price or nil, l = lim == "1" or nil,
+        t = time(), by = Short(sender) }
+end
+
+---------------------------------------------------------------------------
 -- Messages
 ---------------------------------------------------------------------------
 FT.On("CHAT_MSG_ADDON", function(prefix, text, channel, sender)
@@ -303,6 +325,7 @@ FT.On("CHAT_MSG_ADDON", function(prefix, text, channel, sender)
     elseif kind == "F" then OnFarm(sender, a, b, c, d)
     elseif kind == "S" then OnSold(sender, a, b, c, d, e)
     elseif kind == "G" then OnDeal(sender, a, b, c, d)
+    elseif kind == "V" then OnVendor(sender, a, b, c, d, e, select(8, strsplit("\t", text)))
     end
 end)
 

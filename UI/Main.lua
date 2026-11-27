@@ -26,6 +26,7 @@ local groupLast = { make = "make", you = "portfolio" }
 
 local win, nav, content, ticker, statusLeft, statusRight, scanDot, scanText, sizeBox, gearBtn, brand
 local lastPage = "today"
+local quickSearch
 local pages = {}
 
 -- three sizes instead of dragging a corner: compact, standard, the whole screen
@@ -452,11 +453,19 @@ local function BuildScanBox(header, anchor, closeButton)
     return f
 end
 
+function FT.UpdateQuickSearch()
+    if not quickSearch then return end
+    local show = FT.currentTab ~= "market" and not (FT.Scanner and FT.Scanner.mode ~= nil)
+    if not show and quickSearch:HasFocus() then quickSearch:ClearFocus() end
+    quickSearch:SetShown(show)
+end
+
 function FT.UpdateScanBox()
     local f = scanBox
     if not f then return end
     local S = FT.Scanner
     local running = S.mode ~= nil
+    FT.UpdateQuickSearch()
     f:SetShown(running)
     f.stop:SetShown(running)
     f.bar:SetShown(running)
@@ -569,6 +578,17 @@ local function Build()
         if FT.currentTab == "settings" then FT.SelectTab(lastPage) else FT.SelectTab("settings") end
     end)
 
+    -- v0.43: search from any page. The first letter typed takes you to Market, the rest goes on in its own search
+    -- box (hidden on Market itself, which has that box, and while a scan shows its progress here)
+    quickSearch = UI.Input(header, 170, 24, L["Search item..."], function(text)
+        if not text or text == "" then return end
+        quickSearch:SetValue("")
+        quickSearch:ClearFocus()
+        FT.SelectTab("market")
+        if FT.Tabs.market and FT.Tabs.market.TypeIn then FT.Tabs.market.TypeIn(text) end
+    end)
+    quickSearch:SetPoint("RIGHT", gearBtn, "LEFT", -12, 0)
+
     scanText = UI.Text(header, 11, "muted", "RIGHT")
     scanText:SetPoint("RIGHT", gearBtn, "LEFT", -14, 0)
     scanText:Hide()
@@ -578,7 +598,7 @@ local function Build()
     BuildScanBox(header, scanDot, gearBtn)
     FT.UpdateScanBox()
     -- what the tour points at
-    FT.MainRefs = { nav = nav, pill = pill, house = houseChip, gear = gearBtn, scan = scanBox }
+    FT.MainRefs = { nav = nav, pill = pill, house = houseChip, gear = gearBtn, scan = scanBox, search = quickSearch }
 
     -- ticker tape
     ticker = BuildTicker(win)
@@ -716,6 +736,7 @@ function FT.SelectTab(name)
     end
     nav:SetValue(GROUP_OF[name] or name)
     if gearBtn then gearBtn:Update() end
+    FT.UpdateQuickSearch()
     local page = Page(name)
     for n, p in pairs(pages) do p:SetShown(n == name) end
     local tab = FT.Tabs[name]
@@ -728,6 +749,7 @@ end
 
 function FT.Show(tab)
     if not win then Build() end
+    local open = win:IsShown()
     win:Show()
     win:Raise()
     if tab == "sell" then
@@ -735,9 +757,8 @@ function FT.Show(tab)
         if FT.Tabs.portfolio and FT.Tabs.portfolio.SetView then FT.Tabs.portfolio.SetView("sell") end
         tab = nil
     else
-        local last = FT.db and FT.db.ui and FT.db.ui.lastTab
-        if last == "sell" or last == "settings" then last = nil end
-        FT.SelectTab(tab or FT.currentTab or last or "today")
+        -- opened: Today, every time (v0.43); already open: the page you're on
+        FT.SelectTab(tab or (open and FT.currentTab) or "today")
     end
     -- once a version: what's new (or, on a first install, the tour)
     if FT.News then C_Timer.After(0.4, FT.News.OnWindow) end

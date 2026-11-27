@@ -1411,7 +1411,43 @@ local function CraftWindow()
     d.shop:FitText(24)
     d.shop:SetPoint("RIGHT", d.chart, "LEFT", -6, 0)
     d.shop:SetTip(L["Shopping list"], L["The materials to buy (not the vendor ones) as an Auctionator shopping list."])
+    -- v0.43: where the recipe comes from, and whether it's on the auction house (click: the recipe in Market)
+    d.recipe = CreateFrame("Button", nil, d)
+    d.recipe:SetPoint("TOPLEFT", 16, -56)
+    d.recipe:SetPoint("RIGHT", d, "RIGHT", -16, 0)
+    d.recipe:SetHeight(20)
+    d.recipe.icon = UI.Icon(d.recipe, 16)
+    d.recipe.icon:SetPoint("LEFT", 0, 0)
+    d.recipe.text = UI.Text(d.recipe, 12, "text")
+    d.recipe.text:SetPoint("LEFT", d.recipe.icon, "RIGHT", 8, 0)
+    d.recipe.text:SetPoint("RIGHT", 0, 0)
+    d.recipe:SetScript("OnClick", function(self)
+        if self.itemID and not UI.ItemClick(self.itemID) then FT.OpenItem(self.itemID) end
+    end)
+    d.recipe:SetScript("OnEnter", function(self)
+        local src = self.src
+        if not src then return end
+        if self.itemID then UI.TipItem(self, self.itemID) else GameTooltip:SetOwner(self, "ANCHOR_RIGHT") end
+        GameTooltip:AddLine(" ")
+        if src.trainer then
+            GameTooltip:AddLine(L["No recipe item teaches it: a profession trainer does."], 0.75, 0.78, 0.82, true)
+        else
+            local v = src.vendor
+            if v then
+                GameTooltip:AddLine(string.format(L["Sold by %s in %s"], v.n or "?", v.z or "?"), 1, 0.82, 0, true)
+                if v.p then GameTooltip:AddLine(string.format(L["for %s"], FT.Money(v.p, "short")) .. (v.l and ("  ·  " .. L["limited stock: it comes back over time"]) or ""), 0.75, 0.78, 0.82, true) end
+                GameTooltip:AddLine(v.by and string.format(L["Seen by %s (Wolf network)"], v.by) or L["Seen by you"], 0.58, 0.55, 0.5)
+            else
+                GameTooltip:AddLine(L["No Wolf user has seen a merchant sell it: a drop or a quest. Wowhead (on its Market page) has where."], 0.75, 0.78, 0.82, true)
+            end
+            GameTooltip:AddLine(" ")
+            GameTooltip:AddLine(L["Click: the recipe on the Market page."], 0.58, 0.55, 0.5)
+        end
+        GameTooltip:Show()
+    end)
+    d.recipe:SetScript("OnLeave", function() GameTooltip:Hide() end)
     local panel = UI.Panel(d, "bg0", "line")
+    d.panel = panel
     panel:SetPoint("TOPLEFT", 12, -60)
     panel:SetPoint("BOTTOMRIGHT", -12, 92)
     local cols = {
@@ -1466,6 +1502,38 @@ function FT.ShowCraft(r)
     d.sub:SetText(L[r.prof or "?"] .. (known and ("  ·  " .. FT.C("up", L["Known by"] .. " " .. table.concat(who, ", "))) or ""))
     d.parts = e.parts
     d.list:SetItems(e.parts or {})
+    -- the recipe: a trainer, a merchant, a drop - and on the auction house or not
+    local src = FT.Craft.RecipeSource and FT.Craft.RecipeSource(r)
+    d.recipe.src = src
+    d.recipe:SetShown(src ~= nil)
+    d.panel:SetPoint("TOPLEFT", 12, src and -82 or -60)
+    d:SetHeight(src and 422 or 400)
+    if src then
+        local ah = src.ah
+        d.recipe.itemID = ah and ah.id or src.items[1]
+        d.recipe.icon:SetShown(d.recipe.itemID ~= nil)
+        if d.recipe.itemID then d.recipe.icon:SetItem(d.recipe.itemID) end
+        local parts = {}
+        local from
+        if src.trainer then
+            from = L["a trainer"]
+        elseif src.vendor then
+            from = string.format(L["%s (vendor), %s"], src.vendor.n or "?", src.vendor.z or "?")
+        else
+            from = L["a drop or quest"]
+        end
+        parts[1] = FT.C("accent", L["Recipe:"]) .. " " .. from
+        if not src.trainer then
+            if ah and ah.listed > 0 then
+                parts[2] = FT.C("up", string.format(L["on the AH %s"], FT.Money(ah.price, "short"))) .. FT.C("dim", ", " .. string.format(L["%s listed"], FT.Num(ah.listed)))
+            elseif ah then
+                parts[2] = FT.C("dim", string.format(L["not on the AH (last %s)"], FT.Money(ah.price, "short")))
+            else
+                parts[2] = FT.C("dim", L["never seen on the AH"])
+            end
+        end
+        UI.FitBits(d.recipe.text, table.concat(parts, FT.C("dim", "  ·  ")))
+    end
     local qty = r.outputQty or 1
     local buyReady = FT.Price(r.output)
     local rows = {

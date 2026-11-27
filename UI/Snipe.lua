@@ -108,7 +108,8 @@ local function Build(parent)
         update = function(row, x)
             row.icon:SetItem(x.id)
             row.name:SetText(FT.ItemText(x.id, 40))
-            row.line:SetText(FT.C("up", FT.Money(x.price, "short")) .. FT.C("dim", "  ·  " .. L["normally"] .. " ")
+            -- (a narrow column: the last parts go before the line is cut)
+            UI.FitBits(row.line, FT.C("up", FT.Money(x.price, "short")) .. FT.C("dim", "  ·  " .. L["normally"] .. " ")
                 .. FT.Money(math.floor(x.fair), "short") .. FT.C("dim", "  ·  ") .. FT.Pct(x.off)
                 .. (x.listed and FT.C("dim", "  ·  " .. string.format(L["%s listed"], FT.Num(x.listed))) or ""))
             row.chip:Set(x.conf)
@@ -134,7 +135,7 @@ local function Build(parent)
         update = function(row, x)
             row.icon:SetItem(x.id)
             row.name:SetText(FT.ItemText(x.id, 30))
-            row.line:SetText(x.under and (L["under"] .. " " .. FT.Money(x.under, "short") .. FT.C("dim", "  ·  "
+            UI.FitBits(row.line, x.under and (L["under"] .. " " .. FT.Money(x.under, "short") .. FT.C("dim", "  ·  "
                 .. string.format(L["back %d/%d"], x.ok, x.n))) or string.format(L["back %d/%d"], x.ok, x.n))
             row.chip:Set(x.hit and "safe" or "good")
             row.chip.text:SetText(x.hit and L["CHEAP NOW"] or (x.price and FT.Money(x.price, "short") or "—"))
@@ -274,7 +275,7 @@ function P.BuildWatch(f)
             if x.usual then bits[#bits + 1] = L["usual"] .. " " .. FT.Money(math.floor(x.usual), "short") end
             if x.deal then bits[#bits + 1] = FT.C("up", string.format(L["%s under %s"], FT.Num(x.deal.n), FT.Money(x.deal.under, "short"))) end
             if FT.Scanner.LiveOn(x.id) then bits[#bits + 1] = FT.C("up", L["live"]) end
-            row.line:SetText(table.concat(bits, FT.C("dim", "  ·  ")))
+            UI.FitBits(row.line, table.concat(bits, FT.C("dim", "  ·  ")))
             if x.deal then
                 row.chip:Set("safe")
                 row.chip.text:SetText(L["DEAL"])

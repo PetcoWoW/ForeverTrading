@@ -1,5 +1,20 @@
 # Wolf
 
+## v0.43 - search from anywhere, what you own live, where recipes come from
+
+- **Search from any page:** a search box at the top of the window. The first letter takes you to Market and the
+  typing goes on there. Wolf now always opens on Today.
+- **What you own, live:** loot, mail, AH buys, crafts and gold show on Today and You (Holdings, the donut) as they
+  happen. Listings on the auction house count in "Everything you own".
+- **Picked up vs prices:** Today's "+12g with the last prices" is what the prices did, only; a second line says what
+  you picked up (or spent) today. The first days, before a few updates are in, the line shows 14 days of what you
+  hold and since yesterday comes from it.
+- **Where a recipe comes from:** a craft's window says if the recipe is from a trainer, a merchant (name and zone,
+  seen by you or a Wolf user in your guild or group) or a drop or quest, and whether it's on the auction house now and
+  at what price. Click it for the recipe's Market page.
+- **Market:** the "I own" filter is "Owned".
+- **Fixed:** a two-line verdict on an item page ran under When it sells.
+
 ## v0.42 - Simple Wolf and the Wolf network
 
 Wolf slimmed down for first-timers, tried out first in Wolf Lab.

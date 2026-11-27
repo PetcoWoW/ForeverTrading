@@ -837,7 +837,20 @@ step("layout", function()
     { "you: holdings, gold", "portfolio", function() FT.Tabs.portfolio.donut:Pick("gold") end },
     { "you: holdings", "portfolio", function() FT.Tabs.portfolio.donut:Pick(nil) end },
     { "market", "market" }, { "market item", "market", function() FT.OpenItem(12363) end },
-    { "market item: a flask", "market", function() FT.OpenItem(13510) end },
+    { "market item: two-line verdict", "market", function()
+      -- v0.43: a long reason takes two lines; When it sells starts below it
+      realCall = realCall or FT.An.Call
+      FT.An.Call = function(...)
+        local c = realCall(...)
+        local x = {}
+        for k, v in pairs(c) do x[k] = v end
+        x.text = "Cheaper than usual (-34%), but dips like this kept falling for days on end: wait for it to settle first"
+        x.conf = x.conf or "likely"
+        return x
+      end
+      FT.OpenItem(12363)
+    end },
+    { "market item: a flask", "market", function() if realCall then FT.An.Call = realCall end; FT.OpenItem(13510) end },
     { "market item: a raw mat", "market", function() FT.OpenItem(4338) end },
     { "market: watchlist", "market", function() FT.Tabs.market.ClearSelection(); FT.Tabs.market.SetFilter("fav") end },
     { "market item: a craft of yours", "market", function() FT.OpenItem(18405) end },
@@ -945,6 +958,29 @@ step("layout", function()
       end
       print("item window checked: " .. #texts .. " texts")
     end
+  end
+  -- the craft window with its recipe line (v0.43): a merchant's recipe, on the auction house
+  do
+    local r = FT.Craft.AllRecipes()[1]
+    for _, x in ipairs(FT.Craft.AllRecipes()) do if x.name and #x.name > 20 then r = x break end end
+    local had = FT.RECIPE_ITEMS
+    FT.RECIPE_ITEMS = { [r.name:lower()] = { 13510 } }
+    FT.db.recipeVendors = { [13510] = { n = "Kylanna Windwhisper", z = "Ashenvale", p = 40000, l = true, t = time(), by = "Sarge" } }
+    FT.ShowCraft(r)
+    local win = _G["WolfOfBootyBayCraft"]
+    mock.layout.Settle(win)
+    local found, texts = mock.layout.Overlaps(win)
+    for _, o in ipairs(found) do
+      total = total + 1
+      print(string.format("OVERLAP [craft window] %q x %q  (%dx%d px)", o[1].text:sub(1, 50), o[2].text:sub(1, 50), o[3], o[4]))
+    end
+    for _, t in ipairs(texts) do
+      if t.cut then cuts = cuts + 1; local rr = mock.layout.Rect(t.f); print(string.format("CUT [craft window] %q  box %d text %d", t.text:sub(1, 120), rr[2] - rr[1], mock.layout.TextWidth(t.f))) end
+      if t.spill then cuts = cuts + 1; print(string.format("SPILL [craft window] %q", t.text:sub(1, 60))) end
+    end
+    print("craft window checked: " .. #texts .. " texts")
+    win:Hide()
+    FT.RECIPE_ITEMS, FT.db.recipeVendors = had, nil
   end
   FT.SetWindowSize("std")
   print("layout: " .. total .. " overlapping text pairs, " .. cuts .. " texts cut short")
@@ -1230,6 +1266,75 @@ step("network", function()
   assert(not N.SoldText(id + 1), "another house's sale isn't taken")
   print("network: sent " .. n .. " changed prices; " .. ft:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "") .. "; " .. N.SoldText(id))
   IsInGuild = realGuild
+end)
+-- v0.43: opens on Today, search from any page, what you pick up, where a recipe comes from
+step("v0.43", function()
+  -- opened: Today, whatever page was last
+  FT.Show("market"); WolfOfBootyBayFrame:Hide(); FT.Toggle()
+  assert(FT.currentTab == "today", "opens on Today: " .. tostring(FT.currentTab))
+  -- the top search: typing on Today takes you to Market with it
+  local qs = FT.MainRefs.search
+  assert(qs and qs:IsShown(), "the top search shows on Today")
+  qs:SetText("thor")
+  qs:GetScript("OnTextChanged")(qs, true)
+  assert(FT.currentTab == "market", "typing opens Market: " .. tostring(FT.currentTab))
+  assert(FT.Tabs.market.searchBox:GetText() == "thor", "Market's box has it: " .. tostring(FT.Tabs.market.searchBox:GetText()))
+  assert(not qs:IsShown(), "the top search hides on Market")
+  FT.Show("today")
+  assert(qs:IsShown(), "and comes back elsewhere")
+  -- picked up: ten more of something priced, at today's price; Today says it
+  local P = FT.Port
+  P.TrackPlay()
+  local id
+  for i, x in pairs(FT.db.inv[FT.charKey].bags) do
+    local st = FT.An.Stats(i)
+    if st and st.price and st.price > 100 then id = i break end
+  end
+  assert(id, "a priced item in the bags")
+  local before = P.Played()
+  local bags = FT.db.inv[FT.charKey].bags
+  bags[id] = bags[id] + 10
+  FT.Fire("FT_INVENTORY_CHANGED")
+  P.Snapshot()
+  local got = P.Played() - before
+  local want = math.floor(10 * FT.An.Stats(id).price)
+  assert(math.abs(got - want) <= 1, "picked up " .. got .. ", want " .. want)
+  FT.Tabs.today.FillWorth()
+  local since = FT.Tabs.today.since.__text or ""
+  assert(since:find("picked up today", 1, true), "Today says it: " .. since)
+  bags[id] = bags[id] - 10
+  FT.Fire("FT_INVENTORY_CHANGED")
+  P.Snapshot()
+  -- the worth line on the first days: 14 days of what you hold
+  print("today worth: " .. tostring(FT.Tabs.today.worth.__text) .. " | " .. tostring(FT.Tabs.today.update.__text):gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "")
+    .. " | " .. since:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "") .. " | " .. tostring(FT.Tabs.today.span.__text))
+  -- a recipe: from a trainer, from a merchant someone in the guild saw, on the auction house
+  local r
+  for _, x in ipairs(FT.Craft.AllRecipes()) do if x.name then r = x break end end
+  local had = FT.RECIPE_ITEMS
+  FT.RECIPE_ITEMS = {}
+  assert(FT.Craft.RecipeSource(r).trainer, "no recipe item: a trainer")
+  FT.RECIPE_ITEMS = { [r.name:lower()] = { 13510 } }
+  FT.db.recipeVendors = nil
+  local realGuild, realInstant = IsInGuild, FT.GetItemInfoInstant
+  IsInGuild = function() return true end
+  -- (the test's stand-in recipe item is a flask: the game would say it's a recipe)
+  FT.GetItemInfoInstant = function(i) if i == 13510 then return i, nil, nil, nil, nil, 9, 2 end return realInstant(i) end
+  local enc = FT.Hist.Enc
+  mock.fire("CHAT_MSG_ADDON", "WOLFNET1", table.concat({ "V", "1", FT.houseKey, enc(13510), "Kylanna", "Ashenvale", enc(40000), "1" }, "\t"), "GUILD", "Sarge-Realm")
+  IsInGuild, FT.GetItemInfoInstant = realGuild, realInstant
+  local src = FT.Craft.RecipeSource(r)
+  assert(src.vendor and src.vendor.n == "Kylanna" and src.vendor.l and src.vendor.by == "Sarge", "a merchant heard from the network")
+  assert(src.ah and src.ah.id == 13510, "its price on the auction house")
+  FT.ShowCraft(r)
+  local line = WolfOfBootyBayCraft.recipe.text.__text or ""
+  assert(line:find("Kylanna", 1, true), "the craft window says where: " .. line)
+  print("recipe line: " .. line:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", ""))
+  WolfOfBootyBayCraft:Hide()
+  -- without the recipe data: no line
+  FT.RECIPE_ITEMS = nil
+  assert(FT.Craft.RecipeSource(r) == nil, "no recipe data: nothing said")
+  FT.RECIPE_ITEMS, FT.db.recipeVendors = had, nil
 end)
 step("logout", function() mock.fire("PLAYER_LOGOUT") end)
 '''

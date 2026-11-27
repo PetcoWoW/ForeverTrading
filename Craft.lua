@@ -267,6 +267,29 @@ function C.Eval(r)
     return e
 end
 
+-- Where a recipe comes from (v0.43): { items = { recipe itemIDs }, trainer = true (no recipe item: a trainer),
+-- vendor = { n = merchant, z = zone, p = price, l = limited, by = who saw it }, ah = { id, price, listed } (the
+-- cheapest one listed now, else the last price seen, listed = 0) }; nil when the recipe data doesn't say
+function C.RecipeSource(r)
+    if not (r and type(r.name) == "string" and FT.RECIPE_ITEMS) then return nil end
+    local ids = FT.RECIPE_ITEMS[r.name:lower()]
+    if not ids or #ids == 0 then return { items = {}, trainer = true } end
+    local out = { items = ids }
+    local vendors = FT.db and FT.db.recipeVendors
+    for _, id in ipairs(ids) do
+        if vendors and vendors[id] and not out.vendor then out.vendor = vendors[id] end
+        local st = FT.An and FT.An.Stats(id)
+        if st and st.price then
+            local listed = st.listed or 0
+            local a = out.ah
+            if not a or (listed > 0 and (a.listed == 0 or st.price < a.price)) then
+                out.ah = { id = id, price = st.price, listed = listed }
+            end
+        end
+    end
+    return out
+end
+
 function C.Find(key)
     for _, r in ipairs(C.List()) do
         if r.key == key then return r end

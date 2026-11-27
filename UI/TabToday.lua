@@ -180,6 +180,11 @@ local function Thirds(row, frames)
     end)
 end
 
+local function Signed(v)
+    local m = FT.Money(math.abs(v), "gold")
+    return v >= 0 and FT.C("up", "+" .. m) or FT.C("down", "-" .. m)
+end
+
 function T.Build(p)
     -- everything you own: worth, the last update's move, since yesterday, a line of the last 24 updates
     local own = UI.Panel(p, "bg1", "line")
@@ -199,6 +204,7 @@ function T.Build(p)
     local span = UI.Text(own, 10, "dim", "RIGHT")
     span:SetPoint("RIGHT", -14, 0)
     span:SetText(L["last 24 updates"])
+    T.span = span
     T.spark = UI.Sparkline(own, 240, 32)
     T.spark:SetPoint("RIGHT", span, "LEFT", -10, 0)
     T.update:SetPoint("RIGHT", T.spark, "LEFT", -12, 0)
@@ -207,14 +213,25 @@ function T.Build(p)
         GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
         GameTooltip:AddLine(L["Everything you own"], 1, 1, 1)
         GameTooltip:AddLine(L["Bags, banks, mail and the auction house of your characters on this server, at the latest prices, plus their gold."], 0.75, 0.78, 0.82, true)
-        local list = FT.Port.Snaps()
-        if #list >= 2 then
+        local played = FT.Port.Played()
+        if played ~= 0 then
             GameTooltip:AddLine(" ")
-            GameTooltip:AddLine(L["What each price update did to it"], 1, 0.82, 0)
-            for i = #list, math.max(2, #list - 5), -1 do
-                local d = list[i].v - list[i - 1].v
-                GameTooltip:AddDoubleLine(FT.TimeOfDay(list[i].t) .. FT.C("dim", "   " .. FT.Money(list[i].v, "gold")),
-                    d >= 0 and FT.C("up", "+" .. FT.Money(d, "gold")) or FT.C("down", FT.Money(d, "gold")), 0.85, 0.87, 0.9, 1, 1, 1)
+            GameTooltip:AddDoubleLine(played > 0 and L["Picked up today"] or L["Spent today"], Signed(played), 1, 0.82, 0)
+            GameTooltip:AddLine(L["Loot, gold, buys, crafts and sales today, at the prices of the moment. Price updates aren't in it. A sale counts once its gold is read from the mailbox."], 0.58, 0.55, 0.5, true)
+        end
+        local list = FT.Port.Snaps()
+        local shown = 0
+        for i = #list, 2, -1 do
+            local d = list[i].move
+            if d == nil and not list[i].k then d = list[i].v - list[i - 1].v end
+            if d then
+                if shown == 0 then
+                    GameTooltip:AddLine(" ")
+                    GameTooltip:AddLine(L["What each price update did to it"], 1, 0.82, 0)
+                end
+                GameTooltip:AddDoubleLine(FT.TimeOfDay(list[i].t) .. FT.C("dim", "   " .. FT.Money(list[i].v, "gold")), Signed(d), 0.85, 0.87, 0.9, 1, 1, 1)
+                shown = shown + 1
+                if shown >= 6 then break end
             end
         end
         GameTooltip:AddLine(" ")
@@ -275,21 +292,52 @@ local function BagRows()
     return out, total
 end
 
+-- the line: the worth at each of the last 24 updates; the first days (fewer than 6 of them), what you hold now was
+-- worth on each of the last 14 days
+local function WorthLine()
+    local list = FT.Port.Snaps()
+    local vals = {}
+    if #list >= 6 then
+        for i = math.max(1, #list - 23), #list do vals[#vals + 1] = list[i].v end
+        return vals, L["last 24 updates"], nil
+    end
+    local hist = FT.Port.History(14)
+    for _, h in ipairs(hist) do vals[#vals + 1] = h.value end
+    if #vals < 2 then
+        vals = {}
+        for _, x in ipairs(list) do vals[#vals + 1] = x.v end
+        return vals, L["last 24 updates"], nil
+    end
+    return vals, L["14 days"], vals[#vals] - vals[#vals - 1]
+end
+
 function T.FillWorth()
     if not built then return end
     T.worth:SetText(FT.Money(FT.Port.Worth(), "gold"))
     local lastMove, dayMove, now = FT.Port.WorthMoves()
-    if lastMove then
-        T.update:SetText((lastMove >= 0 and FT.C("up", "+" .. FT.Money(lastMove, "gold")) or FT.C("down", FT.Money(lastMove, "gold")))
-            .. FT.C("muted", " " .. string.format(L["with the last prices (%s)"], FT.TimeOfDay(now.t))))
+    local vals, span, histDay = WorthLine()
+    dayMove = dayMove or histDay
+    T.span:SetText(span)
+    if lastMove == 0 then
+        T.update:SetText(FT.C("muted", string.format(L["no change with the last prices (%s)"], FT.TimeOfDay(now.t))))
+    elseif lastMove then
+        T.update:SetText(Signed(lastMove) .. FT.C("muted", " " .. string.format(L["with the last prices (%s)"], FT.TimeOfDay(now.t))))
+    elseif dayMove and dayMove ~= 0 then
+        T.update:SetText(Signed(dayMove) .. FT.C("muted", " " .. L["since yesterday"]))
+        dayMove = nil -- said above
     else
         T.update:SetText(FT.C("dim", L["its move shows from the next prices"]))
     end
-    T.since:SetText(dayMove and ((dayMove >= 0 and ("+" .. FT.Money(dayMove, "gold")) or FT.Money(dayMove, "gold")) .. " " .. L["since yesterday"]) or "")
-    local vals = {}
-    local list = FT.Port.Snaps()
-    for i = math.max(1, #list - 23), #list do vals[#vals + 1] = list[i].v end
-    T.spark:SetValues(vals, (lastMove or 0) >= 0 and "up" or "down")
+    local parts = {}
+    local played = FT.Port.Played()
+    if played > 0 then
+        parts[#parts + 1] = Signed(played) .. " " .. L["picked up today"]
+    elseif played < 0 then
+        parts[#parts + 1] = Signed(played) .. " " .. L["spent today"]
+    end
+    if dayMove and dayMove ~= 0 then parts[#parts + 1] = Signed(dayMove) .. " " .. L["since yesterday"] end
+    UI.FitBits(T.since, table.concat(parts, FT.C("dim", "  ·  ")))
+    T.spark:SetValues(vals, (#vals < 2 or vals[#vals] >= vals[1]) and "up" or "down")
 end
 
 function T.Refresh()
@@ -318,3 +366,4 @@ FT.On("FT_DEALS_READY", IfShown)
 FT.On("FT_CRAFTS_READY", IfShown)
 FT.On("FT_MOVERS_READY", IfShown)
 FT.On("FT_INVENTORY_CHANGED", function() FT.Debounce("todayBags", 1, IfShown) end)
+FT.On("PLAYER_MONEY", function() if built and T.cards[1]:IsVisible() then FT.Debounce("todayWorth", 1, T.FillWorth) end end)

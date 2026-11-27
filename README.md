@@ -17,12 +17,14 @@ and the words and adds its own features. See `NOTICE`.
 
 Restart the game fully the first time (new addon files load at launch, not on `/reload`), then type `/wolf`.
 
-## The window (v0.42)
+## The window (v0.43)
 
 Four tabs: **Today** (what you own and what the last prices did to it, your top 3, your bags, what's going up and
 down), **Market** (search any item: the verdict first, one chart, when it sells, what it makes or costs to make,
 where to farm it), **Make gold** (Flip it, Craft it, Farm it, Raid prep) and **You** (Holdings with a donut of where
 your gold sits, Sessions, Characters, Journal). Every call is one of six verdicts: BUY, SELL, HOLD, WAIT, CRAFT, FARM.
+The search box at the top works from any page. What you own follows loot, mail, buys and gold as they happen, and a
+craft's window says where its recipe comes from and whether it's on the auction house.
 
 **The Wolf network:** Wolf users in your guild and group share the prices that changed after a scan (no `/reload`),
 what sold, farm rates per mob and watchlist deals, in hidden addon messages; a price far from what's known waits

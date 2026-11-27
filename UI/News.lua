@@ -12,6 +12,11 @@ FT.News = N
 -- start, after the files are read (a table made with them would keep the English)
 local function News()
     return {
+        ["v0.43"] = {
+            { L["Search from any page"], L["The search box at the top of the window: type and Market opens with it. Wolf now always opens on Today."], function() FT.Show("today") end },
+            { L["What you own, live"], L["Loot, mail, buys, crafts and gold show on Today and You as they happen, and Today says what you picked up today apart from what prices did."], function() FT.Show("today") end },
+            { L["Where a recipe comes from"], L["A craft's window says if its recipe is from a trainer, a merchant (where) or a drop, and if it's on the auction house now and at what price."], function() FT.ShowSub("make", "craft") end },
+        },
         ["v0.42"] = {
             { L["Simple Wolf: four tabs"], L["Today, Market, Make gold, You. Today: what you own and what the last prices did to it, your top 3, your bags, what's going up and down."], function() FT.Show("today") end },
             { L["Six verdicts"], L["BUY, SELL, HOLD, WAIT, CRAFT, FARM, one colour each everywhere. CASH OUT and HODL only with Settings > Meme mode on."], nil },

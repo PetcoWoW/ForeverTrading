@@ -111,8 +111,8 @@ end
 
 ---------------------------------------------------------------------------
 -- What you own, at every price update (v0.42): a snapshot each time new prices come in (Blizzard's with a reload,
--- your scans, a guild member's scan). { t = the prices' time, v = items + gold, at = when it was taken }, the last
--- 48 per side. Today shows what the last one did to your worth.
+-- your scans, a guild member's scan). { t = the prices' time, v = items + listings + gold, at = when it was taken,
+-- move = what those prices did }, the last 48 per side. Today shows what the last one did to your worth.
 ---------------------------------------------------------------------------
 local SNAPS = 48
 
@@ -123,9 +123,27 @@ local function PricesTime()
     return t > 0 and t or nil
 end
 
+-- your listings on the auction house at market price (not sold yet): posting moves an item there, it stays yours
+function P.ListedWorth()
+    local total = 0
+    if not (FT.Owned and FT.Owned.List) then return 0 end
+    for _, b in ipairs((FT.Owned.List())) do
+        if b.itemID and not b.sold then
+            local s = FT.An.Stats(b.itemID)
+            if s and s.price then total = total + s.price * (b.qty or 1) end
+        end
+    end
+    return total
+end
+
+-- items (bags, bank, mail, on the way), listings and gold: what Today's "Everything you own" says
 function P.Worth()
-    local _, total = P.Rows()
-    return (total or 0) + P.Gold()
+    local total = 0
+    for id, h in pairs(P.Holdings()) do
+        local s = FT.An.Stats(id)
+        if s and s.price then total = total + s.price * h.total end
+    end
+    return total + P.ListedWorth() + P.Gold()
 end
 
 function P.Snaps()
@@ -136,31 +154,109 @@ function P.Snaps()
     return FT.db.worthLog[key]
 end
 
+-- What you did today, at the prices of the moment: loot, gold, buys, crafts, sales (a price update is not in it).
+-- { day, v } per side; a new day starts again from 0.
+function P.Played()
+    if not (FT.db and FT.sideKey) then return 0 end
+    FT.db.worthPlay = FT.db.worthPlay or {}
+    local x = FT.db.worthPlay[FT.sideKey]
+    if not x or x.day ~= FT.Day() then return 0 end
+    return x.v or 0
+end
+
+local function AddPlayed(d)
+    FT.db.worthPlay = FT.db.worthPlay or {}
+    local x = FT.db.worthPlay[FT.sideKey]
+    if not x or x.day ~= FT.Day() then
+        x = { day = FT.Day(), v = 0 }
+        FT.db.worthPlay[FT.sideKey] = x
+    end
+    x.v = x.v + d
+end
+
+-- which readings the worth is made of: a character, bank or mailbox read for the first time adds what was already
+-- there, which is not something you picked up
+local function Readings()
+    local k = 0
+    for guid, inv in pairs(FT.db.inv or {}) do
+        local c = FT.db.chars[guid]
+        if c and c.side == FT.sideKey and type(inv) == "table" then
+            k = k + 1 + (inv.bankT and 1000 or 0) + (inv.mailT and 1000000 or 0)
+        end
+    end
+    return k
+end
+
+-- What you hold, counted (items with listings, and gold): what changed since the last count, at the prices of now,
+-- is what you picked up or spent. Kept in memory only: the first count after a login is the starting point.
+local basket
+local function Count()
+    local items = {}
+    for id, h in pairs(P.Holdings()) do items[id] = h.total end
+    if FT.Owned and FT.Owned.List then
+        for _, b in ipairs((FT.Owned.List())) do
+            if b.itemID and not b.sold then items[b.itemID] = (items[b.itemID] or 0) + (b.qty or 1) end
+        end
+    end
+    return { items = items, gold = P.Gold(), k = Readings() }
+end
+
+local function TrackPlay()
+    local now = Count()
+    local before = basket
+    basket = now
+    if not before or before.k ~= now.k then return end
+    local d = now.gold - before.gold
+    for id, n in pairs(now.items) do
+        local was = before.items[id] or 0
+        if n ~= was then
+            local s = FT.An.Stats(id)
+            if s and s.price then d = d + (n - was) * s.price end
+        end
+    end
+    for id, was in pairs(before.items) do
+        if not now.items[id] then
+            local s = FT.An.Stats(id)
+            if s and s.price then d = d - was * s.price end
+        end
+    end
+    d = math.floor(d)
+    if d ~= 0 then AddPlayed(d) end
+end
+P.TrackPlay = TrackPlay
+
+-- A snapshot is taken when new prices come in; its `move` is what those prices did (the worth just before them
+-- is kept up to date as your bags and gold change, so what you picked up meanwhile is not counted as a move).
 function P.Snapshot()
     if not (FT.db and FT.sideKey) then return end
+    TrackPlay()
     local t = PricesTime()
     if not t then return end
     local list = P.Snaps()
     local last = list[#list]
     local v = math.floor(P.Worth())
     if v <= 0 then return end
-    -- the same prices again: the worth taken now (your bags changed), not a new update
+    local k = basket and basket.k
     if last and last.t == t then
-        last.v, last.at = v, time()
+        -- the same prices: your things changed (counted above), not the prices
+        last.v, last.at, last.k = v, time(), k
+    elseif last and last.t > t then
+        return -- older prices than the last snapshot's (a reload before the newest arrived): nothing to say
     else
-        list[#list + 1] = { t = t, v = v, at = time() }
+        list[#list + 1] = { t = t, v = v, at = time(), k = k, move = (last and last.k == k) and (v - last.v) or nil }
         while #list > SNAPS do table.remove(list, 1) end
     end
     FT.Fire("FT_WORTH_CHANGED")
 end
 
--- the last update's move, and the move since about a day ago (nil when there's nothing to compare)
+-- the last update's move, the move since about a day ago (nil when there's nothing to compare) and the newest snapshot
 function P.WorthMoves()
     local list = P.Snaps()
     local n = #list
     if n == 0 then return nil end
     local now = list[n]
-    local lastMove = n >= 2 and (now.v - list[n - 1].v) or nil
+    local lastMove = now.move
+    if lastMove == nil and n >= 2 and not now.k then lastMove = now.v - list[n - 1].v end -- a v0.42 snapshot
     local dayAgo
     for i = n - 1, 1, -1 do
         dayAgo = list[i]
@@ -171,6 +267,11 @@ end
 
 FT.On("FT_MARKET_READY", function() FT.Debounce("worthSnap", 3, P.Snapshot) end)
 FT.On("FT_SCAN_DONE", function() FT.Debounce("worthSnap", 3, P.Snapshot) end)
+-- your things change (loot, mail, a buy, a craft, a listing, gold): the worth follows, and Today and You with it
+local function Track() FT.Debounce("worthSnap", 2, P.Snapshot) end
+FT.On("FT_INVENTORY_CHANGED", Track)
+FT.On("FT_OWNED_CHANGED", Track)
+FT.On("PLAYER_MONEY", Track)
 
 -- worth of today's holdings on each of the last `days` days: { { t, value } }
 function P.History(days)

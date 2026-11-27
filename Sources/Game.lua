@@ -547,21 +547,37 @@ FT.On("FT_LOGIN", SaveMoney)
 local function MerchantItem(i)
     if C_MerchantFrame and C_MerchantFrame.GetItemInfo then
         local ok, info = pcall(C_MerchantFrame.GetItemInfo, i)
-        if ok and type(info) == "table" then return info.price, info.stackCount, info.hasExtendedCost end
+        if ok and type(info) == "table" then return info.price, info.stackCount, info.hasExtendedCost, info.numAvailable end
         return nil
     end
     if GetMerchantItemInfo then
-        local _, _, price, stack, _, _, _, extendedCost = GetMerchantItemInfo(i)
-        return price, stack, extendedCost
+        local _, _, price, stack, numAvailable, _, _, extendedCost = GetMerchantItemInfo(i)
+        return price, stack, extendedCost, numAvailable
     end
+end
+
+-- v0.43: a merchant that sells recipes - where it is, for the craft window ("Vendor: Kylanna, Ashenvale"), and
+-- shared with the Wolf network so everyone learns it from whoever passes by
+local function SawRecipe(id, price, limited)
+    local _, _, _, _, _, classID = FT.GetItemInfoInstant(id)
+    if classID ~= 9 then return end
+    local npc = UnitName and UnitName("npc")
+    if not npc then return end
+    local zone = GetZoneText and GetZoneText() or ""
+    FT.db.recipeVendors = FT.db.recipeVendors or {}
+    local was = FT.db.recipeVendors[id]
+    if was and was.n == npc and was.z == zone then return end
+    FT.db.recipeVendors[id] = { n = npc, z = zone, p = price, l = limited or nil, t = time() }
+    if FT.Net and FT.Net.RecipeVendor then FT.Net.RecipeVendor(id, npc, zone, price, limited) end
 end
 
 local function ScanMerchant()
     if not GetMerchantNumItems then return end
     local n = 0
     for i = 1, GetMerchantNumItems() do
-        local price, stack, extendedCost = MerchantItem(i)
+        local price, stack, extendedCost, numAvailable = MerchantItem(i)
         local id = (GetMerchantItemID and GetMerchantItemID(i)) or ItemID(GetMerchantItemLink and GetMerchantItemLink(i))
+        if id then pcall(SawRecipe, id, (not extendedCost and price and price > 0) and price or nil, (numAvailable or -1) >= 0) end
         if id and price and price > 0 and not extendedCost then
             local unit = math.floor(price / math.max(1, stack or 1) + 0.5)
             if FT.db.vendor[id] ~= unit then n = n + 1 end
