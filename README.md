@@ -20,15 +20,14 @@ and the words and adds its own features. See `NOTICE`.
 
 Restart the game fully the first time (new addon files load at launch, not on `/reload`), then type `/wolf`.
 
-## The window (v0.50)
+## The window (v0.51)
 
 Four tabs: **Today** (what you own and what the last prices did to it, a seven-day calendar of what's coming, your
 best moves, your bags, what's going up and down), **Market** (search any item: the verdict first, one chart, when it
 sells, the market with a buy/sell calculator, what it makes or costs to make, where it comes from), **Make gold**
-(Flip it, Craft it, Farm it, Coming up) and **You** (Holdings with a donut of where your gold sits, Sessions,
-Characters, Journal). Every call is one of six verdicts: BUY, SELL, HOLD, WAIT, CRAFT, FARM. The search box at the top
-works from any page. **Coming up** calls next week's best farms, the raids and the events, each with how sure Wolf
-is. **Craft it** has Level it up and Worth learning. Every item that trades says where it comes from (ForeverDB and
+(Flip it, Craft it, Farm it, Raids, PvP), **You** (Holdings with a donut of where your gold sits, Sessions,
+Characters, Journal) and **Calculator** (sums with a cheat sheet). Every call is one of six verdicts: BUY, SELL, HOLD, WAIT, CRAFT, FARM. The search box at the top
+works from any page. Today's calendar shows what's coming; Farm it's Next week, Raids and PvP say how sure Wolf is. **Craft it** has Level it up and Worth learning. Every item that trades says where it comes from (ForeverDB and
 Wolf's notes on Forever's new items).
 
 **The Wolf network:** Wolf users in your guild and group share the prices that changed after a scan (no `/reload`),

@@ -1,5 +1,28 @@
 # Wolf
 
+## v0.51 - the Calculator page, Raids and PvP, truer sources
+
+- **Calculator**, its own page next to You: an item or none, how many, buying or selling, a price each. Buying an
+  item walks up its listings; selling takes home what's left after the real cut. Beside it a **cheat sheet** of your
+  last sums with running totals (buying, selling, net), kept between sessions: click a line to load it again, x to
+  drop it, Wipe (click twice) to clear it. Item pages have a Calculator button.
+- **Make gold is Flip it, Craft it, Farm it, Raids, PvP.** The Coming up page came apart: next week's best farms
+  are Farm it's **Next week**; the raids' calls (how sure) are on **Raids**; **PvP** is new - the PvP kit studied
+  like the raids (Forever's own sources first, each item says how sure), what to do around the battleground weeks
+  (stock up the week before, sell into it) and the materials behind it. Today's calendar stays.
+- **Today's calendar:** click an event for its page (a battleground week opens PvP, raid night Raids, the Faire
+  its turn-ins); All of it shows four weeks.
+- **Your best moves** add two rows: your listings someone undercut, and what to post tonight (what you hold that
+  sells best in the next few hours).
+- **How to learn it:** every craftable item's Craft it section says where its recipe is (a trainer, a vendor and
+  where, a drop, Merchant's Favor) and its price on the auction house - or who of yours knows it.
+- **Truer, shorter sources:** no chests or containers unless nothing else gives it; no vendors that aren't in the
+  world; bosses and instance vendors say their instance; BoE gear says "World drop" first with Wowhead for the best
+  rates; made items show only drops worth farming. Long lines wrap; hover a section for every line.
+- **The session tracker, folded,** is small: the zone, the timer, the gold and gold an hour, with pause and stop
+  on it. No "Session".
+- **Fixed:** the craft window's last row ("Need it yourself?") sat lower than its label.
+
 ## v0.50 - Coming up, where everything comes from, the buy/sell calculator
 
 - **Coming up** (Make gold, in place of Raid prep): this week's events (the Darkmoon Faire, a battleground's holiday

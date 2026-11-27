@@ -233,7 +233,7 @@ function T.Build(p)
             local bits = { string.format(L["%d recipes"], #x.into) }
             if x.held > 0 then bits[#bits + 1] = string.format(L["you hold %s"], FT.Num(x.held)) end
             if (x.gathered or 0) > 0 then bits[#bits + 1] = string.format(L["gathered %s"], FT.Num(x.gathered)) end
-            row.line:SetText(table.concat(bits, " · "))
+            UI.FitBits(row.line, table.concat(bits, "  ·  "))
             row.price:SetText(x.market.price and FT.Money(x.market.price, "short") or FT.C("dim", "—"))
             row.ch:SetText(Change(x.market.ch7))
             row.chip:SetMove(x.move)

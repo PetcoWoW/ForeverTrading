@@ -20,18 +20,21 @@ Restart the game fully the first time (new addons load at launch, not on `/reloa
 
 ## What's inside
 
-**Today**: what everything you own is worth and what the last prices did to it, a seven-day calendar of what's coming (the Darkmoon Faire, battleground weeks, the raids), your best moves, and what's going up and down.
+**Today**: what everything you own is worth and what the last prices did to it, a calendar of what's coming (the Darkmoon Faire, battleground weeks, the raids), your best moves (including listings someone undercut and what to post tonight), and what's going up and down.
 
-**Market**: search any item. The verdict comes first, then one clean chart, when it sells best, where it comes from (mobs, nodes, vendors, Merchant's Favor, quests), what it costs to craft, and a buy/sell calculator: what buying 20 really costs up the listings, and what selling 20 takes home after the auction house's cut.
+**Market**: search any item. The verdict comes first, then one clean chart, when it sells best, where it comes from (mobs, nodes, vendors, Merchant's Favor, quests), and what it costs to craft and where to learn the recipe.
 
 **Make gold**
 
 - **Flip it**: deals worth buying and relisting.
 - **Craft it**: what your recipes make in profit, a craft queue with the shopping list, the cheapest way to level a profession, and recipes worth learning (with where to get them).
-- **Farm it**: the best things to farm for your level and professions, and where.
-- **Coming up**: next week's best farms, what to stock for the raids and events, each with how sure Wolf is (High, Medium, Low) from its own track record.
+- **Farm it**: the best things to farm for your level and professions, and where; Next week shows the best farms ahead.
+- **Raids**: what raiders will burn through, ranked, with your move on each and how sure Wolf is (High, Medium, Low) from its own track record.
+- **PvP**: the battleground kit (potions, bombs anyone can throw, their materials), and when to stock up before a battleground week.
 
 **You**: Holdings across all your characters (bags, bank, mail, listings, gold), Sessions (gold an hour), Characters and a Journal of everything you bought and sold.
+
+**Calculator**: what buying or selling any amount comes to (it walks up the listings and takes off the auction house's cut), with a cheat sheet that keeps your last sums.
 
 Every call is one of six verdicts, one colour each: **BUY**, **SELL**, **HOLD**, **WAIT**, **CRAFT**, **FARM**.
 
@@ -52,7 +55,7 @@ A price far from what's known waits until a second user agrees, so one bad scan 
 
 ## Safe on stream
 
-No pop-ups, no sounds. Wolf only ever speaks in a chat line: a deal from your guild, a reminder the day before an event, a newer version (once).
+No pop-ups, no sounds. Wolf only ever speaks in a chat line: a deal from your guild, a reminder the day before an event, a newer version (once). The session tracker folds down to one small bar.
 
 ---
 

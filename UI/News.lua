@@ -12,6 +12,12 @@ FT.News = N
 -- start, after the files are read (a table made with them would keep the English)
 local function News()
     return {
+        ["v0.51"] = {
+            { L["Calculator"], L["Its own page, next to You: buying or selling any amount, with or without an item, and a cheat sheet of your last sums."], function() FT.SelectTab("calc") end },
+            { L["Raids and PvP"], L["Make gold is Flip it, Craft it, Farm it, Raids and PvP: the PvP kit studied like the raids, around the battleground weeks. Next week's farms are in Farm it."], function() FT.ShowSub("make", "pvp") end },
+            { L["How to learn it"], L["Every craftable item says where its recipe is. Sources are shorter: no chests, the world drop first for gear."], function() FT.Show("market") end },
+            { L["Your best moves"], L["Now with your undercut listings and what to post tonight. The calendar's events open their page; All of it shows four weeks."], function() FT.Show("today") end },
+        },
         ["v0.50"] = {
             { L["Coming up"], L["Make gold > Coming up and a calendar on Today: the Darkmoon Faire, battleground weeks, the raids, and next week's best farms, each with how sure Wolf is."], function() FT.Show("today") end },
             { L["Where everything comes from"], L["Every item's page says where it's from: the mobs, nodes, vendors, Merchant's Favor and quests, Forever's new ones too. Crafted materials say Craft it, with their timers."], function() FT.Show("market") end },
