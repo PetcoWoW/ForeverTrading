@@ -988,8 +988,8 @@ local LIST_SECTION = { crafts = true, make = true, farm = true }
 local function SectionKeys(id)
     local keys = { "when", "market", "history" }
     if FT.Craft.UsedIn(id) then keys[#keys + 1] = "crafts" end
-    local rs = FT.Craft.ByOutput(id)
-    if rs and rs[1] then keys[#keys + 1] = "make" end
+    -- a recipe of yours, else the game's (v0.43: the materials show for anything craftable, known or not)
+    if UI.RecipeOf and UI.RecipeOf(id) then keys[#keys + 1] = "make" end
     if FT.Farm.IsRaw(id) then keys[#keys + 1] = "farm" end
     return keys
 end
@@ -1073,6 +1073,8 @@ local function SectionTexts(key, id, s)
         local r = FT.Craft.Best and FT.Craft.Best(id) or (rs and rs[1])
         if r and r.recipe then r = r.recipe end
         r = r or (rs and rs[1])
+        local known = r ~= nil
+        if not r and UI.RecipeOf then r = UI.RecipeOf(id); known = r ~= nil and next(r.knownBy or {}) ~= nil end
         local e = r and FT.Craft.Eval(r)
         if not e then return FT.C("dim", L["No price for its materials yet"]), {} end
         local sum
@@ -1086,6 +1088,7 @@ local function SectionTexts(key, id, s)
             more[#more + 1] = part.qty .. " " .. FT.ItemText(part.itemID, 24) .. FT.C("dim", "  " .. (part.total and FT.Money(math.floor(part.total), "short") or "—"))
             if #more >= 4 then break end
         end
+        if not known then more[#more + 1] = FT.C("dim", L["None of your characters knows it  ·  Breakdown: where the recipe is"]) end
         return sum, more, { L["Breakdown"], function() FT.ShowCraft(r) end }
     else -- farm
         local spots = FT.Farm.Spots(id)

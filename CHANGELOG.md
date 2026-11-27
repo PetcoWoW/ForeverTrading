@@ -13,7 +13,8 @@
   seen by you or a Wolf user in your guild or group) or a drop or quest, and whether it's on the auction house now and
   at what price. Click it for the recipe's Market page.
 - **Market:** the "I own" filter is "Owned".
-- **Fixed:** a two-line verdict on an item page ran under When it sells.
+- **Fixed:** a two-line verdict on an item page ran under When it sells. An item's Craft it section (its materials)
+  shows again for anything craftable, not only recipes your characters know.
 
 ## v0.42 - Simple Wolf and the Wolf network
 
