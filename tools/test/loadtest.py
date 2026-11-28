@@ -844,8 +844,15 @@ step("layout", function()
     { "you: sessions", "sessions", function() FT.ShowSub("you", "sessions") end },
     { "you: holdings, liquid", "portfolio", function() FT.ShowSub("you", "portfolio"); FT.Tabs.portfolio.donutBox.seg.buttons[2].onClick() end },
     { "you: holdings, bank only", "portfolio", function() FT.Tabs.portfolio.donutBox.seg.buttons[1].onClick(); FT.Tabs.portfolio.donut:Pick("bank") end },
-    { "you: holdings, gold", "portfolio", function() FT.Tabs.portfolio.donut:Pick("gold") end },
+    { "you: holdings, on the AH", "portfolio", function() FT.Tabs.portfolio.donut:Pick("ah") end },
     { "you: holdings", "portfolio", function() FT.Tabs.portfolio.donut:Pick(nil) end },
+    { "you: holdings, a slice under the mouse", "portfolio", function()
+        local d = FT.Tabs.portfolio.donut
+        assert(not (d.subText or ""):find("liquid", 1, true), "the middle: the total and the coins")
+        d.hover = d.slices[1] and d.slices[1].key; d:ShowMiddle()
+        assert(not d.hover or (d.sub.__text or ""):find(d.slices[1].label, 1, true), "a slice's numbers in the middle")
+        d.hover = nil; d:ShowMiddle()
+    end },
     { "market", "market" }, { "market item", "market", function() FT.OpenItem(12363) end },
     { "market item: two-line verdict", "market", function()
       -- v0.43: a long reason takes two lines; When it sells starts below it
@@ -1524,6 +1531,24 @@ step("v0.50", function()
   w(CT.wipe); assert(#FT.db.calcSheet == 0, "the second wipes it")
   CT.Log()
   CT.each:SetValue(""); CT.qty:SetValue("")
+  -- (v0.54) the item box suggests as you type; a pick fills it
+  local nm = FT.Name(12363) or ""
+  local ids = CT.Suggest(nm)
+  local has = false
+  for _, id in ipairs(ids) do if id == 12363 then has = true end end
+  assert(#ids >= 1 and #ids <= 8 and has, "suggestions for '" .. nm .. "': " .. #ids)
+  assert(#CT.Suggest("x") == 0, "one letter: no list yet")
+  CT.item:SetValue(nm:sub(1, 5)); CT.ShowSuggest(CT.Suggest(nm:sub(1, 5)))
+  assert(CT.sugg:IsShown(), "the list opens under the box")
+  CT.PickItem(12363)
+  assert(not CT.sugg:IsShown() and CT.Sum().id == 12363 and CT.item:GetText() == nm, "a pick fills the box and closes the list")
+  -- (v0.54) buying walks your last scan's listings at today's price when a newer price came since
+  local lvb, lp, lpt = C.Levels(12363)
+  local raw = FT.Hist.Book(12363)
+  if lvb and lp and lpt and raw and raw.t and lpt > raw.t + 1800 and math.abs(lp - raw.levels[1][1]) / raw.levels[1][1] > 0.01 then
+    assert(lvb.shifted and lvb.levels[1][1] == lp, "the listings shifted to today's price")
+  end
+  print("calc listings: " .. (lvb and lvb.shifted and "shifted to today's price" or "as scanned"))
 
   -- Level it up and Worth learning (the test's recipes are another character's: this one gets a copy, and skills)
   local ks = {}
@@ -1599,6 +1624,8 @@ step("v0.51", function()
   assert(h.miniPause:IsShown() and h.miniStop:IsShown(), "pause and stop when folded")
   assert(h:GetWidth() <= 180, "folded, it's narrow: " .. h:GetWidth())
   assert(h.miniPause:GetWidth() >= 20, "a pause button you can hit")
+  assert(h.miniPause:GetWidth() == h.miniStop:GetWidth() and h.miniStop:GetWidth() == h.fold:GetWidth()
+    and h.miniPause:GetHeight() == h.fold:GetHeight(), "fold, pause and stop: one size")
   print("folded tracker: " .. h:GetWidth() .. " x " .. h:GetHeight())
   h.miniPause:GetScript("OnClick")(h.miniPause)
   assert(FT.Session.Current().paused, "pause from the folded tracker")

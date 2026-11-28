@@ -34,7 +34,7 @@ Restart the game fully the first time (new addons load at launch, not on `/reloa
 
 **You**: Holdings across all your characters (bags, bank, mail, listings, gold), Sessions (gold an hour), Characters and a Journal of everything you bought and sold.
 
-**Calculator**: what buying or selling any amount comes to (it walks up the listings and takes off the auction house's cut), with a cheat sheet that keeps your last sums.
+**Calculator**: type an item and pick it from the list, then see what buying or selling any amount comes to (it walks up the listings at today's price and takes off the auction house's cut), with a cheat sheet that keeps your last sums.
 
 Every call is one of six verdicts, one colour each: **BUY**, **SELL**, **HOLD**, **WAIT**, **CRAFT**, **FARM**.
 

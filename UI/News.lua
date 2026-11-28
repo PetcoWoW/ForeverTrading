@@ -12,6 +12,11 @@ FT.News = N
 -- start, after the files are read (a table made with them would keep the English)
 local function News()
     return {
+        ["v0.54"] = {
+            { L["Calculator suggests"], L["Type a few letters of an item: pick it from the list. Buying and selling use today's price, even when your last scan is older."], function() FT.SelectTab("calc") end },
+            { L["Where your items sit"], L["You's donut is a solid ring of your items; hover a slice for its numbers in the middle. Your coins sit in the middle with the total."], function() FT.ShowSub("you", "portfolio") end },
+            { L["A clearer wolf"], L["A brighter logo on the minimap, and the folded tracker's buttons all one size."], nil },
+        },
         ["v0.53"] = {
             { L["A new face"], L["Wolf's logo is the game's own black wolf, on the minimap button and in the header. The banner over the window is gone."], nil },
         },

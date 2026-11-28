@@ -1,5 +1,17 @@
 # Wolf
 
+## v0.54 - small fixes
+
+- **Calculator:** the item box suggests items as you type (the busiest first; Enter takes the top one). Buying and
+  selling use today's price: when a newer price came since your last scan (the hourly prices, the Wolf network),
+  your scan's listings are shifted to it before Wolf walks up them, and selling starts a copper under today's
+  cheapest.
+- **You:** the donut is a solid ring (no stripes or gaps), of your items only - where they are or how fast they
+  sell. Your coins sit in the middle under the total of everything you own. Hover a slice: its gold and share show
+  in the middle (no tooltip).
+- **The folded tracker:** fold, pause and stop are one size and one look.
+- **The logo:** the black wolf, brightened and its dark border trimmed, so it reads on the minimap.
+
 ## v0.53 - a new face
 
 - **The logo is the game's own black wolf** (the Black Wolf mount icon), on the minimap button, in the window's

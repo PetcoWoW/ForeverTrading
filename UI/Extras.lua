@@ -128,7 +128,6 @@ local function BuildMinimap()
     local icon = mb:CreateTexture(nil, "ARTWORK")
     icon:SetSize(20, 20)
     icon:SetTexture(ICON)
-    icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
     if icon.SetMask then icon:SetMask("Interface\\CharacterFrame\\TempPortraitAlphaMask") end
     icon:SetPoint("CENTER")
     local border = mb:CreateTexture(nil, "OVERLAY")
@@ -1639,32 +1638,28 @@ local function BuildHUD()
     h.title = UI.Text(h, 11, "accent")
     h.title:SetPoint("TOPLEFT", 10, -8)
     -- the fold: - leaves the gold and gold an hour, + brings the items back (kept after /reload)
-    h.fold = UI.Button(h, "-", 18, 16, "default", function()
+    -- (v0.54) the fold, pause and stop: one size, one look (the game's button in the classic look), our glyphs
+    local function Square(glyph, onClick)
+        local b = UI.Button(h, "", 20, 20, "default", onClick)
+        b.tex = b:CreateTexture(nil, "OVERLAY")
+        b.tex:SetSize(11, 11)
+        b.tex:SetPoint("CENTER", 0, b.game and 1 or 0)
+        b.tex:SetTexture(FT.MEDIA .. glyph)
+        b.tex:SetVertexColor(UI.RGB(b.game and "accent" or "text"))
+        return b
+    end
+    h.fold = UI.Button(h, "-", 20, 20, "default", function()
         FT.db.ui = FT.db.ui or {}
         FT.db.ui.hudFolded = not FT.db.ui.hudFolded or nil
         FT.UpdateHUD()
     end)
-    h.fold:SetPoint("TOPRIGHT", -6, -5)
-    -- (v0.51) folded: pause and stop right on it, small
-    local function Mini(tex, onClick, tip)
-        local b = CreateFrame("Button", nil, h)
-        b:SetSize(20, 20)
-        b.hover = UI.RoundTex(b, "BACKGROUND", "bg2", 1)
-        b.hover:SetAllPoints()
-        b.hover:Hide()
-        b.tex = b:CreateTexture(nil, "ARTWORK")
-        b.tex:SetPoint("CENTER")
-        b.tex:SetSize(18, 18)
-        b.tex:SetTexture(tex)
-        b:SetScript("OnClick", onClick)
-        b:SetScript("OnEnter", function(self) self.hover:Show(); UI.TipText(self, tip()) end)
-        b:SetScript("OnLeave", function(self) self.hover:Hide(); GameTooltip:Hide() end)
-        return b
-    end
-    h.miniStop = Mini("Interface\\Buttons\\UI-StopButton", function() FT.Session.Stop() end, function() return L["Stop the session"] end)
+    h.fold:SetPoint("TOPRIGHT", -6, -4)
+    -- folded: pause and stop on it
+    h.miniStop = Square("stop", function() FT.Session.Stop() end)
+    h.miniStop:SetTip(L["Stop the session"])
     h.miniStop:SetPoint("BOTTOMRIGHT", -6, 5)
-    h.miniPause = Mini("Interface\\TimeManager\\PauseButton", function() FT.Session.Pause() end,
-        function() local c = FT.Session.Current() return c and c.paused and L["Resume"] or L["Pause"] end)
+    h.miniPause = Square("pause", function() FT.Session.Pause() end)
+    h.miniPause:SetTip(L["Pause"])
     h.miniPause:SetPoint("RIGHT", h.miniStop, "LEFT", -4, 0)
     h.time = UI.Text(h, 11, "muted", "RIGHT")
     h.time:SetPoint("TOPRIGHT", -30, -8)
@@ -1820,7 +1815,8 @@ function FT.UpdateHUD()
     h.rate:ClearAllPoints()
     if folded then
         -- (v0.51) three short rows, narrow: the zone and the fold; the gold and the timer; gold an hour, pause, stop
-        h.miniPause.tex:SetTexture(s.paused and "Interface\\TimeManager\\PlayButton" or "Interface\\TimeManager\\PauseButton")
+        h.miniPause.tex:SetTexture(FT.MEDIA .. (s.paused and "play" or "pause"))
+        h.miniPause:SetTip(s.paused and L["Resume"] or L["Pause"])
         h.time:SetPoint("TOPRIGHT", -10, -28)
         h.rate:SetPoint("BOTTOMLEFT", 10, 9)
         h.rate:SetJustifyH("LEFT")
@@ -1830,9 +1826,9 @@ function FT.UpdateHUD()
         h.track:Hide()
         h.thumb:Hide()
         -- as wide as what's in it
-        local row1 = (h.title:GetStringWidth() or 0) + 8 + 18
+        local row1 = (h.title:GetStringWidth() or 0) + 8 + 20
         local row2 = (h.worth:GetStringWidth() or 0) + 12 + (h.time:GetStringWidth() or 0)
-        local row3 = (h.rate:GetStringWidth() or 0) + 10 + 44
+        local row3 = (h.rate:GetStringWidth() or 0) + 10 + 50
         local w = math.floor(math.max(140, 16 + math.max(row1, row2, row3)) + 0.5)
         if math.abs((h:GetWidth() or 0) - w) > 1 then h:SetWidth(w) end
         return

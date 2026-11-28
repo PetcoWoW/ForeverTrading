@@ -12,11 +12,28 @@ FT.Calc = C
 
 -- buying qty: { total, avg, top, enough, levels (how many prices you walk through), vendor, vendorHow, cheaper } -
 -- nil with nothing listed
+-- (v0.54) the listings to walk: your last scan's, but at today's price when a newer price came since (the hourly
+-- prices, the Wolf network): its depth shifted so its cheapest is the newest lowest price. { levels, t, shifted }
+local function Levels(id)
+    local book = FT.Hist.Book(id)
+    local p, pt = FT.Price(id)
+    if not (book and book.levels and #book.levels > 0) then return nil, p, pt end
+    local low = book.levels[1][1]
+    if p and pt and book.t and pt > book.t + 1800 and low and low > 0 and math.abs(p - low) / low > 0.01 then
+        local k, levels = p / low, {}
+        for i, lv in ipairs(book.levels) do levels[i] = { math.max(1, math.floor(lv[1] * k + 0.5)), lv[2] } end
+        return { levels = levels, t = pt, qty = book.qty, shifted = true }, p, pt
+    end
+    return book, p, pt
+end
+C.Levels = Levels
+
 function C.Buy(id, qty)
     qty = math.max(1, math.floor(tonumber(qty) or 1))
-    local book = FT.Hist.Book(id)
+    local book, p = Levels(id)
     local out = { qty = qty }
-    if book and book.levels and #book.levels > 0 then
+    if book then
+        out.shifted = book.shifted
         local left, cost, n, top = qty, 0, 0, nil
         for _, lv in ipairs(book.levels) do
             if left <= 0 then break end
@@ -33,7 +50,6 @@ function C.Buy(id, qty)
         out.listed = book.qty
         out.t = book.t
     else
-        local p = FT.Price(id)
         if not p then return nil end
         out.total, out.avg, out.top, out.enough, out.got, out.levels, out.guess = p * qty, p, p, nil, qty, 1, true
     end
@@ -58,8 +74,8 @@ end
 function C.Sell(id, qty, unit, hours)
     qty = math.max(1, math.floor(tonumber(qty) or 1))
     local s = FT.An.Stats(id) or {}
-    local book = FT.Hist.Book(id)
-    local cheapest = (book and book.levels and book.levels[1] and book.levels[1][1]) or s.price
+    local book, p = Levels(id)
+    local cheapest = (book and book.levels[1] and book.levels[1][1]) or p or s.price
     if not unit then
         -- under the cheapest by a copper - unless the cheapest is bait: then the normal price
         unit = (s.bait and s.fair) or (cheapest and math.max(1, cheapest - 1)) or s.fair
@@ -103,6 +119,9 @@ function C.BuyLines(b)
         .. FT.C("dim", "  ·  " .. string.format(L["%s each on average"], FT.Money(math.floor(b.avg or 0), "short")))
     if b.guess then
         lines[#lines + 1] = FT.C("dim", L["At the lowest price: the listings come with a scan."])
+    elseif b.shifted and b.enough ~= false then
+        lines[#lines + 1] = string.format(L["The dearest you'd pay: %s  ·  %d prices up the listings"], FT.Money(b.top, "short"), b.levels)
+            .. FT.C("dim", "  ·  " .. L["your last scan's listings at today's price"])
     elseif b.enough == false then
         lines[#lines + 1] = FT.C("down", string.format(L["Only %s listed: you'd buy them all"], FT.Num(b.got)))
     else

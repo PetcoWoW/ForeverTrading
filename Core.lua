@@ -4,14 +4,14 @@ local L = FT.L
 
 -- The version being released: a copy straight from the repository (not packaged) has no version in its TOC yet
 -- (the packager puts the tag there) and shows this one. Set it with every release.
-local RELEASE = "v0.53"
+local RELEASE = "v0.54"
 local GetMeta = (C_AddOns and C_AddOns.GetAddOnMetadata) or GetAddOnMetadata
 FT.VERSION = (GetMeta and GetMeta(ADDON, "Version")) or RELEASE
 if FT.VERSION == "" or FT.VERSION:find("@", 1, true) then FT.VERSION = RELEASE end
 FT.VERSION_TEXT = FT.VERSION:match("^%d") and ("v" .. FT.VERSION) or FT.VERSION
 FT.MEDIA = "Interface\\AddOns\\" .. ADDON .. "\\media\\"
--- Wolf's logo: the game's own black wolf icon (nothing to ship)
-FT.LOGO = "Interface\\Icons\\Ability_Mount_BlackDireWolf"
+-- Wolf's logo: the game's black wolf icon, brightened and its border trimmed so it reads at minimap size (v0.54)
+FT.LOGO = FT.MEDIA .. "logo"
 FT.URL_SUPPORT = "https://github.com/thewoolfi/ForeverTrading"
 FT.URL_GITHUB = "https://github.com/PetcoWoW/ForeverTrading"
 FT.URL_CURSEFORGE = "https://www.curseforge.com/wow/addons/wolf-ah-stock-market"

@@ -208,12 +208,10 @@ local JSORT = {
 -- is what one seller can move), listed. A click shows just that slice in the table; again: everything.
 ---------------------------------------------------------------------------
 DONUT_W = function() return (FT.Compact() and 320 or 360) + 16 * (tonumber(FT.S and FT.S.textSize) or 0) end
-local WHERE = { { "gold", "Gold on hand", "accent" }, { "bags", "Bags", "blue" }, { "bank", "Bank", "up" },
-    { "mail", "Mail", "purple" }, { "ah", "On the AH", "muted" } }
-local LIQUID = { { "gold", "Gold on hand", "accent" }, { "today", "Sells today", "up" }, { "week", "Sells this week", "blue" },
-    { "slow", "Slow to sell", "orange" }, { "ah", "Listed on the AH", "muted" } }
-local LIQ_TIP = { today = "The market takes this many in a day.", week = "A few days of what the market takes.",
-    slow = "More than a week of what the market takes: gold tied up.", ah = "Waiting for a buyer.", gold = "Coins on your characters, in their mail too." }
+-- (v0.54) the ring is your items; your coins are in the middle with the total (a coin slice said nothing new)
+local WHERE = { { "bags", "Bags", "blue" }, { "bank", "Bank", "up" }, { "mail", "Mail", "purple" }, { "ah", "On the AH", "accent" } }
+local LIQUID = { { "today", "Sells today", "up" }, { "week", "Sells this week", "blue" },
+    { "slow", "Slow to sell", "orange" }, { "ah", "Listed on the AH", "accent" } }
 local donutView, donutPick = "where", nil
 
 local function Liquidity(id, qty)
@@ -309,7 +307,8 @@ end
 function T.FillDonut()
     if not T.donut then return end
     local defs = donutView == "where" and WHERE or LIQUID
-    local sums = { gold = FT.Port.Gold() }
+    local gold = FT.Port.Gold() or 0
+    local sums = {}
     for _, piece in ipairs(Pieces(T.rows or {})) do
         local k = SliceOf(piece)
         sums[k] = (sums[k] or 0) + piece.value
@@ -318,18 +317,14 @@ function T.FillDonut()
     for _, d in ipairs(defs) do
         local v = sums[d[1]] or 0
         if v > 0 then
-            slices[#slices + 1] = { key = d[1], label = L[d[2]], color = d[3], value = v, tip = LIQ_TIP[d[1]] and L[LIQ_TIP[d[1]]] }
+            slices[#slices + 1] = { key = d[1], label = L[d[2]], color = d[3], value = v }
             total = total + v
         end
     end
-    local liquid = (sums.gold or 0) + (donutView == "liquid" and (sums.today or 0) or 0)
-    if donutView == "where" then
-        for _, piece in ipairs(Pieces(T.rows or {})) do
-            if piece.loc ~= "ah" and Liquidity(piece.row.id, piece.row.qty) == "today" then liquid = liquid + piece.value end
-        end
-    end
+    -- the middle: everything you own (coins and items), and how much of it is coins
     T.donut.picked = donutPick
-    T.donut:SetSlices(slices, FT.Money(total, "gold"), total > 0 and string.format(L["%d%% liquid"], math.floor(liquid / total * 100 + 0.5)) or "")
+    T.donut:SetSlices(slices, FT.Money(total + gold, "gold"),
+        gold > 0 and (FT.Money(gold, "gold") .. " " .. L["in coins"]) or L["no coins on you"])
     donutPick = T.donut.picked
     for i, r in ipairs(T.donutBox.legend) do
         local sl = slices[i]
@@ -346,9 +341,7 @@ function T.FillDonut()
     end
     local sl = donutPick and T.donut.byKey[donutPick]
     T.showAll:SetShown(sl ~= nil)
-    if sl and donutPick == "gold" then
-        T.filter:SetText(FT.C("accent", sl.label) .. "  " .. FT.Money(sl.value, "gold") .. FT.C("dim", "  ·  " .. L["coins on your characters (Characters has each)"]))
-    elseif sl then
+    if sl then
         T.filter:SetText(FT.C("accent", sl.label) .. "  " .. FT.Money(sl.value, "gold") .. FT.C("dim", string.format("  ·  %d%%", math.floor(sl.share * 100 + 0.5))))
     else
         T.filter:SetText(L["Everything"] .. FT.C("dim", "  ·  " .. L["click a slice to see just that"]))
@@ -358,7 +351,6 @@ end
 -- the table's rows for the chosen slice: the part of each item that's there (nil: every row whole)
 function T.SliceRows(rows)
     if not donutPick then return rows end
-    if donutPick == "gold" then return {} end
     local out, byId = {}, {}
     for _, piece in ipairs(Pieces(rows)) do
         if SliceOf(piece) == donutPick then

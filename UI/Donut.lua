@@ -1,5 +1,5 @@
 -- Wolf: a donut chart (v0.42, from Wolf Lab): where your wealth sits. Drawn from 360 short lines (one a degree: the game has no arcs).
--- Hover a slice: it stands out and its numbers show; click: it stays chosen (again: everything). Used on You.
+-- Hover a slice: it stands out and its numbers show in the middle; click: it stays chosen (again: everything). Used on You.
 local ADDON, FT = ...
 local UI, L = FT.UI, FT.L
 
@@ -31,23 +31,45 @@ function UI.Donut(parent, R, ringW, onPick)
         return d.of[math.floor(deg) + 1]
     end
 
+    -- (v0.54) a solid ring: every line opaque and wide enough to overlap the next one at the outer edge (no
+    -- stripes, no gaps); a slice not chosen is darkened toward the panel instead of see-through
+    local bgc = UI.C.bg1
+    local function Mix(c, k)
+        return { bgc[1] + (c[1] - bgc[1]) * k, bgc[2] + (c[2] - bgc[2]) * k, bgc[3] + (c[3] - bgc[3]) * k }
+    end
     function d:Draw()
         local c = (self:GetWidth() or 0) / 2
+        local empty = not self.total or self.total <= 0
         for i = 1, 360 do
             local key = self.of[i]
             local sl = key and self.byKey[key]
-            if sl then
-                local lit = (self.hover == key) or (self.picked == key)
-                local dim = self.picked and self.picked ~= key and self.hover ~= key
+            if sl or empty then
+                local lit = sl and ((self.hover == key) or (self.picked == key))
+                local dim = sl and self.picked and self.picked ~= key and self.hover ~= key
                 local r2 = R + (lit and 6 or 0)
                 local r1 = R - ringW
-                -- clockwise from the top, a degree a line (thick enough to leave no gaps)
+                local col = sl and (UI.C[sl.color] or UI.C.text) or UI.C.line
+                col = dim and Mix(col, 0.35) or (lit and col or Mix(col, 0.88))
+                -- clockwise from the top, a degree a line, a little wider than a degree at the outer edge
                 local a = math.rad(90 - (i - 0.5))
                 local ca, sa = math.cos(a), math.sin(a)
-                UI.PlaceLine(self.lines[i], c + ca * r1, c + sa * r1, c + ca * r2, c + sa * r2, 3, sl.color, dim and 0.3 or (lit and 1 or 0.85))
+                local w = math.max(4, 2 * math.pi * r2 / 360 * 1.8)
+                UI.PlaceLine(self.lines[i], c + ca * r1, c + sa * r1, c + ca * r2, c + sa * r2, w, col, 1)
             else
                 UI.HideLine(self.lines[i])
             end
+        end
+    end
+
+    -- the middle: the total, or the slice under the mouse (no tooltip)
+    function d:ShowMiddle()
+        local sl = self.hover and self.byKey and self.byKey[self.hover]
+        if sl then
+            self.center:SetText(FT.Money(sl.value, "gold"))
+            self.sub:SetText(sl.label .. "  " .. FT.C("dim", string.format("%d%%", math.floor(sl.share * 100 + 0.5))))
+        else
+            self.center:SetText(self.centerText or "")
+            self.sub:SetText(self.subText or "")
         end
     end
 
@@ -68,8 +90,8 @@ function UI.Donut(parent, R, ringW, onPick)
         -- rounding: the last degrees go to the last slice
         for k = at + 1, 360 do self.of[k] = slices[#slices] and slices[#slices].key end
         if self.picked and not self.byKey[self.picked] then self.picked = nil end
-        self.center:SetText(center or "")
-        self.sub:SetText(sub or "")
+        self.centerText, self.subText = center, sub
+        self:ShowMiddle()
         self:Draw()
     end
 
@@ -81,24 +103,14 @@ function UI.Donut(parent, R, ringW, onPick)
 
     d:SetScript("OnUpdate", function(self)
         if not self:IsMouseOver() then
-            if self.hover then self.hover = nil; self:Draw(); GameTooltip:Hide() end
+            if self.hover then self.hover = nil; self:Draw(); self:ShowMiddle() end
             return
         end
         local key = SliceAt()
         if key ~= self.hover then
             self.hover = key
             self:Draw()
-            local sl = key and self.byKey[key]
-            if sl then
-                GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-                GameTooltip:AddLine(sl.label, 1, 0.82, 0)
-                GameTooltip:AddDoubleLine(FT.Money(sl.value, "gold"), string.format("%d%%", math.floor(sl.share * 100 + 0.5)), 1, 1, 1, 0.8, 0.8, 0.8)
-                if sl.tip then GameTooltip:AddLine(sl.tip, 0.75, 0.75, 0.75, true) end
-                GameTooltip:AddLine(self.picked == key and L["Click: show everything again"] or L["Click: just this"], 0.58, 0.55, 0.5)
-                GameTooltip:Show()
-            else
-                GameTooltip:Hide()
-            end
+            self:ShowMiddle()
         end
     end)
     d:SetScript("OnMouseUp", function(self) local key = SliceAt(); if key then self:Pick(key) end end)

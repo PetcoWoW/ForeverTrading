@@ -39,6 +39,31 @@ local function FindItem(text)
 end
 T.FindItem = FindItem
 
+-- (v0.54) what the item box suggests as you type: up to 8 items on the market with every word of it in their name,
+-- those whose name starts with it first, then the busiest
+local function Suggest(text)
+    local q = FT.Fold(text or ""):gsub("^%s+", ""):gsub("%s+$", "")
+    if #q < 2 then return {} end
+    local match = FT.NameMatcher(text)
+    if not match then return {} end
+    local found = {}
+    for _, r in ipairs(FT.Market.Rows() or {}) do
+        if r.id and match(r.id) then
+            local name = FT.Fold(FT.Name(r.id) or "")
+            found[#found + 1] = { id = r.id, starts = name:sub(1, #q) == q, v = (r.qty or 0), name = name }
+        end
+    end
+    table.sort(found, function(a, b)
+        if a.starts ~= b.starts then return a.starts end
+        if a.v ~= b.v then return a.v > b.v end
+        return a.name < b.name
+    end)
+    local out = {}
+    for i = 1, math.min(8, #found) do out[i] = found[i].id end
+    return out
+end
+T.Suggest = Suggest
+
 -- the sum now: { lines, total, take, unit, qty } (take: what selling brings home)
 function T.Sum()
     local qty = math.max(1, math.floor(tonumber(T.qty:GetText()) or 1))
@@ -73,6 +98,40 @@ function T.Sum()
     end
     out.lines = out.lines or { FT.C("dim", L["Pick an item, or type a price each."]) }
     return out
+end
+
+-- the suggestions: ids (nil or empty: closed)
+function T.ShowSuggest(ids)
+    local sg = T.sugg
+    if not sg then return end
+    -- nothing to suggest, or the one typed exactly
+    if not ids or #ids == 0 or (#ids == 1 and ids[1] == state.id and FT.Fold(FT.Name(ids[1]) or "") == FT.Fold(T.item:GetText() or "")) then
+        sg.ids = nil
+        sg:Hide()
+        return
+    end
+    sg.ids = ids
+    for i, r in ipairs(sg.rows) do
+        local id = ids[i]
+        r.id = id
+        r:SetShown(id ~= nil)
+        if id then
+            r.icon:SetItem(id)
+            UI.FitBits(r.name, FT.ItemText(id, 40))
+            local price = FT.Price(id)
+            r.price:SetText(price and FT.Money(price, "short") or "")
+        end
+    end
+    sg:SetHeight(#ids * UI.RowH(22) + 4)
+    sg:Show()
+end
+
+-- a suggestion chosen: its name in the box, the sums on it
+function T.PickItem(id)
+    state.id = id
+    T.item:SetValue(FT.Name(id) or "")
+    T.ShowSuggest(nil)
+    T.Update()
 end
 
 local function Show(sum)
@@ -144,14 +203,52 @@ function T.Build(p)
     lab1:SetPoint("TOPLEFT", 14, -48)
     lab1:SetText(L["Item"])
     T.item = UI.Input(left, 220, 24, L["Type an item, or leave it empty"], function(text)
-        FT.Debounce("calcItem", 0.25, function()
+        FT.Debounce("calcItem", 0.2, function()
             state.id = FindItem(text)
             T.Update()
+            T.ShowSuggest(Suggest(text))
         end)
-    end, function() T.Log() end)
+    end, function()
+        -- Enter: the first suggestion when the list is open, else onto the sheet
+        local first = T.sugg and T.sugg:IsShown() and T.sugg.ids and T.sugg.ids[1]
+        if first then T.PickItem(first) else T.Log() end
+    end)
     T.item:SetPoint("TOPLEFT", lab1, "BOTTOMLEFT", 0, -4)
     T.item:SetPoint("RIGHT", left, "RIGHT", -14, 0)
-    UI.ClearButton(T.item, function() state.id = nil; T.Update() end)
+    UI.ClearButton(T.item, function() state.id = nil; T.ShowSuggest(nil); T.Update() end)
+    -- the suggestions under the box, over the page; a click picks one
+    local sg = CreateFrame("Frame", nil, left)
+    sg:SetPoint("TOPLEFT", T.item, "BOTTOMLEFT", 0, -2)
+    sg:SetPoint("TOPRIGHT", T.item, "BOTTOMRIGHT", 0, -2)
+    sg:SetFrameLevel(left:GetFrameLevel() + 20)
+    UI.Skin(sg, "popup", "bg2")
+    sg:EnableMouse(true)
+    sg.rows = {}
+    for i = 1, 8 do
+        local r = CreateFrame("Button", nil, sg)
+        r:SetHeight(UI.RowH(22))
+        r:SetPoint("TOPLEFT", 1, -2 - (i - 1) * UI.RowH(22))
+        r:SetPoint("TOPRIGHT", -1, -2 - (i - 1) * UI.RowH(22))
+        r.hl = UI.RoundTex(r, "BACKGROUND", "hl", 1)
+        r.hl:SetAllPoints()
+        r.hl:Hide()
+        r.icon = UI.Icon(r, 16)
+        r.icon:SetPoint("LEFT", 6, 0)
+        r.price = UI.Text(r, 11, "muted", "RIGHT")
+        r.price:SetPoint("RIGHT", -8, 0)
+        r.name = UI.Text(r, 12, "text")
+        r.name:SetPoint("LEFT", r.icon, "RIGHT", 6, 0)
+        r.name:SetPoint("RIGHT", r.price, "LEFT", -6, 0)
+        if r.name.SetWordWrap then r.name:SetWordWrap(false) end
+        r:SetScript("OnEnter", function(self) self.hl:Show() end)
+        r:SetScript("OnLeave", function(self) self.hl:Hide() end)
+        r:SetScript("OnClick", function(self) if self.id then T.PickItem(self.id) end end)
+        sg.rows[i] = r
+    end
+    sg:Hide()
+    T.sugg = sg
+    -- leaving the box closes it (a moment later, so a click on it still lands)
+    T.item:HookScript("OnEditFocusLost", function() C_Timer.After(0.2, function() if T.sugg and not T.sugg:IsMouseOver() then T.ShowSuggest(nil) end end) end)
     T.icon = UI.Icon(left, 18)
     T.icon:SetPoint("TOPLEFT", T.item, "BOTTOMLEFT", 0, -6)
     T.pick = UI.Text(left, 12, "text")

@@ -1,13 +1,13 @@
 ## Interface: 16001
 ## Title: |cfff0b90bWolf|r
 ## Notes: The auction house as a stock market for WoW Forever: a ticker tape, 7-day trend lines, what to buy, sell and craft, your portfolio and farming sessions. Works with Auctionator.
-## Version: 0.53
+## Version: 0.54
 ## Author: PetcoWoW
 ## X-Website: https://github.com/PetcoWoW/ForeverTrading
 ## X-License: Apache-2.0
 ## SavedVariables: WolfOfBootyBayDB
 ## OptionalDeps: Auctionator
-## IconTexture: Interface\Icons\Ability_Mount_BlackDireWolf
+## IconTexture: Interface\AddOns\WolfOfBootyBay\media\logo
 ## Category: Auction/Economy
 ## X-Category: Auction/Economy
 
