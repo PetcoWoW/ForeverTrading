@@ -1,5 +1,16 @@
 # Wolf
 
+## v0.58 - Wolf updates itself
+
+- **The prices companion (1.1) keeps Wolf up to date:** a new Wolf - a version or a fix - is swapped in while you
+  play, checked against its fingerprint; the next /reload (the same one that loads new prices) loads it. Your prices
+  and settings stay. A version with new files waits until the game is closed (the game reads its file list only at
+  launch), and chat says so. Off in the companion's tray menu: "Keep Wolf updated".
+- In game: "Wolf v0.59 is ready (the prices companion brought it): [Reload]", the minimap dot's menu loads it, and
+  once it's in, one line with what's new.
+- Release builds carry their commit (the TOC's X-Commit) and their version in the code, so a reload-loaded Wolf
+  knows which it is.
+
 ## v0.57 - worth at a glance, solo dungeons, quiet alerts, farming tracked by itself
 
 - **You > Holdings:** no ring to read. The total, then each part biggest first - its gold, its share (a bar of it

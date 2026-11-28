@@ -141,10 +141,17 @@ jobs:
           mkdir -p dist/WolfOfBootyBay
           git archive HEAD | tar -x -C dist/WolfOfBootyBay
           cp Data/Feed.lua dist/WolfOfBootyBay/Data/Feed.lua
+          # (v0.58) the commit it's built from, for the companion's updates (a new commit: a new Wolf, hotfixes too),
+          # and the version in the code as well: a /reload reads new code but not the TOC (the game reads that at
+          # launch), so after an update by the companion the code knows its own version
+          COMMIT=$(git rev-parse --short=12 HEAD)
           ( cd dist/WolfOfBootyBay \
             && rm -rf .github tools companion .gitattributes .gitignore .pkgmeta \
-            && sed -i "s/^## Version: .*/## Version: $VERSION/" WolfOfBootyBay.toc )
+            && sed -i "s/^## Version: .*/## Version: $VERSION\n## X-Commit: $COMMIT/" WolfOfBootyBay.toc \
+            && sed -i "s/^local RELEASE = \"v[0-9.]*\"/local RELEASE = \"v$VERSION\"/" Core.lua \
+            && grep -q "^## X-Commit: $COMMIT" WolfOfBootyBay.toc && grep -q "^local RELEASE = \"v$VERSION\"" Core.lua )
           ( cd dist && zip -qr "WolfOfBootyBay-$VERSION.zip" WolfOfBootyBay )
+          ADDON_SHA=$(sha256sum "dist/WolfOfBootyBay-$VERSION.zip" | cut -d' ' -f1)
           # for the companion app (companion/, released on its own by companion.yml): the price file on its own and
           # a small note of when its prices are from (it reads only this every 15 minutes), at releases/latest/download/
           cp Data/Feed.lua dist/Feed.lua
@@ -155,8 +162,12 @@ jobs:
             const ts = [...lua.matchAll(/\[(\d+)\] = \{ t = (\d+),/g)].map(m => [m[1], Number(m[2])]);
             const houses = Object.fromEntries(ts);
             const t = Math.max(0, ...ts.map(x => x[1]));
-            fs.writeFileSync("dist/latest.json", JSON.stringify({ built, t, houses, version: process.argv[1], bytes: lua.length }));
-          ' "$VERSION"
+            // (v0.58) the addon itself, for the companion: which commit, the zip (this release, by its tag) and its fingerprint
+            const [version, commit, sha, repo] = process.argv.slice(1);
+            const zip = `https://github.com/${repo}/releases/download/v${version}/WolfOfBootyBay-${version}.zip`;
+            fs.writeFileSync("dist/latest.json", JSON.stringify({ built, t, houses, version, bytes: lua.length,
+              addonVersion: version, addonCommit: commit, addonZip: zip, addonSha256: sha }));
+          ' "$VERSION" "$COMMIT" "$ADDON_SHA" "$GITHUB_REPOSITORY"
           # for WowUp (it reads GitHub releases): which zip is the addon, for every game type it may call WoW Forever
           # by. Without it WowUp guesses from the newest release only, and the companion's own release (no zip) can
           # be the newest.

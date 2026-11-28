@@ -12,6 +12,9 @@ FT.News = N
 -- start, after the files are read (a table made with them would keep the English)
 local function News()
     return {
+        ["v0.58"] = {
+            { L["Wolf updates itself"], L["The prices companion now keeps Wolf up to date: a new one comes in while you play, and your next /reload loads it."], nil },
+        },
         ["v0.57"] = {
             { L["Your worth at a glance"], L["You > Holdings: the total, then each part's gold and share with its top items. What it is: herbs, ore, cloth, gear..."], function() FT.ShowSub("you", "portfolio") end },
             { L["Solo dungeons"], L["Farm it > Dungeons > Solo: the whole run's loot for one, slower, well under your level. For classes that hold big pulls."], function() FT.ShowSub("make", "farm") end },

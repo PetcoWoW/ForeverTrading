@@ -31,7 +31,11 @@ local function MinimapTooltip(self)
     end
     local fresh, newer = FT.Alerts()
     if fresh then GameTooltip:AddLine(L["Newer prices are waiting: right-click to load them."], 0.12, 1, 0.12, true) end
-    if newer then GameTooltip:AddLine(string.format(L["Wolf v%s is out: update it in the CurseForge app or WowUp."], newer), 1, 0.82, 0, true) end
+    if newer then
+        local C = FT.Companion
+        GameTooltip:AddLine(string.format((C and C.Updates()) and (C.Pending() and L["Wolf v%s is ready: it goes in when you restart the game."] or L["Wolf v%s is ready: right-click to load it."])
+            or L["Wolf v%s is out: update it in the CurseForge app or WowUp."], newer), 1, 0.82, 0, true)
+    end
     if fresh or newer then GameTooltip:AddLine(" ") end
     GameTooltip:AddLine(L["Click: open / close the window"], 0.8, 0.8, 0.8)
     GameTooltip:AddLine(L["Right-click: sessions, and what's waiting"], 0.8, 0.8, 0.8)
@@ -47,7 +51,16 @@ local function MenuItems()
     local items = {}
     local fresh, newer = FT.Alerts()
     if fresh then items[#items + 1] = { L["Load the fresh prices"], function() ReloadUI() end, "up" } end
-    if newer then items[#items + 1] = { string.format(L["Get v%s (CurseForge)"], newer), function() FT.ShowCurseForge() end, "accent" } end
+    if newer then
+        local C = FT.Companion
+        if C and C.Updates() and C.Pending() then
+            items[#items + 1] = { string.format(L["v%s goes in when the game restarts"], newer), nil, "muted" }
+        elseif C and C.Updates() then
+            items[#items + 1] = { string.format(L["Load Wolf v%s (reload)"], newer), function() ReloadUI() end, "accent" }
+        else
+            items[#items + 1] = { string.format(L["Get v%s (CurseForge)"], newer), function() FT.ShowCurseForge() end, "accent" }
+        end
+    end
     if #items > 0 then items[#items + 1] = { "-" } end
     if S.Current() then
         items[#items + 1] = { S.Current().auto and L["Stop the farming session"] or L["Stop the session"], function() S.Stop() end, "down" }

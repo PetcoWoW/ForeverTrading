@@ -79,9 +79,22 @@ function V.Tell(theirs)
     if was and was >= n then return false end
     FT.db.told.version = string.format("%d.%d", math.floor(n / 1000), n % 1000)
     FT.db.told.versionAt = time()
-    FT.Print(string.format(L["A newer Wolf is out: v%s (you have %s). Update it in the CurseForge app or WowUp."],
-        FT.db.told.version, FT.VERSION_TEXT or FT.VERSION))
+    FT.Print(V.HowToGet(FT.db.told.version))
     return true
+end
+
+-- (v0.58) the line for a newer Wolf: the prices companion brings it (a /reload, or a game restart when it has new
+-- files), or the CurseForge app / WowUp
+function V.HowToGet(v)
+    local C = FT.Companion
+    if C and C.Updates() then
+        if C.Pending() then
+            return string.format(L["Wolf v%s is ready: it has new files, so it goes in when you restart the game (the prices companion brings it)."], v)
+        end
+        return string.format(L["Wolf v%s is ready (the prices companion brought it): %s"], v,
+            FT.ChatLink and FT.ChatLink("reload", L["Reload"], "/reload") or "/reload")
+    end
+    return string.format(L["A newer Wolf is out: v%s (you have %s). Update it in the CurseForge app or WowUp."], v, FT.VERSION_TEXT or FT.VERSION)
 end
 
 -- a newer version heard from another Wolf user (this file's version message, or any Wolf network message)
@@ -158,8 +171,22 @@ function V.RemindAgain()
     if not (V.Newest() or (FT.FEED and FT.FEED.release and V.ReleaseNewer(FT.FEED.release, FT.VERSION))) then return end
     if (MM(t.version) or 0) <= (MM(FT.VERSION) or 0) or t.again == t.version or time() - t.versionAt < 3 * 86400 then return end
     t.again = t.version
+    if FT.Companion and FT.Companion.Updates() then FT.Print(V.HowToGet(t.version)) return end
     FT.Print(string.format(L["Still on %s: v%s is out. Update it in the CurseForge app or WowUp (Wolf's prices and pages are made for the newest)."],
         FT.VERSION_TEXT or FT.VERSION, t.version))
+end
+
+-- (v0.58) the prices companion put this version in: one line, once a version
+function V.SelfUpdated()
+    local n = FT.Companion and FT.Companion.Note()
+    if not (FT.db and n and n.updated) then return end
+    local mine = MM(FT.VERSION)
+    if not mine or MM(n.updated) ~= mine then return end
+    FT.db.told = FT.db.told or {}
+    if FT.db.told.self == mine then return end
+    FT.db.told.self = mine
+    FT.Print(string.format(L["Wolf %s is in: the prices companion updated it. What's new: %s"], FT.VERSION_TEXT or FT.VERSION,
+        FT.ChatLink and FT.ChatLink("news", L["See it"], "/wolf news") or "/wolf news"))
 end
 
 -- the newest version known (heard, or the price file's), when newer than ours
@@ -170,4 +197,4 @@ function V.Outdated()
     return n
 end
 
-FT.On("FT_READY", function() C_Timer.After(25, V.Remind); C_Timer.After(40, V.RemindAgain) end)
+FT.On("FT_READY", function() C_Timer.After(25, V.Remind); C_Timer.After(40, V.RemindAgain); C_Timer.After(8, V.SelfUpdated) end)

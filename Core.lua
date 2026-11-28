@@ -4,10 +4,13 @@ local L = FT.L
 
 -- The version being released: a copy straight from the repository (not packaged) has no version in its TOC yet
 -- (the packager puts the tag there) and shows this one. Set it with every release.
-local RELEASE = "v0.57"
+local RELEASE = "v0.58"
 local GetMeta = (C_AddOns and C_AddOns.GetAddOnMetadata) or GetAddOnMetadata
 FT.VERSION = (GetMeta and GetMeta(ADDON, "Version")) or RELEASE
 if FT.VERSION == "" or FT.VERSION:find("@", 1, true) then FT.VERSION = RELEASE end
+-- (v0.58) a release build has its full version in the code too (the release robot writes it): after the prices
+-- companion updates Wolf, a /reload runs the new code while the game still has the old TOC's version
+if RELEASE:match("^v%d+%.%d+%.%d+$") then FT.VERSION = RELEASE:sub(2) end
 FT.VERSION_TEXT = FT.VERSION:match("^%d") and ("v" .. FT.VERSION) or FT.VERSION
 FT.MEDIA = "Interface\\AddOns\\" .. ADDON .. "\\media\\"
 -- Wolf's logo: the game's black wolf icon, brightened and its border trimmed so it reads at minimap size (v0.54)

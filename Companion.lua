@@ -21,6 +21,17 @@ function C.Note()
     if type(n) == "table" and tonumber(n.checked) then return n end
 end
 
+-- (v0.58) the companion keeps Wolf itself up to date (companion 1.1, "Keep Wolf updated" on): a newer Wolf is swapped
+-- in while you play and your next /reload loads it; one with new files waits for the game to close (pending)
+function C.Updates()
+    local n = C.Note()
+    return n ~= nil and n.auto == true and C.Running()
+end
+function C.Pending()
+    local n = C.Note()
+    return n and n.pending or nil
+end
+
 -- it had checked within 40 minutes of this login or reload: it's running
 function C.Running()
     local n = C.Note()
@@ -62,6 +73,7 @@ function FT.ChatAction(action, fn) actions[action] = fn end
 local Link = FT.ChatLink
 
 actions.reload = function() ReloadUI() end
+actions.news = function() if FT.News then FT.News.Show() end end
 actions.get = function()
     FT.ShowLink(L["Wolf prices companion (Windows)"], C.Pitch(), C.URL)
 end

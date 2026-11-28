@@ -49,10 +49,26 @@ jobs:
           "price file: $((Get-Item $feed).Length) bytes"
           $note = Get-Content (Join-Path $addon 'Data\Companion.lua') -Raw
           $note
-          if ($note -notmatch 'FT\.COMPANION = \{ version = "[\d.]+", checked = \d+, built = \d+, t = \d+ \}') { throw 'no note' }
+          if ($note -notmatch 'FT\.COMPANION = \{ version = "[\d.]+", checked = \d+, built = \d+, t = \d+(, [^}]*)? \}') { throw 'no note' }
+          # (1.1) Wolf itself: the pretend folder had only its TOC, with no commit in it - the newest Wolf is put in
+          if (-not (Test-Path (Join-Path $addon 'Core.lua'))) { throw 'Wolf was not updated' }
+          $toc = Get-Content (Join-Path $addon 'WolfOfBootyBay.toc') -Raw
+          if ($toc -notmatch '## X-Commit: \w+') { throw 'no commit in the new TOC' }
+          if ($note -notmatch 'updated = "[\d.]+"') { throw 'the note does not say Wolf was updated' }
+          "Wolf put in: $(($toc | Select-String '## Version: (.*)').Matches[0].Groups[1].Value)"
           # a second check: nothing newer, no download
           $p = Start-Process -FilePath out\WolfPrices.exe -ArgumentList @('--check', "`"$root`"") -Wait -PassThru
-          Get-Content (Join-Path $root 'wolfprices-check.txt')
+          $second = Get-Content (Join-Path $root 'wolfprices-check.txt') -Raw
+          $second
+          if ($second -notmatch 'wolfUpdated= ') { throw 'the same Wolf was put in twice' }
+          # a developer's copy (made with git) is never touched
+          $dev = Join-Path $env:RUNNER_TEMP 'wowdev'
+          $devAddon = Join-Path $dev '_forever_\Interface\AddOns\WolfOfBootyBay'
+          New-Item -ItemType Directory -Force -Path (Join-Path $devAddon 'Data'), (Join-Path $devAddon '.git') | Out-Null
+          Copy-Item WolfOfBootyBay.toc $devAddon
+          Copy-Item Data\Companion.lua (Join-Path $devAddon 'Data')
+          $p = Start-Process -FilePath out\WolfPrices.exe -ArgumentList @('--check', "`"$dev`"") -Wait -PassThru
+          if (Test-Path (Join-Path $devAddon 'Core.lua')) { throw "a developer's copy was updated" }
           echo "WOWROOT=$root" >> $env:GITHUB_ENV
 
       - name: Pictures of its windows

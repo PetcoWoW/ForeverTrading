@@ -6,7 +6,7 @@
 
 1. **Download** it (the link above).
 2. **Open it and click Install.** Done. You never open it again.
-3. **Play.** When newer prices are waiting, a chat line at the auction house says so: click **Load them**.
+3. **Play.** When newer prices (or a newer Wolf) are waiting, a chat line says so: click **Load them**. The app keeps Wolf itself up to date too.
 
 > **"Windows protected your PC"?** Click **More info**, then **Run anyway**. It's a new app, so Windows doesn't know it yet.
 

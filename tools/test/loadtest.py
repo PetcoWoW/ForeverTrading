@@ -244,6 +244,24 @@ step("alerts", function()
   FT.UpdateMinimapDot()
   assert(mb.dot:IsShown(), "a newer Wolf: the dot")
   print("alerts: dot, mailbox line once, version again once")
+  -- (v0.58) the prices companion keeps Wolf up to date: a newer one is a /reload away, or waits for a restart; once
+  -- it's in, one line
+  local realNote = FT.COMPANION
+  FT.COMPANION = { version = "1.1.0", checked = time() - 60, built = time() - 600, t = time() - 900, auto = true }
+  assert(FT.Ver.HowToGet("9.9"):find("Reload", 1, true), "the companion brought it: reload")
+  FT.COMPANION.pending = "9.9.1"
+  assert(FT.Ver.HowToGet("9.9"):find("restart", 1, true), "new files: a restart")
+  FT.COMPANION.pending = nil
+  FT.COMPANION.updated, FT.COMPANION.updatedAt = FT.VERSION, time() - 300
+  FT.db.told.self = nil
+  printed = {}
+  FT.Print = function(t) printed[#printed + 1] = t end
+  FT.Ver.SelfUpdated(); FT.Ver.SelfUpdated()
+  FT.Print = realPrint
+  assert(#printed == 1 and printed[1]:find("updated it", 1, true), "updated: said once")
+  FT.COMPANION.auto = false
+  assert(FT.Ver.HowToGet("9.9"):find("CurseForge", 1, true), "no companion updates: CurseForge")
+  FT.COMPANION = realNote
   FT.Ver.newest = nil
   FT.db.told.version, FT.db.told.versionAt, FT.db.told.again = nil, nil, nil
   FT.UpdateMinimapDot()

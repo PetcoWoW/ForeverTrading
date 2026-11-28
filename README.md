@@ -20,7 +20,7 @@ and the words and adds its own features. See `NOTICE`.
 
 Restart the game fully the first time (new addon files load at launch, not on `/reload`), then type `/wolf`.
 
-## The window (v0.57)
+## The window (v0.58)
 
 Four tabs: **Today** (what you own and what the last prices did to it, a calendar of what's coming, your best moves,
 your bags, your movers, and what happened while you were away), **Market** (search any item: the verdict first, one chart, when it
@@ -40,6 +40,11 @@ A small program by the clock that keeps the prices fresh: every 15 minutes it as
 repository's releases) whether there are newer prices, and if so puts them in the addon folder. It never shows a
 notification, a window or a sound on its own - safe on stream. In game, when you open the auction house and newer
 prices are waiting, chat says so with a **[Load them]** link (the game reads files only at login or `/reload`).
+
+**It keeps Wolf itself up to date too** (companion 1.1): a new Wolf - a new version or a fix - is swapped in while
+you play, checked against its fingerprint, and your next `/reload` loads it, with your prices and settings kept. One
+with new files (the game reads the file list only at launch) waits until you close the game. Off: "Keep Wolf
+updated" in its tray menu. A copy made with git is never touched.
 
 - **Download:** [WolfPricesSetup.exe](https://github.com/PetcoWoW/ForeverTrading/releases/download/companion/WolfPricesSetup.exe). Setup finds World of Warcraft and the addon, installs for your
   Windows user only (no admin rights) and starts with Windows if you leave that ticked.
