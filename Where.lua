@@ -20,9 +20,19 @@ local function Npc(id)
     local s = FT.SRC_N and FT.SRC_N[id]
     if not s then return nil end
     local p = Split(s, "|")
-    return { id = id, name = p[1], zones = p[2] ~= "" and p[2] or nil, lv = p[3] ~= "" and p[3] or nil, fac = p[4] ~= "" and p[4] or nil,
+    local n = { id = id, name = p[1], zones = p[2] ~= "" and p[2] or nil, lv = p[3] ~= "" and p[3] or nil, fac = p[4] ~= "" and p[4] or nil,
         rank = p[5] ~= "" and p[5] or nil } -- rank (v0.55): 1 elite, 2 rare elite, 3 boss, 4 rare
+    -- (v0.56) its farm facts: spawns and respawn (0: summoned or event-only), coin and vendor loot a kill, what it
+    -- drops that trades (expected a kill), priced in game
+    if p[6] and p[6] ~= "" then
+        local sp, resp = p[6]:match("^(%d+):(%d+)$")
+        n.spawns, n.respawn = tonumber(sp), tonumber(resp)
+        n.floor = tonumber(p[7]) or 0
+        n.trades = p[8] ~= "" and p[8] or nil
+    end
+    return n
 end
+W.Npc = Npc
 
 local function Obj(id)
     local s = FT.SRC_O and FT.SRC_O[id]

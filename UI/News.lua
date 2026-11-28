@@ -12,6 +12,10 @@ FT.News = N
 -- start, after the files are read (a table made with them would keep the English)
 local function News()
     return {
+        ["v0.56"] = {
+            { L["Honest drops"], L["Drops lists real farms only, no world epics, ranked by steady gold an hour; rare drops apart. Dungeons go by wing."], function() FT.ShowSub("make", "farm") end },
+            { L["Where to farm it"], L["Redesigned: the best way for you to get it first, then other spots with their odds, and your own loot in a line."], nil },
+        },
         ["v0.55"] = {
             { L["Drops"], L["Make gold > Farm it > Drops: what mobs drop that sells - patterns, gear, rare reagents - with the mob, its level and the odds. Priciest first, or gold a kill."], function() FT.ShowSub("make", "farm") end },
             { L["Dungeons"], L["Farm it > Dungeons: which dungeon pays best, a full clear or the trash, at today's prices, split five ways. Click one: what drops in it."], function() FT.ShowSub("make", "farm") end },

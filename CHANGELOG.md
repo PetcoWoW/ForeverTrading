@@ -1,5 +1,19 @@
 # Wolf
 
+## v0.56 - honest drops, a cozier farm window
+
+- **Drops lists real farms only.** World drops (epics any mob of a level can give, 1 in thousands) are gone from it:
+  1,118 of its 1,706 entries were those. What's left is loot a mob is worth killing for.
+- **Ranked by steady gold an hour:** each mob's coin, vendor loot and common trade drops, at how many you can kill an
+  hour (its spawns and respawn, elites slower). Rare drops are counted apart ("+12g in rare drops"), never mixed in.
+  Priciest or Per hour; rare spawns say so.
+- **Dungeons per wing** (Dire Maul East/West/North, Stratholme Live/Undead, Lower/Upper Blackrock Spire, the four
+  Scarlet Monastery wings): the steady gold of a run split five ways, rare drops apart.
+- **Where to farm it, redesigned:** one answer first - the best way for you to get it, at your level - with its odds,
+  gold an hour, spawns, solo or group; then a few other spots with odds bars; your own loot in one line. As tall as
+  what it says. A world drop says so: any mob of the level, about 1 in N, and your level's best farm instead.
+- The daily sources build reads cMaNGOS classic-db (GPL-3) too: spawns, respawns, coin and full loot tables.
+
 ## v0.55 - Drops and Dungeons
 
 - **Farm it > Drops:** what mobs drop that sells for a gold or more - patterns, gear, rare reagents (the gathered

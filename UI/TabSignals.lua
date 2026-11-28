@@ -763,12 +763,16 @@ local function DungeonTip(row, x)
     GameTooltip:AddLine(d.name, 1, 0.82, 0)
     GameTooltip:AddLine(string.format(L["Level %s  ·  the door is in %s"], d.lv, L[d.door] or d.door), 0.85, 0.87, 0.9)
     GameTooltip:AddLine(" ")
-    GameTooltip:AddDoubleLine(dungeonTrash and L["A clear of the trash"] or L["A full clear"], FT.Money(math.floor(d.value), "gold"), 0.85, 0.87, 0.9, 1, 1, 1)
+    GameTooltip:AddDoubleLine((dungeonTrash and L["The trash, steady"] or L["A run, steady"]), FT.Money(math.floor(d.steady), "gold"), 0.85, 0.87, 0.9, 1, 1, 1)
     GameTooltip:AddDoubleLine(string.format(L["Each, in a group of %d"], 5), FT.Money(math.floor(d.each), "gold"), 0.85, 0.87, 0.9, 0.12, 1, 0.12)
     GameTooltip:AddDoubleLine(L["Of it, coin"], FT.Money(math.floor(d.coin), "gold"), 0.6, 0.64, 0.7, 0.6, 0.64, 0.7)
+    if d.jackpot > 0 then
+        GameTooltip:AddDoubleLine(L["Rare drops, on average (not counted above)"], "+" .. FT.Money(math.floor(d.jackpot), "gold"), 0.95, 0.75, 0.3, 0.95, 0.75, 0.3)
+    end
     for _, t in ipairs(d.top) do
         local n = t.n >= 10 and FT.Num(math.floor(t.n + 0.5)) or string.format("%.1f", t.n)
-        GameTooltip:AddDoubleLine(FT.ItemText(t.id, 32) .. FT.C("dim", "  x" .. n), FT.Money(math.floor(t.worth), "short"), 1, 1, 1, 0.85, 0.87, 0.9)
+        GameTooltip:AddDoubleLine(FT.ItemText(t.id, 32) .. FT.C("dim", "  x" .. n .. (t.jackpot and ("  " .. L["rare"]) or "")),
+            FT.Money(math.floor(t.worth), "short"), 1, 1, 1, t.jackpot and 0.95 or 0.85, t.jackpot and 0.75 or 0.87, t.jackpot and 0.3 or 0.9)
     end
     GameTooltip:AddLine(" ")
     if d.measured then
@@ -827,7 +831,7 @@ local function BuildFarmView(p)
     end)
     f.mat:SetPoint("LEFT", f.kind, "RIGHT", 8, 0)
     f.mat:SetValue(farmKind)
-    f.sort = UI.Segmented(f, { { "price", L["Priciest"] }, { "kill", L["Per kill"] } }, function(v)
+    f.sort = UI.Segmented(f, { { "price", L["Priciest"] }, { "hour", L["Per hour"] } }, function(v)
         dropSort = v
         T.RefreshFarm()
     end, 22)
@@ -860,19 +864,20 @@ local function DropRows()
         local bits = { w.name }
         local where = e.dungeon or (w.zones and w.zones:match("^[^,]+"))
         if where then bits[#bits + 1] = L[where] or where end
-        if w.lv then bits[#bits + 1] = string.format(L["level %s"], w.lv) end
+        if w.lv then bits[#bits + 1] = string.format(L["level %s"], w.lv) .. (FT.Drops.Elite(w) and (" " .. L["elite"]) or "") end
         bits[#bits + 1] = FT.Drops.Odds(e.chance) or FT.C("accent", L["rate unknown"])
+        if e.rare then bits[#bits + 1] = FT.C("accent", L["a rare spawn: up now and then"]) end
         if (e.ch7 or 0) <= -0.15 then bits[#bits + 1] = FT.C("down", FT.Pct(e.ch7) .. " " .. L["this week"]) end
         local value
-        if dropSort == "kill" then
-            value = e.perKill and (FT.C("up", "~" .. FT.Money(math.floor(e.perKill + 0.5), "short")) .. FT.C("dim", " " .. L["a kill"]))
+        if dropSort == "hour" then
+            value = e.perHour and (FT.C("up", "~" .. FT.Money(math.floor(e.perHour + 0.5), "short")) .. FT.C("dim", " " .. L["an hour"]))
                 or FT.C("dim", FT.Money(e.price, "short") .. " " .. L["each"])
         else
             value = FT.C("up", FT.Money(e.price, "short")) .. FT.C("dim", " " .. L["each"])
         end
         out[#out + 1] = {
             id = e.id, drop = e, fit = true, reason = table.concat(bits, FT.C("dim", "  ·  ")), value = value,
-            signal = "FARM", label = e.group and L["GROUP"] or L["SOLO"], strength = e.chance > 0 and 2 or 1,
+            signal = "FARM", label = e.rare and L["RARE SPAWN"] or (e.group and L["GROUP"] or L["SOLO"]), strength = e.chance > 0 and 2 or 1,
         }
     end
     return out
@@ -886,8 +891,8 @@ local function DungeonRows()
         if q == "" or d.name:lower():find(q, 1, true) then
             local names = {}
             for i = 1, math.min(3, #d.top) do names[#names + 1] = FT.Name(d.top[i].id) or "?" end
-            local bits = { string.format(L["level %s"], d.lv), L[d.door] or d.door,
-                "~" .. FT.Money(math.floor(d.value), "gold") .. " " .. (dungeonTrash and L["the trash"] or L["a clear"]) }
+            local bits = { string.format(L["level %s"], d.lv), L[d.door] or d.door }
+            if d.jackpotEach >= 10000 then bits[#bits + 1] = FT.C("accent", "+" .. FT.Money(math.floor(d.jackpotEach), "gold") .. " " .. L["in rare drops"]) end
             if #names > 0 then bits[#bits + 1] = table.concat(names, ", ") end
             out[#out + 1] = {
                 id = d.top[1] and d.top[1].id, title = FT.C("text", d.name), dungeonInfo = d, fit = true,
@@ -951,7 +956,7 @@ function T.RefreshFarm()
     if farmMode == "drops" then
         local rows = DropRows()
         f.hint:SetText(dropDungeon and string.format(L["What drops in %s and sells, best first."], dropDungeon)
-            or L["Mob drops that sell, and the mob. Rate unknown: new loot no one has counted yet."])
+            or L["Drops you can farm, and the mob. No world drops: any mob can give those."])
         f.list:SetEmptyText(rows and L["No drop sells for a gold or more yet: the price feed fills this over a few hours."] or L["Working out the drops..."])
         f.count:SetText(rows and #rows > 0 and string.format(L["%d drops"], #rows) or "")
         f.list:SetItems(rows or {}, true)
@@ -959,8 +964,8 @@ function T.RefreshFarm()
     end
     if farmMode == "dungeons" then
         local rows = DungeonRows()
-        f.hint:SetText(dungeonTrash and L["The trash only (no bosses): each dungeon at today's prices, split five ways."]
-            or L["A full clear of each dungeon at today's prices, split five ways. Click one: what drops in it."])
+        f.hint:SetText(dungeonTrash and L["The trash only (no bosses): the steady gold of a run, split five ways."]
+            or L["Each run's steady gold at today's prices, split five ways; rare drops apart. Click one: its drops."])
         f.list:SetEmptyText(L["No dungeon found."])
         f.count:SetText(string.format(L["%d dungeons"], #rows))
         f.list:SetItems(rows, true)

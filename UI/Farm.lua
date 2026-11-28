@@ -3,20 +3,247 @@ local L = FT.L
 local UI = FT.UI
 
 ---------------------------------------------------------------------------
--- Where to farm a raw material: its price and how it sells, Wowhead, the spots for your level (Classic's, with
--- your own numbers there) and the mobs you looted it from. Opened from the Farm Board, the item's chart, the
--- right-click menu and the farm tip in chat.
+-- Where to farm it (v0.56, redesigned from the farm study): one answer first - the best way for you to get it -
+-- then a few other spots with their odds and gold an hour, your own loot in a line, and nothing empty: the window
+-- is as tall as what it says. World drops say so honestly (any mob of the level; your level's best farm instead).
+-- Opened from Farm it, Drops, the item page, the right-click menu and the farm tip in chat.
 ---------------------------------------------------------------------------
 local win
-local SPOT_ROWS, MOB_ROWS = 6, 5
+local MAX_ROWS = 5
+local W_BASE = 470
+local PAD = 12
+
+local ICONS = {
+    mob = "Interface\\TargetingFrame\\UI-TargetingFrame-Skull",
+    skin = "Interface\\Icons\\INV_Misc_Pelt_Wolf_01",
+    node = "Interface\\Icons\\INV_Ore_Copper_01",
+    herb = "Interface\\Icons\\INV_Misc_Herb_07",
+    vendor = "Interface\\Icons\\INV_Misc_Coin_01",
+    quest = "Interface\\GossipFrame\\AvailableQuestIcon",
+    zone = "Interface\\Icons\\INV_Misc_Map_01",
+    box = "Interface\\Icons\\INV_Box_01",
+    favor = "Interface\\Icons\\INV_Letter_15",
+}
+
+local function Money(c) return FT.Money(math.floor((c or 0) + 0.5), "short") end
+
+---------------------------------------------------------------------------
+-- What the window says: { card = { k, big, where, meta, chips = { {text, tone} } }, others = { rows }, mine, note }
+---------------------------------------------------------------------------
+local function LowLevel(lv) return tonumber((lv or ""):match("^(%d+)")) end
+
+local function Model(id)
+    local Dr, Wh = FT.Drops, FT.Where
+    local level = FT.Me and FT.Me.Level() or 60
+    local g = Wh.Get(id)
+    local unit = Dr.Worth(id)
+    local cands = {}
+    -- mobs that drop it: how many of it an hour for you, and the mob's steady gold an hour
+    for _, x in ipairs(g.drops) do
+        local w = x.who
+        if w and Dr.Killable(w) then
+            local steady, jackpot, kph = Dr.MobHour(w)
+            kph = kph or Dr.KillsAnHour(w)
+            local lo = LowLevel(w.lv)
+            local perHour = x.chance > 0 and kph * x.chance / 10000 or nil
+            local dng = Dr.DungeonOf(w.zones)
+            cands[#cands + 1] = {
+                kind = "mob", who = w, name = w.name, where = dng or (w.zones and w.zones:match("^[^,]+")), lv = w.lv,
+                chance = x.chance, perHour = perHour, steady = steady, jackpot = jackpot, kph = kph,
+                elite = Dr.Elite(w), rare = Dr.Rare(w), dungeon = dng,
+                high = lo and lo > level + 3,
+                score = (perHour and perHour * unit or 0) + (steady or 0) * 0.25 - ((lo and lo > level + 3) and 1e9 or 0),
+            }
+        end
+    end
+    for _, x in ipairs(g.skin) do
+        local w = x.who
+        if w then
+            cands[#cands + 1] = { kind = "skin", name = w.name, where = w.zones and w.zones:match("^[^,]+"), lv = w.lv, chance = x.chance,
+                needs = L["Skinning"], score = -1 }
+        end
+    end
+    for _, x in ipairs(g.nodes) do
+        local o = x.who
+        if o and not o.chest then
+            cands[#cands + 1] = { kind = (FT.Farm.KindOf(id) == "herb") and "herb" or "node", name = o.name,
+                where = o.zones and o.zones:match("^[^,]+"), chance = x.chance, score = -2 }
+        end
+    end
+    local vendor
+    for _, v in ipairs(g.vendors) do
+        if v.zones and (not v.fac or v.fac == "" or v.fac == "AH" or v.fac == (UnitFactionGroup and (UnitFactionGroup("player") == "Alliance" and "A" or "H"))) then
+            vendor = vendor or v
+            cands[#cands + 1] = { kind = "vendor", name = v.name, where = v.zones and v.zones:match("^[^,]+"), score = -3 }
+        end
+    end
+    for _, q in ipairs(g.quests) do
+        cands[#cands + 1] = { kind = "quest", name = q.name, lv = q.lv and tostring(q.lv), score = -4 }
+    end
+    for _, b in ipairs(g.boxes) do
+        cands[#cands + 1] = { kind = "box", name = FT.Name(b.itemID) or L["a container"], chance = b.chance, score = -6 }
+    end
+    -- the spots written for raw materials (zones by level)
+    local spots, data = FT.Farm.Spots(id, level)
+    for _, sp in ipairs(spots or {}) do
+        cands[#cands + 1] = { kind = "zone", name = sp.zone, lv = sp.lo .. "-" .. sp.hi, what = sp.what, fit = sp.fit, yours = sp.yours,
+            score = (sp.fit == 0 and 1e6 or 0) - sp.fit, skill = data and data.skill, gather = data and data.kind }
+    end
+    table.sort(cands, function(a, b) return a.score > b.score end)
+
+    local card, chips = { chips = {} }, nil
+    chips = card.chips
+    local worldLv, worldOne = Dr.World(id)
+    local bestMob
+    for _, c in ipairs(cands) do if c.kind == "mob" and not c.high then bestMob = c break end end
+    local gathered = FT.Farm.IsRaw and FT.Farm.IsRaw(id)
+    local answer
+    if worldLv and not (bestMob and bestMob.chance >= 200) and not vendor and #g.nodes == 0 and #g.skin == 0 then
+        -- a world drop: no spot is better than another
+        card.k = L["WORLD DROP · NOT A FARM"]
+        card.big = string.format(L["Any mob level %d and up"], worldLv)
+        card.meta = string.format(L["About 1 in %s kills, from any mob of that level: no spot is better than another. Farm what pays anyway, and this is a bonus."], FT.Num(worldOne))
+        local best = Dr.BestSpot(level)
+        if best then
+            chips[#chips + 1] = { string.format(L["your level's best farm: %s, %s · ~%s an hour"], best.who.name,
+                best.who.zones and best.who.zones:match("^[^,]+") or "?", FT.Money(math.floor(best.steady), "gold")) }
+        end
+    elseif vendor and not gathered then
+        answer = nil
+        card.k = L["BUY IT"]
+        card.big = string.format(L["Sold by %s"], vendor.name)
+        card.where = vendor.zones and vendor.zones:match("^[^,]+")
+        card.meta = L["A vendor sells it: no farming needed."]
+    else
+        answer = cands[1]
+        if answer and answer.kind == "mob" then
+            local solo = not answer.elite and not answer.dungeon
+            card.k = solo and string.format(L["BEST SOLO FOR YOU (LEVEL %d)"], level) or L["BEST WAY TO GET IT"]
+            card.big, card.where = answer.name, answer.where
+            local meta = {}
+            if answer.lv then meta[#meta + 1] = string.format(L["Level %s"], answer.lv) .. (answer.elite and (" " .. L["elite"]) or "") end
+            meta[#meta + 1] = Dr.Odds(answer.chance) or L["the odds aren't known yet (new Forever loot)"]
+            if answer.steady then meta[#meta + 1] = FT.C("up", "~" .. FT.Money(math.floor(answer.steady), "gold") .. " " .. L["an hour"]) .. " " .. L["steady, all its loot counted"] end
+            card.meta = table.concat(meta, "  ·  ")
+            chips[#chips + 1] = answer.rare and { L["RARE SPAWN · up now and then"], "warn" } or (solo and { L["SOLO"], "solo" } or { L["GROUP"] .. (answer.elite and (" · " .. L["elite"]) or ""), "group" })
+            if answer.who.spawns and answer.who.spawns > 0 then
+                chips[#chips + 1] = { string.format(L["%d spawns · respawn %d min"], answer.who.spawns, math.floor((answer.who.respawn or 300) / 60 + 0.5)) }
+            end
+            if answer.perHour and answer.perHour >= 0.05 then
+                chips[#chips + 1] = { string.format(L["~%s of it an hour"], answer.perHour >= 1 and FT.Num(math.floor(answer.perHour + 0.5)) or string.format("%.1f", answer.perHour)) }
+            end
+            for _, z in ipairs(cands) do
+                if z.kind == "zone" and z.skill then
+                    chips[#chips + 1] = { string.format(L["or gather it: %s · %s %d"], z.name, L[z.gather == "herb" and "Herbalism" or "Mining"] or "", z.skill) }
+                    break
+                end
+            end
+            if answer.jackpot and answer.jackpot >= 10000 then
+                chips[#chips + 1] = { "+ " .. string.format(L["rare drops ~%s an hour"], FT.Money(math.floor(answer.jackpot), "gold")) }
+            end
+        elseif answer and answer.kind == "zone" then
+            card.k = string.format(L["BEST FOR YOU (LEVEL %d)"], level)
+            card.big = answer.name
+            card.meta = (answer.what or "") .. (answer.lv and ("  ·  " .. string.format(L["level %s"], answer.lv)) or "")
+            if answer.skill then chips[#chips + 1] = { string.format(L["needs %s %d"], L[answer.gather == "herb" and "Herbalism" or "Mining"] or "", answer.skill) } end
+        elseif answer then
+            card.k = L["WHERE IT COMES FROM"]
+            card.big, card.where = answer.name, answer.where
+            card.meta = (answer.kind == "skin" and (L["Skinning"] .. "  ·  ") or "") .. (Dr.Odds(answer.chance) or "")
+                .. (answer.lv and ("  ·  " .. string.format(L["level %s"], answer.lv)) or "")
+        else
+            card.k = L["WHERE IT COMES FROM"]
+            card.big = L["Not in Wolf's sources yet"]
+            card.meta = L["Loot one and Wolf counts it: where you were and from what."]
+        end
+    end
+    local r = FT.Market.Row(id)
+    if r and (r.ch7 or 0) <= -0.15 and (answer and answer.kind == "mob") then chips[#chips + 1] = { L["price falling: others found it"], "warn" } end
+
+    -- the other spots: the next best, a few
+    local others = {}
+    for _, c in ipairs(cands) do
+        if c ~= answer and #others < MAX_ROWS and not (c.kind == "vendor" and card.k == L["BUY IT"]) then
+            local odds, gph
+            if c.kind == "mob" then
+                odds = Dr.Odds(c.chance) or L["odds unknown"]
+                gph = c.steady and (FT.Money(math.floor(c.steady), "gold") .. L["/h"]) or nil
+            elseif c.kind == "zone" then
+                odds = c.lv and string.format(L["level %s"], c.lv) or ""
+            else
+                odds = Dr.Odds(c.chance) or (c.kind == "vendor" and L["sells it"]) or (c.kind == "quest" and L["a reward"]) or ""
+            end
+            local where = {}
+            if c.where then where[#where + 1] = L[c.where] or c.where end
+            if c.kind == "mob" and c.lv then where[#where + 1] = c.lv .. (c.elite and (" " .. L["elite"]) or "") end
+            if c.rare then where[#where + 1] = L["rare spawn"] end
+            others[#others + 1] = { kind = c.kind, name = c.name, where = table.concat(where, " · "),
+                odds = odds .. (gph and (" · " .. gph) or ""), ratio = c.chance and c.chance > 0 and c.chance or (c.steady and 1) or 0, steady = c.steady }
+        end
+    end
+    -- the bars: the odds against the best of them
+    local top = 0
+    for _, o in ipairs(others) do top = math.max(top, o.ratio or 0) end
+    for _, o in ipairs(others) do o.bar = top > 0 and (o.ratio or 0) / top or 0 end
+
+    -- your own loot, one line
+    local mine
+    local m = FT.Farm.Mobs(id, 1)[1]
+    if m then
+        local gh = m.zone and FT.Farm.ZoneGoldHour(m.zone)
+        mine = string.format(L["Your loot: %s from %s %s (%s)"], FT.Num(m.n), FT.Num(m.corpses), m.name or L["mobs"],
+            FT.Drops.Odds(math.floor(m.per * 10000 + 0.5)) or "")
+            .. (gh and ("  ·  " .. string.format(L["%s an hour there"], FT.Money(math.floor(gh), "gold"))) or "")
+    elseif not worldLv and card.k ~= L["BUY IT"] then
+        mine = L["Your loot: none yet. Farm it and Wolf counts your own odds."]
+    end
+    local note = worldLv and L["World drops aren't in Drops: no mob is a real farm for them."]
+        or L["Odds: ForeverDB and player counts; yours once you've looted 5+."]
+    return { card = card, others = others, mine = mine, mineEmpty = not m, note = note, world = worldLv ~= nil }
+end
+
+---------------------------------------------------------------------------
+-- The window
+---------------------------------------------------------------------------
+local function Chip(parent)
+    local c = UI.Panel(parent, "bg2", "line")
+    c.text = UI.Text(c, 10, "muted")
+    c.text:SetPoint("CENTER", 0, 0)
+    return c
+end
+
+local function Row(parent)
+    local r = CreateFrame("Frame", nil, parent)
+    r:SetHeight(UI.RowH(22))
+    r.icon = r:CreateTexture(nil, "ARTWORK")
+    r.icon:SetSize(14, 14)
+    r.icon:SetPoint("LEFT", 8, 0)
+    r.bar = CreateFrame("Frame", nil, r)
+    r.bar:SetSize(56, 5)
+    r.bar:SetPoint("RIGHT", -8, 0)
+    r.bar.bg = UI.Tex(r.bar, "BACKGROUND", "line", 0.6)
+    r.bar.bg:SetAllPoints()
+    r.bar.fill = UI.Tex(r.bar, "ARTWORK", "accent", 1)
+    r.bar.fill:SetPoint("TOPLEFT")
+    r.bar.fill:SetPoint("BOTTOMLEFT")
+    r.odds = UI.Text(r, 11, "text", "RIGHT")
+    r.odds:SetPoint("RIGHT", r.bar, "LEFT", -8, 0)
+    r.name = UI.Text(r, 12, "text")
+    r.name:SetPoint("LEFT", r.icon, "RIGHT", 6, 0)
+    r.name:SetPoint("RIGHT", r.odds, "LEFT", -8, 0)
+    r.line = UI.Tex(r, "BACKGROUND", "line", 0.35)
+    r.line:SetHeight(1)
+    r.line:SetPoint("TOPLEFT", 4, 0)
+    r.line:SetPoint("TOPRIGHT", -4, 0)
+    return r
+end
 
 local function Win()
     if win then return win end
     UI.ResolveFont()
     local ts = tonumber(FT.S and FT.S.textSize) or 0
-    local spotH, mobH = UI.RowH(32), UI.RowH(24)
     local d = CreateFrame("Frame", "WolfOfBootyBayFarm", UIParent)
-    d:SetSize(640 + 20 * ts, 150 + SPOT_ROWS * spotH + MOB_ROWS * mobH + 30 * ts)
+    d:SetWidth(W_BASE + 30 * ts)
     d:SetPoint("CENTER", 0, 40)
     d:SetFrameStrata("DIALOG")
     d:SetToplevel(true)
@@ -27,122 +254,69 @@ local function Win()
     d:SetScript("OnDragStart", d.StartMoving)
     d:SetScript("OnDragStop", d.StopMovingOrSizing)
     UI.Skin(d, "window", "bg1")
-    if d.bg then d.bg:SetAlpha(0.92) end
+    if d.bg then d.bg:SetAlpha(0.94) end
 
-    d.icon = UI.Icon(d, 30)
-    d.icon:SetPoint("TOPLEFT", 16, -14)
+    -- the head: the item, how it sells, Best crafts, Wowhead, close
+    d.icon = UI.Icon(d, 34)
+    d.icon:SetPoint("TOPLEFT", PAD + 2, -PAD)
     d.icon:EnableMouse(true)
     d.icon:SetScript("OnEnter", function(self) if d.itemID then UI.TipItem(self, d.itemID) end end)
     d.icon:SetScript("OnLeave", function() GameTooltip:Hide() end)
-    d.close = UI.Button(d, L["Close"], 10, 22, "default", function() d:Hide() end)
-    d.close:FitText(24)
-    d.close:SetPoint("TOPRIGHT", -12, -12)
-    d.wowhead = UI.Button(d, L["Wowhead"], 10, 22, "default", function() FT.Farm.Wowhead(d.itemID) end)
-    d.wowhead:FitText(20)
-    d.wowhead:SetPoint("RIGHT", d.close, "LEFT", -6, 0)
+    d.close = UI.CloseButton(d, function() d:Hide() end, 26)
+    d.close:SetPoint("TOPRIGHT", -6, -6)
+    d.wowhead = UI.Button(d, L["Wowhead"], 10, 20, "default", function() FT.Farm.Wowhead(d.itemID) end)
+    d.wowhead:FitText(16)
+    d.wowhead:SetPoint("RIGHT", d.close, "LEFT", -4, 0)
     d.wowhead:SetTip(L["Wowhead"], L["Its page on Wowhead (WoW Forever): every mob that drops it, with drop chances and a map."])
-    d.crafts = UI.Button(d, L["Best crafts"], 10, 22, "default", function() FT.ShowBestUse(d.itemID) end)
-    d.crafts:FitText(20)
-    d.crafts:SetPoint("RIGHT", d.wowhead, "LEFT", -6, 0)
+    d.crafts = UI.Button(d, L["Best crafts"], 10, 20, "default", function() FT.ShowBestUse(d.itemID) end)
+    d.crafts:FitText(16)
+    d.crafts:SetPoint("RIGHT", d.wowhead, "LEFT", -4, 0)
     d.crafts:SetTip(L["Best crafts"], L["The finished products made from it, the best sellers first."])
     d.title = UI.Text(d, 14, "text")
     d.title:SetPoint("TOPLEFT", d.icon, "TOPRIGHT", 10, -1)
-    d.title:SetPoint("RIGHT", d.crafts, "LEFT", -10, 0)
+    d.title:SetPoint("RIGHT", d.crafts, "LEFT", -8, 0)
     d.sum = UI.Text(d, 11, "muted")
-    d.sum:SetPoint("TOPLEFT", d.title, "BOTTOMLEFT", 0, -4)
-    d.sum:SetPoint("RIGHT", d, "RIGHT", -16, 0)
+    d.sum:SetPoint("TOPLEFT", d.title, "BOTTOMLEFT", 0, -5)
+    d.sum:SetPoint("RIGHT", d, "RIGHT", -PAD, 0)
+    d.headLine = UI.Tex(d, "ARTWORK", "line", 0.6)
+    d.headLine:SetHeight(1)
+    d.headLine:SetPoint("TOPLEFT", 4, -(PAD + 34 + 9))
+    d.headLine:SetPoint("TOPRIGHT", -4, -(PAD + 34 + 9))
 
-    local function Section(anchor, y, title)
-        local t = UI.Text(d, 12, "text")
-        t:SetPoint("TOPLEFT", anchor, "BOTTOMLEFT", anchor == d and 16 or 0, y)
-        t:SetText(title)
-        local sub = UI.Text(d, 10, "dim")
-        sub:SetPoint("LEFT", t, "RIGHT", 10, 0)
-        sub:SetPoint("RIGHT", d, "RIGHT", -16, 0)
-        return t, sub
+    -- the answer
+    d.card = UI.Panel(d, "bg2", "accent")
+    d.card:SetPoint("TOPLEFT", PAD, -(PAD + 34 + 18))
+    d.card:SetPoint("RIGHT", d, "RIGHT", -PAD, 0)
+    d.card.k = UI.Text(d.card, 10, "accent")
+    d.card.k:SetPoint("TOPLEFT", 11, -9)
+    d.card.big = UI.Text(d.card, 14, "text")
+    d.card.big:SetPoint("TOPLEFT", d.card.k, "BOTTOMLEFT", 0, -5)
+    d.card.big:SetPoint("RIGHT", d.card, "RIGHT", -11, 0)
+    d.card.meta = UI.Text(d.card, 11, "muted")
+    d.card.meta:SetPoint("TOPLEFT", d.card.big, "BOTTOMLEFT", 0, -4)
+    d.card.meta:SetPoint("RIGHT", d.card, "RIGHT", -11, 0)
+    if d.card.meta.SetWordWrap then d.card.meta:SetWordWrap(true) end
+    d.chips = {}
+
+    -- the other spots
+    d.otherHead = UI.Text(d, 12, "accent")
+    d.otherSub = UI.Text(d, 10, "dim", "RIGHT")
+    d.list = UI.Panel(d, "bg1", "line")
+    d.rows = {}
+    for i = 1, MAX_ROWS do
+        local r = Row(d.list)
+        r:SetPoint("TOPLEFT", 1, -2 - (i - 1) * UI.RowH(22))
+        r:SetPoint("RIGHT", d.list, "RIGHT", -1, 0)
+        if i == 1 then r.line:Hide() end
+        d.rows[i] = r
     end
 
-    -- the spots for your level
-    d.t1, d.s1 = Section(d.icon, -16, "")
-    d.t1:ClearAllPoints()
-    d.t1:SetPoint("TOPLEFT", 16, -60)
-    d.spots = UI.List(d, {
-        rowHeight = spotH,
-        cols = {
-            { key = "where", width = "fill", make = function(row)
-                local c = CreateFrame("Frame", nil, row)
-                c.zone = UI.Text(c, 12, "text")
-                c.zone:SetPoint("TOPLEFT", 0, -3)
-                c.zone:SetPoint("RIGHT")
-                c.what = UI.Text(c, 10, "dim")
-                c.what:SetPoint("TOPLEFT", c.zone, "BOTTOMLEFT", 0, -3)
-                c.what:SetPoint("RIGHT")
-                return c
-            end, cellHeight = spotH },
-            { key = "lv", width = 70 + 6 * ts, justify = "RIGHT", size = 11 },
-            { key = "you", width = 170 + 14 * ts, justify = "RIGHT", size = 11 },
-        },
-        update = function(row, x)
-            local c = row.cells.where
-            c.zone:SetText(x.zone .. (x.fit == 0 and ("  " .. FT.C("up", L["your level"])) or ""))
-            UI.FitBits(c.what, x.what or (x.skill and string.format(L["needs %s %d"], x.skillName, x.skill)) or "")
-            row.cells.lv:SetText(x.own and "" or FT.C(x.fit == 0 and "text" or "dim", string.format(L["level %d-%d"], x.lo, x.hi)))
-            local y = x.yours
-            row.cells.you:SetText(y and (FT.C("accent", string.format(L["you: %s an hour"], FT.Num(math.floor(y.perHour + 0.5))))
-                .. (y.goldHour and FT.C("dim", " · " .. FT.Money(math.floor(y.goldHour), "short") .. L["/h"]) or "")) or "")
-        end,
-        onClick = function(x) FT.Farm.WowheadSearch(x.zone) end,
-        onEnter = function(row, x)
-            GameTooltip:SetOwner(row, "ANCHOR_RIGHT")
-            GameTooltip:AddLine(x.zone, 1, 1, 1)
-            if x.what then GameTooltip:AddLine(x.what, 0.85, 0.87, 0.9, true) end
-            if not x.own then GameTooltip:AddLine(string.format(L["level %d-%d"], x.lo, x.hi), 0.6, 0.64, 0.7) end
-            if x.yours then
-                GameTooltip:AddLine(string.format(L["You looted %s here in %d minutes of looting."], FT.Num(x.yours.n), x.yours.mins), 0.95, 0.75, 0.3, true)
-            end
-            GameTooltip:AddLine(" ")
-            GameTooltip:AddLine(L["Click: the zone on Wowhead (a link to copy)."], 0.6, 0.64, 0.7)
-            GameTooltip:Show()
-        end,
-    })
-    d.spots:SetPoint("TOPLEFT", d.t1, "BOTTOMLEFT", -4, -6)
-    d.spots:SetPoint("RIGHT", d, "RIGHT", -12, 0)
-    d.spots:SetHeight(SPOT_ROWS * spotH)
-    d.spots:SetEmptyText("")
-
-    -- the mobs you looted it from
-    d.t2, d.s2 = Section(d, 0, L["From your loot"])
-    d.t2:ClearAllPoints()
-    d.t2:SetPoint("TOPLEFT", d.spots, "BOTTOMLEFT", 4, -14)
-    d.s2:SetText(L["what Wolf saw you loot (5 corpses or more of a mob)"])
-    d.mobs = UI.List(d, {
-        rowHeight = mobH,
-        cols = {
-            { key = "mob", width = "fill" },
-            { key = "zone", width = 150 + 10 * ts, size = 11, color = "muted" },
-            { key = "per", width = 150 + 12 * ts, justify = "RIGHT", size = 11 },
-        },
-        update = function(row, m)
-            row.cells.mob:SetText((m.name or FT.C("dim", L["a mob"])) .. (m.lv and FT.C("dim", " (" .. m.lv .. ")") or ""))
-            row.cells.zone:SetText(m.zone or "")
-            local pct = m.per < 1 and (math.floor(m.per * 100 + 0.5) .. "%") or string.format(L["%.1f each"], m.per)
-            row.cells.per:SetText(FT.C("accent", pct) .. FT.C("dim", " " .. string.format(L["of %d"], m.corpses)))
-        end,
-        onClick = function(m)
-            if m.npc then
-                FT.ShowLink(m.name or L["a mob"], L["Wowhead: copy the link (Ctrl+C) and paste it in your browser."], FT.Farm.WowheadURL("npc", m.npc))
-            end
-        end,
-    })
-    d.mobs:SetPoint("TOPLEFT", d.t2, "BOTTOMLEFT", -4, -6)
-    d.mobs:SetPoint("RIGHT", d, "RIGHT", -12, 0)
-    d.mobs:SetHeight(MOB_ROWS * mobH)
-    d.mobs:SetEmptyText(L["Nothing yet: loot it and Wolf counts every corpse and where you were."])
-
+    -- your loot, and the small print
+    d.mine = UI.Panel(d, "bg1", "line")
+    d.mine.text = UI.Text(d.mine, 11, "muted")
+    d.mine.text:SetPoint("LEFT", 10, 0)
+    d.mine.text:SetPoint("RIGHT", -10, 0)
     d.note = UI.Text(d, 10, "dim")
-    d.note:SetPoint("BOTTOMLEFT", 16, 12)
-    d.note:SetPoint("RIGHT", d, "RIGHT", -16, 0)
-    d.note:SetText(L["Spots: how Classic hands it out (Forever may differ). Your numbers: only what you looted."])
 
     tinsert(UISpecialFrames, "WolfOfBootyBayFarm")
     d:Hide()
@@ -150,14 +324,105 @@ local function Win()
     return d
 end
 
-local SKILL = { herb = "Herbalism", ore = "Mining" }
+local TONES = { solo = "up", group = "accent", warn = "down" }
+
+-- lay the window out for a model: top to bottom, as tall as what it holds
+local function Layout(d, mdl)
+    local width = d:GetWidth()
+    local inner = width - 2 * PAD
+    local c = d.card
+    c.k:SetText(mdl.card.k or "")
+    c.big:SetText((mdl.card.big or "") .. (mdl.card.where and FT.C("dim", "  ·  " .. (L[mdl.card.where] or mdl.card.where)) or ""))
+    c.meta:SetWidth(inner - 22)
+    c.meta:SetText(mdl.card.meta or "")
+    local metaH = 0
+    if mdl.card.meta and mdl.card.meta ~= "" then
+        local lines = math.max(1, math.ceil((c.meta:GetStringWidth() or 0) / math.max(1, inner - 22)))
+        metaH = math.ceil(math.max(c.meta:GetStringHeight() or 0, lines * (UI.Size(11) + 3)))
+    end
+    c.meta:SetHeight(math.max(1, metaH))
+    local chipTop = 9 + UI.Size(10) + 5 + UI.Size(14) + 4 + metaH + 6
+    -- the chips, left to right, wrapping
+    for _, ch in ipairs(d.chips) do ch:Hide() end
+    local x, y, chipH = 11, 0, UI.Size(10) + 8
+    local nChips = #(mdl.card.chips or {})
+    for i, ch in ipairs(mdl.card.chips or {}) do
+        local cp = d.chips[i] or Chip(c)
+        d.chips[i] = cp
+        cp.text:SetText(ch[1])
+        UI.SetTextColor(cp.text, TONES[ch[2]] or "muted")
+        local w = math.min((cp.text:GetStringWidth() or 40) + 14, inner - 22)
+        if x + w > inner - 11 and x > 11 then x, y = 11, y + chipH + 4 end
+        cp:SetSize(w, chipH)
+        cp:ClearAllPoints()
+        cp:SetPoint("TOPLEFT", c, "TOPLEFT", x, -chipTop - y)
+        cp:Show()
+        x = x + w + 4
+    end
+    local chipsH = nChips > 0 and (y + chipH + 8) or 0
+    local cardH = 9 + UI.Size(10) + 5 + UI.Size(14) + 4 + metaH + chipsH + 10
+    c:SetHeight(cardH)
+    local top = PAD + 34 + 18 + cardH + 10
+    -- the other spots
+    local n = #mdl.others
+    if n > 0 then
+        d.otherHead:ClearAllPoints()
+        d.otherHead:SetPoint("TOPLEFT", PAD + 2, -top)
+        d.otherHead:SetText(mdl.world and L["Where it has dropped"] or L["Other spots"])
+        d.otherSub:ClearAllPoints()
+        d.otherSub:SetPoint("TOPRIGHT", -PAD - 2, -top - 1)
+        d.otherSub:SetText(L["odds · steady gold an hour"])
+        top = top + UI.Size(12) + 6
+        d.list:ClearAllPoints()
+        d.list:SetPoint("TOPLEFT", PAD, -top)
+        d.list:SetPoint("RIGHT", d, "RIGHT", -PAD, 0)
+        local rh = UI.RowH(22)
+        d.list:SetHeight(n * rh + 4)
+        for i, r in ipairs(d.rows) do
+            local o = mdl.others[i]
+            r:SetShown(o ~= nil)
+            if o then
+                r.icon:SetTexture(ICONS[o.kind] or ICONS.mob)
+                r.icon:SetTexCoord(o.kind == "mob" and 0 or 0.08, o.kind == "mob" and 1 or 0.92, o.kind == "mob" and 0 or 0.08, o.kind == "mob" and 1 or 0.92)
+                UI.FitBits(r.name, FT.C("text", o.name or "?") .. (o.where ~= "" and FT.C("dim", "  ·  " .. o.where) or ""))
+                r.odds:SetText(o.odds or "")
+                r.bar.fill:SetWidth(math.max(1, 56 * (o.bar or 0)))
+                r.bar.fill:SetShown((o.bar or 0) > 0)
+            end
+        end
+        d.otherHead:Show(); d.otherSub:Show(); d.list:Show()
+        top = top + n * rh + 4 + 10
+    else
+        d.otherHead:Hide(); d.otherSub:Hide(); d.list:Hide()
+    end
+    -- your loot
+    if mdl.mine then
+        d.mine:ClearAllPoints()
+        d.mine:SetPoint("TOPLEFT", PAD, -top)
+        d.mine:SetPoint("RIGHT", d, "RIGHT", -PAD, 0)
+        local mh = UI.Size(11) + 14
+        d.mine:SetHeight(mh)
+        UI.SetTextColor(d.mine.text, mdl.mineEmpty and "dim" or "text")
+        UI.FitBits(d.mine.text, mdl.mine)
+        d.mine:Show()
+        top = top + mh + 8
+    else
+        d.mine:Hide()
+    end
+    d.note:ClearAllPoints()
+    d.note:SetPoint("TOPLEFT", PAD + 2, -top)
+    d.note:SetPoint("RIGHT", d, "RIGHT", -PAD, 0)
+    UI.FitBits(d.note, mdl.note or "")
+    top = top + UI.Size(10) + PAD
+    d:SetHeight(top)
+end
 
 function FT.ShowFarm(itemID)
     if not itemID then return end
     local d = Win()
     d.itemID = itemID
     d.icon:SetItem(itemID)
-    d.title:SetText(L["Where to farm"] .. ": " .. FT.ItemText(itemID, 40))
+    d.title:SetText(FT.ItemText(itemID, 40))
     d.crafts:SetShown(FT.Craft.UsedIn(itemID) ~= nil)
     -- how it sells
     local r = FT.Market.Row(itemID)
@@ -165,37 +430,14 @@ function FT.ShowFarm(itemID)
     local bits = {}
     if r and r.price then bits[#bits + 1] = FT.C("text", FT.Money(r.price, "short")) .. FT.C("dim", " " .. L["each"]) end
     if rate then bits[#bits + 1] = FT.Sales.PerDayText(rate) end
-    if r and r.ch7 then bits[#bits + 1] = FT.Pct(r.ch7) .. " " .. L["this week"] end
-    local level = (UnitLevel and UnitLevel("player")) or 60
-    local spots, data = FT.Farm.Spots(itemID, level)
-    if data and data.skill then bits[#bits + 1] = string.format(L["needs %s %d"], L[SKILL[data.kind]], data.skill) end
+    if r and r.ch7 then bits[#bits + 1] = FT.C(r.ch7 >= 0 and "up" or "down", FT.Pct(r.ch7) .. " " .. L["this week"]) end
     UI.FitBits(d.sum, table.concat(bits, FT.C("dim", "  ·  ")))
-    -- the spots, yours first
-    d.t1:SetText(string.format(L["For you (level %d)"], level))
-    d.s1:SetText(data and (data.kind == "cloth" and L["cloth: any humanoid of the level; these camps have many"]
-        or data.kind == "leather" and L["leather: skin the beasts of the level"]
-        or (data.kind == "herb" or data.kind == "ore") and L["the zones it grows in, by level"]
-        or "") or "")
-    for _, sp in ipairs(spots) do
-        if not sp.what and data and data.skill then sp.skill, sp.skillName = data.skill, L[SKILL[data.kind]] end
-    end
-    -- zones you looted it in that aren't on the list
-    local listed = {}
-    for _, sp in ipairs(spots) do listed[sp.zone] = true end
-    for _, y in ipairs(FT.Farm.YourZones(itemID, 3)) do
-        if not listed[y.zone] then
-            table.insert(spots, 1, { zone = y.zone, lo = level, hi = level, fit = 0, own = true, what = L["where you looted it"], yours = y })
-        end
-    end
-    -- no spots written for it: where the sources say it comes from (nodes, skinning, drops, vendors...)
-    local lines = FT.Where and FT.Where.Lines(itemID, SPOT_ROWS) or {}
-    d.spots:SetEmptyText(#lines > 0 and table.concat(lines, "\n")
-        or L["Not in Wolf's sources yet: the loot log fills it in when a Wolf user loots one."])
-    d.spots:SetItems(spots)
-    d.mobs:SetItems(FT.Farm.Mobs(itemID, 10))
+    d.model = Model(itemID)
+    Layout(d, d.model)
     d:Show()
     d:Raise()
 end
+FT.FarmModel = Model
 
 FT.On("FT_FARM_LOGGED", function()
     if win and win:IsShown() and win.itemID then FT.Debounce("farmWin", 1, function() FT.ShowFarm(win.itemID) end) end

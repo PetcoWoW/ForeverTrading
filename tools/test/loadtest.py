@@ -618,13 +618,35 @@ step("farm", function()
     local found, texts = mock.layout.Overlaps(d)
     for _, o in ipairs(found) do print(string.format("OVERLAP [where to farm @%d] %q x %q  (%dx%d px)", lv, o[1].text:sub(1, 50), o[2].text:sub(1, 50), o[3], o[4])) end
     for _, t in ipairs(texts) do if t.cut then print(string.format("CUT [where to farm @%d] %q", lv, t.text:sub(1, 80))) end end
-    print(string.format("where to farm @%d: %d spots, %d mobs; first %s", lv, #d.spots.items, #d.mobs.items, d.spots.items[1].zone))
-    assert(#d.mobs.items == 1)
+    local m = d.model
+    print(string.format("where to farm @%d: %s | %s | %d other spots | %s | %dpx tall", lv, m.card.k or "?", m.card.big or "?", #m.others,
+      (m.mine or ""):gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", ""), d:GetHeight()))
+    assert(m.card.k and m.card.big, "one answer first")
+    assert(m.mine and m.mine:find("12", 1, true), "your loot in one line: " .. tostring(m.mine))
+    assert(d:GetHeight() < 420, "as tall as what it says: " .. d:GetHeight())
     d:Hide()
   end
   mock.level = 60
-  FT.ShowFarm(3858) -- ore: zones and the skill
-  assert(_G.WolfOfBootyBayFarm.sum.fitText:find("Mining 175"), "ore shows its Mining")
+  -- (v0.56) the three kinds: ore (zones and the skill), a world epic (not a farm), a pattern you can target
+  local function chipsText(m) local t = {} for _, c in ipairs(m.card.chips) do t[#t + 1] = c[1] end return table.concat(t, " | ") end
+  FT.ShowFarm(3858)
+  local mo = _G.WolfOfBootyBayFarm.model
+  assert(chipsText(mo):find("Mining 175", 1, true) or (mo.card.meta or ""):find("Mining", 1, true), "ore shows its Mining: " .. chipsText(mo))
+  for _, id in ipairs({ 1168, 252892 }) do
+    FT.ShowFarm(id)
+    local d = _G.WolfOfBootyBayFarm
+    mock.layout.Settle(d)
+    local found, texts = mock.layout.Overlaps(d)
+    for _, o in ipairs(found) do print(string.format("OVERLAP [where to farm %d] %q x %q  (%dx%d px)", id, o[1].text:sub(1, 50), o[2].text:sub(1, 50), o[3], o[4])) end
+    for _, t in ipairs(texts) do if t.cut then print(string.format("CUT [where to farm %d] %q", id, t.text:sub(1, 80))) end end
+    local m = d.model
+    print(string.format("where to farm %d: %s | %s | %s", id, m.card.k, m.card.big, chipsText(m)))
+    if id == 1168 then
+      assert(m.world and m.card.k:find("WORLD", 1, true), "a world epic: not a farm")
+    else
+      assert(m.card.big == "Gordok Ogre-Mage" or m.card.big == "Gordok Mage-Lord", "Dawn Armor: the ogres")
+    end
+  end
   _G.WolfOfBootyBayFarm:Hide()
   -- the tip: mageweave up this week, selling every day, at 42
   local r = FT.Market.Row(4338)
@@ -905,16 +927,17 @@ step("layout", function()
       assert(rows and #rows > 0, "drops listed: " .. tostring(rows and #rows))
       print("drops: " .. #rows .. ", top " .. (FT.Name(rows[1].id) or "?") .. " | " .. (rows[1].reason or ""):gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", ""))
       for _, x in ipairs(rows) do
-        assert(FT.Drops.Killable(x.drop.who), "no world boss or raid mob: " .. tostring(x.drop.who.name))
+        assert(FT.Drops.Killable(x.drop.who), "no world boss, raid, summoned or 61+ mob: " .. tostring(x.drop.who.name))
+        assert(not FT.Drops.World(x.id) or x.drop.chance >= 200, "no world drops: " .. tostring(FT.Name(x.id)))
       end
     end },
-    { "money: drops per kill", "signals", function()
+    { "money: drops per hour", "signals", function()
       local f = FT.Tabs.signals
       f.RefreshFarm()
       local bar = FT.Tabs.signals
-      for _, b in ipairs((bar.farmKindBar and bar.farmKindBar:GetParent().sort or {}).buttons or {}) do if b.value == "kill" then b.onClick() end end
+      for _, b in ipairs((bar.farmKindBar and bar.farmKindBar:GetParent().sort or {}).buttons or {}) do if b.value == "hour" then b.onClick() end end
       local rows = f.DropRows()
-      assert(rows[1] and rows[1].drop.perKill, "per kill: the known rates first")
+      assert(rows[1] and rows[1].drop.perHour, "per hour: the known rates first")
     end },
     { "money: dungeons", "signals", function()
       local f = FT.Tabs.signals
@@ -922,7 +945,7 @@ step("layout", function()
       local rows = f.DungeonRows()
       assert(#rows >= 15, "the dungeons: " .. #rows)
       local d = rows[1].dungeonInfo
-      assert(d.value > d.coin and d.each == d.value / 5, "a clear: loot and coin, split five ways")
+      assert(d.steady > d.coin and d.each == d.steady / 5, "a run: steady loot and coin, split five ways; rare drops apart")
       print("dungeons: best " .. d.name .. " " .. math.floor(d.each / 10000) .. "g each a clear, " .. math.floor(d.hour / 10000) .. "g an hour each")
     end },
     { "money: dungeons, the trash", "signals", function()

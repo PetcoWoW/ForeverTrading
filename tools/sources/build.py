@@ -6,7 +6,7 @@ recipe list (Data/Recipes.lua) and Wolf's own hand table (tools/sources/hand.jso
 don't carry, each line with where it came from). Writes the gap list (tools/sources/gaps.txt): items sold on the
 auction house that Wolf can't place - the build fails on them unless they're in hand.json.
 
-  python3 tools/sources/build.py <forever-db checkout> [Data/Feed.lua with prices, for the gap list]
+  python3 tools/sources/build.py <forever-db checkout> [Data/Feed.lua with prices] [cMaNGOS ClassicDB_*.sql.gz]
 """
 import json, os, re, sys, collections
 from lupa import LuaRuntime, lua_type
@@ -14,6 +14,7 @@ from lupa import LuaRuntime, lua_type
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 FDB = sys.argv[1] if len(sys.argv) > 1 else "/tmp/forever-db"
 FEED = sys.argv[2] if len(sys.argv) > 2 else None
+CDB = sys.argv[3] if len(sys.argv) > 3 else None   # cMaNGOS classic-db's dump (v0.56: farm values, world drops, wings)
 OUT = os.path.join(ROOT, "Data", "Sources.lua")
 GAPS = os.path.join(ROOT, "tools", "sources", "gaps.txt")
 HAND = os.path.join(ROOT, "tools", "sources", "hand.json")
@@ -114,12 +115,50 @@ dead = sorted(r for r, out, mats in recipe_rows if not real(out) or any(not real
 
 # ---- which items get a line ----------------------------------------------------------------------------
 ah = set()
+build_price = collections.defaultdict(list)   # what an item sells for today (the realms' median): to pick what matters
 if FEED and os.path.exists(FEED):
     for m in re.finditer(r'data = "([^"]*)"', open(FEED, encoding="utf-8").read()):
-        for k in re.findall(r'(?:^|;)(\d+)=', m.group(1)):
+        for k, first in re.findall(r'(?:^|;)(\d+)=([^,;]*)', m.group(1)):
             i = int(k)
             if i < 400000:
                 ah.add(i)
+                if first:
+                    build_price[i].append(int(first, 36))
+build_price = {i: sorted(v)[len(v) // 2] for i, v in build_price.items()}
+
+# (v0.56) cMaNGOS: farm values, world drops, spawns and respawns, dungeon wings
+cm = None
+if CDB and os.path.exists(CDB):
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    from cmangos import CMaNGOS
+    cm = CMaNGOS(CDB, FDB)
+JACKPOT = 20000   # a drop worth 2g+ ...
+JACKPOT_P = 0.05  # ... that comes less than 5% of kills: the jackpot, apart from the steady gold
+def farm_fields(n):
+    """"spawns:respawn|floor|item*expected,..." (expected a kill x 10000): the mob's farm facts, priced in game"""
+    f = cm.mob(n, ah) if cm else None
+    if f is None:
+        return "0:0||" if cm and n in cm.ctpl else None
+    sp, resp, floor, trade = f
+    # Forever's own drops (ForeverDB, players' recordings) that 1.12 doesn't have
+    fl = forever_loot().get(n, {})
+    for i, ch in fl.items():
+        if i not in trade and ch > 0 and i in ah:
+            trade[i] = ch / 10000.0
+    top = sorted(trade.items(), key=lambda kv: -(kv[1] * build_price.get(kv[0], 0)))[:4]
+    top = [(i, e) for i, e in top if e * build_price.get(i, 0) >= 1]
+    return "%d:%d|%d|%s" % (sp, resp, floor, ",".join("%d*%d" % (i, max(1, round(e * 10000))) for i, e in top))
+_fl = None
+def forever_loot():
+    """npc -> { item: chance per 10000 } from ForeverDB's full drop lists"""
+    global _fl
+    if _fl is None:
+        _fl = collections.defaultdict(dict)
+        src = F.drop if F.drop is not None else D.drop
+        for i, rws in src.items():
+            for npc, ch in pairs_list(rws):
+                _fl[npc][int(i)] = ch
+    return _fl
 want = (ah | crafted | mats_of | recipe_items) & set(item)
 
 npcs, objs, quests = {}, {}, {}
@@ -130,7 +169,9 @@ def npc_ref(n):
         if v.get(3):
             lv = str(v[3]) if v.get(3) == v.get(4) or not v.get(4) else "%s-%s" % (v[3], v[4])
         rank = v.get(5)
-        npcs[n] = "|".join([v.get(1) or "?", ",".join(zones("c%d" % n)), lv, nfac.get(n, "")] + ([str(rank)] if rank else []))
+        extra = farm_fields(n) if cm else None
+        npcs[n] = "|".join([v.get(1) or "?", ",".join(zones("c%d" % n)), lv, nfac.get(n, "")]
+                           + ([str(rank or ""), extra] if extra else ([str(rank)] if rank else [])))
     return n
 # a chest, box or crate (not a node you gather): Wolf shows these only when nothing else gives the item
 CHESTY = re.compile(r"(?i)chest|box|crate|cache|strongbox|footlocker|coffer|trunk|basket|barrel|sack|\bbag\b|locker|stash|bundle|cask|urn\b|reliquary|container|treasure|supplies|pile of")
@@ -295,13 +336,55 @@ events.sort()
 
 def lstr(s):
     return '"' + s.replace("\\", "\\\\").replace('"', '\\"') + '"'
+# (v0.56) the farm spots: the best open-world mobs of each level by steady gold an hour (today's prices), so
+# Wolf can say "your level's best farm" without every mob of the game; and the world drops
+world = {}
+if cm:
+    def steady_hour(n):
+        f = cm.mob(n, ah)
+        c = cm.ctpl.get(n)
+        if not f or not c:
+            return 0
+        sp, resp, floor, trade = f
+        v = floor
+        for i, e in trade.items():
+            pr = build_price.get(i, 0) * 0.95
+            if e >= JACKPOT_P or pr < JACKPOT:
+                v += pr * e
+        kph = min(30 if c["rank"] in (1, 2) else 90, sp * 3600.0 / max(resp, 60))
+        return v * kph
+    BAD = re.compile(r"(?i)guard|peacekeeper|trigger|\(|dummy|totem|invisible|bunny|target|grunt|sentinel|watchman|defender")
+    by_level = collections.defaultdict(list)
+    for n, c in cm.ctpl.items():
+        sp = cm.sp.get(n)
+        if not sp or c["npcflags"] or c["creaturetype"] == 8 or c["rank"] in (2, 3, 4) or BAD.search(c["name"] or ""):
+            continue
+        if (c["minlevel"] or 0) > 61 or D.npc[n] is None:
+            continue
+        on_land = sum(1 for x in sp if x[0] in (0, 1))
+        if on_land < 6:
+            continue
+        by_level[c["minlevel"] or 1].append((steady_hour(n), n))
+    farm_spots = 0
+    for lv, xs in by_level.items():
+        for v, n in sorted(xs, reverse=True)[:8]:
+            if v > 0:
+                npc_ref(n)
+                farm_spots += 1
+    for i, (lv, one) in cm.world_items().items():
+        if i in ah and build_price.get(i, 0) >= 10000:   # what Drops would have listed: a gold or more
+            world[i] = (lv, one)
+    print("farm spots: %d mobs; world drops: %d items" % (farm_spots, len(world)))
+
 out = []
 out.append("-- Where every item comes from (generated by tools/sources/build.py - don't edit by hand).")
 out.append("-- From ForeverDB (github.com/foreverfraddons/forever-db, GPL-3.0; drop counts from Drop Tables,")
 out.append("-- github.com/valcheffnet/DropTables, CC BY-SA 4.0) and Wolf's own Forever notes (tools/sources/hand.json).")
 out.append("-- FT.SRC[item] = \"kind=...;kind=...\": d drops (npc:chance per 10000), s skinning, o objects and nodes,")
 out.append("-- i containers (item:chance), f Merchant's Favor vendors, v vendors, q quest rewards, w world drop from level.")
-out.append("-- FT.SRC_N[npc] = \"name|zones|levels|A/H|rank\" (rank: 1 elite, 2 rare elite, 3 boss, 4 rare); FT.SRC_O[object] = \"name|zones\";")
+out.append("-- FT.SRC_N[npc] = \"name|zones|levels|A/H|rank|spawns:respawn|floor|item*expected,...\" (rank: 1 elite, 2 rare elite,")
+out.append("-- 3 boss, 4 rare; floor: copper a kill in coin and vendor loot; expected: of each traded drop a kill x 10000;")
+out.append("-- spawns 0: summoned or event-only); FT.SRC_O[object] = \"name|zones\";")
 out.append("-- FT.SRC_Q[quest] = \"title|level\".")
 out.append("local ADDON, FT = ...")
 out.append("FT.SRC_BUILT = %s" % lstr(str(T(D.meta).get("build"))))
@@ -338,6 +421,8 @@ out.append("-- recipes that can't be made in Forever: an item they make or use i
 out.append("FT.SRC_DEAD = {" + ",".join("[%d]=true" % r for r in dead) + "}")
 out.append("-- Merchant's Favor vendors: npc -> \"A\" (Three Corners, Redridge) or \"H\" (west of the Crossroads, the Barrens)")
 out.append("FT.SRC_MF = {" + ",".join("[%d]=%s" % (n, lstr(v)) for n, v in sorted(MF.items())) + "}")
+out.append("-- (v0.56) world drops (a pool 15+ kinds of mob roll, cMaNGOS): item -> \"lowest level:about 1 in N kills\"")
+out.append("FT.SRC_WORLD = {" + ",".join("[%d]=\"%d:%d\"" % (i, lv, one) for i, (lv, one) in sorted(world.items())) + "}")
 open(OUT, "w", encoding="utf-8").write("\n".join(out) + "\n")
 
 os.makedirs(os.path.dirname(GAPS), exist_ok=True)
@@ -361,6 +446,15 @@ DUNGEONS = {  # map: (name, where the door is, minutes for a full clear of every
     349: ("Maraudon", "Desolace", 75), 109: ("Sunken Temple", "Swamp of Sorrows", 60), 230: ("Blackrock Depths", "Blackrock Mountain", 120),
     229: ("Blackrock Spire", "Blackrock Mountain", 90), 429: ("Dire Maul", "Feralas", 120), 289: ("Scholomance", "Western Plaguelands", 75),
     329: ("Stratholme", "Eastern Plaguelands", 90),
+}
+# (v0.56) the dungeons with wings you run apart: each spawn goes to the wing of its nearest anchor boss
+WINGS = {
+    429: [("Dire Maul East", 35, [11492, 14327, 11490]), ("Dire Maul West", 45, [11486, 11496, 11489]),
+          ("Dire Maul North", 35, [11501, 14325, 14326])],
+    329: [("Stratholme Live", 45, [10812, 10811]), ("Stratholme Undead", 45, [10440, 10438])],
+    229: [("Lower Blackrock Spire", 50, [9568, 9237, 9196]), ("Upper Blackrock Spire", 50, [10363, 9816])],
+    189: [("SM Graveyard", 15, [4543, 3983]), ("SM Library", 25, [6487, 3974]), ("SM Armory", 25, [3975]),
+          ("SM Cathedral", 30, [3977, 3976])],
 }
 GD = F.gold if F.gold is not None else D.gold
 gold = {int(k): T(v) for k, v in GD.items()} if GD is not None else {}
@@ -396,6 +490,21 @@ for k, v in SP.items():
         m = pt.get(1)
         if m in DUNGEONS:
             spawns[m][n] = spawns[m].get(n, 0) + (len(pt) - 1) // 2
+wing_of = {}                              # (map, npc) -> {wing: count}
+if cm:
+    spawns = collections.defaultdict(dict)
+    for m in DUNGEONS:
+        anchors = []
+        for wname, _, bosses in WINGS.get(m, []):
+            for b in bosses:
+                for s_ in cm.sp.get(b, []):
+                    if s_[0] == m:
+                        anchors.append((wname, s_[1], s_[2], s_[3]))
+        for n, x, y, z in cm.spawns_in(m):
+            spawns[m][n] = spawns[m].get(n, 0) + 1
+            if anchors:
+                w = min(anchors, key=lambda a: (a[1] - x) ** 2 + (a[2] - y) ** 2 + (a[3] - z) ** 2)[0]
+                wing_of.setdefault((m, n), collections.Counter())[w] += 1
 want_npcs = set(n for m in spawns.values() for n in m)
 loot = collections.defaultdict(list)     # npc -> [(item, chance per 10000)]
 DROP = F.drop if F.drop is not None else D.drop
@@ -407,19 +516,20 @@ for i, rows in DROP.items():
         if npc in want_npcs and item[i].get(5) != 12:   # quest items sell for nothing
             loot[npc].append((i, chance))
 dng = []
-for m, (name, door, minutes) in sorted(DUNGEONS.items(), key=lambda x: x[1][0]):
-    allx, trash, unknown = collections.Counter(), collections.Counter(), set()
+def unit(name, base, door, minutes, members):
+    """one dungeon run: members = [(npc, spawns)]"""
+    allx, trash, unknown, chance_of = collections.Counter(), collections.Counter(), set(), {}
     coin = coin_t = mobs = bosses = 0
-    lvs = []
-    for n, cnt in spawns[m].items():
+    lvs, who = [], []
+    for n, cnt in members:
         v = T(D.npc[n]) or {}
         if not loot.get(n) and n not in gold:
             continue                     # no loot, no coin: a friendly or a decoration
-        # a boss: in the encounter list, or one of a kind with a blue-or-better drop at 5% or more (a boss's table)
         boss = v.get(1) in enc_names[m] or (cnt == 1 and any(chance >= 500 and (item.get(i, {}).get(2) or 0) >= 3
                                                              for i, chance in loot.get(n, [])))
         mobs += cnt
         bosses += 1 if boss else 0
+        who.append(n)
         if v.get(3):
             lvs += [int(v[3])] * cnt
         g = gold.get(n, {}).get(1) or coin_guess(int(v.get(3) or 1), 1 if (v.get(5) or 0) in (1, 2) else 0)
@@ -430,25 +540,35 @@ for m, (name, door, minutes) in sorted(DUNGEONS.items(), key=lambda x: x[1][0]):
             if chance <= 0:
                 unknown.add(i)
                 continue
+            chance_of[i] = max(chance_of.get(i, 0), chance)
             e = cnt * chance / 10000.0
             allx[i] += e
             if not boss:
                 trash[i] += e
     if not mobs:
-        continue
+        return
     lvs.sort()
     lv = "%d-%d" % (lvs[len(lvs) // 10], lvs[(len(lvs) * 9) // 10]) if lvs else ""
     def enc(c):
         top = [(i, e) for i, e in c.most_common() if e >= 0.005][:110]
-        return ",".join("%d:%d" % (i, max(1, round(e * 1000))) for i, e in top)
-    dng.append("{n=%s,door=%s,lv=%s,min=%d,mobs=%d,bosses=%d,coin=%d,coinT=%d,items=%s,trash=%s,u=%s}," % (
-        lstr(name), lstr(door), lstr(lv), minutes, mobs, bosses, coin, coin_t, lstr(enc(allx)), lstr(enc(trash)),
-        lstr(",".join(str(i) for i in sorted(unknown)[:60]))))
+        # j: a drop under 5% a kill (a jackpot when it's worth 2g+: Wolf counts it apart from the steady gold)
+        return ",".join("%d:%d%s" % (i, max(1, round(e * 1000)), ":j" if chance_of.get(i, 0) < 500 else "") for i, e in top)
+    dng.append("{n=%s,b=%s,door=%s,lv=%s,min=%d,mobs=%d,bosses=%d,coin=%d,coinT=%d,items=%s,trash=%s,u=%s,m=%s}," % (
+        lstr(name), lstr(base), lstr(door), lstr(lv), minutes, mobs, bosses, coin, coin_t, lstr(enc(allx)), lstr(enc(trash)),
+        lstr(",".join(str(i) for i in sorted(unknown)[:60])), lstr(",".join(str(n) for n in sorted(set(who))))))
+for m, (name, door, minutes) in sorted(DUNGEONS.items(), key=lambda x: x[1][0]):
+    if m in WINGS and cm:
+        for wname, wmin, _ in WINGS[m]:
+            members = [(n, wing_of[(m, n)][wname]) for n in spawns[m] if wing_of.get((m, n), {}).get(wname)]
+            unit(wname, name, door, wmin, members)
+    else:
+        unit(name, name, door, minutes, list(spawns[m].items()))
 DOUT = os.path.join(ROOT, "Data", "Dungeons.lua")
 open(DOUT, "w", encoding="utf-8").write("\n".join([
     "-- What a full clear of each 5-man dungeon drops on average (generated by tools/sources/build.py - don't edit by hand).",
     "-- From ForeverDB (spawns, loot tables, coin counts; GPL-3.0, Drop Tables counts CC BY-SA 4.0). items/trash:",
-    "-- \"item:thousandths of one a clear\" (trash leaves the bosses out); coin in copper; u: drops of unknown rate;",
+    "-- \"item:thousandths of one a clear[:j]\" (j: under 5% a kill - a jackpot when it's worth 2g+; trash leaves the",
+    "-- bosses out); coin in copper; u: drops of unknown rate; b: the dungeon (wings share it); m: its mobs;",
     "-- min: a rough full clear of every wing, for a guide - Wolf's sessions measure the real one.",
     "local ADDON, FT = ...",
     "FT.DNG = {"] + dng + ["}"]) + "\n")

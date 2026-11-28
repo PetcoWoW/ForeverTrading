@@ -1,4 +1,4 @@
-# Where every item comes from: Data/Sources.lua from ForeverDB, Wolf's recipes and Wolf's own notes (daily, or by hand).
+# Where every item comes from: Data/Sources.lua from ForeverDB and cMaNGOS classic-db, Wolf's recipes and Wolf's own notes (daily, or by hand).
 name: sources
 on:
   schedule:
@@ -20,6 +20,11 @@ jobs:
         run: |
           git clone -q --depth 1 https://github.com/foreverfraddons/forever-db.git /tmp/forever-db
           pip install -q lupa
+      - name: cMaNGOS classic-db (spawns, respawns and full loot tables, for gold an hour and world drops)
+        run: |
+          git clone -q --depth 1 --filter=blob:none --no-checkout https://github.com/cmangos/classic-db.git /tmp/cdb
+          cd /tmp/cdb && git sparse-checkout set --no-cone 'Full_DB/*.sql.gz' && git checkout -q
+          ls Full_DB/*.sql.gz | head -1 > /tmp/cdbpath
       - name: The newest prices (which items trade, for the gap list)
         env: { GH_TOKEN: "${{ github.token }}" }
         run: |
@@ -28,7 +33,7 @@ jobs:
           unzip -q -o ./*.zip 2>/dev/null || true
           find /tmp/rel -name Feed.lua | head -1 > /tmp/feedpath
       - name: Build Data/Sources.lua and Data/Dungeons.lua
-        run: python3 tools/sources/build.py /tmp/forever-db "$(cat /tmp/feedpath)"
+        run: python3 tools/sources/build.py /tmp/forever-db "$(cat /tmp/feedpath)" "/tmp/cdb/$(cat /tmp/cdbpath)"
       - name: Commit it when it changed
         run: |
           git config user.name "github-actions[bot]"
