@@ -22,7 +22,7 @@ Restart the game fully the first time (new addons load at launch, not on `/reloa
 
 **Today**: what everything you own is worth and what the last prices did to it, a calendar of what's coming (the Darkmoon Faire, battleground weeks, the raids), your best moves (including listings someone undercut and what to post tonight), what you own that moved, and what sold while you were away.
 
-**Market**: the market's mood, its value over time, the top gainers and losers, the most traded items and the biggest sellers. Search any item: The verdict comes first, then one clean chart, when it sells best, where it comes from (mobs, nodes, vendors, Merchant's Favor, quests), and what it costs to craft and where to learn the recipe.
+**Market**: the market's mood, its value over time, the top gainers and losers, the most traded items and the biggest sellers. Search any item: the verdict comes first, then one clean chart, when it sells best, where it comes from (mobs, nodes, vendors, Merchant's Favor, quests), and what it costs to craft and where to learn the recipe.
 
 **Make gold**
 

@@ -256,7 +256,14 @@ function UI.Chart(parent)
 
         -- vertical grid (not on the simple line: its dates are enough) and time labels
         local simpleLine = d.mode == "line" and not d.centerZero
-        local every = math.max(1, math.floor(count / 6 + 0.5))
+        -- (v0.52) as many dates as fit the width at this text size (six at most), never two over each other
+        local probe = self.tlabels:Get()
+        probe:SetText(d.hourly and "12a" or "11/28")
+        local lw = (probe:GetStringWidth() or 30) + 14
+        probe:Hide()
+        local fit = math.max(2, math.min(6, math.floor(((self:GetWidth() or W) - AXIS_W) / lw)))
+        local every = math.max(1, math.ceil(count / fit))
+        local placed = {}
         for i = first, last do
             if (last - i) % every == 0 then
                 local x = X(i)
@@ -274,9 +281,16 @@ function UI.Chart(parent)
                 -- never past the chart's edges
                 local half = (fs:GetStringWidth() or 0) / 2 + 2
                 local cx = math.max(half, math.min((self:GetWidth() or W) - AXIS_W - half, x))
-                fs:ClearAllPoints()
-                fs:SetPoint("CENTER", self, "BOTTOMLEFT", cx, TIME_H / 2)
-                fs:Show()
+                local clash = false
+                for _, p in ipairs(placed) do if math.abs(p - cx) < half * 2 + 4 then clash = true end end
+                if clash then
+                    fs:Hide()
+                else
+                    placed[#placed + 1] = cx
+                    fs:ClearAllPoints()
+                    fs:SetPoint("CENTER", self, "BOTTOMLEFT", cx, TIME_H / 2)
+                    fs:Show()
+                end
             end
         end
 

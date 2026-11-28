@@ -675,10 +675,10 @@ local function MoverList(parent, title)
     box.title:SetPoint("TOPLEFT", 12, -10)
     box.title:SetText(title)
     local bump = (UI.Size(12) - 12) * 5
+    -- (v0.52) the name and the one number that matters (the day's move, or gold a day): side by side in the
+    -- compact window too; the price is in the hover
     local cols = {
         { key = "name", title = "", width = "fill", make = NameCell, cellHeight = 24 },
-        { key = "spark", title = "", width = 40, justify = "RIGHT", make = SparkCell, cellHeight = 16 },
-        { key = "price", title = "", width = 54 + bump, justify = "RIGHT" },
         { key = "ch", title = "", width = 60 + bump, justify = "RIGHT" },
     }
     box.list = UI.List(box, {
@@ -687,11 +687,7 @@ local function MoverList(parent, title)
             local cell = row.cells.name
             cell.icon:SetItem(r.id)
             cell.star:SetText("")
-            cell.text:SetText(FT.ItemText(r.id) .. (r.pushed and FT.C("accent", "  " .. L["pushed up?"]) or ""))
-            -- its last week, colored by the week's move (today's move is the number beside it)
-            local wk = r.ch7 or r.ch1 or 0
-            row.cells.spark:SetValues(r.spark, wk > 0 and "up" or (wk < 0 and "down" or "muted"))
-            row.cells.price:SetText(T.ShortMoney(r.price))
+            UI.FitSize(cell.text, FT.ItemText(r.id) .. (r.pushed and FT.C("accent", "  " .. L["pushed up?"]) or ""), 12, 3)
             -- (v0.52) Most traded: the gold that changes hands a day, in place of the day's move
             if r.gold then row.cells.ch:SetText(FT.C("text", T.ShortMoney(r.gold)))
             else row.cells.ch:SetText(FT.C((r.ch1 or 0) >= 0 and "up" or "down", FT.An.Pc(r.ch1 or 0))) end
@@ -699,6 +695,8 @@ local function MoverList(parent, title)
         onClick = function(r) if not UI.ItemClick(r.id) then T.Select(r.id) end end,
         onEnter = function(row, r)
             UI.TipItem(row, r.id)
+            GameTooltip:AddDoubleLine(L["Price"], FT.Money(r.price, "short"), 0.6, 0.64, 0.7, 1, 1, 1)
+            GameTooltip:Show()
             if r.gold then
                 GameTooltip:AddLine(" ")
                 GameTooltip:AddLine(string.format(L["~%s sold a day at ~%s: %s a day changes hands"], r.perDay >= 10 and FT.Num(math.floor(r.perDay + 0.5)) or string.format("%.1f", r.perDay),

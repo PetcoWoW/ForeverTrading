@@ -258,7 +258,7 @@ function W.RecipeLine(itemID)
     local g = W.Get(itemID)
     for _, n in ipairs(g.favor) do
         if ForYou(n.camp) then
-            return string.format(L["Merchant's Favor: %s (%s)"], n.name, n.camp == "H" and L["the Crossroads"] or L["Three Corners"]), "favor"
+            return string.format(L["Merchant's Favor  ·  %s  ·  %s"], n.name, n.camp == "H" and L["the Crossroads"] or L["Three Corners"]), "favor"
         end
     end
     for _, n in ipairs(g.vendors) do
