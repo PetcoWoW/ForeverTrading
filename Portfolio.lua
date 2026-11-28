@@ -484,10 +484,16 @@ function Ses.Summary(s)
         items = items, money = s.money or 0, secs = secs, unpriced = unpriced, rateIn = math.max(0, RATE_AFTER - secs) }
 end
 
-function Ses.Start()
-    if FT.db.session then return end
-    FT.db.session = { start = time(), since = time(), secs = 0, items = {}, money = 0, zone = Zone() }
-    FT.Print(L["Session started: everything you loot counts. Stop it with a right-click on the minimap button, or /wolf farm."])
+function Ses.Start(auto)
+    local cur = FT.db.session
+    if cur and not (cur.auto and not auto) then return end
+    -- (v0.57) your own session takes over from a farming one: that one is saved first
+    if cur then Ses.Stop() end
+    FT.db.session = { start = time(), since = time(), secs = 0, items = {}, money = 0, zone = Zone(), auto = auto or nil,
+        lastAt = time(), loots = 0 }
+    if not auto then
+        FT.Print(L["Session started: everything you loot counts. Stop it with a right-click on the minimap button, or /wolf farm."])
+    end
     FT.Fire("FT_SESSION_CHANGED")
 end
 
@@ -504,9 +510,35 @@ function Ses.Pause(on)
     FT.Fire("FT_SESSION_CHANGED")
 end
 
+-- (v0.57) a farming session's name: where, and what it was mostly (herbs, mining, skinning, cloth, or mobs)
+local AUTO_KIND = { herb = "herbs", ore = "mining", leather = "skinning", cloth = "cloth" }
+local function AutoName(s)
+    local by, total = {}, 0
+    for id, qty in pairs(s.items or {}) do
+        local k = FT.Farm and FT.Farm.KindOf(id)
+        k = k and AUTO_KIND[k] or "mobs"
+        by[k] = (by[k] or 0) + qty
+        total = total + qty
+    end
+    local best, n = "mobs", 0
+    for k, q in pairs(by) do if q > n then best, n = k, q end end
+    return string.format("%s · %s, %d min", s.zone or "?", L[best], math.floor((s.secs or 0) / 60 + 0.5))
+end
+
+local AUTO_MIN_SECS, AUTO_MIN_LOOTS = 300, 3
 function Ses.Stop()
     local s = FT.db.session
     if not s then return end
+    if s.auto then
+        -- too little to mean anything: not kept
+        s.secs = Ses.Elapsed(s)
+        if s.secs < AUTO_MIN_SECS or (s.loots or 0) < AUTO_MIN_LOOTS then
+            FT.db.session = nil
+            FT.Fire("FT_SESSION_CHANGED")
+            return
+        end
+        s.name = AutoName(s)
+    end
     local sum = Ses.Summary(s)
     s.secs = Ses.Elapsed(s)
     s.stop = time()
@@ -516,9 +548,14 @@ function Ses.Stop()
     table.insert(FT.db.sessions, 1, s)
     for i = #FT.db.sessions, MAX_SAVED + 1, -1 do FT.db.sessions[i] = nil end
     FT.db.session = nil
-    FT.Print(string.format(L["Session done: %s in %s, %s an hour."], FT.Money(s.worth, "short"),
-        FT.Duration and FT.Duration(s.secs) or (math.floor(s.secs / 60) .. " min"),
-        sum.perHour and FT.Money(math.floor(sum.perHour), "short") or "?"))
+    if s.auto then
+        FT.Print(string.format(L["Farming session saved: %s, %s an hour (You > Sessions)."], s.name,
+            sum.perHour and FT.Money(math.floor(sum.perHour), "short") or FT.Money(s.worth, "short")))
+    else
+        FT.Print(string.format(L["Session done: %s in %s, %s an hour."], FT.Money(s.worth, "short"),
+            FT.Duration and FT.Duration(s.secs) or (math.floor(s.secs / 60) .. " min"),
+            sum.perHour and FT.Money(math.floor(sum.perHour), "short") or "?"))
+    end
     FT.Fire("FT_SESSION_CHANGED")
 end
 
@@ -544,8 +581,67 @@ function Ses.UsualPerHour()
     return secs >= 3600 and worth / secs * 3600 or nil
 end
 
-FT.On("CHAT_MSG_LOOT", function(msg)
+---------------------------------------------------------------------------
+-- (v0.57) The farming tracker: a session that runs itself. Your first gather or loot out of town (not resting in a
+-- city or inn, not in a battleground) starts one, quietly - nothing on screen; 5 minutes without loot pauses it and
+-- those minutes don't count; the next loot goes on; 30 minutes paused (or logged out) ends it. Kept in You >
+-- Sessions with where and what ("Felwood · herbs"), one line in chat; one under 5 minutes or 3 loots isn't kept.
+-- Starting your own session saves it and takes over. Settings > Alerts.
+---------------------------------------------------------------------------
+local AUTO_IDLE, AUTO_END = 300, 1800
+local function OutInTheWorld()
+    if IsResting and IsResting() then return false end
+    if IsInInstance then
+        local inside, kind = IsInInstance()
+        if inside and (kind == "pvp" or kind == "arena") then return false end
+    end
+    return true
+end
+
+-- a loot line (not an item handed to you): starts a farming session when none runs
+local function OwnLoot(msg)
+    for _, key in ipairs({ "LOOT_ITEM_SELF_MULTIPLE", "LOOT_ITEM_SELF" }) do
+        local p = _G[key] and _G[key]:gsub("([%(%)%.%+%-%*%?%[%]%^%$])", "%%%1"):gsub("%%s", "(.+)"):gsub("%%d", "(%%d+)")
+        if p and msg:match("^" .. p .. "$") then return true end
+    end
+    return not _G.LOOT_ITEM_SELF and msg:find("^You receive loot") ~= nil
+end
+function Ses.AutoMaybe(msg, money)
+    if FT.S.autoSession == false or FT.db.session or not OutInTheWorld() then return end
+    if not money and not OwnLoot(msg) then return end
+    Ses.Start(true)
+end
+
+-- the idle check: paused after 5 quiet minutes (the quiet ones taken back off), ended after 30 paused
+function Ses.AutoTick(now)
     local s = FT.db.session
+    if not (s and s.auto) then return end
+    now = now or time()
+    if not s.paused and now - (s.lastAt or s.start) > AUTO_IDLE then
+        s.secs = math.max(0, Ses.Elapsed(s) - (now - (s.lastAt or s.start)))
+        s.since, s.paused, s.idle, s.pausedAt = nil, true, true, s.lastAt or now
+        FT.Fire("FT_SESSION_CHANGED")
+    elseif s.paused and now - (s.pausedAt or now) > AUTO_END then
+        Ses.Stop()
+    end
+end
+C_Timer.NewTicker(30, function() if FT.db then pcall(Ses.AutoTick) end end)
+
+-- a loot after an idle pause: on again
+local function Wake(s)
+    if s and s.paused and s.idle then
+        s.since, s.paused, s.idle, s.pausedAt = time(), nil, nil, nil
+        FT.Fire("FT_SESSION_CHANGED")
+    end
+end
+
+FT.On("CHAT_MSG_LOOT", function(msg)
+    if not FT.db.session and type(msg) == "string" then Ses.AutoMaybe(msg) end
+    local s = FT.db.session
+    if s and s.auto then
+        -- only your own loot keeps a farming session going (an item handed to you doesn't)
+        if OwnLoot(msg) then Wake(s) else return end
+    end
     if not s or s.paused then return end
     local id, n = Ses.ParseLoot(msg)
     if id then
@@ -554,15 +650,19 @@ FT.On("CHAT_MSG_LOOT", function(msg)
         s.found = s.found or {}
         s.found[id] = (s.found[id] or 0) + math.floor((Ses.UnitValue(id) or 0) * n)
         s.lastLoot, s.lastN, s.lastT = id, n, time()
+        s.lastAt, s.loots = time(), (s.loots or 0) + 1
         FT.Fire("FT_SESSION_LOOT", id, n)
     end
 end)
 FT.On("CHAT_MSG_MONEY", function(msg)
+    if not FT.db.session and Ses.ParseMoney(msg) > 0 then Ses.AutoMaybe(msg, true) end
     local s = FT.db.session
+    if s and s.auto then Wake(s) end
     if not s or s.paused then return end
     local c = Ses.ParseMoney(msg)
     if c > 0 then
         s.money = (s.money or 0) + c
+        s.lastAt, s.loots = time(), (s.loots or 0) + 1
         FT.Fire("FT_SESSION_LOOT")
     end
 end)
@@ -581,6 +681,7 @@ end)
 -- logged out mid-session: the time away doesn't count
 FT.On("PLAYER_LOGOUT", function()
     local s = FT.db.session
+    if s then s.outAt = time() end
     if s and not s.paused then
         s.secs = Ses.Elapsed(s)
         s.since = nil
@@ -589,6 +690,23 @@ FT.On("PLAYER_LOGOUT", function()
 end)
 FT.On("FT_READY", function()
     local s = FT.db.session
+    if s and s.auto then
+        -- a farming session: a /reload goes straight on; longer away, the quiet time is taken off and it waits
+        -- paused for the next loot; 30 minutes or more since the last loot, it's over
+        local now = time()
+        local last = s.lastAt or s.start
+        if s.resume then
+            s.resume = nil
+            if now - last <= AUTO_IDLE then
+                s.since = now
+            else
+                s.secs = math.max(0, (s.secs or 0) - math.max(0, (s.outAt or now) - last))
+                s.paused, s.idle, s.pausedAt = true, true, last
+            end
+        end
+        if now - last > AUTO_END then Ses.Stop() else FT.Fire("FT_SESSION_CHANGED") end
+        return
+    end
     if s and s.resume then
         s.since, s.resume = time(), nil
         FT.Print(L["Your session goes on (the time logged out doesn't count)."])

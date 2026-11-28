@@ -79,16 +79,24 @@ local function Quiet()
     return false
 end
 
--- at the auction house: newer prices are waiting (at most once a visit, and 20 minutes apart)
-local saidAt = 0
-FT.On("AUCTION_HOUSE_SHOW", function()
-    C_Timer.After(2, function()
-        if not C.FreshReady() or Quiet() or GetTime() - saidAt < 20 * 60 then return end
-        saidAt = GetTime()
-        FT.Print(string.format(L["Newer prices should be waiting (yours are from %s). %s"],
-            FT.TimeOfDay(FT.Feed.Time()), Link("reload", L["Load them"], L["/reload loads them."])))
-    end)
-end)
+-- (v0.57) newer prices are waiting: said at a natural pause - opening the auction house or a mailbox, out of a
+-- fight and an instance - once an hour at most; the rest of the time only the minimap button's dot and the header's
+-- light show it. Settings > Alerts: load them by itself when the auction house opens (off by default).
+local saidAt = -3600
+function C.Moment(where)
+    if not C.FreshReady() or Quiet() then return end
+    if where == "ah" and FT.S.autoLoad then
+        FT.Print(L["Loading the fresh prices (Settings > Alerts)..."])
+        C_Timer.After(0.3, ReloadUI)
+        return
+    end
+    if GetTime() - saidAt < 3600 then return end
+    saidAt = GetTime()
+    FT.Print(string.format(L["Newer prices should be waiting (yours are from %s). %s"],
+        FT.TimeOfDay(FT.Feed.Time()), Link("reload", L["Load them"], L["/reload loads them."])))
+end
+FT.On("AUCTION_HOUSE_SHOW", function() C_Timer.After(1, function() C.Moment("ah") end) end)
+FT.On("MAIL_SHOW", function() C_Timer.After(1, function() C.Moment("mail") end) end)
 
 -- no companion: once ever, after a real visit
 local openedAt

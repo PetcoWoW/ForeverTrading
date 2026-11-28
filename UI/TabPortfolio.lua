@@ -183,6 +183,7 @@ function T.Build(p)
         T.donutBox:SetPoint("TOPLEFT", 8, -38)
         T.donutBox:SetPoint("BOTTOMLEFT", 8, 8)
         T.donutBox:SetWidth(DONUT_W())
+        if T.worth and T.rows then FT.Debounce("worthFit", 0.1, T.FillDonut) end
         T.filter:ClearAllPoints()
         T.filter:SetPoint("TOPLEFT", T.donutBox, "TOPRIGHT", 12, -6)
         T.filter:SetPoint("RIGHT", T.showAll, "LEFT", -10, 0)
@@ -203,16 +204,22 @@ local JSORT = {
 }
 
 ---------------------------------------------------------------------------
--- Where your gold sits (v0.42): a donut you hover and click. Where it is - gold on hand, bags, bank, mail, on the
--- auction house - or how liquid it is - gold on hand, sells today, this week, slow to sell (a fifth of a day's sales
--- is what one seller can move), listed. A click shows just that slice in the table; again: everything.
+-- Where your worth is (v0.57; a donut from v0.42 to v0.56): no ring to read - the total, then a row for each part,
+-- biggest first: its gold and share, a bar of it behind the row, and its top items. What it is (herbs, ore, cloth,
+-- leather, enchanting, consumables, gear, recipes), where it is (bags, bank, mail, on the AH) or how liquid it is
+-- (sells today, this week, slow to sell - a fifth of a day's sales is what one seller can move - listed). A click
+-- shows just that part in the table; again: everything.
 ---------------------------------------------------------------------------
 DONUT_W = function() return (FT.Compact() and 320 or 360) + 16 * (tonumber(FT.S and FT.S.textSize) or 0) end
--- (v0.54) the ring is your items; your coins are in the middle with the total (a coin slice said nothing new)
+local WHAT = { { "herb", "Herbs", "up" }, { "ore", "Ore and stone", "orange" }, { "cloth", "Cloth", "purple" },
+    { "leather", "Leather", "accent" }, { "enchant", "Enchanting", "blue" }, { "mats", "Other materials", "muted" },
+    { "consum", "Consumables", "down" }, { "gear", "Gear", "text" }, { "recipe", "Recipes", "purple" }, { "other", "Other", "dim" } }
 local WHERE = { { "bags", "Bags", "blue" }, { "bank", "Bank", "up" }, { "mail", "Mail", "purple" }, { "ah", "On the AH", "accent" } }
 local LIQUID = { { "today", "Sells today", "up" }, { "week", "Sells this week", "blue" },
     { "slow", "Slow to sell", "orange" }, { "ah", "Listed on the AH", "accent" } }
-local donutView, donutPick = "where", nil
+local VIEWS = { what = WHAT, where = WHERE, liquid = LIQUID }
+local MAX_PARTS = 7
+local donutView, donutPick = "what", nil
 
 local function Liquidity(id, qty)
     local rate = FT.Sales.Rate(id)
@@ -220,6 +227,29 @@ local function Liquidity(id, qty)
     local days = qty / math.max(0.2, perDay * 0.2)
     if days <= 1 then return "today" elseif days <= 7 then return "week" end
     return "slow"
+end
+
+-- what an item is: by its class and subclass (the market's row, else the game's instant info)
+local TRADE = { [9] = "herb", [7] = "ore", [5] = "cloth", [6] = "leather", [12] = "enchant" }
+local kindCache = {}
+local function WhatOf(id)
+    if not id then return "other" end
+    local k = kindCache[id]
+    if k then return k end
+    local r = FT.Market.Row(id)
+    local cls, sub = r and r.cls, r and r.sub
+    if not cls then
+        local _, _, _, _, _, c, sc = FT.GetItemInfoInstant(id)
+        cls, sub = c, sc
+    end
+    if cls == 7 then k = TRADE[sub] or "mats"
+    elseif cls == 0 then k = "consum"
+    elseif cls == 2 or cls == 4 then k = "gear"
+    elseif cls == 9 then k = "recipe"
+    elseif cls == 5 or cls == 3 then k = "mats"
+    else k = "other" end
+    if cls then kindCache[id] = k end
+    return k
 end
 
 -- every row of the table split by where it is (a part of an item in each place), and your listed auctions
@@ -249,102 +279,154 @@ end
 
 local function SliceOf(piece)
     if donutView == "where" then return piece.loc end
+    if donutView == "what" then return WhatOf(piece.row and piece.row.id or piece.id) end
     if piece.loc == "ah" then return "ah" end
     return Liquidity(piece.row.id, piece.row.qty)
+end
+
+-- the parts as numbers: { key, label, color, value, share, top = { names } }, biggest first (the small ones in
+-- "Other" when there are too many)
+function T.WorthParts()
+    local defs = VIEWS[donutView]
+    local sums, items = {}, {}
+    for _, piece in ipairs(Pieces(T.rows or {})) do
+        local k = SliceOf(piece)
+        sums[k] = (sums[k] or 0) + piece.value
+        local id = piece.row and piece.row.id or piece.id
+        items[k] = items[k] or {}
+        items[k][id] = (items[k][id] or 0) + piece.value
+    end
+    local parts, total = {}, 0
+    for _, d in ipairs(defs) do
+        local v = sums[d[1]] or 0
+        if v > 0 then
+            local top = {}
+            for id, iv in pairs(items[d[1]]) do top[#top + 1] = { id, iv } end
+            table.sort(top, function(x, y) if x[2] ~= y[2] then return x[2] > y[2] end return x[1] < y[1] end)
+            local names = {}
+            for i = 1, math.min(3, #top) do names[i] = FT.Name(top[i][1]) or "?" end
+            parts[#parts + 1] = { key = d[1], label = L[d[2]], color = d[3], value = v, top = names, n = #top }
+            total = total + v
+        end
+    end
+    table.sort(parts, function(x, y) return x.value > y.value end)
+    for _, pt in ipairs(parts) do pt.share = total > 0 and pt.value / total or 0 end
+    return parts, total
+end
+
+local function PartRow(box)
+    local r = CreateFrame("Button", nil, box)
+    r:SetHeight(UI.RowH(36))
+    r.fill = UI.Tex(r, "BACKGROUND", "accent", 0.16)
+    r.fill:SetPoint("TOPLEFT", 0, -1)
+    r.fill:SetPoint("BOTTOMLEFT", 0, 1)
+    r.hover = UI.Tex(r, "BORDER", "hl", 0.7)
+    r.hover:SetAllPoints()
+    r.hover:Hide()
+    r.sw = UI.Tex(r, "ARTWORK", "accent", 1)
+    r.sw:SetSize(4, UI.RowH(36) - 8)
+    r.sw:SetPoint("LEFT", 2, 0)
+    r.pct = UI.Text(r, 12, "muted", "RIGHT")
+    r.pct:SetPoint("TOPRIGHT", -8, -5)
+    r.pct:SetWidth(40)
+    r.val = UI.Text(r, 13, "text", "RIGHT")
+    r.val:SetPoint("RIGHT", r.pct, "LEFT", -6, 0)
+    r.val:SetWidth(UI.RowH(78) + 8 * (tonumber(FT.S.textSize) or 0))
+    r.label = UI.Text(r, 13, "text")
+    r.label:SetPoint("TOPLEFT", 12, -5)
+    r.label:SetPoint("RIGHT", r.val, "LEFT", -6, 0)
+    r.top = UI.Text(r, 10, "dim")
+    r.top:SetPoint("BOTTOMLEFT", 12, 5)
+    r.top:SetPoint("RIGHT", -8, 0)
+    r:SetScript("OnEnter", function(self) self.hover:Show() end)
+    r:SetScript("OnLeave", function(self) self.hover:Hide() end)
+    r:SetScript("OnClick", function(self) if self.key then T.worth:Pick(self.key) end end)
+    return r
 end
 
 function T.BuildDonut(p)
     local box = UI.Panel(p, "bg1", "line")
     T.donutBox = box
-    box.seg = UI.Segmented(box, { { "where", L["Where it is"] }, { "liquid", L["How liquid"] } }, function(v)
+    box.seg = UI.Segmented(box, { { "what", L["What it is"] }, { "where", L["Where it is"] }, { "liquid", L["How liquid"] } }, function(v)
         donutView, donutPick = v, nil
-        if T.donut then T.donut.picked = nil end
         T.FillDonut()
         T.RefreshList()
     end, 22)
-    box.seg:SetPoint("TOP", 0, -10)
+    box.seg:SetPoint("TOPLEFT", 8, -8)
+    box.seg:SetPoint("TOPRIGHT", -8, -8)
     box.seg:SetValue(donutView)
-    T.donut = UI.Donut(box, 104, 34, function(key)
-        donutPick = key
+    box.total = UI.Text(box, 20, "text")
+    box.total:SetPoint("TOPLEFT", 10, -40)
+    box.sub = UI.Text(box, 11, "muted")
+    box.sub:SetPoint("TOPLEFT", box.total, "BOTTOMLEFT", 1, -3)
+    box.sub:SetPoint("RIGHT", box, "RIGHT", -10, 0)
+    box.parts = {}
+    for i = 1, MAX_PARTS do
+        local r = PartRow(box)
+        r:SetPoint("TOPLEFT", 6, -40 - UI.Size(20) - UI.Size(11) - 16 - (i - 1) * (UI.RowH(36) + 3))
+        r:SetPoint("RIGHT", box, "RIGHT", -6, 0)
+        box.parts[i] = r
+    end
+    -- what the rows answer to (the old donut's Pick, for the table and the tests)
+    T.worth = { picked = nil, byKey = {} }
+    function T.worth:Pick(key)
+        self.picked = (key and self.picked ~= key) and key or nil
+        donutPick = self.picked
         T.FillDonut()
         T.RefreshList()
-    end)
-    T.donut:SetPoint("TOP", box.seg, "BOTTOM", 0, -6)
-    box.legend = {}
-    for i = 1, 5 do
-        local r = CreateFrame("Button", nil, box)
-        r:SetHeight(UI.RowH(22))
-        r:SetPoint("TOPLEFT", T.donut, "BOTTOMLEFT", -34, -4 - (i - 1) * UI.RowH(23))
-        r:SetPoint("TOPRIGHT", T.donut, "BOTTOMRIGHT", 34, -4 - (i - 1) * UI.RowH(23))
-        r.hover = UI.Tex(r, "BACKGROUND", "hl", 0.6)
-        r.hover:SetAllPoints()
-        r.hover:Hide()
-        r.sw = UI.Tex(r, "ARTWORK", "accent", 1)
-        r.sw:SetSize(10, 10)
-        r.sw:SetPoint("LEFT", 6, 0)
-        r.pct = UI.Text(r, 12, "muted", "RIGHT")
-        r.pct:SetPoint("RIGHT", -6, 0)
-        r.pct:SetWidth(38)
-        r.val = UI.Text(r, 12, "text", "RIGHT")
-        r.val:SetPoint("RIGHT", r.pct, "LEFT", -6, 0)
-        r.val:SetWidth(UI.RowH(70) + 6 * (tonumber(FT.S.textSize) or 0))
-        r.label = UI.Text(r, 12, "text")
-        r.label:SetPoint("LEFT", r.sw, "RIGHT", 8, 0)
-        r.label:SetPoint("RIGHT", r.val, "LEFT", -6, 0)
-        r:SetScript("OnEnter", function(self)
-            self.hover:Show()
-            if self.key then T.donut.hover = self.key; T.donut:Draw() end
-        end)
-        r:SetScript("OnLeave", function(self) self.hover:Hide(); T.donut.hover = nil; T.donut:Draw() end)
-        r:SetScript("OnClick", function(self) if self.key then T.donut:Pick(self.key) end end)
-        box.legend[i] = r
     end
     T.filter = UI.Text(p, 12, "text")
-    T.showAll = UI.Button(p, L["Show everything"], 10, 22, "default", function() T.donut:Pick(nil) end)
+    T.showAll = UI.Button(p, L["Show everything"], 10, 22, "default", function() T.worth:Pick(nil) end)
     T.showAll:FitText(22)
 end
 
 function T.FillDonut()
-    if not T.donut then return end
-    local defs = donutView == "where" and WHERE or LIQUID
+    if not T.worth then return end
+    local box = T.donutBox
     local gold = FT.Port.Gold() or 0
-    local sums = {}
-    for _, piece in ipairs(Pieces(T.rows or {})) do
-        local k = SliceOf(piece)
-        sums[k] = (sums[k] or 0) + piece.value
-    end
-    local slices, total = {}, 0
-    for _, d in ipairs(defs) do
-        local v = sums[d[1]] or 0
-        if v > 0 then
-            slices[#slices + 1] = { key = d[1], label = L[d[2]], color = d[3], value = v }
-            total = total + v
+    local parts, total = T.WorthParts()
+    -- the small ones together, past what fits in the box's height
+    local top0 = 40 + UI.Size(20) + UI.Size(11) + 16
+    local fit = MAX_PARTS
+    local h = box:GetHeight()
+    if h and h > top0 + 40 then fit = math.max(2, math.min(MAX_PARTS, math.floor((h - top0 - 4) / (UI.RowH(36) + 3)))) end
+    if #parts > fit then
+        local rest = { key = "rest", label = L["The rest"], color = "dim", value = 0, share = 0, top = {}, n = 0 }
+        for i = fit, #parts do
+            rest.value, rest.share = rest.value + parts[i].value, rest.share + parts[i].share
+            rest.top[#rest.top + 1] = parts[i].label
+            parts[i] = nil
         end
+        parts[fit] = rest
     end
-    -- the middle: everything you own (coins and items), and how much of it is coins
-    T.donut.picked = donutPick
-    T.donut:SetSlices(slices, FT.Money(total + gold, "gold"),
-        gold > 0 and (FT.Money(gold, "gold") .. " " .. L["in coins"]) or L["no coins on you"])
-    donutPick = T.donut.picked
-    for i, r in ipairs(T.donutBox.legend) do
-        local sl = slices[i]
-        r:SetShown(sl ~= nil)
-        if sl then
-            r.key = sl.key
-            local c = UI.C[sl.color] or UI.C.text
+    T.worth.byKey, T.worth.parts = {}, parts
+    for _, pt in ipairs(parts) do T.worth.byKey[pt.key] = pt end
+    if donutPick and not T.worth.byKey[donutPick] then donutPick = nil end
+    T.worth.picked = donutPick
+    box.total:SetText(FT.Money(total + gold, "gold"))
+    UI.FitBits(box.sub, L["all you own"] .. FT.C("dim", "  ·  ") .. (gold > 0 and (FT.Money(gold, "gold") .. " " .. L["in coins"]) or L["no coins on you"]))
+    for i, r in ipairs(box.parts) do
+        local pt = parts[i]
+        r:SetShown(pt ~= nil)
+        if pt then
+            r.key = pt.key ~= "rest" and pt.key or nil
+            local c = UI.C[pt.color] or UI.C.text
             r.sw:SetColorTexture(c[1], c[2], c[3], 1)
-            r.label:SetText(sl.label)
-            UI.SetTextColor(r.label, donutPick == sl.key and "accent" or "text")
-            r.val:SetText(FT.Money(sl.value, "gold"))
-            r.pct:SetText(string.format("%d%%", math.floor(sl.share * 100 + 0.5)))
+            r.fill:SetColorTexture(c[1], c[2], c[3], donutPick == pt.key and 0.32 or 0.16)
+            r.fill:SetWidth(math.max(2, (DONUT_W() - 28) * pt.share))
+            r.label:SetText(pt.label)
+            UI.SetTextColor(r.label, donutPick == pt.key and "accent" or "text")
+            r.val:SetText(FT.Money(pt.value, "gold"))
+            r.pct:SetText(string.format("%d%%", math.floor(pt.share * 100 + 0.5)))
+            UI.FitBits(r.top, table.concat(pt.top, " · ") .. ((pt.n or 0) > 3 and (" · " .. string.format(L["+%d more"], pt.n - 3)) or ""))
         end
     end
-    local sl = donutPick and T.donut.byKey[donutPick]
+    local sl = donutPick and T.worth.byKey[donutPick]
     T.showAll:SetShown(sl ~= nil)
     if sl then
         T.filter:SetText(FT.C("accent", sl.label) .. "  " .. FT.Money(sl.value, "gold") .. FT.C("dim", string.format("  ·  %d%%", math.floor(sl.share * 100 + 0.5))))
     else
-        T.filter:SetText(L["Everything"] .. FT.C("dim", "  ·  " .. L["click a slice to see just that"]))
+        T.filter:SetText(L["Everything"] .. FT.C("dim", "  ·  " .. L["click a part to see just that"]))
     end
 end
 

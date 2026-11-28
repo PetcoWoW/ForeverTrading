@@ -12,6 +12,12 @@ FT.News = N
 -- start, after the files are read (a table made with them would keep the English)
 local function News()
     return {
+        ["v0.57"] = {
+            { L["Your worth at a glance"], L["You > Holdings: the total, then each part's gold and share with its top items. What it is: herbs, ore, cloth, gear..."], function() FT.ShowSub("you", "portfolio") end },
+            { L["Solo dungeons"], L["Farm it > Dungeons > Solo: the whole run's loot for one, slower, well under your level. For classes that hold big pulls."], function() FT.ShowSub("make", "farm") end },
+            { L["Farming tracked by itself"], L["Your first gather starts a session quietly; 5 idle minutes pause it, 30 end it. In You > Sessions."], function() FT.ShowSub("you", "sessions") end },
+            { L["Quiet alerts"], L["A dot on the minimap button when fresh prices or a new Wolf are waiting; right-click it to load or update."], nil },
+        },
         ["v0.56"] = {
             { L["Honest drops"], L["Drops lists real farms only, no world epics, ranked by steady gold an hour; rare drops apart. Dungeons go by wing."], function() FT.ShowSub("make", "farm") end },
             { L["Where to farm it"], L["Redesigned: the best way for you to get it first, then other spots with their odds, and your own loot in a line."], nil },

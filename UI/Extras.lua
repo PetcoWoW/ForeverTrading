@@ -26,11 +26,15 @@ local function MinimapTooltip(self)
     local s = FT.Session.Current()
     if s then
         local sum = FT.Session.Summary(s)
-        GameTooltip:AddLine(string.format(L["Session: %s, %s an hour"], FT.Money(math.floor(sum.worth), "short"),
+        GameTooltip:AddLine(string.format(s.auto and L["Farming (by itself): %s, %s an hour"] or L["Session: %s, %s an hour"], FT.Money(math.floor(sum.worth), "short"),
             sum.perHour and FT.Money(math.floor(sum.perHour), "short") or "..."), 0.05, 0.8, 0.5)
     end
+    local fresh, newer = FT.Alerts()
+    if fresh then GameTooltip:AddLine(L["Newer prices are waiting: right-click to load them."], 0.12, 1, 0.12, true) end
+    if newer then GameTooltip:AddLine(string.format(L["Wolf v%s is out: update it in the CurseForge app or WowUp."], newer), 1, 0.82, 0, true) end
+    if fresh or newer then GameTooltip:AddLine(" ") end
     GameTooltip:AddLine(L["Click: open / close the window"], 0.8, 0.8, 0.8)
-    GameTooltip:AddLine(L["Right-click: start or stop a session"], 0.8, 0.8, 0.8)
+    GameTooltip:AddLine(L["Right-click: sessions, and what's waiting"], 0.8, 0.8, 0.8)
     GameTooltip:AddLine(L["Drag: move"], 0.8, 0.8, 0.8)
     GameTooltip:Show()
 end
@@ -40,10 +44,30 @@ local menu, menuBlock -- the right-click menu and the click-anywhere-to-close la
 -- the right-click menu: start or stop a session, nothing else (the rest is a left-click away; pause is on the panel)
 local function MenuItems()
     local S = FT.Session
+    local items = {}
+    local fresh, newer = FT.Alerts()
+    if fresh then items[#items + 1] = { L["Load the fresh prices"], function() ReloadUI() end, "up" } end
+    if newer then items[#items + 1] = { string.format(L["Get v%s (CurseForge)"], newer), function() FT.ShowCurseForge() end, "accent" } end
+    if #items > 0 then items[#items + 1] = { "-" } end
     if S.Current() then
-        return { { L["Stop the session"], function() S.Stop() end, "down" } }
+        items[#items + 1] = { S.Current().auto and L["Stop the farming session"] or L["Stop the session"], function() S.Stop() end, "down" }
+    else
+        items[#items + 1] = { L["Start a session"], function() S.Start() end, "up" }
     end
-    return { { L["Start a session"], function() S.Start() end, "up" } }
+    return items
+end
+
+-- (v0.57) what's waiting, quietly: newer prices on disk (green dot), a newer Wolf (gold dot); nothing else
+function FT.Alerts()
+    local fresh = FT.Companion and FT.Companion.FreshReady() or false
+    local newer = FT.Ver and FT.Ver.Outdated and FT.Ver.Outdated() or nil
+    return fresh, newer
+end
+function FT.UpdateMinimapDot()
+    if not (mb and mb.dot) then return end
+    local fresh, newer = FT.Alerts()
+    mb.dot:SetShown(fresh or newer ~= nil)
+    UI.SetTexColor(mb.dot, fresh and "up" or "accent", 1)
 end
 
 -- items: { { label, fn, color } or { "-" } } (none: the session menu of the minimap button)
@@ -134,7 +158,13 @@ local function BuildMinimap()
     border:SetSize(52, 52)
     border:SetTexture("Interface\\Minimap\\MiniMap-TrackingBorder")
     border:SetPoint("TOPLEFT")
-    -- a click: the window; right-click: start or stop a session
+    mb.dot = UI.Dot(mb, 9, "up", 1, "OVERLAY")
+    mb.dot:SetPoint("TOPRIGHT", -3, -3)
+    mb.dot:Hide()
+    C_Timer.NewTicker(60, FT.UpdateMinimapDot)
+    FT.On("FT_NEWER_VERSION", FT.UpdateMinimapDot)
+    C_Timer.After(5, FT.UpdateMinimapDot)
+    -- a click: the window; right-click: sessions, and what's waiting
     mb:SetScript("OnClick", function(self, button)
         if button == "RightButton" then FT.ShowMenu(self) else FT.Toggle() end
     end)
@@ -1773,7 +1803,8 @@ end
 function FT.UpdateHUD()
     local S = FT.Session
     local s = S.Current()
-    if not s or FT.S.sessionPanel == false then
+    -- (v0.57) a farming session (it ran by itself) shows nothing on screen
+    if not s or s.auto or FT.S.sessionPanel == false then
         if hud then hud:Hide() end
         return
     end

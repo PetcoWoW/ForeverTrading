@@ -168,6 +168,86 @@ step("session details", function()
     print("sessions after delete:", n, "->", #FT.Session.List())
   end
 end)
+-- (v0.57) the farming tracker: a gather starts it quietly, 5 quiet minutes pause it (not counted), a loot goes on,
+-- 30 minutes paused ends and keeps it; a tiny one isn't kept; your own session takes over
+step("auto session", function()
+  LOOT_ITEM_SELF = LOOT_ITEM_SELF or "You receive loot: %s."
+  LOOT_ITEM_SELF_MULTIPLE = LOOT_ITEM_SELF_MULTIPLE or "You receive loot: %sx%d."
+  if FT.Session.Current() then FT.Session.Stop() end
+  local herb = "|cffffffff|Hitem:13464::::::::60:::::|h[Golden Sansam]|h|r"
+  local n0 = #FT.Session.List()
+  mock.fire("CHAT_MSG_LOOT", string.format(LOOT_ITEM_SELF_MULTIPLE, herb, 2))
+  local s = FT.Session.Current()
+  assert(s and s.auto, "a gather started a farming session")
+  FT.UpdateHUD()
+  local hud = _G["WolfOfBootyBaySession"]
+  assert(not (hud and hud:IsShown()), "nothing on screen")
+  for i = 1, 8 do mock.run(60); mock.fire("CHAT_MSG_LOOT", string.format(LOOT_ITEM_SELF, herb)) end
+  mock.run(400)
+  assert(s.paused and s.idle, "5 quiet minutes: paused")
+  local secs = FT.Session.Elapsed(s)
+  assert(secs >= 470 and secs <= 500, "the quiet minutes don't count: " .. secs)
+  mock.fire("CHAT_MSG_LOOT", string.format(LOOT_ITEM_SELF, herb))
+  assert(not s.paused, "a loot: on again")
+  mock.run(60); mock.fire("CHAT_MSG_MONEY", "You loot 35 Silver")
+  mock.run(2200)
+  assert(not FT.Session.Current(), "30 minutes paused: over")
+  local kept = FT.Session.List()[1]
+  assert(#FT.Session.List() == n0 + 1 and kept.auto and kept.name:find("herbs", 1, true), "kept: " .. tostring(kept and kept.name))
+  print("auto session: " .. kept.name .. ", " .. kept.worth .. "c, " .. kept.secs .. "s")
+  -- a tiny one: not kept
+  mock.fire("CHAT_MSG_LOOT", string.format(LOOT_ITEM_SELF, herb))
+  mock.run(2400)
+  assert(not FT.Session.Current() and #FT.Session.List() == n0 + 1, "a tiny one isn't kept")
+  -- resting in town: no farming session; out again with your own session: it takes over
+  IsResting = function() return true end
+  mock.fire("CHAT_MSG_LOOT", string.format(LOOT_ITEM_SELF, herb))
+  assert(not FT.Session.Current(), "not in town")
+  IsResting = function() return false end
+  mock.fire("CHAT_MSG_LOOT", string.format(LOOT_ITEM_SELF, herb))
+  FT.Session.Start()
+  assert(FT.Session.Current() and not FT.Session.Current().auto, "your own session takes over")
+  FT.Session.Stop()
+  FT.S.autoSession = false
+  mock.fire("CHAT_MSG_LOOT", string.format(LOOT_ITEM_SELF, herb))
+  assert(not FT.Session.Current(), "off in Settings")
+  FT.S.autoSession = true
+end)
+-- (v0.57) the quiet alerts: newer prices or a newer Wolf - a dot on the minimap button, its menu, a line at the
+-- mailbox once an hour
+step("alerts", function()
+  local C = FT.Companion
+  local real = C.FreshReady
+  C.FreshReady = function() return true end
+  FT.UpdateMinimapDot()
+  local mb = _G["WolfOfBootyBayMinimapButton"]
+  assert(mb.dot:IsShown(), "fresh prices: the dot")
+  local printed = {}
+  local realPrint = FT.Print
+  FT.Print = function(t) printed[#printed + 1] = t end
+  mock.fire("MAIL_SHOW"); mock.run(2)
+  mock.fire("MAIL_SHOW"); mock.run(2)
+  FT.Print = realPrint
+  local said = 0
+  for _, t in ipairs(printed) do if t:find("Newer prices", 1, true) then said = said + 1 end end
+  assert(said == 1, "once an hour at the mailbox: " .. said)
+  FT.ShowMenu(mb)
+  C.FreshReady = real
+  FT.db.told = FT.db.told or {}
+  FT.db.told.version, FT.db.told.versionAt, FT.db.told.again = "9.9", time() - 4 * 86400, nil
+  FT.Ver.newest = "v9.9.1"
+  printed = {}
+  FT.Print = function(t) printed[#printed + 1] = t end
+  FT.Ver.RemindAgain(); FT.Ver.RemindAgain()
+  FT.Print = realPrint
+  assert(#printed == 1 and printed[1]:find("9.9", 1, true), "three days on: once more")
+  FT.UpdateMinimapDot()
+  assert(mb.dot:IsShown(), "a newer Wolf: the dot")
+  print("alerts: dot, mailbox line once, version again once")
+  FT.Ver.newest = nil
+  FT.db.told.version, FT.db.told.versionAt, FT.db.told.again = nil, nil, nil
+  FT.UpdateMinimapDot()
+end)
 step("recap and pings", function()
   FT.Port.Recap()
   FT.Port.SellPings()
@@ -864,16 +944,26 @@ step("layout", function()
     { "today", "today" },
     { "make: raid prep", "radar", function() FT.ShowSub("make", "raid") end },
     { "you: sessions", "sessions", function() FT.ShowSub("you", "sessions") end },
-    { "you: holdings, liquid", "portfolio", function() FT.ShowSub("you", "portfolio"); FT.Tabs.portfolio.donutBox.seg.buttons[2].onClick() end },
-    { "you: holdings, bank only", "portfolio", function() FT.Tabs.portfolio.donutBox.seg.buttons[1].onClick(); FT.Tabs.portfolio.donut:Pick("bank") end },
-    { "you: holdings, on the AH", "portfolio", function() FT.Tabs.portfolio.donut:Pick("ah") end },
-    { "you: holdings", "portfolio", function() FT.Tabs.portfolio.donut:Pick(nil) end },
-    { "you: holdings, a slice under the mouse", "portfolio", function()
-        local d = FT.Tabs.portfolio.donut
-        assert(not (d.subText or ""):find("liquid", 1, true), "the middle: the total and the coins")
-        d.hover = d.slices[1] and d.slices[1].key; d:ShowMiddle()
-        assert(not d.hover or (d.sub.__text or ""):find(d.slices[1].label, 1, true), "a slice's numbers in the middle")
-        d.hover = nil; d:ShowMiddle()
+    { "you: holdings, liquid", "portfolio", function() FT.ShowSub("you", "portfolio"); FT.Tabs.portfolio.donutBox.seg.buttons[3].onClick() end },
+    { "you: holdings, bank only", "portfolio", function() FT.Tabs.portfolio.donutBox.seg.buttons[2].onClick(); FT.Tabs.portfolio.worth:Pick("bank") end },
+    { "you: holdings, on the AH", "portfolio", function() FT.Tabs.portfolio.worth:Pick("ah") end },
+    { "you: holdings, what it is", "portfolio", function()
+        -- (v0.57) no ring: the total, then each part's gold and share, biggest first, with its top items
+        local T = FT.Tabs.portfolio
+        T.worth:Pick(nil); T.donutBox.seg.buttons[1].onClick()
+        local parts = T.worth.parts
+        assert(#parts >= 2, "parts of your worth: " .. #parts)
+        local share = 0
+        for i, pt in ipairs(parts) do
+          share = share + pt.share
+          if i > 1 then assert(pt.value <= parts[i - 1].value or parts[i].key == "rest", "biggest first") end
+        end
+        assert(math.abs(share - 1) < 0.01, "shares add up: " .. share)
+        local r = T.donutBox.parts[1]
+        assert(r.val.__text and r.val.__text ~= "" and r.top.fitText and r.top.fitText ~= "", "a part shows its gold and top items")
+        local names = {}
+        for _, pt in ipairs(parts) do names[#names + 1] = string.format("%s %d%%", pt.label, math.floor(pt.share * 100 + 0.5)) end
+        print("worth by what: " .. table.concat(names, ", "))
     end },
     { "market", "market" }, { "market item", "market", function() FT.OpenItem(12363) end },
     { "market item: two-line verdict", "market", function()
@@ -951,6 +1041,22 @@ step("layout", function()
     { "money: dungeons, the trash", "signals", function()
       local view = FT.Tabs.signals.farmKindBar:GetParent()
       for _, b in ipairs(view.trash.buttons) do if b.value == "trash" then b.onClick() end end
+    end },
+    { "money: dungeons, solo", "signals", function()
+      -- (v0.57) solo: the whole run's loot, slower, only well under your level; hard ones marked and below
+      local f = FT.Tabs.signals
+      local view = f.farmKindBar:GetParent()
+      for _, b in ipairs(view.trash.buttons) do if b.value == "solo" then b.onClick() end end
+      local rows = f.DungeonRows()
+      assert(#rows >= 5, "solo dungeons at 60: " .. #rows)
+      local d = rows[1].dungeonInfo
+      assert(d.solo and d.each == d.steady and not d.hardSolo, "solo: all the loot is yours")
+      for _, r in ipairs(rows) do assert(r.dungeonInfo.solo) end
+      local hard = 0
+      for _, r in ipairs(rows) do if r.dungeonInfo.hardSolo then hard = hard + 1 end end
+      print(string.format("solo dungeons: %d (%d hard), best %s %dg a run, ~%d min", #rows, hard, d.name, math.floor(d.each / 10000), d.min))
+      assert(view.hint.__text and view.hint.__text:find("hard", 1, true), "the caveat: it's hard")
+      for _, b in ipairs(view.trash.buttons) do if b.value == "full" then b.onClick() end end
     end },
     { "money: a dungeon's drops", "signals", function()
       local f = FT.Tabs.signals

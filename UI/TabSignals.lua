@@ -571,7 +571,7 @@ local FARM_KINDS = {
 -- (v0.55) what Farm it shows: materials (their kind in a dropdown), Drops, Dungeons, Next week
 local FARM_MODES = { { "all", "Materials" }, { "drops", "Drops" }, { "dungeons", "Dungeons" }, { "next", "Next week" } }
 local farmMode = "all"
-local dropSort, dropDungeon, dungeonTrash = "price", nil, false
+local dropSort, dropDungeon, dungeonMode = "price", nil, "full"
 local FARM_CLASS = FT.Farm.CLASS -- the item classes and subclasses of each (FT.Farm)
 local farmKind = "all"
 
@@ -763,8 +763,10 @@ local function DungeonTip(row, x)
     GameTooltip:AddLine(d.name, 1, 0.82, 0)
     GameTooltip:AddLine(string.format(L["Level %s  ·  the door is in %s"], d.lv, L[d.door] or d.door), 0.85, 0.87, 0.9)
     GameTooltip:AddLine(" ")
-    GameTooltip:AddDoubleLine((dungeonTrash and L["The trash, steady"] or L["A run, steady"]), FT.Money(math.floor(d.steady), "gold"), 0.85, 0.87, 0.9, 1, 1, 1)
-    GameTooltip:AddDoubleLine(string.format(L["Each, in a group of %d"], 5), FT.Money(math.floor(d.each), "gold"), 0.85, 0.87, 0.9, 0.12, 1, 0.12)
+    GameTooltip:AddDoubleLine((dungeonMode == "trash" and L["The trash, steady"] or L["A run, steady"]), FT.Money(math.floor(d.steady), "gold"), 0.85, 0.87, 0.9, 1, 1, 1)
+    if not d.solo then
+        GameTooltip:AddDoubleLine(string.format(L["Each, in a group of %d"], 5), FT.Money(math.floor(d.each), "gold"), 0.85, 0.87, 0.9, 0.12, 1, 0.12)
+    end
     GameTooltip:AddDoubleLine(L["Of it, coin"], FT.Money(math.floor(d.coin), "gold"), 0.6, 0.64, 0.7, 0.6, 0.64, 0.7)
     if d.jackpot > 0 then
         GameTooltip:AddDoubleLine(L["Rare drops, on average (not counted above)"], "+" .. FT.Money(math.floor(d.jackpot), "gold"), 0.95, 0.75, 0.3, 0.95, 0.75, 0.3)
@@ -778,8 +780,12 @@ local function DungeonTip(row, x)
     if d.measured then
         GameTooltip:AddLine(string.format(L["Your own runs here: %s an hour"], FT.Money(math.floor(d.measured), "gold")), 0.12, 1, 0.12, true)
     else
-        GameTooltip:AddLine(string.format(L["About %d min a full clear of every wing: ~%s an hour each. Run it with the session tracker on and Wolf measures it."],
+        GameTooltip:AddLine(string.format(d.solo and L["About %d min a clear on your own: ~%s an hour. Run it with the session tracker on and Wolf measures it."]
+            or L["About %d min a full clear of every wing: ~%s an hour each. Run it with the session tracker on and Wolf measures it."],
             d.min, FT.Money(math.floor(d.hour), "gold")), 0.6, 0.64, 0.7, true)
+    end
+    if d.hardSolo then
+        GameTooltip:AddLine(L["Hard solo: under 8 levels below you, its elites hit back. Smaller pulls, and slower."], 1, 0.6, 0.18, true)
     end
     GameTooltip:AddLine(L["The average of its loot tables: a lucky epic beats it, a dry run doesn't."], 0.6, 0.64, 0.7, true)
     GameTooltip:AddLine(L["Click: what drops in it, best first"], 0.6, 0.64, 0.7)
@@ -837,8 +843,8 @@ local function BuildFarmView(p)
     end, 22)
     f.sort:SetPoint("LEFT", f.kind, "RIGHT", 8, 0)
     f.sort:SetValue(dropSort)
-    f.trash = UI.Segmented(f, { { "full", L["Full clear"] }, { "trash", L["Trash only"] } }, function(v)
-        dungeonTrash = v == "trash"
+    f.trash = UI.Segmented(f, { { "full", L["Full clear"] }, { "trash", L["Trash only"] }, { "solo", L["Solo"] } }, function(v)
+        dungeonMode = v
         T.RefreshFarm()
     end, 22)
     f.trash:SetPoint("LEFT", f.kind, "RIGHT", 8, 0)
@@ -887,7 +893,7 @@ end
 local function DungeonRows()
     local q = (T.search or ""):lower()
     local out = {}
-    for _, d in ipairs(FT.Drops.Dungeons(dungeonTrash)) do
+    for _, d in ipairs(FT.Drops.Dungeons(dungeonMode)) do
         if q == "" or d.name:lower():find(q, 1, true) then
             local names = {}
             for i = 1, math.min(3, #d.top) do names[#names + 1] = FT.Name(d.top[i].id) or "?" end
@@ -897,8 +903,8 @@ local function DungeonRows()
             out[#out + 1] = {
                 id = d.top[1] and d.top[1].id, title = FT.C("text", d.name), dungeonInfo = d, fit = true,
                 reason = table.concat(bits, FT.C("dim", "  ·  ")),
-                value = FT.C("up", "~" .. FT.Money(math.floor(d.each), "gold")) .. FT.C("dim", " " .. L["each"]),
-                signal = "FARM", label = string.format(L["~%d MIN"], d.min), strength = d.high and 1 or 2,
+                value = FT.C("up", "~" .. FT.Money(math.floor(d.each), "gold")) .. FT.C("dim", " " .. (d.solo and L["a run"] or L["each"])),
+                signal = "FARM", label = d.hardSolo and L["HARD SOLO"] or string.format(L["~%d MIN"], d.min), strength = d.high and 1 or 2,
             }
         end
     end
@@ -964,9 +970,19 @@ function T.RefreshFarm()
     end
     if farmMode == "dungeons" then
         local rows = DungeonRows()
-        f.hint:SetText(dungeonTrash and L["The trash only (no bosses): the steady gold of a run, split five ways."]
-            or L["Each run's steady gold at today's prices, split five ways; rare drops apart. Click one: its drops."])
-        f.list:SetEmptyText(L["No dungeon found."])
+        local hint
+        if dungeonMode == "solo" then
+            local _, class = UnitClass and UnitClass("player")
+            local cls = class and FT.Drops.SOLO_CLASSES[class]
+            hint = L["Solo: all the loot is yours, but it's hard - for a geared class that holds big pulls (warrior, paladin, druid, warlock, mage)."]
+                .. (class and not cls and (" " .. L["Your class will find it slow."]) or "")
+        elseif dungeonMode == "trash" then
+            hint = L["The trash only (no bosses): the steady gold of a run, split five ways."]
+        else
+            hint = L["Each run's steady gold at today's prices, split five ways; rare drops apart. Click one: its drops."]
+        end
+        f.hint:SetText(hint)
+        f.list:SetEmptyText(dungeonMode == "solo" and L["No dungeon is far enough under your level to solo yet."] or L["No dungeon found."])
         f.count:SetText(string.format(L["%d dungeons"], #rows))
         f.list:SetItems(rows, true)
         return

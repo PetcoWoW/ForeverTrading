@@ -1,5 +1,23 @@
 # Wolf
 
+## v0.57 - worth at a glance, solo dungeons, quiet alerts, farming tracked by itself
+
+- **You > Holdings:** no ring to read. The total, then each part biggest first - its gold, its share (a bar of it
+  behind the row) and its top items. **What it is** (herbs, ore, cloth, leather, enchanting, consumables, gear,
+  recipes) is the new default; Where it is and How liquid stay. Click a part: just that in the table.
+- **Dungeons > Solo:** the whole run's loot is yours, at a slower clear (smaller pulls), only dungeons well under
+  your level; 3 to 7 levels under is marked HARD SOLO. The caveat says it plainly: for a geared class that holds big
+  pulls (warrior, paladin, druid, warlock, mage).
+- **Quiet alerts:** a small dot on the minimap button - green when newer prices are waiting, gold when a newer Wolf
+  is out - and both in its right-click menu ([Load the fresh prices], [Get v...]). The chat line comes at a natural
+  pause (opening the auction house or a mailbox), once an hour at most. A newer Wolf is said at login once, and once
+  more three days on if you're still on the old one. Settings > Alerts: load fresh prices by itself when the
+  auction house opens (off by default).
+- **Farming tracked by itself:** your first gather or loot out of town starts a session quietly (nothing on screen);
+  5 minutes without loot pauses it and those minutes don't count; 30 ends it. Saved in You > Sessions as where and
+  what ("Felwood · herbs, 42 min") with one chat line; tiny ones aren't kept; your own session takes over. Settings >
+  Alerts.
+
 ## v0.56 - honest drops, a cozier farm window
 
 - **Drops lists real farms only.** World drops (epics any mob of a level can give, 1 in thousands) are gone from it:

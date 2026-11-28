@@ -238,10 +238,24 @@ local parsed = {}
 -- { name, base, door, lv, min, mobs, bosses, coin, steady (a run), jackpot (a run), each (steady, a person), hour
 -- (steady each, guessed), jackpotEach, measured (your own gold an hour there), top = { {id, n, worth, jackpot} } }
 -- best first
-function D.Dungeons(trashOnly)
+-- (v0.57) solo: the whole run's loot is yours, but pulls are smaller: slower, and only well under your level - 8+
+-- levels under is a solo farm for a geared class that holds big pulls; 3 to 7 under is hard (shown, below the
+-- rest); closer than that isn't listed. Modes: "full", "trash" (or true), "solo".
+local SOLO_EASY, SOLO_HARD = 8, 3
+local SOLO_SLOW = { easy = 1.4, hard = 2.2 }
+D.SOLO_CLASSES = { WARRIOR = true, PALADIN = true, DRUID = true, WARLOCK = true, MAGE = true }
+local function HighLevel(lv) local a, b = tostring(lv or ""):match("^(%d+)%-?(%d*)") return tonumber(b ~= "" and b or a) end
+
+function D.Dungeons(mode)
+    if mode == true then mode = "trash" end
+    mode = mode or "full"
+    local trashOnly, solo = mode == "trash", mode == "solo"
     local me = FT.Me and FT.Me.Level() or 60
     local out = {}
     for _, d in ipairs(FT.DNG or {}) do
+      local hi = HighLevel(d.lv)
+      local gap = hi and (me - hi) or 0
+      if not solo or gap >= SOLO_HARD then
         local key = d.n .. (trashOnly and "|t" or "")
         parsed[key] = parsed[key] or Parse(trashOnly and d.trash or d.items)
         local coin = trashOnly and d.coinT or d.coin
@@ -260,16 +274,20 @@ function D.Dungeons(trashOnly)
             return a.worth > b.worth
         end)
         while #top > 8 do table.remove(top) end
-        local each = steady / GROUP
-        local runs = math.min(60 / math.max(d.min or 60, 1), RUNS_AN_HOUR)
+        local split = solo and 1 or GROUP
+        local hard = solo and gap < SOLO_EASY
+        local min = solo and math.floor((d.min or 60) * (hard and SOLO_SLOW.hard or SOLO_SLOW.easy) + 0.5) or d.min
+        local each = steady / split
+        local runs = math.min(60 / math.max(min or 60, 1), RUNS_AN_HOUR)
         local measured = FT.Farm and FT.Farm.ZoneGoldHour and FT.Farm.ZoneGoldHour(d.b or d.n)
         local low = LowLevel(d.lv)
         out[#out + 1] = {
-            name = d.n, base = d.b or d.n, door = d.door, lv = d.lv, min = d.min, mobs = d.mobs, bosses = d.bosses,
+            name = d.n, base = d.b or d.n, door = d.door, lv = d.lv, min = min, mobs = d.mobs, bosses = d.bosses,
             coin = coin, steady = steady, jackpot = jackpot, value = steady, each = each, hour = each * runs,
-            jackpotEach = jackpot / GROUP, measured = measured, top = top,
-            unknown = d.u ~= "" and d.u or nil, high = low and low > me + 3,
+            jackpotEach = jackpot / split, measured = measured, top = top, solo = solo, hardSolo = hard,
+            unknown = d.u ~= "" and d.u or nil, high = (low and low > me + 3) or hard,
         }
+      end
     end
     table.sort(out, function(a, b)
         if a.high ~= b.high then return not a.high end

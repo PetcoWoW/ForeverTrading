@@ -78,6 +78,7 @@ function V.Tell(theirs)
     local was = MM(FT.db.told.version)
     if was and was >= n then return false end
     FT.db.told.version = string.format("%d.%d", math.floor(n / 1000), n % 1000)
+    FT.db.told.versionAt = time()
     FT.Print(string.format(L["A newer Wolf is out: v%s (you have %s). Update it in the CurseForge app or WowUp."],
         FT.db.told.version, FT.VERSION_TEXT or FT.VERSION))
     return true
@@ -150,4 +151,23 @@ function V.Remind()
     end
 end
 
-FT.On("FT_READY", function() C_Timer.After(25, V.Remind) end)
+-- (v0.57) still on the old one three days after the line: said once more at login, then only the minimap dot
+function V.RemindAgain()
+    local t = FT.db and FT.db.told
+    if not (t and t.version and t.versionAt) then return end
+    if not (V.Newest() or (FT.FEED and FT.FEED.release and V.ReleaseNewer(FT.FEED.release, FT.VERSION))) then return end
+    if (MM(t.version) or 0) <= (MM(FT.VERSION) or 0) or t.again == t.version or time() - t.versionAt < 3 * 86400 then return end
+    t.again = t.version
+    FT.Print(string.format(L["Still on %s: v%s is out. Update it in the CurseForge app or WowUp (Wolf's prices and pages are made for the newest)."],
+        FT.VERSION_TEXT or FT.VERSION, t.version))
+end
+
+-- the newest version known (heard, or the price file's), when newer than ours
+function V.Outdated()
+    local n = V.Newest()
+    local rel = FT.FEED and FT.FEED.release
+    if rel and V.ReleaseNewer(rel, FT.VERSION) and not (n and V.Newer(n, rel)) then n = rel end
+    return n
+end
+
+FT.On("FT_READY", function() C_Timer.After(25, V.Remind); C_Timer.After(40, V.RemindAgain) end)
