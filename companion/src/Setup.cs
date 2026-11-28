@@ -8,7 +8,7 @@ namespace WolfPrices
 {
     static class Setup
     {
-        const string Pitch = "Keeps your auction house prices fresh. Every 15 minutes it quietly brings Blizzard's newest prices into your addon: no pop-ups, no sounds, nothing on stream. In game, chat says when there are newer ones to load.";
+        const string Pitch = "Keeps your auction house prices fresh, and Wolf itself up to date. Every 15 minutes it quietly brings Blizzard's newest prices (and any new Wolf) into your addon: no pop-ups, no sounds, nothing on stream. In game, chat says when there's something to load.";
         const string Small = "Installs for you only, no admin rights. Remove it any time: Settings > Apps.";
 
         public static Page Welcome(WolfWindow w, Settings s, Found found, Action<Found> retry)
@@ -16,7 +16,7 @@ namespace WolfPrices
             var p = new Page
             {
                 Title = App.Name,
-                Subtitle = "fresh auction prices for the Wolf addon",
+                Subtitle = "fresh prices for the Wolf addon - version " + App.Version,
                 Body = Pitch,
                 CheckText = "Start with Windows",
                 Checked = true,
@@ -43,12 +43,16 @@ namespace WolfPrices
             else
                 p.Rows.Add(new Row { Ok = false, Label = "World of Warcraft", Detail = "not found", Link = new Button_ { Text = "Pick folder...", Click = pick } });
             if (found != null)
-                p.Rows.Add(new Row { Ok = true, Label = "Wolf addon", Detail = "installed" });
+                p.Rows.Add(new Row { Ok = true, Label = "Wolf addon", Detail = "installed" + (AddonUpdate.InstalledWolf(found) != null ? ", version " + AddonUpdate.InstalledWolf(found) : "") });
             else
                 p.Rows.Add(new Row { Ok = false, Label = "Wolf addon", Detail = "get it from CurseForge first",
                     Link = new Button_ { Text = "Look again", Click = () => retry(Wow.Resolve(s)) } });
+            // (1.1.2) what's there now and what this is
+            var have = Installer.IsInstalled ? Installer.InstalledVersion : null;
+            if (Installer.IsInstalled)
+                p.Rows.Add(new Row { Ok = true, Label = "Wolf prices", Detail = (have ?? "an older version") + " installed" + (have == App.Version ? " (this one)" : ", this is " + App.Version) });
             p.Buttons.Add(new Button_ { Text = "Cancel", Click = () => w.Close() });
-            p.Buttons.Add(new Button_ { Text = Installer.IsInstalled ? "Update" : "Install", Primary = true, Enabled = found != null });
+            p.Buttons.Add(new Button_ { Text = Installer.IsInstalled ? (have == App.Version ? "Install again" : "Update") : "Install", Primary = true, Enabled = found != null });
             return p;
         }
 
@@ -57,9 +61,9 @@ namespace WolfPrices
             var p = new Page
             {
                 Title = "All set",
-                Subtitle = "the wolf is by your clock",
-                Body = "Your prices stay fresh from now on" + (startup ? ", every time Windows starts." : " (start it from the Start menu after a restart).") +
-                       " When you open the auction house and newer prices are waiting, chat says so: click Load them, done.\n\n" +
+                Subtitle = "version " + App.Version + " is by your clock",
+                Body = "Your prices and Wolf stay fresh from now on" + (startup ? ", every time Windows starts." : " (start it from the Start menu after a restart).") +
+                       " When newer prices or a new Wolf are waiting, chat says so: click Load them (or Reload), done.\n\n" +
                        "Hover the wolf by the clock to see when your prices are from. Windows may tuck it under the ^ arrow.",
             };
             p.Buttons.Add(new Button_ { Text = "Finish", Primary = true, Click = () => w.Close() });
@@ -129,6 +133,8 @@ namespace WolfPrices
                         long ready = Prices.Times(f.FeedFile).T, inGame = Prices.InGame(f);
                         p.Body = "It checks for new prices every 15 minutes, quietly.";
                         p.Rows.Add(new Row { Ok = true, Label = "In your addon folder", Detail = "Blizzard's prices of " + Fmt.Time(ready) });
+                        var wolf = AddonUpdate.InstalledWolf(f);
+                        if (wolf != null) p.Rows.Add(new Row { Ok = true, Label = "Wolf addon", Detail = "version " + wolf + (s.AutoUpdate ? ", kept up to date" : "") });
                         p.Rows.Add(new Row { Ok = inGame >= ready || inGame == 0, Label = "In game",
                             Detail = inGame == 0 ? "not seen yet (log in once)" : (inGame >= ready ? Fmt.Time(inGame) + ", up to date" : Fmt.Time(inGame) + " - /reload loads the newer ones") });
                         p.Buttons.Add(new Button_ { Text = "Check now", Click = () =>

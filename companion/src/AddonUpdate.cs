@@ -61,17 +61,39 @@ namespace WolfPrices
             return string.Join("\n", keep);
         }
 
-        public static bool GameRunning()
+        // (1.1.2) the game is open: a program running from inside its game version's folder (...\_forever_\). By
+        // where it runs from, not its name: WowUp, Battle.net and the like aren't the game (1.1.0 took anything
+        // called "Wow..." for it, WowUp too, and waited for ever)
+        public static bool GameRunning(Found f)
         {
+            if (f == null || string.IsNullOrEmpty(f.Dir)) return false;
+            var dir = Path.GetFullPath(f.Dir).TrimEnd('\\') + "\\";
             try
             {
-                return Process.GetProcesses().Any(p =>
+                using (var q = new System.Management.ManagementObjectSearcher("SELECT ExecutablePath FROM Win32_Process"))
                 {
-                    try { return p.ProcessName.StartsWith("Wow", StringComparison.OrdinalIgnoreCase); }
-                    catch { return false; }
-                });
+                    foreach (System.Management.ManagementObject p in q.Get())
+                    {
+                        var exe = p["ExecutablePath"] as string;
+                        if (!string.IsNullOrEmpty(exe) && exe.StartsWith(dir, StringComparison.OrdinalIgnoreCase)) return true;
+                    }
+                }
+                return false;
             }
-            catch { return false; }
+            catch (Exception e)
+            {
+                Log.Write("is the game open? " + e.Message);
+                // without WMI: the game's own program names
+                var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "Wow", "WowClassic", "WowClassicT", "WowClassicB", "WowT", "WowB", "Wow-64" };
+                try { return Process.GetProcesses().Any(p => { try { return names.Contains(p.ProcessName); } catch { return false; } }); }
+                catch { return false; }
+            }
+        }
+
+        // the Wolf in the addon folder: its version (the TOC's)
+        public static string InstalledWolf(Found f)
+        {
+            return f == null ? null : TocField(Toc(f), "Version");
         }
 
         static string Sha256(string file)

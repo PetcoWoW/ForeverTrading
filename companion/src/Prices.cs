@@ -157,7 +157,7 @@ namespace WolfPrices
                 res.Ready = disk.T;
                 res.Ok = true;
                 // (1.1) Wolf itself: a newer build swapped in (or waiting for the game to close)
-                var up = AddonUpdate.Run(f, info, settings, AddonUpdate.GameRunning());
+                var up = AddonUpdate.Run(f, info, settings, AddonUpdate.GameRunning(f));
                 if (up.Updated != null && up.Updated != settings.Updated)
                 {
                     settings.Updated = up.Updated;

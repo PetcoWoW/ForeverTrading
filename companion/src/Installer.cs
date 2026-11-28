@@ -25,6 +25,20 @@ namespace WolfPrices
 
         public static bool IsInstalled { get { return File.Exists(App.InstalledExe); } }
 
+        // (1.1.2) the version installed now (Settings > Apps' entry), for setup to say what it updates from
+        public static string InstalledVersion
+        {
+            get
+            {
+                try
+                {
+                    using (var k = Registry.CurrentUser.OpenSubKey(UninstallKey))
+                        return k == null ? null : k.GetValue("DisplayVersion") as string;
+                }
+                catch { return null; }
+            }
+        }
+
         public static bool StartsWithWindows
         {
             get

@@ -13,7 +13,7 @@ namespace WolfPrices
     {
         readonly NotifyIcon icon;
         readonly ToolStripMenuItem status, startup, keepUpdated;
-        readonly System.Windows.Forms.Timer every, selfCheck;
+        readonly System.Windows.Forms.Timer every, selfCheck, waitGame;
         readonly Control ui; // for coming back to the window thread
         readonly Settings settings = Settings.Load();
         Found found;
@@ -25,7 +25,7 @@ namespace WolfPrices
             ui.CreateControl();
 
             var menu = new ContextMenuStrip { Renderer = new DarkRenderer(), ShowImageMargin = false, Font = Theme.Body(9.5f) };
-            var head = new ToolStripMenuItem(App.Name) { Enabled = false, Font = Theme.Semi(9.5f) };
+            var head = new ToolStripMenuItem(App.Name + " " + App.Version) { Enabled = false, Font = Theme.Semi(9.5f) };
             status = new ToolStripMenuItem("Checking...") { Enabled = false };
             menu.Items.Add(head);
             menu.Items.Add(status);
@@ -52,6 +52,15 @@ namespace WolfPrices
             var first = new System.Windows.Forms.Timer { Interval = 3000 };
             first.Tick += (s, e) => { first.Stop(); first.Dispose(); Check(); };
             first.Start();
+
+            // (1.1.2) a Wolf waiting for the game to close: looked at every minute, and put in once it's closed
+            waitGame = new System.Windows.Forms.Timer { Interval = 60 * 1000 };
+            waitGame.Tick += (s, e) =>
+            {
+                if (AddonUpdate.Last.Pending == null || found == null || busy == 1) return;
+                ThreadPool.QueueUserWorkItem(_ => { if (!AddonUpdate.GameRunning(found)) Back(Check); });
+            };
+            waitGame.Start();
 
             // its own updates: a minute after starting, then every 6 hours
             selfCheck = new System.Windows.Forms.Timer { Interval = 60 * 1000 };
@@ -125,6 +134,7 @@ namespace WolfPrices
         {
             every.Stop();
             selfCheck.Stop();
+            waitGame.Stop();
             icon.Visible = false;
             icon.Dispose();
             if (mutex != null) { try { mutex.ReleaseMutex(); } catch { } mutex.Dispose(); mutex = null; }

@@ -69,6 +69,30 @@ jobs:
           Copy-Item Data\Companion.lua (Join-Path $devAddon 'Data')
           $p = Start-Process -FilePath out\WolfPrices.exe -ArgumentList @('--check', "`"$dev`"") -Wait -PassThru
           if (Test-Path (Join-Path $devAddon 'Core.lua')) { throw "a developer's copy was updated" }
+          # (1.1.2) a Wolf with new files while the game is open (a program running from inside _forever_): it waits;
+          # WowUp (outside it) isn't the game; once the game is closed it goes in
+          $pend = Join-Path $env:RUNNER_TEMP 'wowpend'
+          $pendAddon = Join-Path $pend '_forever_\Interface\AddOns\WolfOfBootyBay'
+          New-Item -ItemType Directory -Force -Path (Join-Path $pendAddon 'Data') | Out-Null
+          (Get-Content WolfOfBootyBay.toc) + 'Gone.lua' | Set-Content (Join-Path $pendAddon 'WolfOfBootyBay.toc')
+          Copy-Item Data\Companion.lua (Join-Path $pendAddon 'Data')
+          Copy-Item "$env:WINDIR\System32\PING.EXE" (Join-Path $pend '_forever_\WowClassic.exe')
+          Copy-Item "$env:WINDIR\System32\PING.EXE" (Join-Path $env:RUNNER_TEMP 'WowUp.exe')
+          $game = Start-Process -FilePath (Join-Path $pend '_forever_\WowClassic.exe') -ArgumentList '-n 120 127.0.0.1' -PassThru -WindowStyle Hidden
+          $wowup = Start-Process -FilePath (Join-Path $env:RUNNER_TEMP 'WowUp.exe') -ArgumentList '-n 120 127.0.0.1' -PassThru -WindowStyle Hidden
+          $p = Start-Process -FilePath out\WolfPrices.exe -ArgumentList @('--check', "`"$pend`"") -Wait -PassThru
+          $r = Get-Content (Join-Path $pend 'wolfprices-check.txt') -Raw
+          "game open: $r"
+          if ($r -notmatch 'wolfPending=0\.') { throw 'with the game open it did not wait' }
+          if (Test-Path (Join-Path $pendAddon 'Core.lua')) { throw 'it was put in with the game open' }
+          Stop-Process -Id $game.Id -Force
+          Start-Sleep 1
+          $p = Start-Process -FilePath out\WolfPrices.exe -ArgumentList @('--check', "`"$pend`"") -Wait -PassThru
+          $r = Get-Content (Join-Path $pend 'wolfprices-check.txt') -Raw
+          "game closed (WowUp still open): $r"
+          if ($r -notmatch 'wolfUpdated=0\.') { throw 'with the game closed it was not put in (WowUp taken for the game?)' }
+          if (-not (Test-Path (Join-Path $pendAddon 'Core.lua'))) { throw 'no Core.lua after the update' }
+          Stop-Process -Id $wowup.Id -Force
           echo "WOWROOT=$root" >> $env:GITHUB_ENV
 
       - name: Setup over a running copy (1.1.1)
