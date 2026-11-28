@@ -1,5 +1,10 @@
 # Wolf
 
+## v0.60 - a test update (not on CurseForge)
+
+- Only for testing the prices companion's updates: a new version number and a line in a spare file
+  (Extra\Logic1.lua) that /wolf build shows. Nothing else changed; it came to companion users only.
+
 ## v0.59 - room to grow without a restart
 
 - **Spare files:** six empty code files (Extra\Logic1-4, Extra\UI1-2) and two data files (Data\Extra1-2) in the

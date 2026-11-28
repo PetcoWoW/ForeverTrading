@@ -133,7 +133,8 @@ jobs:
           # of one version don't go there: its rules don't allow a stream of data-only files)
           PREV=$(gh release list --limit 30 --json tagName --jq '[.[] | select(.tagName | startswith("v"))][0].tagName // ""' 2>/dev/null || echo "")
           PREVMAJMIN=$(echo "${PREV#v}" | cut -d. -f1,2)
-          if [ "$PREVMAJMIN" != "$MAJMIN" ]; then echo "NEW_VERSION=1" >> "$GITHUB_ENV"; fi
+          # (a commit that says [no curseforge] - a test build for the companion's updates - stays off CurseForge)
+          if [ "$PREVMAJMIN" != "$MAJMIN" ] && ! git log -1 --format=%B | grep -qi "\[no curseforge\]"; then echo "NEW_VERSION=1" >> "$GITHUB_ENV"; fi
           echo "MAJMIN=$MAJMIN" >> "$GITHUB_ENV"
           # the newest Wolf and prices companion, for the addon's "a newer one is out" line (v0.42): the companion
           # brings this file every hour, so even a friend with nobody online hears of a new version
