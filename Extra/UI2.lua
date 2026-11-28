@@ -54,7 +54,10 @@ local function Go(p)
             FT.OpenItem(p.item)
         elseif p.group then
             FT.ShowSub(p.group, p.sub)
-            if p.farm and FT.Tabs.signals.SetFarmMode and FT.Tabs.signals.FarmMode() ~= p.farm then FT.Tabs.signals.SetFarmMode(p.farm) end
+            if p.sub == "make" then
+                local want = p.farm == "mats" and "mats" or "deals"
+                if FT.Tabs.signals.flipMode ~= want then FT.Tabs.signals.SetFlipMode(want) end
+            elseif p.farm and FT.Tabs.signals.SetFarmMode and FT.Tabs.signals.FarmMode() ~= p.farm then FT.Tabs.signals.SetFarmMode(p.farm) end
         else
             FT.SelectTab(p.tab)
             if p.tab == "market" and FT.Tabs.market.Home then FT.Tabs.market.Home() end

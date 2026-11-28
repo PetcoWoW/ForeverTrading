@@ -459,7 +459,11 @@ function FT.ShowFarm(itemID)
     local r = FT.Market.Row(itemID)
     local rate = FT.Sales.Rate(itemID)
     local bits = {}
-    if r and r.price then bits[#bits + 1] = FT.C("text", FT.Money(r.price, "short")) .. FT.C("dim", " " .. L["each"]) end
+    if r and r.price then
+        -- (v0.62) what it sells for, when that's well under its listing
+        local note = FT.WorthNote(itemID)
+        bits[#bits + 1] = note and FT.C("orange", note) or (FT.C("text", FT.Money(r.price, "short")) .. FT.C("dim", " " .. L["each"]))
+    end
     if rate then bits[#bits + 1] = FT.Sales.PerDayText(rate) end
     if r and r.ch7 then bits[#bits + 1] = FT.C(r.ch7 >= 0 and "up" or "down", FT.Pct(r.ch7) .. " " .. L["this week"]) end
     UI.FitBits(d.sum, table.concat(bits, FT.C("dim", "  ·  ")))

@@ -159,10 +159,12 @@ local function Entry(r)
     if D.World(r.id) and best.chance < 200 then return nil end
     local who = best.who
     local dng = DungeonOf(who.zones)
-    local net = r.price * (1 - FT.Cut())
+    -- (v0.62) what it really sells for, not its listing (a pattern listed at 30g that sells at 12g is 12g)
+    local worth = FT.Worth(r.id) or r.price
+    local net = worth * (1 - FT.Cut())
     local each = best.chance > 0 and net * best.chance / 10000 or nil
     return {
-        id = r.id, price = r.price, ch7 = r.ch7, who = who, chance = best.chance, dungeon = dng, rare = Rare(who),
+        id = r.id, price = worth, listed = r.price, note = FT.WorthNote(r.id), ch7 = r.ch7, who = who, chance = best.chance, dungeon = dng, rare = Rare(who),
         group = dng ~= nil or who.rank == "1",
         lv = LowLevel(who.lv),
         perKill = each, perHour = each and each * D.KillsAnHour(who) or nil,

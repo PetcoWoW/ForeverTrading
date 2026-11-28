@@ -12,6 +12,11 @@ FT.News = N
 -- start, after the files are read (a table made with them would keep the English)
 local function News()
     return {
+        ["v0.62"] = {
+            { L["What really sells"], L["Wolf values items at what they sold for, not what's listed: a pattern listed at 30g that sells at 12g is 12g."], nil },
+            { L["Shopping verdicts"], L["At the auction house, hovering a listing: BUY NOW, FAIR or WAIT for its own price."], nil },
+            { L["Materials to buy"], L["Make gold > Flip it > Materials: each one's buy-below line, and what you paid."], function() FT.ShowSub("make", "make"); FT.Tabs.signals.SetFlipMode("mats") end },
+        },
         ["v0.61"] = {
             { L["Back and Forward"], L["By the search box, like a browser: back to where you were. The search shows what it finds under it; only picking one opens it."], nil },
             { L["Right-click the wolf"], L["By the minimap, while a session runs: its card, with Show on screen and Stop and save."], nil },

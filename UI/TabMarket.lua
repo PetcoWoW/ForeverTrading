@@ -1350,9 +1350,36 @@ local function BuildItemView(parent)
     v.calc:SetPoint("RIGHT", v.watch, "LEFT", -6, 0)
     v.calc:SetTip(L["Calculator"], L["What buying or selling some of it comes to: walks up the listings, takes off the cut. Your sums stay on its cheat sheet."])
 
+    -- (v0.62) what you paid for it, typed once (for what the auction house mail can't tell: bought from a player,
+    -- before Wolf): a small box in place of the button, Enter keeps it, empty clears it
+    v.paid = UI.Button(v, L["Paid"], 10, 24, "default", function()
+        if not state.selected then return end
+        v.paid:Hide()
+        local p = FT.Paid(state.selected)
+        local c = p and p.manual and math.floor(p.unit) or nil
+        v.paidBox:SetValue(c and string.format("%dg %ds %dc", math.floor(c / 10000), math.floor(c / 100) % 100, c % 100) or "")
+        v.paidBox:Show()
+        v.paidBox:SetFocus()
+    end)
+    v.paid:FitText(18)
+    v.paid:SetPoint("RIGHT", v.calc, "LEFT", -6, 0)
+    v.paid:SetTip(L["What you paid"], L["Type what you paid each (like 1g 20s), Enter. Wolf already counts what you bought at the auction house; this is for the rest."])
+    v.paidBox = UI.Input(v, 96, 24, L["each, e.g. 1g 20s"], nil, function()
+        local id = state.selected
+        local unit = FT.Calc.ParseMoney(v.paidBox:GetText() or "")
+        if id then FT.SetPaid(id, unit) end
+        v.paidBox:ClearFocus()
+    end)
+    v.paidBox:SetPoint("RIGHT", v.calc, "LEFT", -6, 0)
+    v.paidBox:Hide()
+    v.paidBox:HookScript("OnEditFocusLost", function()
+        v.paidBox:Hide(); v.paid:Show()
+        if state.selected and T.ShowItem then T.ShowItem(state.selected) end
+    end)
+
     v.call = UI.Panel(v, "bg2", "accent")
     v.call:SetPoint("TOPLEFT", 0, -48)
-    v.call:SetPoint("RIGHT", v.calc, "LEFT", -10, 0)
+    v.call:SetPoint("RIGHT", v.paid, "LEFT", -10, 0)
     v.call:SetHeight(UI.RowH(34))
     v.call:EnableMouse(true)
     v.callBadge = UI.Badge(v.call, 84, 22)
@@ -1451,6 +1478,9 @@ function T.ShowItem(id, keepView)
     end
     local own = FT.Port.Count(id)
     if own > 0 then parts[#parts + 1] = FT.C("text", string.format(L["you have %s"], FT.Num(own))) end
+    -- (v0.62) what you paid, and how it stands now
+    local paidText = FT.PaidText and FT.PaidText(id)
+    if paidText then table.insert(parts, 1, paidText) end
     -- (v0.61) your listing of it, first: undercut (by how much, since when) or the cheapest
     local mine = FT.Owned and FT.Owned.Mine and FT.Owned.Mine(id)
     if mine then

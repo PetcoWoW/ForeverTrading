@@ -217,6 +217,10 @@ local function BuildDeals(p)
     end, 22)
     f.age:SetPoint("LEFT", f.ageLabel, "RIGHT", 6, 0)
     f.age:SetValue(dstate.age)
+    -- (v0.62) Flip it's two rows: Deals now / Materials, then the mode's own choice
+    f.mode = UI.Segmented(f, { { "deals", L["Deals now"] }, { "mats", L["Materials"] } }, function(v) T.SetFlipMode(v) end, 22)
+    f.mode:SetPoint("TOPLEFT", 0, -1)
+    f.mode:SetValue("deals")
     f.check = UI.Button(f, L["Check order books"], 10, 24, "default", function() T.CheckBooks() end)
     f.check:FitText(24)
     f.check:SetPoint("TOPRIGHT", 0, 0)
@@ -448,6 +452,87 @@ local DEAL_VIEWS = { make = true }
 
 local sellView, farmView, craftView -- the Sell yours, Farm Board and Craft for profit views (built in T.Build)
 
+---------------------------------------------------------------------------
+-- (v0.62) Flip it > Materials: the raw materials people trade (herbs, ore, cloth, leather, enchanting, elemental),
+-- each with today's lowest, a "buy below" line (its usual less your Buy-below setting, Settings > Signals) and a
+-- verdict: BUY NOW under it, WAIT over its usual (or while it's still sliding), FAIR between. Yours first (what
+-- your characters' professions use), and what you paid when Wolf knows (your auction house mail, or Set what I
+-- paid on the item's page).
+---------------------------------------------------------------------------
+T.flipMode = "deals"
+local matsShow = "yours"
+local MAT_SUBS = { [9] = true, [7] = true, [5] = true, [6] = true, [12] = true, [10] = true }
+
+local function YourProfs()
+    local out = {}
+    for name, lv in pairs(FT.Me and FT.Me.Profs() or {}) do if (lv or 0) > 0 then out[FT.ProfKey(name)] = true end end
+    return out
+end
+
+local function MatRows()
+    local profs = YourProfs()
+    local th = (FT.S.buyBelow or 15) / 100
+    local match = FT.NameMatcher(T.search)
+    local out = {}
+    for _, r in ipairs(FT.Market.Rows() or {}) do
+        if r.cls == 7 and MAT_SUBS[r.sub] and r.price and (not match or match(r.id)) then
+            local rate = FT.Sales.Rate(r.id)
+            local perDay = rate and rate.perDay or 0
+            local yours = false
+            for _, rc in ipairs(FT.Craft.UsedIn(r.id) or {}) do if profs[rc.prof] then yours = true break end end
+            if perDay >= 3 and (matsShow == "all" or yours) then
+                local s = FT.An.Stats(r.id)
+                local sig, _, why = FT.An.BuySignal(s)
+                local below = s.avg and s.avg * (1 - th) or nil
+                local label, signal, strength
+                if sig == "BUY" then label, signal, strength = L["BUY NOW"], "BUY", 3
+                elseif sig == "EXPENSIVE" or sig == "WATCH" then label, signal, strength = L["WAIT"], "WAIT", 2
+                elseif sig == "FAIR" then label, signal, strength = L["FAIR"], "HOLD", 1
+                else label, signal, strength = nil, "NODATA", 0 end
+                local bits = {}
+                if below then bits[#bits + 1] = string.format(L["buy below %s"], FT.Money(math.floor(below), "short")) end
+                if sig == "WATCH" or sig == "EXPENSIVE" then bits[#bits + 1] = FT.C("dim", why) end
+                local paid = FT.PaidText(r.id)
+                if paid then bits[#bits + 1] = paid end
+                bits[#bits + 1] = FT.C("dim", FT.Sales.PerDayText(rate))
+                out[#out + 1] = {
+                    id = r.id, fit = true, reason = table.concat(bits, FT.C("dim", "  ·  ")),
+                    value = FT.C(sig == "BUY" and "up" or "text", FT.Money(r.price, "short")) .. FT.C("dim", " " .. L["now"]),
+                    signal = signal, label = label, strength = strength,
+                    rank = (sig == "BUY" and 0 or (sig == "FAIR" and 1 or 2)), dev = s.dev or 0, vol = perDay * r.price,
+                }
+            end
+        end
+    end
+    table.sort(out, function(a, b)
+        if a.rank ~= b.rank then return a.rank < b.rank end
+        if a.rank == 0 and a.dev ~= b.dev then return a.dev < b.dev end
+        return a.vol > b.vol
+    end)
+    return out
+end
+T.MatRows = MatRows
+
+function T.SetFlipMode(v)
+    T.flipMode = v
+    if dealsView and dealsView.mode then dealsView.mode:SetValue(v) end
+    if T.matsView and T.matsView.mode then T.matsView.mode:SetValue(v) end
+    T.SetView("make")
+    if v == "mats" then T.RefreshMats() else T.RefreshDeals() end
+    if FT.NavNote then FT.NavNote() end
+end
+
+function T.RefreshMats()
+    local f = T.matsView
+    if not (f and f:IsShown()) then return end
+    local rows = MatRows()
+    f.list:SetEmptyText(matsShow == "yours" and L["None your professions use that trade enough yet. Show: All."] or L["No materials with prices yet."])
+    f.list:SetItems(rows, true)
+    local now = 0
+    for _, x in ipairs(rows) do if x.rank == 0 then now = now + 1 end end
+    f.count:SetText(now > 0 and FT.C("up", string.format(L["%d under their buy-below now"], now)) or "")
+end
+
 function T.SetView(view)
     -- the old names (the tour, What's new, other pages): one Make gold list now; Sell yours is in Portfolio
     if view == "sell" then
@@ -462,11 +547,19 @@ function T.SetView(view)
     local deals = DEAL_VIEWS[view]
     if deals then dstate.kind = "all" end
     if dealsView then
-        dealsView:SetShown(deals or false)
+        dealsView:SetShown((deals and T.flipMode ~= "mats") or false)
         dealsView.kind:Hide()
+        -- (v0.62) the age choice on the second row, under Deals now / Materials
         dealsView.ageLabel:ClearAllPoints()
-        dealsView.ageLabel:SetPoint("TOPLEFT", 0, -6)
+        dealsView.ageLabel:SetPoint("TOPLEFT", 2, -40)
+        dealsView.hint:ClearAllPoints()
+        dealsView.hint:SetPoint("TOPLEFT", 0, -66)
+        dealsView.hint:SetPoint("RIGHT", 0, 0)
+        dealsView.box:ClearAllPoints()
+        dealsView.box:SetPoint("TOPLEFT", 0, -84)
+        dealsView.box:SetPoint("BOTTOMRIGHT", 0, 0)
     end
+    if T.matsView then T.matsView:SetShown((deals and T.flipMode == "mats") or false) end
     if sellView then sellView:SetShown(view == "sell") end
     if farmView then farmView:SetShown(view == "farm") end
     if craftView then craftView:SetShown(view == "craft") end
@@ -889,6 +982,7 @@ local function DropRows()
         bits[#bits + 1] = FT.Drops.Odds(e.chance) or FT.C("accent", L["rate unknown"])
         if e.rare then bits[#bits + 1] = FT.C("accent", L["a rare spawn: up now and then"]) end
         if (e.ch7 or 0) <= -0.15 then bits[#bits + 1] = FT.C("down", FT.Pct(e.ch7) .. " " .. L["this week"]) end
+        if e.note then bits[#bits + 1] = FT.C("orange", e.note) end
         local value
         if dropSort == "hour" then
             value = e.perHour and (FT.C("up", "~" .. FT.Money(math.floor(e.perHour + 0.5), "short")) .. FT.C("dim", " " .. L["an hour"]))
@@ -1075,6 +1169,35 @@ function T.Build(p)
     T.viewSeg:SetValue(T.view)
     dealsView = BuildDeals(p)
     farmView = BuildFarmView(p)
+    -- (v0.62) Flip it > Materials
+    do
+        local f = ListView(p, function(x) if x.id then FT.OpenItem(x.id) end end, function(row, x)
+            if x and x.id then UI.TipItem(row, x.id) end
+        end)
+        f:Hide()
+        if f.kind then f.kind:Hide() end
+        f.mode = UI.Segmented(f, { { "deals", L["Deals now"] }, { "mats", L["Materials"] } }, function(v) T.SetFlipMode(v) end, 22)
+        f.mode:SetPoint("TOPLEFT", 0, -1)
+        f.mode:SetValue("mats")
+        f.row2 = UI.Text(f, 12, "muted")
+        f.row2:SetPoint("TOPLEFT", 2, -40)
+        f.row2:SetText(L["Show"])
+        f.show = UI.Segmented(f, { { "yours", L["What your professions use"] }, { "all", L["All"] } }, function(v)
+            matsShow = v
+            T.RefreshMats()
+        end, 22)
+        f.show:SetPoint("LEFT", f.row2, "RIGHT", 10, 0)
+        f.show:SetValue(matsShow)
+        f.hint:ClearAllPoints()
+        f.hint:SetPoint("TOPLEFT", 0, -66)
+        f.hint:SetPoint("RIGHT", 0, 0)
+        f.hint:SetText(L["Buy below its line and it's cheap for that item: under its usual by your Buy-below setting. Click one: its page."])
+        f.box:ClearAllPoints()
+        f.box:SetPoint("TOPLEFT", 0, -84)
+        f.box:SetPoint("BOTTOMRIGHT", 0, 0)
+        T.matsView = f
+        f:HookScript("OnShow", function() T.RefreshMats() end)
+    end
     craftView = BuildCraftView(p)
     -- the deals are looked for again on new prices only while they are on the screen (Sell yours and the
     -- line under the title use them too)
@@ -1086,7 +1209,7 @@ function T.Refresh()
     local best = BestMove()
     if DEAL_VIEWS[T.view] or T.view == "sell" or T.view == "farm" or T.view == "craft" then
         T.rules:SetText(best or FT.C("dim", L["No deal right now: the list fills as prices come in."]))
-        if DEAL_VIEWS[T.view] then T.RefreshDeals() end
+        if DEAL_VIEWS[T.view] then if T.flipMode == "mats" then T.RefreshMats() else T.RefreshDeals() end end
         if T.view == "sell" then T.RefreshSell() end
         if T.view == "farm" then T.RefreshFarm() end
         if T.view == "craft" then T.RefreshCraft() end

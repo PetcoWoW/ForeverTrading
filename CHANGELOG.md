@@ -1,5 +1,20 @@
 # Wolf
 
+## v0.62 - what things really sell for, shopping verdicts, materials to buy
+
+- **What sells, not what's listed:** the prices are listings, and on a thin market a listing can sit at 30g for
+  weeks while what sells goes for 12g. Wolf now values items at what they sold for (the price robot compares the
+  auction house hour by hour; your scans and your guild's too), never above the listing. A pattern or piece of gear
+  no one's been seen buying counts at a careful share of its listing and says so ("listed 30g, no sale seen yet").
+  Drops, Dungeons, Where to farm it and sessions all use it; Drops rows say "listed 30g · sells ~12g".
+- **Shopping at the auction house:** hovering a listing reads as a buyer would - BUY NOW (under its usual by your
+  Buy-below setting), FAIR, or WAIT - for that listing's own price, with what it usually goes for. Your own bags
+  still say SELL / HOLD.
+- **Flip it > Materials:** herbs, ore, cloth, leather, enchanting and elemental materials, each with today's
+  price, a buy-below line, and BUY NOW / FAIR / WAIT; what your professions use first (or all).
+- **What you paid:** from your auction house buys (the mail), or typed once on the item's page (Paid); shown on
+  Materials and the item's page with how it stands now ("you paid ~1g 05s for 80 · now +12%").
+
 ## v0.61 - getting around, honest dungeons, your auctions in place
 
 - **Back and Forward** by the search box, like a browser (the mouse's side buttons too): every page, section,

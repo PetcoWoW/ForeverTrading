@@ -733,6 +733,7 @@ function FT.Place()
     if g then p.group, p.sub = g, groupLast[g] end
     if tab == "market" and FT.Tabs.market and FT.Tabs.market.CurrentItem then p.item = FT.Tabs.market.CurrentItem() end
     if tab == "signals" and p.sub == "farm" and FT.Tabs.signals.FarmMode then p.farm = FT.Tabs.signals.FarmMode() end
+    if tab == "signals" and p.sub == "make" and FT.Tabs.signals.flipMode == "mats" then p.farm = "mats" end
     return p
 end
 

@@ -312,6 +312,35 @@ step("chart marks and listings", function()
   local box = FT.Tabs.portfolio.donutBox
   assert(box.undercut:IsShown(), "Holdings: the undercut badge")
   print("chart marks: 2; your listing undercut by " .. (math.ceil(p * 1.3) - m.low) .. "c; Holdings badge shown")
+  -- (v0.62) what you paid: the buy above (80 from the mail), then typed in; on the item's page
+  local paid = FT.Paid(id)
+  assert(paid and paid.qty == 80 and not paid.manual, "what you paid: from the mail")
+  FT.SetPaid(id, 12345)
+  assert(FT.Paid(id).manual and FT.PaidText(id):find("you paid", 1, true), "what you paid: typed in")
+  FT.OpenItem(id)
+  FT.SetPaid(id, nil)
+  -- (v0.62) shopping at the auction house: the buyer's verdict on a listing's own price
+  local s = FT.An.Stats(id)
+  if s.avg then
+    local cheap = FT.BuyerTip(id, { unit = s.avg * 0.5 })
+    local dear = FT.BuyerTip(id, { unit = s.avg * 2 })
+    assert(cheap[2] and cheap[2][1]:find("BUY NOW", 1, true), "a cheap listing: BUY NOW")
+    assert(dear[2] and dear[2][1]:find("WAIT", 1, true), "a dear one: WAIT")
+    print("buyer tip: " .. cheap[2][1]:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "") .. " / " .. dear[2][1]:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", ""))
+  end
+  -- (v0.62) what an item really goes for: a pattern with no sale seen counts at a careful share of its listing
+  local pat
+  for _, r in ipairs(FT.Market.Rows() or {}) do
+    if r.cls == 9 and r.price and r.price > 10000 then
+      local rate = FT.Sales.Rate(r.id)
+      if not rate or (rate.perDay or 0) < 1 then pat = r break end
+    end
+  end
+  if pat then
+    local w, _, info = FT.Worth(pat.id)
+    assert(info and info.unproven and w < pat.price, "a pattern no one's seen sell: not its listing")
+    print("worth: a pattern listed " .. pat.price .. "c counts " .. math.floor(w) .. "c (" .. (FT.WorthNote(pat.id) or "") .. ")")
+  end
   FT.db.owned = saved
   FT.db.undercut = nil
 end)
@@ -1130,9 +1159,21 @@ step("layout", function()
       local view = FT.Tabs.signals.farmKindBar:GetParent()
       for _, b in ipairs(view.trash.buttons) do if b.value == "trash" then b.onClick() end end
     end },
+    { "money: flip it, materials", "signals", function()
+      -- (v0.62) Flip it > Materials: buy-below lines and BUY NOW / WAIT / FAIR
+      FT.ShowSub("make", "make")
+      FT.Tabs.signals.SetFlipMode("mats")
+      local rows = FT.Tabs.signals.MatRows()
+      local below = 0
+      for _, x in ipairs(rows) do if (x.reason or ""):find("buy below", 1, true) then below = below + 1 end end
+      print(string.format("flip materials: %d rows, %d with a buy-below line, first %s", #rows, below, rows[1] and (rows[1].label or "?") or "-"))
+    end },
+    { "money: flip it, deals", "signals", function() FT.Tabs.signals.SetFlipMode("deals") end },
     { "money: dungeons, solo", "signals", function()
       -- (v0.57) solo: the whole run's loot, slower, only well under your level; hard ones marked and below
       local f = FT.Tabs.signals
+      FT.ShowSub("make", "farm")
+      f.SetFarmMode("dungeons")
       local view = f.farmKindBar:GetParent()
       for _, b in ipairs(view.trash.buttons) do if b.value == "solo" then b.onClick() end end
       local rows = f.DungeonRows()

@@ -395,6 +395,52 @@ FT.On("FT_PRICES_CHANGED", function() wipe(tipCache) end)
 FT.On("FT_SCAN_DONE", function() wipe(tipCache) end)
 FT.On("FT_LEARNED", function() wipe(tipCache) end)
 
+-- (v0.62) Shopping: at the auction house, hovering a listing (not something in your bags) reads as a buyer would
+-- - BUY NOW (under its usual by your Buy-below setting), FAIR, or WAIT (over it) - for that listing's own price when
+-- the game's auction list says it (Blizzard's window), or today's lowest
+local function BuyerView(tt)
+    if not FT.ahOpen then return nil end
+    local owner = tt.GetOwner and tt:GetOwner()
+    local name = owner and owner.GetName and owner:GetName() or ""
+    if name:find("Container") or name:find("Bank") or name:find("Bag") or name:find("Character") or name:find("Trade") or name:find("Mail") then return nil end
+    local unit
+    local n = name:match("^BrowseButton(%d+)Item$") or name:match("^BrowseButton(%d+)$")
+    if n and GetAuctionItemInfo then
+        local offset = (FauxScrollFrame_GetOffset and BrowseScrollFrame) and FauxScrollFrame_GetOffset(BrowseScrollFrame) or 0
+        local _, _, count, _, _, _, _, _, _, buyout = GetAuctionItemInfo("list", offset + tonumber(n))
+        if buyout and buyout > 0 then unit = buyout / math.max(1, count or 1) end
+    end
+    return { unit = unit }
+end
+
+local function BuyerLines(itemID, view)
+    local s = FT.An.Stats(itemID)
+    local price = view.unit or s.price
+    if not price then return false end
+    local out = {}
+    local _, pname, age = FT.PriceTag(s.source, s.t)
+    out[#out + 1] = { "|cfff0b90bWolf|r " .. (view.unit and L["this listing"] or pname), FT.Money(math.floor(price), "short") .. ((not view.unit and age) and FT.C("dim", "  " .. age) or "") }
+    local usual = s.avg
+    if usual and usual > 0 then
+        local th = (FT.S.buyBelow or 15) / 100
+        local dev = (price - usual) / usual
+        local sig, color, why
+        if dev <= -th then
+            sig, color, why = L["BUY NOW"], "up", string.format(L["%d%% under its usual"], math.floor(-dev * 100 + 0.5))
+        elseif dev >= th then
+            sig, color, why = L["WAIT"], "orange", string.format(L["%d%% over its usual"], math.floor(dev * 100 + 0.5))
+        else
+            sig, color, why = L["FAIR"], "muted", L["about its usual"]
+        end
+        out[#out + 1] = { FT.C(color, sig) .. "  " .. FT.C("dim", why), FT.C("dim", L["usually"] .. " ") .. FT.Money(math.floor(usual), "short") }
+    end
+    local note = FT.WorthNote(itemID)
+    if note then out[#out + 1] = { FT.C("orange", note) } end
+    return out
+end
+
+FT.BuyerTip = BuyerLines -- (for the tests)
+
 local function TipLines(itemID, detail)
     local s = FT.An.Stats(itemID)
     local rs = FT.Craft.ByOutput(itemID)
@@ -505,12 +551,14 @@ local function AddLines(tt, itemID)
     if not (FT.S and FT.S.tooltip and itemID) then return end
     if tt.IsForbidden and tt:IsForbidden() then return end
     local detail = IsShiftKeyDown and IsShiftKeyDown() or false
-    local key = itemID .. (detail and "+" or "")
+    local view = BuyerView(tt)
+    local key = itemID .. (detail and "+" or "") .. (view and ("b" .. math.floor(view.unit or 0)) or "")
     local c = tipCache[key]
     local now = GetTime()
     if not (c and (now - c.t < TIP_FRESH or InCombatLockdown())) then
         if InCombatLockdown() then return end -- nothing is worked out in a fight
-        local ok, lines = pcall(TipLines, itemID, detail)
+        local ok, lines
+        if view then ok, lines = pcall(BuyerLines, itemID, view) else ok, lines = pcall(TipLines, itemID, detail) end
         if not ok then FT.Debug(lines) lines = false end
         c = { t = now, lines = lines }
         tipCache[key] = c

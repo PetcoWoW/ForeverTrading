@@ -435,12 +435,106 @@ end
 -- what one is worth now: its market price - the same number as its tooltip and the Portfolio (FT.Price, the newest
 -- of your scans, the Blizzard API and Auctionator) - else what a vendor pays when the auction house has none;
 -- nil: no price anywhere yet (shown as such, never counted as 0 without saying so)
-function Ses.UnitValue(itemID)
-    local p = FT.Price(itemID)
-    if p and p > 0 then return p, "ah" end
+-- (v0.62) What an item really goes for, not what it's listed at. The prices are listings: on a thin market a
+-- listing can sit at 30g for weeks while what sells goes for 12g. So: what it sold for (the price robot comparing
+-- the auction house hour by hour, your own scans, your guild's) when sales were seen - never more than it's listed
+-- at; with no sale seen on a thin market (under one a day) of patterns and gear, or only a couple listed, a
+-- careful share of the listing - said so; never under what a vendor pays. info: { listed, sold, unproven }
+local UNPROVEN = 0.6
+local worthCache, worthFor = {}, nil
+local WorthNow
+function FT.Worth(itemID)
+    -- (kept until new prices: drops, dungeons and sessions ask for the same items again and again)
+    local rows = FT.Market.Rows()
+    if worthFor ~= rows then worthCache, worthFor = {}, rows end
+    local c = worthCache[itemID]
+    if c then return c[1], c[2], c[3] end
+    local v, via, info = WorthNow(itemID)
+    worthCache[itemID] = { v, via, info }
+    return v, via, info
+end
+FT.On("FT_PRICES_CHANGED", function() worthFor = nil end)
+
+function WorthNow(itemID)
+    local listed, _, _, qty = FT.Price(itemID)
     local vendor = FT.VendorSell(itemID)
-    if vendor and vendor > 0 then return vendor, "vendor" end
-    return nil, nil
+    if not listed or listed <= 0 then
+        if vendor and vendor > 0 then return vendor, "vendor", nil end
+        return nil, nil, nil
+    end
+    local rate = FT.Sales.Rate(itemID)
+    local sold = rate and (rate.sold or 0) >= 2 and rate.avgPrice or nil
+    local v, info
+    if sold then
+        v, info = math.min(listed, sold), { listed = listed, sold = sold }
+    else
+        local r = FT.Market.Row(itemID)
+        local cls = r and r.cls
+        local thin = not rate or (rate.perDay or 0) < 1
+        if thin and (cls == 9 or cls == 2 or cls == 4 or (qty or 0) <= 2) then
+            v, info = listed * UNPROVEN, { listed = listed, unproven = true }
+        else
+            v = listed
+        end
+    end
+    if vendor and vendor > v then return vendor, "vendor", info end
+    return v, "ah", info
+end
+
+-- listed vs what it sells for, in words when they part ("listed 30g · sells ~12g"; "listed 30g, no sale seen yet")
+function FT.WorthNote(itemID)
+    local v, _, info = FT.Worth(itemID)
+    if not (info and info.listed) then return nil end
+    if info.unproven then return string.format(FT.L["listed %s, no sale seen yet"], FT.Money(info.listed, "short")) end
+    if info.sold and info.sold < info.listed * 0.8 then
+        return string.format(FT.L["listed %s · sells ~%s"], FT.Money(info.listed, "short"), FT.Money(math.floor(v), "short"))
+    end
+    return nil
+end
+
+-- (v0.62) What you paid for an item: what you typed on its page (Set what I paid), else your auction house buys
+-- of it these 60 days (the auction house's mail). { unit, qty, manual }
+local paidIdx, paidN
+function FT.Paid(itemID)
+    local m = FT.db and FT.db.paid and FT.db.paid[itemID]
+    if m and m.unit then return { unit = m.unit, qty = m.qty, manual = true } end
+    local ev = FT.Journal and FT.Journal.Events() or {}
+    if paidN ~= #ev then
+        paidIdx, paidN = {}, #ev
+        local since = time() - 60 * 86400
+        for _, e in ipairs(ev) do
+            if e.k == "B" and e.t >= since and (e.q or 0) > 0 then
+                local x = paidIdx[e.id] or { v = 0, q = 0 }
+                x.v, x.q = x.v + e.v, x.q + e.q
+                paidIdx[e.id] = x
+            end
+        end
+    end
+    local x = paidIdx[itemID]
+    if x and x.q > 0 then return { unit = x.v / x.q, qty = x.q } end
+    return nil
+end
+function FT.SetPaid(itemID, unit)
+    FT.db.paid = FT.db.paid or {}
+    FT.db.paid[itemID] = unit and unit > 0 and { unit = unit, t = time() } or nil
+    FT.Fire("FT_PAID_CHANGED", itemID)
+end
+-- "you paid ~1g 05s for 80 · now +12%"
+function FT.PaidText(itemID)
+    local p = FT.Paid(itemID)
+    if not p then return nil end
+    local now = FT.Price(itemID)
+    local txt = p.qty and string.format(FT.L["you paid ~%s for %s"], FT.Money(math.floor(p.unit), "short"), FT.Num(p.qty))
+        or string.format(FT.L["you paid ~%s"], FT.Money(math.floor(p.unit), "short"))
+    if now and p.unit > 0 then
+        local ch = (now - p.unit) / p.unit
+        txt = txt .. " · " .. FT.C(ch >= 0 and "up" or "down", string.format(FT.L["now %s"], FT.Pct(ch)))
+    end
+    return txt
+end
+
+function Ses.UnitValue(itemID)
+    return FT.Worth(itemID)
 end
 
 function Ses.Current() return FT.db.session end
