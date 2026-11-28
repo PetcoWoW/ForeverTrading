@@ -1,5 +1,11 @@
 # Wolf
 
+## v0.53 - a new face
+
+- **The logo is the game's own black wolf** (the Black Wolf mount icon), on the minimap button, in the window's
+  header and in the addon list. Wolf ships no logo file of its own any more.
+- **No banner over the window:** the header with the logo is the top of the window (it still drags it).
+
 ## v0.52 - Today about you, a cozier, lighter Wolf
 
 - **Today is about you:** **Your movers** (what you own that moved with the last prices, and what it did in gold)

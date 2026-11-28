@@ -12,6 +12,9 @@ FT.News = N
 -- start, after the files are read (a table made with them would keep the English)
 local function News()
     return {
+        ["v0.53"] = {
+            { L["A new face"], L["Wolf's logo is the game's own black wolf, on the minimap button and in the header. The banner over the window is gone."], nil },
+        },
         ["v0.52"] = {
             { L["Today is about you"], L["Your movers (what you own that moved) and While you were away (what sold, what came back) in place of the market's gainers and losers."], function() FT.Show("today") end },
             { L["The market's own lists"], L["Market's home: gainers or losers, and Most traded or Market Makers, each on a switch."], function() FT.Show("market") end },
