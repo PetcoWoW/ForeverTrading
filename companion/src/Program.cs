@@ -27,13 +27,15 @@ namespace WolfPrices
                 if (has("--check")) return Check(arg("--check"));
                 if (has("--pictures")) return Pictures(arg("--pictures"), arg("--wow"));
                 if (has("--uninstall")) { Installer.Uninstall(has("--quiet")); return 0; }
+                // (1.1.1) setup without its window, for the build's own test (over a running copy)
+                if (has("--install-quiet")) { Installer.Install(false); return 0; }
                 if (has("--tray") || App.IsInstalledCopy) return Tray.Run(has("--updated"));
                 return Setup.Run();
             }
             catch (Exception e)
             {
                 Log.Write("stopped: " + e);
-                if (!has("--check") && !has("--pictures") && !has("--tray")) Ui.Tell("Something went wrong", e.Message);
+                if (!has("--check") && !has("--pictures") && !has("--tray") && !has("--install-quiet")) Ui.Tell("Something went wrong", e.Message);
                 return 1;
             }
         }

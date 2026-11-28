@@ -1,5 +1,15 @@
 # Wolf
 
+## v0.59 - room to grow without a restart
+
+- **Spare files:** six empty code files (Extra\Logic1-4, Extra\UI1-2) and two data files (Data\Extra1-2) in the
+  TOC. The game reads its list of files only at launch, so new code goes into a spare one and the prices
+  companion's update still comes in with a /reload. (This version adds them: it's the one that waits for a restart.)
+- **/wolf build:** which build runs, and what the prices companion last put in (or what waits for a restart).
+- **Prices companion 1.1.1:** setup run while it's by the clock closes the running one first (an older one that
+  doesn't answer is closed for it) instead of failing; it waits for a restart only when Wolf's files or saved data
+  change, not its description.
+
 ## v0.58 - Wolf updates itself
 
 - **The prices companion (1.1) keeps Wolf up to date:** a new Wolf - a version or a fix - is swapped in while you

@@ -42,14 +42,20 @@ namespace WolfPrices
             return null;
         }
 
-        // what the game reads from a TOC at launch: every line but the version and the commit
+        // what a /reload can't take from a new TOC (the game reads it at launch): its files and its saved data. (1.1.1:
+        // a new title, notes or version needs no restart - they only show in the AddOns list)
         public static string TocShape(string tocFile)
         {
             var keep = new List<string>();
             foreach (var line in File.ReadAllLines(tocFile, Encoding.UTF8))
             {
                 var t = line.Trim().Replace('/', '\\');
-                if (t.Length == 0 || t.StartsWith("## Version:", StringComparison.OrdinalIgnoreCase) || t.StartsWith("## X-Commit:", StringComparison.OrdinalIgnoreCase)) continue;
+                if (t.Length == 0) continue;
+                if (t.StartsWith("#"))
+                {
+                    if (!t.StartsWith("## SavedVariables", StringComparison.OrdinalIgnoreCase)) continue;
+                    t = System.Text.RegularExpressions.Regex.Replace(t, @"\s+", "");
+                }
                 keep.Add(t.ToLowerInvariant());
             }
             return string.Join("\n", keep);

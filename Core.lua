@@ -4,7 +4,7 @@ local L = FT.L
 
 -- The version being released: a copy straight from the repository (not packaged) has no version in its TOC yet
 -- (the packager puts the tag there) and shows this one. Set it with every release.
-local RELEASE = "v0.58"
+local RELEASE = "v0.59"
 local GetMeta = (C_AddOns and C_AddOns.GetAddOnMetadata) or GetAddOnMetadata
 FT.VERSION = (GetMeta and GetMeta(ADDON, "Version")) or RELEASE
 if FT.VERSION == "" or FT.VERSION:find("@", 1, true) then FT.VERSION = RELEASE end
@@ -870,6 +870,7 @@ FT.COMMANDS = {
     { "/wolf perf", "how fast it runs and the memory it takes" },
     { "/wolf debug", "extra lines in chat, for bug reports" },
     { "/wolf curseforge", "the link to the newest version" },
+    { "/wolf build", "which build runs, and what the prices companion last put in" },
     { "/wolf github | credits", "where the code is, who it's built on" },
 }
 
@@ -926,6 +927,19 @@ SlashCmdList.WOLFOFBOOTYBAY = function(msg)
         FT.PerfReport()
     elseif cmd == "news" then
         FT.News.Show()
+    elseif cmd == "build" then
+        -- (v0.58) the build running (a /reload after the companion's update shows the new one) and the companion's note
+        FT.Print(string.format(L["This is Wolf %s."], FT.VERSION_TEXT or FT.VERSION))
+        -- a line a spare file (Extra\) can set: proof a /reload loaded code put in while the game ran
+        if FT.SPARE_NOTE then FT.Print(FT.C("up", FT.SPARE_NOTE)) end
+        local n = FT.Companion and FT.Companion.Note()
+        if n then
+            FT.Print(FT.C("dim", string.format(L["Prices companion %s, checked %s%s%s."], n.version or "?", FT.Ago(n.checked),
+                n.updated and (", " .. string.format(L["last put in Wolf %s %s"], n.updated, n.updatedAt and FT.Ago(n.updatedAt) or "")) or "",
+                n.pending and (", " .. string.format(L["Wolf %s waits for a game restart"], n.pending)) or "")))
+        else
+            FT.Print(FT.C("dim", L["No prices companion seen (Settings > About)."]))
+        end
     elseif cmd == "tour" then
         FT.Tour.Start()
     else

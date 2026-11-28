@@ -1,0 +1,3 @@
+-- Wolf: a spare data file (v0.59), for a future data table: listed in the TOC so the prices companion's update
+-- loads it with a /reload. Empty until it's used.
+local _, FT = ...

@@ -261,7 +261,9 @@ step("alerts", function()
   assert(#printed == 1 and printed[1]:find("updated it", 1, true), "updated: said once")
   FT.COMPANION.auto = false
   assert(FT.Ver.HowToGet("9.9"):find("CurseForge", 1, true), "no companion updates: CurseForge")
+  SlashCmdList.WOLFOFBOOTYBAY("build")
   FT.COMPANION = realNote
+  SlashCmdList.WOLFOFBOOTYBAY("build")
   FT.Ver.newest = nil
   FT.db.told.version, FT.db.told.versionAt, FT.db.told.again = nil, nil, nil
   FT.UpdateMinimapDot()

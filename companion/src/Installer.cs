@@ -50,8 +50,18 @@ namespace WolfPrices
             {
                 var tmp = App.InstalledExe + ".new";
                 File.Copy(App.SelfExe, tmp, true);
-                if (File.Exists(App.InstalledExe)) File.Replace(tmp, App.InstalledExe, null);
-                else File.Move(tmp, App.InstalledExe);
+                // (1.1.1) Windows can hold the old program's file a moment after it quits: a few tries
+                for (int i = 0; ; i++)
+                {
+                    try
+                    {
+                        if (File.Exists(App.InstalledExe)) File.Replace(tmp, App.InstalledExe, null);
+                        else File.Move(tmp, App.InstalledExe);
+                        break;
+                    }
+                    catch (IOException) { if (i >= 40) throw; Thread.Sleep(250); }
+                    catch (UnauthorizedAccessException) { if (i >= 40) throw; Thread.Sleep(250); }
+                }
             }
             try { Shortcut(StartMenuLink, App.InstalledExe, "", "Wolf prices: fresh auction prices for Wolf"); }
             catch (Exception e) { Log.Write("start menu shortcut: " + e.Message); }
@@ -78,8 +88,33 @@ namespace WolfPrices
             Process.Start(new ProcessStartInfo(App.InstalledExe, "--tray") { UseShellExecute = false, WorkingDirectory = App.InstallDir });
         }
 
-        // the one running by the clock: asked to quit, then waited for
+        // the one running by the clock: asked to quit, then waited for; (1.1.1) and one that doesn't quit (an older one,
+        // or stuck) is closed - only programs of ours (WolfPrices.exe), never this one
         public static void StopRunning()
+        {
+            Ask();
+            try
+            {
+                int me = Process.GetCurrentProcess().Id;
+                foreach (var p in Process.GetProcessesByName("WolfPrices"))
+                {
+                    if (p.Id == me) continue;
+                    try
+                    {
+                        if (!p.WaitForExit(3000))
+                        {
+                            p.Kill();
+                            p.WaitForExit(5000);
+                            Log.Write("closed an older Wolf prices that didn't quit (" + p.Id + ")");
+                        }
+                    }
+                    catch (Exception e) { Log.Write("closing the running one: " + e.Message); }
+                }
+            }
+            catch (Exception e) { Log.Write("stop running: " + e.Message); }
+        }
+
+        static void Ask()
         {
             try
             {

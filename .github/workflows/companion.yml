@@ -71,6 +71,23 @@ jobs:
           if (Test-Path (Join-Path $devAddon 'Core.lua')) { throw "a developer's copy was updated" }
           echo "WOWROOT=$root" >> $env:GITHUB_ENV
 
+      - name: Setup over a running copy (1.1.1)
+        shell: pwsh
+        run: |
+          $p = Start-Process -FilePath out\WolfPrices.exe -ArgumentList '--install-quiet' -Wait -PassThru
+          if ($p.ExitCode -ne 0) { throw "first install exited $($p.ExitCode)" }
+          $installed = Join-Path $env:LOCALAPPDATA 'Programs\WolfPrices\WolfPrices.exe'
+          $tray = Start-Process -FilePath $installed -ArgumentList '--tray' -PassThru
+          Start-Sleep 5
+          if ($tray.HasExited) { throw 'the installed one did not keep running' }
+          # the download run again while it's by the clock: it must close it and put itself in
+          $p = Start-Process -FilePath out\WolfPrices.exe -ArgumentList '--install-quiet' -Wait -PassThru
+          Get-Content (Join-Path $env:APPDATA 'WolfPrices\log.txt') -Tail 6
+          if ($p.ExitCode -ne 0) { throw "install over a running one exited $($p.ExitCode)" }
+          Start-Sleep 1
+          if (-not $tray.HasExited) { throw 'the running one was not closed' }
+          "installed over a running copy: ok"
+
       - name: Pictures of its windows
         shell: pwsh
         run: |
