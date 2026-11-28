@@ -279,6 +279,8 @@ local function InitDB()
     db.inv = db.inv or {}
     db.vendor = db.vendor or {}
     db.frame = db.frame or {}
+    -- (v0.51) saved data nothing reads any more: the old Radar's self-check
+    db.radar = nil
     -- 1.1: price charts are one line; the moving averages start switched off
     if (db.version or 1) < 2 then
         db.settings.showMA = false

@@ -142,12 +142,17 @@ end
 local opened = {}   -- corpses looted this login (a second loot of the same one - skinning - is no new corpse)
 local openedN = 0
 
-local function Prune(d)
+local function PruneOf(t, max)
     local n, list = 0, {}
-    for id, m in pairs(d.mobs) do n = n + 1; list[#list + 1] = { id, m.c or 0 } end
-    if n <= MAX_MOBS then return end
+    for id, m in pairs(t or {}) do n = n + 1; list[#list + 1] = { id, m.c or 0 } end
+    if n <= max then return end
     table.sort(list, function(a, b) return a[2] < b[2] end)
-    for i = 1, n - MAX_MOBS do d.mobs[list[i][1]] = nil end
+    for i = 1, n - max do t[list[i][1]] = nil end
+end
+-- the mobs and (v0.51) the nodes and chests: the most looted kept
+local function Prune(d)
+    PruneOf(d.mobs, MAX_MOBS)
+    PruneOf(d.objs, 300)
 end
 
 function F.OnLoot()
@@ -199,6 +204,7 @@ function F.OnLoot()
                         if not o then
                             o = { c = 0, items = {}, z = zname }
                             d.objs[npc] = o
+                            newMobs = true
                         end
                         if not opened[guid] then
                             opened[guid] = true

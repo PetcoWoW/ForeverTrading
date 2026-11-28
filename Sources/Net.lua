@@ -31,6 +31,7 @@ local DEAL_GAP = 30 * 60      -- the same item's deal said again at most this of
 local DEALS_AN_HOUR = 6
 
 local queue = {}
+local bestOf = {} -- (v0.51) the pooled loot's index: "F" / "O" -> item -> { key, per, c } (Index below)
 local pending = {} -- id -> { p, from, t } a price waiting for a second user
 local heardDeal, dealsHour, dealsHourAt = {}, 0, 0
 
@@ -249,18 +250,61 @@ local function OnObjects(sender, objText, zone, cText, itemsText)
     end
     o.by[Short(sender)] = { c = c, items = items, t = time() }
     FT.db.netObj[obj] = o
+    bestOf.O = nil
 end
+
+-- (v0.51) the pooled loot, kept light: what a Wolf user said more than 60 days ago goes, and an index item -> the
+-- best mob / node is made once (again when something new is heard), not a walk through all of it per item
+local OLD = 60 * 86400
+local function PruneBy(t)
+    local now = time()
+    for key, m in pairs(t or {}) do
+        local any = false
+        for who, b in pairs(m.by or {}) do
+            if (b.t or 0) < now - OLD then m.by[who] = nil else any = true end
+        end
+        if not any then t[key] = nil end
+    end
+end
+local function Index(kind)
+    if bestOf[kind] then return bestOf[kind] end
+    local t = FT.db and (kind == "F" and FT.db.netFarm or FT.db.netObj) or {}
+    local sums = {}
+    for key, m in pairs(t) do
+        local per = {}
+        for _, b in pairs(m.by or {}) do
+            for id, got in pairs(b.items or {}) do
+                local x = per[id] or { c = 0, got = 0 }
+                x.c, x.got = x.c + (b.c or 0), x.got + got
+                per[id] = x
+            end
+        end
+        for id, x in pairs(per) do
+            if x.c >= 10 and x.got > 0 then
+                local cur = sums[id]
+                if not cur or x.got / x.c > cur.per then sums[id] = { key = key, per = x.got / x.c, c = x.c } end
+            end
+        end
+    end
+    bestOf[kind] = sums
+    return sums
+end
+N.PruneBy = PruneBy
+FT.On("FT_READY", function()
+    if FT.db then PruneBy(FT.db.netFarm); PruneBy(FT.db.netObj) end
+    -- sales heard: a month at most
+    local now = time()
+    for id, list in pairs(FT.db and FT.db.netSales or {}) do
+        for i = #list, 1, -1 do if (list[i].t or 0) < now - 30 * 86400 then table.remove(list, i) end end
+        if #list == 0 then FT.db.netSales[id] = nil end
+    end
+end)
 
 -- the best node or chest for an item, pooled: "Wolf users: <node> 0.12 a node (340 nodes) · <zone>"
 function N.LootText(id)
-    local best, bestPer, bestC, bestObj
-    for obj, o in pairs(FT.db and FT.db.netObj or {}) do
-        local c, got = 0, 0
-        for _, b in pairs(o.by or {}) do
-            if b.items and b.items[id] then c, got = c + b.c, got + b.items[id] end
-        end
-        if c >= 10 and got > 0 and (not bestPer or got / c > bestPer) then best, bestPer, bestC, bestObj = o, got / c, c, obj end
-    end
+    local x = Index("O")[id]
+    if not x then return nil end
+    local best, bestPer, bestC, bestObj = FT.db.netObj[x.key], x.per, x.c, x.key
     if not best then return nil end
     local name = FT.SRC_O and FT.SRC_O[bestObj] and FT.SRC_O[bestObj]:match("^([^|]*)") or L["a node"]
     return FT.C("text", name) .. FT.C("dim", "  ·  " .. string.format(L["Wolf users: %s a node (%s nodes)"], string.format("%.2f", bestPer), FT.Num(bestC))
@@ -281,18 +325,14 @@ local function OnFarm(sender, npcText, name, cText, itemsText)
     end
     m.by[Short(sender)] = { c = c, items = items, t = time() }
     FT.db.netFarm[npc] = m
+    bestOf.F = nil
 end
 
 -- the best mob for an item, pooled over every Wolf user heard: "Wolf users: <mob> 0.35 a corpse (120 corpses)"
 function N.FarmText(id)
-    local best, bestPer, bestC
-    for _, m in pairs(FT.db and FT.db.netFarm or {}) do
-        local c, got = 0, 0
-        for _, b in pairs(m.by or {}) do
-            if b.items and b.items[id] then c, got = c + b.c, got + b.items[id] end
-        end
-        if c >= 10 and got > 0 and (not bestPer or got / c > bestPer) then best, bestPer, bestC = m, got / c, c end
-    end
+    local x = Index("F")[id]
+    if not x then return nil end
+    local best, bestPer, bestC = FT.db.netFarm[x.key], x.per, x.c
     if not best then return nil end
     return FT.C("text", best.n or "?") .. FT.C("dim", "  ·  " .. string.format(L["Wolf users: %s a corpse (%s corpses)"], string.format("%.2f", bestPer), FT.Num(bestC)))
 end

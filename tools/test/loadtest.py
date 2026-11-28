@@ -36,7 +36,10 @@ Auctionator = {
 # WOLF_TEXT=2: the largest text size
 if os.environ.get('WOLF_LOOK') or os.environ.get('WOLF_TEXT'):
     lua.execute('WolfOfBootyBayDB = { settings = { look = "%s", textSize = %s } }' % (os.environ.get('WOLF_LOOK', 'classic'), os.environ.get('WOLF_TEXT', 'nil')))
+mem0 = lua.eval('function() collectgarbage("collect") return collectgarbage("count") end')()
 load_all()
+mem1 = lua.eval('function() collectgarbage("collect") return collectgarbage("count") end')()
+print("memory: the addon's files %d KB" % (mem1 - mem0))
 lua.execute('''
 mock.fire("ADDON_LOADED", "WolfOfBootyBay")
 mock.fire("PLAYER_LOGIN")
@@ -44,13 +47,17 @@ mock.fire("PLAYER_ENTERING_WORLD", true, false)
 
 mock.run(200, 0.25)
 ''')
+mem2 = lua.eval('function() collectgarbage("collect") return collectgarbage("count") end')()
+print("memory: after login %d KB more (prices read, lists made; the test's own data included)" % (mem2 - mem1))
 FT = ns
 script = r'''
 local FT = ...
 local function step(name, fn) mock.call("step " .. name, fn) end
+collectgarbage("collect")
+print(string.format("memory after login: %d KB (the test's world included)", collectgarbage("count")))
 step("slash", function() SlashCmdList["WOLFOFBOOTYBAY"]("") end)
 mock.run(1)
-for _, tab in ipairs({ "today", "market", "make", "you", "signals", "radar", "portfolio", "sessions", "sell", "settings", "craft" }) do
+for _, tab in ipairs({ "today", "market", "make", "you", "signals", "radar", "pvp", "calc", "portfolio", "sessions", "sell", "settings", "craft" }) do
   step("tab " .. tab, function() FT.Show(tab) end)
   mock.run(1)
 end
@@ -492,7 +499,7 @@ step("ms test", function()
     lines[#lines + 1] = string.format("%-34s %6.1f ms  (budget %d)", name, ms, budget)
     if ms > budget then over[#over + 1] = string.format("%s %.1f ms > %d", name, ms, budget) end
   end
-  for _, key in ipairs({ "market", "signals", "portfolio", "sessions", "radar", "settings" }) do
+  for _, key in ipairs({ "today", "market", "signals", "portfolio", "sessions", "radar", "pvp", "calc", "settings" }) do
     Check("open page: " .. key, 50, function() FT.Show(key); if FT.Tabs[key].Refresh then FT.Tabs[key].Refresh() end end)
   end
   Check("open an item (chart, breakdown)", 40, function() FT.OpenItem(13510) end)
@@ -1080,27 +1087,10 @@ step("snipe panel", function()
 end)
 -- Radar, with made-up daily sales (the release's price file has none yet): one item selling 5x faster lately with
 -- its price flat, one slowing down - and what the rising one is made of
-step("radar", function()
-  local h = FT.Feed.House()
-  local today = math.floor(FT.Feed.Time() / 86400)
-  h.soldFirst = today - 13
-  local function Enc(list) local t = {} for i, v in ipairs(list) do t[i] = string.format("%s", (function(n) local d, out = "0123456789abcdefghijklmnopqrstuvwxyz", "" if n == 0 then return "0" end while n > 0 do local r = n % 36 out = d:sub(r + 1, r + 1) .. out n = math.floor(n / 36) end return out end)(v * 10)) end return table.concat(t, ",") end
-  -- a crafted item (a recipe output) rising, a material of nothing slowing
-  local rising
-  for _, r in ipairs(FT.Craft.AllRecipes() or {}) do if FT.Price(r.output) then rising = r.output break end end
-  h.soldRaw = {
-    [rising or 12363] = Enc({ 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 20, 22, 25 }),
-    [2770] = Enc({ 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 5, 4, 3 }),
-  }
-  FT.Radar.Build()
-end)
-mock.run(30)
 step("radar shown", function()
   FT.Show("radar")
-  local list = FT.Radar.List()
-  local parts = {}
-  for i, x in ipairs(list) do if i <= 4 then parts[#parts + 1] = x.kind .. "/" .. tostring(x.stage) .. ": " .. FT.Radar.Text(x) end end
-  print("radar:", #list, table.concat(parts, " | "))
+  -- (v0.51: the old Radar's own list is gone; its calendar stays)
+  assert(not FT.Radar.Build, "no Radar list worked out for nothing")
   print("radar next event:", FT.Radar.Next() and FT.Radar.Next().days or "none")
 end)
 step("AH close", function() mock.fire("AUCTION_HOUSE_CLOSED") end)
@@ -1623,7 +1613,9 @@ step("v0.51", function()
   assert(h and h:IsShown(), "the tracker shows")
   assert(not (h.title.__text or ""):find("Session", 1, true), "no Session in it: " .. tostring(h.title.__text))
   assert(h.miniPause:IsShown() and h.miniStop:IsShown(), "pause and stop when folded")
-  assert(h:GetWidth() < 260, "folded, it's narrower: " .. h:GetWidth())
+  assert(h:GetWidth() <= 180, "folded, it's narrow: " .. h:GetWidth())
+  assert(h.miniPause:GetWidth() >= 20, "a pause button you can hit")
+  print("folded tracker: " .. h:GetWidth() .. " x " .. h:GetHeight())
   h.miniPause:GetScript("OnClick")(h.miniPause)
   assert(FT.Session.Current().paused, "pause from the folded tracker")
   h.miniPause:GetScript("OnClick")(h.miniPause)

@@ -1585,7 +1585,7 @@ local function HudRows()
 end
 
 -- folded (v0.42): the title line and the gold with gold an hour, nothing else
-local HUD_FOLDED_H = 48
+local HUD_FOLDED_H = 68
 local function HudFolded() return FT.db and FT.db.ui and FT.db.ui.hudFolded and true or false end
 local function HudHeight(rows)
     if HudFolded() then return HUD_FOLDED_H end
@@ -1647,20 +1647,24 @@ local function BuildHUD()
     -- (v0.51) folded: pause and stop right on it, small
     local function Mini(tex, onClick, tip)
         local b = CreateFrame("Button", nil, h)
-        b:SetSize(14, 14)
+        b:SetSize(20, 20)
+        b.hover = UI.RoundTex(b, "BACKGROUND", "bg2", 1)
+        b.hover:SetAllPoints()
+        b.hover:Hide()
         b.tex = b:CreateTexture(nil, "ARTWORK")
-        b.tex:SetAllPoints()
+        b.tex:SetPoint("CENTER")
+        b.tex:SetSize(18, 18)
         b.tex:SetTexture(tex)
         b:SetScript("OnClick", onClick)
-        b:SetScript("OnEnter", function(self) UI.TipText(self, tip()) end)
-        b:SetScript("OnLeave", function() GameTooltip:Hide() end)
+        b:SetScript("OnEnter", function(self) self.hover:Show(); UI.TipText(self, tip()) end)
+        b:SetScript("OnLeave", function(self) self.hover:Hide(); GameTooltip:Hide() end)
         return b
     end
     h.miniStop = Mini("Interface\\Buttons\\UI-StopButton", function() FT.Session.Stop() end, function() return L["Stop the session"] end)
-    h.miniStop:SetPoint("RIGHT", h.fold, "LEFT", -4, 0)
+    h.miniStop:SetPoint("BOTTOMRIGHT", -6, 5)
     h.miniPause = Mini("Interface\\TimeManager\\PauseButton", function() FT.Session.Pause() end,
         function() local c = FT.Session.Current() return c and c.paused and L["Resume"] or L["Pause"] end)
-    h.miniPause:SetPoint("RIGHT", h.miniStop, "LEFT", -3, 0)
+    h.miniPause:SetPoint("RIGHT", h.miniStop, "LEFT", -4, 0)
     h.time = UI.Text(h, 11, "muted", "RIGHT")
     h.time:SetPoint("TOPRIGHT", -30, -8)
     h.worth = UI.Text(h, 15, "text")
@@ -1669,8 +1673,7 @@ local function BuildHUD()
     h.rate:SetPoint("TOPRIGHT", -10, -27)
     -- its hover: the rate without your best find, and why it waits 10 minutes
     h.rateHit = CreateFrame("Frame", nil, h)
-    h.rateHit:SetPoint("TOPRIGHT", -6, -22)
-    h.rateHit:SetSize(120, 18)
+    h.rateHit:SetAllPoints(h.rate)
     h.rateHit:EnableMouse(true)
     h.rateHit:SetScript("OnEnter", function(self)
         local sm = h.sum
@@ -1813,20 +1816,29 @@ function FT.UpdateHUD()
     h.miniPause:SetShown(folded)
     h.miniStop:SetShown(folded)
     h.time:ClearAllPoints()
+    h.rate:ClearAllPoints()
     if folded then
+        -- (v0.51) three short rows, narrow: the zone and the fold; the gold and the timer; gold an hour, pause, stop
         h.miniPause.tex:SetTexture(s.paused and "Interface\\TimeManager\\PlayButton" or "Interface\\TimeManager\\PauseButton")
-        h.time:SetPoint("RIGHT", h.miniPause, "LEFT", -6, 0)
+        h.time:SetPoint("TOPRIGHT", -10, -28)
+        h.rate:SetPoint("BOTTOMLEFT", 10, 9)
+        h.rate:SetJustifyH("LEFT")
+        h.rate:SetText(sum.perHour and (FT.Money(math.floor(sum.perHour), "gold") .. FT.C("dim", " " .. L["/ hour"]))
+            or FT.C("dim", string.format(L["/ hour in %dm"], math.ceil((sum.rateIn or 0) / 60))))
         for _, r in ipairs(h.rows) do r:Hide() end
         h.track:Hide()
         h.thumb:Hide()
         -- as wide as what's in it
-        local left = math.max(h.title:GetStringWidth() or 0, h.worth:GetStringWidth() or 0)
-        local right = math.max((h.time:GetStringWidth() or 0) + 6 + 14 + 3 + 14 + 4 + 18 + 6, (h.rate:GetStringWidth() or 0) + 10)
-        local w = math.floor(math.max(170, 10 + left + 16 + right) + 0.5)
+        local row1 = (h.title:GetStringWidth() or 0) + 8 + 18
+        local row2 = (h.worth:GetStringWidth() or 0) + 12 + (h.time:GetStringWidth() or 0)
+        local row3 = (h.rate:GetStringWidth() or 0) + 10 + 44
+        local w = math.floor(math.max(140, 16 + math.max(row1, row2, row3)) + 0.5)
         if math.abs((h:GetWidth() or 0) - w) > 1 then h:SetWidth(w) end
         return
     end
     h.time:SetPoint("TOPRIGHT", -30, -8)
+    h.rate:SetPoint("TOPRIGHT", -10, -27)
+    h.rate:SetJustifyH("RIGHT")
     if math.abs((h:GetWidth() or 0) - 260) > 1 then h:SetWidth(260) end
     h.total = #lines
     h.offset = math.max(0, math.min(h.offset or 0, #lines - rows))

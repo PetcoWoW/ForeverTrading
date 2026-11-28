@@ -119,7 +119,22 @@ local function Rule(c, k)
 end
 
 -- { move = expected change in a week (0.08: +8%), sure = 0-100, hits, weeks, why } or nil (too little data)
+-- (v0.51) a call is worked out once and kept half an hour (its daily closes hardly move within one): rows that
+-- draw it again and again (Raids, PvP, Today, Farm it) cost nothing
+local calls, callsAt = {}, 0
+local CALL_KEEP = 1800
+local NONE = {}
 function A.Call(id)
+    if time() - callsAt > CALL_KEEP then calls, callsAt = {}, time() end
+    local c = calls[id]
+    if c == nil then
+        c = A.CallNow(id) or NONE
+        calls[id] = c
+    end
+    return c ~= NONE and c or nil
+end
+
+function A.CallNow(id)
     local daily = FT.Hist and FT.Hist.Daily and FT.Hist.Daily(id, 30)
     if not daily or #daily < 10 then return nil end
     local c = {}
@@ -169,8 +184,17 @@ end
 -- background, kept until new prices come.
 ---------------------------------------------------------------------------
 local list, busy, waiting = nil, false, {}
-FT.On("FT_SCAN_DONE", function() list, pullOf = nil, nil end)
-FT.On("FT_MARKET_READY", function() list, pullOf = nil, nil end)
+-- (v0.51) new prices: the lists again at most every half hour (a live price at the auction house came every few
+-- seconds, and each made the whole list again); a new day or your own scan, at once
+local listAt, listDay = 0, nil
+local function Stale(force)
+    if force or time() - listAt > CALL_KEEP or listDay ~= date("%Y%m%d") then
+        list, pullOf = nil, nil
+        calls, callsAt = {}, 0
+    end
+end
+FT.On("FT_SCAN_DONE", function() Stale(true) end)
+FT.On("FT_MARKET_READY", function() Stale(false) end)
 
 local function Row(id, kind, c, extra)
     local s = FT.An.Stats(id)
@@ -230,6 +254,7 @@ function A.Lists(done)
         table.sort(pvp, function(a, b) return a.perDay * a.price > b.perDay * b.price end)
         while #pvp > 6 do table.remove(pvp) end
         list = { farms = farms, raids = raids, pvp = pvp }
+        listAt, listDay = time(), date("%Y%m%d")
         busy = false
         local w = waiting
         waiting = {}
