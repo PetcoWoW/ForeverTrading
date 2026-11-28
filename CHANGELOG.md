@@ -1,5 +1,22 @@
 # Wolf
 
+## v0.52 - Today about you, a cozier, lighter Wolf
+
+- **Today is about you:** **Your movers** (what you own that moved with the last prices, and what it did in gold)
+  and **While you were away** (what sold, what came back, what you bought since you last played, with the total
+  sold) in place of Going up / Going down today. The market's gainers and losers stay on Market. The calendar shows
+  the top three farms for next week (all of them in Farm it).
+- **Market's home:** the value chart, and under it two lists, each on a switch: Top gainers / Top losers, and
+  **Most traded** (where the most gold changes hands a day) / **Market Makers** (who lists the most).
+- **Compact by default:** Wolf opens compact; Standard and Full screen are in Settings > Window size (the three
+  buttons in the header are gone). Every page was checked at all three sizes and both text sizes: no text ends in
+  "..." any more - long lines wrap, long verdicts take a third line.
+- **The folded session tracker:** three short rows, about 160 wide; bigger pause and stop.
+- **Lighter:** the old Sell page and the item window (unreachable since v0.42) and the hidden Radar list (worked out
+  every hour, shown nowhere) are gone; the Wolf network's loot keeps 60 days and is looked up from an index; your
+  node and chest log keeps the 300 you loot most; next week's calls are kept half an hour instead of worked out
+  again on every price.
+
 ## v0.51 - the Calculator page, Raids and PvP, truer sources
 
 - **Calculator**, its own page next to You: an item or none, how many, buying or selling, a price each. Buying an

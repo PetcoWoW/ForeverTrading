@@ -4,7 +4,7 @@ local L = FT.L
 
 -- The version being released: a copy straight from the repository (not packaged) has no version in its TOC yet
 -- (the packager puts the tag there) and shows this one. Set it with every release.
-local RELEASE = "v0.51"
+local RELEASE = "v0.52"
 local GetMeta = (C_AddOns and C_AddOns.GetAddOnMetadata) or GetAddOnMetadata
 FT.VERSION = (GetMeta and GetMeta(ADDON, "Version")) or RELEASE
 if FT.VERSION == "" or FT.VERSION:find("@", 1, true) then FT.VERSION = RELEASE end
@@ -182,6 +182,7 @@ FT.DEFAULTS = {
     keepDays = 45,
     maxSnaps = 240,
     scale = 1.1,
+    windowSize = "min",     -- (v0.52) compact by default; standard and full screen in Settings
     font = "game",          -- game (Friz Quadrata, wide) / condensed (Sofia Sans Condensed), after a reload
     textSize = 1,           -- added to every text's size: 0 normal, 1 large, 2 larger (after a reload)
     ticker = true,
@@ -281,6 +282,8 @@ local function InitDB()
     db.frame = db.frame or {}
     -- (v0.51) saved data nothing reads any more: the old Radar's self-check
     db.radar = nil
+    -- (v0.52) and the item window's places
+    db.detailFrame, db.detailFrames = nil, nil
     -- 1.1: price charts are one line; the moving averages start switched off
     if (db.version or 1) < 2 then
         db.settings.showMA = false

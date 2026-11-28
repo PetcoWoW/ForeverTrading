@@ -151,6 +151,8 @@ function T.Build(p)
             if FT.Feed.Take then C_Timer.After(0.2, FT.Feed.Take) end
             C_Timer.After(0.5, function() FT.UpdateAHPill(); FT.UpdateStatus() end)
         end)
+    Choice(bs, "windowSize", L["Window size"], { { "min", L["Compact"] }, { "std", L["Standard"] }, { "max", L["Full screen"] } },
+        L["Compact fits most screens; Standard gives the lists more room; Full screen fills it."], function(v) FT.SetWindowSize(v) end)
     Choice(bs, "textSize", L["Text size"], { { 0, L["Normal"] }, { 1, L["Large"] }, { 2, L["Larger"] } },
         L["Makes every text bigger without making the window bigger. Takes effect after a reload."],
         function() FT.AskReload(L["The new text size shows after the interface reloads. Reload now?"]) end)
@@ -176,6 +178,8 @@ function T.Build(p)
     Choice(g, "textSize", L["Text size"], { { 0, L["Normal"] }, { 1, L["Large"] }, { 2, L["Larger"] } },
         L["Makes every text bigger without making the window bigger. Takes effect after a reload."],
         function() FT.AskReload(L["The new text size shows after the interface reloads. Reload now?"]) end)
+    Choice(g, "windowSize", L["Window size"], { { "min", L["Compact"] }, { "std", L["Standard"] }, { "max", L["Full screen"] } },
+        L["Compact fits most screens; Standard gives the lists more room; Full screen fills it."], function(v) FT.SetWindowSize(v) end)
     Choice(g, "scale", L["Window scale"], { { 0.9, "90%" }, { 1.0, "100%" }, { 1.1, "110%" }, { 1.2, "120%" }, { 1.3, "130%" }, { 1.4, "140%" }, { 1.5, "150%" } },
         nil, function(v)
             local w = FT.Window()

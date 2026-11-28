@@ -33,9 +33,10 @@ local pages = {}
 local SIZES = { min = { 1100, 640 }, std = { 1240, 740 } }
 local SIZE_ORDER = { "min", "std", "max" }
 
+-- (v0.52) compact unless Settings says otherwise (the three buttons in the header went to Settings)
 local function SizeMode()
-    local m = FT.db.frame.size
-    return (m == "min" or m == "max") and m or "std"
+    local m = FT.S and FT.S.windowSize
+    return (m == "std" or m == "max") and m or "min"
 end
 
 ---------------------------------------------------------------------------
@@ -113,7 +114,7 @@ function FT.LayoutBrand()
 end
 
 function FT.SetWindowSize(mode)
-    FT.db.frame.size = mode
+    FT.S.windowSize = mode
     if win then
         PlaceWindow()
         LayoutPages()
@@ -553,7 +554,8 @@ local function Build()
     local close = UI.CloseButton(header, function() win:Hide() end)
     close:SetPoint("RIGHT", UI.Classic() and -4 or -8, 0)
 
-    local sizes = BuildSizeButtons(header, close)
+    -- (v0.52) the window's size is in Settings: the header keeps the gear and the close button
+    local sizes = close
 
     -- Settings: a gear (again: back to the page you were on)
     gearBtn = CreateFrame("Button", nil, header)

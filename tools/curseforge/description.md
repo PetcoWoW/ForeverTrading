@@ -20,9 +20,9 @@ Restart the game fully the first time (new addons load at launch, not on `/reloa
 
 ## What's inside
 
-**Today**: what everything you own is worth and what the last prices did to it, a calendar of what's coming (the Darkmoon Faire, battleground weeks, the raids), your best moves (including listings someone undercut and what to post tonight), and what's going up and down.
+**Today**: what everything you own is worth and what the last prices did to it, a calendar of what's coming (the Darkmoon Faire, battleground weeks, the raids), your best moves (including listings someone undercut and what to post tonight), what you own that moved, and what sold while you were away.
 
-**Market**: search any item. The verdict comes first, then one clean chart, when it sells best, where it comes from (mobs, nodes, vendors, Merchant's Favor, quests), and what it costs to craft and where to learn the recipe.
+**Market**: the market's mood, its value over time, the top gainers and losers, the most traded items and the biggest sellers. Search any item: The verdict comes first, then one clean chart, when it sells best, where it comes from (mobs, nodes, vendors, Merchant's Favor, quests), and what it costs to craft and where to learn the recipe.
 
 **Make gold**
 
@@ -61,7 +61,7 @@ No pop-ups, no sounds. Wolf only ever speaks in a chat line: a deal from your gu
 
 ## Good to know
 
-- `/wolf` opens the window. `/wolf news` shows what's new.
+- `/wolf` opens the window (compact; Standard and Full screen are in Settings). `/wolf news` shows what's new.
 - Don't run ForeverTrading at the same time: two scanners do the same work twice.
 - The prices companion only touches Wolf's own price file. No accounts, no game memory, nothing sent anywhere. Remove it in Windows Settings > Apps > Wolf prices.
 

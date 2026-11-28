@@ -12,6 +12,11 @@ FT.News = N
 -- start, after the files are read (a table made with them would keep the English)
 local function News()
     return {
+        ["v0.52"] = {
+            { L["Today is about you"], L["Your movers (what you own that moved) and While you were away (what sold, what came back) in place of the market's gainers and losers."], function() FT.Show("today") end },
+            { L["The market's own lists"], L["Market's home: gainers or losers, and Most traded or Market Makers, each on a switch."], function() FT.Show("market") end },
+            { L["Compact and lighter"], L["Wolf opens compact; Standard and Full screen are in Settings. No text ends in \"...\" at any size, and Wolf does less work in the background."], function() FT.SelectTab("settings") end },
+        },
         ["v0.51"] = {
             { L["Calculator"], L["Its own page, next to You: buying or selling any amount, with or without an item, and a cheat sheet of your last sums."], function() FT.SelectTab("calc") end },
             { L["Raids and PvP"], L["Make gold is Flip it, Craft it, Farm it, Raids and PvP: the PvP kit studied like the raids, around the battleground weeks. Next week's farms are in Farm it."], function() FT.ShowSub("make", "pvp") end },

@@ -678,8 +678,8 @@ local function MoverList(parent, title)
     local cols = {
         { key = "name", title = "", width = "fill", make = NameCell, cellHeight = 24 },
         { key = "spark", title = "", width = 40, justify = "RIGHT", make = SparkCell, cellHeight = 16 },
-        { key = "price", title = "", width = 46 + bump, justify = "RIGHT" },
-        { key = "ch", title = "", width = 46 + bump, justify = "RIGHT" },
+        { key = "price", title = "", width = 54 + bump, justify = "RIGHT" },
+        { key = "ch", title = "", width = 60 + bump, justify = "RIGHT" },
     }
     box.list = UI.List(box, {
         rowHeight = 24, cols = cols,
@@ -692,10 +692,20 @@ local function MoverList(parent, title)
             local wk = r.ch7 or r.ch1 or 0
             row.cells.spark:SetValues(r.spark, wk > 0 and "up" or (wk < 0 and "down" or "muted"))
             row.cells.price:SetText(T.ShortMoney(r.price))
-            row.cells.ch:SetText(FT.C(r.ch1 >= 0 and "up" or "down", FT.An.Pc(r.ch1)))
+            -- (v0.52) Most traded: the gold that changes hands a day, in place of the day's move
+            if r.gold then row.cells.ch:SetText(FT.C("text", T.ShortMoney(r.gold)))
+            else row.cells.ch:SetText(FT.C((r.ch1 or 0) >= 0 and "up" or "down", FT.An.Pc(r.ch1 or 0))) end
         end,
         onClick = function(r) if not UI.ItemClick(r.id) then T.Select(r.id) end end,
-        onEnter = function(row, r) UI.TipItem(row, r.id) end,
+        onEnter = function(row, r)
+            UI.TipItem(row, r.id)
+            if r.gold then
+                GameTooltip:AddLine(" ")
+                GameTooltip:AddLine(string.format(L["~%s sold a day at ~%s: %s a day changes hands"], r.perDay >= 10 and FT.Num(math.floor(r.perDay + 0.5)) or string.format("%.1f", r.perDay),
+                    FT.Money(r.price, "short"), FT.Money(math.floor(r.gold), "short")), 0.85, 0.87, 0.9, true)
+                GameTooltip:Show()
+            end
+        end,
     })
     box.list:SetPoint("TOPLEFT", 1, -32)
     box.list:SetPoint("BOTTOMRIGHT", -1, 4)
@@ -816,23 +826,29 @@ local function BuildOverview(parent)
     local meme = FT.S.meme ~= false
     v.gainers = MoverList(v, meme and L["TO THE MOON (24h)"] or L["Top gainers 24h"])
     v.losers = MoverList(v, meme and L["RUG PULLS (24h)"] or L["Top losers 24h"])
-    -- Market Makers (the sellers with the most gold listed): in the hover of the Listed value card
-    v.cards[2]:SetScript("OnEnter", function(self)
-        GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
-        GameTooltip:AddLine(L["Market Makers"], 1, 1, 1)
-        local makers, t = FT.Whales.Makers()
-        if #makers == 0 then
-            GameTooltip:AddLine(L["The sellers with the most gold listed show here after a Full Scan in Auctionator (it names every seller)."], 0.6, 0.64, 0.7, true)
-        else
-            GameTooltip:AddLine(string.format(L["The sellers with the most gold listed (scan of %s)"], FT.Ago(t)), 0.6, 0.64, 0.7, true)
-            for i = 1, math.min(8, #makers) do
-                local x = makers[i]
-                GameTooltip:AddDoubleLine(x.n .. (x.you and (" " .. L["(you)"]) or ""), FT.Money(x.value, "short") .. "  " .. string.format(L["%d items"], x.items), 0.85, 0.87, 0.9, 1, 1, 1)
-            end
-        end
-        GameTooltip:Show()
-    end)
-    v.cards[2]:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    -- (v0.52) the market's own lists: where the most gold changes hands, and who sells the most (Market Makers
+    -- were the Listed value card's hover)
+    v.traded = MoverList(v, L["Most traded"])
+    v.traded.mode = "traded"
+    v.makers = T.MakersList(v)
+    -- two places, each a switch (their titles are its buttons): the day's moves, and who trades most
+    local function Pair(a, b, keyA, keyB, labelA, labelB, saved)
+        local seg = UI.Segmented(v, { { keyA, labelA }, { keyB, labelB } }, function(k)
+            FT.db.ui = FT.db.ui or {}
+            FT.db.ui[saved] = k
+            a:SetShown(k == keyA)
+            b:SetShown(k == keyB)
+        end, 22)
+        a.title:Hide()
+        b.title:Hide()
+        local k = FT.db.ui and FT.db.ui[saved] or keyA
+        seg:SetValue(k)
+        a:SetShown(k == keyA)
+        b:SetShown(k == keyB)
+        return seg
+    end
+    v.moveSeg = Pair(v.gainers, v.losers, "up", "down", meme and L["TO THE MOON"] or L["Top gainers"], meme and L["RUG PULLS"] or L["Top losers"], "marketMoves")
+    v.whoSeg = Pair(v.traded, v.makers, "traded", "makers", L["Most traded"], L["Market Makers"], "marketWho")
 
     UI.OnSize(v, function(self, w, h)
         local cw = (w - 3 * 8) / 4
@@ -860,18 +876,23 @@ local function BuildOverview(parent)
         self.chartTitle:ClearAllPoints()
         local below = movesY - 18
         self.chartTitle:SetPoint("TOPLEFT", 4, -below)
+        -- (v0.52) the chart; under it two lists, each with its switch: gainers / losers, most traded / makers
+        local listsH = math.max(180, math.floor(h * 0.38))
         self.chart:ClearAllPoints()
         self.chart:SetPoint("TOPLEFT", 0, -below - 18)
         self.chart:SetPoint("TOPRIGHT", 0, -below - 18)
-        local listsH = math.max(180, math.floor(h * 0.36))
         self.chart:SetPoint("BOTTOM", 0, listsH + 8)
-        local half = (w - 8) / 2
-        self.gainers:ClearAllPoints()
-        self.gainers:SetPoint("BOTTOMLEFT", 0, 0)
-        self.gainers:SetSize(half, listsH)
-        self.losers:ClearAllPoints()
-        self.losers:SetPoint("BOTTOMRIGHT", 0, 0)
-        self.losers:SetSize(half, listsH)
+        local half = math.floor((w - 8) / 2)
+        for i, pair in ipairs({ { self.gainers, self.losers, self.moveSeg }, { self.traded, self.makers, self.whoSeg } }) do
+            for k = 1, 2 do
+                local b = pair[k]
+                b:ClearAllPoints()
+                b:SetPoint("BOTTOMLEFT", (i - 1) * (half + 8), 0)
+                b:SetSize(half, listsH)
+            end
+            pair[3]:ClearAllPoints()
+            pair[3]:SetPoint("TOPLEFT", pair[1], "TOPLEFT", 8, -5)
+        end
     end)
     return v
 end
@@ -930,7 +951,15 @@ function T.ShowOverview()
     })
     overview.gainers.list:SetItems(FT.Market.Movers(20, "ch1", true))
     overview.losers.list:SetItems(FT.Market.Movers(20, "ch1", false))
+    -- (v0.52) Most traded and Market Makers
+    local traded = FT.Market.MostTraded(20)
+    overview.traded.list:SetEmptyText(traded and L["No sales seen yet: the price feed fills this over a few hours."] or L["Working it out..."])
+    overview.traded.list:SetItems(traded or {})
+    local makers, t = FT.Whales.Makers()
+    overview.makers.list:SetItems(makers or {})
+    overview.makers.when:SetText(t and FT.Ago(t) or "")
 end
+FT.On("FT_TRADED_READY", function() if overview and overview:IsVisible() then T.ShowOverview() end end)
 
 -- Your top 3: the wolf's moves for you (what you hold, watch, can craft or gather - FT.Eye); short of three,
 -- today's market moves fill in: the best carry and flip, the best thing to farm (else a craft or vendor deal)
@@ -1216,16 +1245,19 @@ local function BuildSections(parent)
                 -- as many extra lines as its share of the height holds
                 local room = math.max(0, math.floor((each - UI.RowH(44)) / UI.RowH(16)))
                 -- (v0.51) a list's long line takes two lines rather than ending in "...", room allowing
-                if LIST_SECTION[key] then
+                do
+                    -- (v0.52: every section's long lines wrap, not only the lists')
                     more = more or {}
                     f.full = { sum, unpack(more) }
-                    f.sum:SetFont(UI.FONT, UI.Size(12), "")
-                    local a, b = UI.SplitLine(f.sum, sum or "")
                     local lines = {}
-                    if b then sum = a; lines[1] = "   " .. b end
+                    if LIST_SECTION[key] then
+                        f.sum:SetFont(UI.FONT, UI.Size(12), "")
+                        local a, b = UI.SplitLine(f.sum, sum or "")
+                        if b then sum = a; lines[1] = "   " .. b end
+                    end
                     for _, line in ipairs(more) do lines[#lines + 1] = line end
                     local probe = f.more[1]
-                    probe:SetFont(UI.FONT, UI.Size(12), "")
+                    probe:SetFont(UI.FONT, UI.Size(LIST_SECTION[key] and 12 or 11), "")
                     local wrapped = {}
                     for i, line in ipairs(lines) do
                         local x, y = UI.SplitLine(probe, line)
@@ -1333,7 +1365,7 @@ local function BuildItemView(parent)
     v.callText:SetPoint("LEFT", v.callBadge, "RIGHT", 12, 0)
     v.callText:SetPoint("RIGHT", v.callSure, "LEFT", -10, 0)
     if v.callText.SetWordWrap then v.callText:SetWordWrap(true) end
-    if v.callText.SetMaxLines then v.callText:SetMaxLines(2) end
+    if v.callText.SetMaxLines then v.callText:SetMaxLines(4) end
     v.call:SetScript("OnEnter", function(self)
         if not v.callWhy then return end
         GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
@@ -1437,9 +1469,19 @@ function T.ShowItem(id, keepView)
     v.callSure:SetText(sure)
     v.callText:SetText(call.text or "")
     -- a long reason takes a second line: the panel grows, the chart and the sections move down
-    local two = (v.callText:GetStringWidth() or 0) > ((v.callText:GetWidth() or 400) + 0.5)
-    v.call:SetHeight(UI.RowH(two and 46 or 34))
-    v.secs:SetPoint("TOPRIGHT", v, "TOPRIGHT", 0, -(48 + UI.RowH(two and 46 or 34) + 10))
+    -- (v0.52: up to four in the compact window at the largest text, never cut)
+    -- (three lines at most: past that the text steps down a size or two rather than squeezing the chart)
+    local lines, size
+    for k = 0, 2 do
+        size = UI.Size(13) - k
+        v.callText:SetFont(UI.FONT, size, "")
+        lines = math.max(1, math.ceil((v.callText:GetStringWidth() or 0) / math.max(1, (v.callText:GetWidth() or 400) - 4)))
+        if lines <= 3 then break end
+    end
+    lines = math.min(lines, 4)
+    local ch = math.max(UI.RowH(34), lines * (size + 5) + 18)
+    v.call:SetHeight(ch)
+    v.secs:SetPoint("TOPRIGHT", v, "TOPRIGHT", 0, -(48 + ch + 10))
     v.callWhy = call.detail
     v.callOther = call.other
 

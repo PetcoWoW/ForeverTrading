@@ -909,7 +909,7 @@ step("layout", function()
     { "settings", "settings" },
     { "settings: all", "settings", function() FT.S.showAdvanced = true; FT.Tabs.settings.Layout() end },
   }
-  for _, size in ipairs({ "std", "min" }) do
+  for _, size in ipairs({ "min", "std", "max" }) do
   FT.SetWindowSize(size)
   for _, pg in ipairs(pages) do
     local key = pg[1] .. " @" .. size
@@ -981,25 +981,9 @@ step("layout", function()
   end
   mock.fire("AUCTION_HOUSE_CLOSED")
   ah:Hide()
-  -- the item window (More), on a flask, standard size
+  -- (v0.52: the item window is gone: an item opens on the Market page)
   FT.ShowItemWindow(13510)
-  mock.run(1)
-  for _, name in ipairs({ "WolfOfBootyBayDetail1", "WolfOfBootyBayDetail" }) do
-    local win = _G[name]
-    if win and win.__shown ~= false then
-      mock.layout.Settle(win)
-      local found, texts = mock.layout.Overlaps(win)
-      for _, o in ipairs(found) do
-        total = total + 1
-        print(string.format("OVERLAP [item window] %q x %q  (%dx%d px)", o[1].text:sub(1, 50), o[2].text:sub(1, 50), o[3], o[4]))
-      end
-      for _, t in ipairs(texts) do
-        if t.cut then cuts = cuts + 1; local r = mock.layout.Rect(t.f); print(string.format("CUT [item window] %q  box %d text %d", t.text:sub(1, 120), r[2] - r[1], mock.layout.TextWidth(t.f))) end
-        if t.spill then cuts = cuts + 1; print(string.format("SPILL [item window] %q", t.text:sub(1, 60))) end
-      end
-      print("item window checked: " .. #texts .. " texts")
-    end
-  end
+  assert(FT.Tabs.market.Selected() == 13510, "an item opens on Market")
   -- the craft window with its recipe line (v0.43): a merchant's recipe, on the auction house
   do
     local r = FT.Craft.AllRecipes()[1]
@@ -1023,7 +1007,7 @@ step("layout", function()
     win:Hide()
     FT.RECIPE_ITEMS, FT.db.recipeVendors = had, nil
   end
-  FT.SetWindowSize("std")
+  FT.SetWindowSize("min")
   print("layout: " .. total .. " overlapping text pairs, " .. cuts .. " texts cut short")
   for id, n in pairs(held) do inv.bags[id] = n end
   FT.Fire("FT_INVENTORY_CHANGED")
@@ -1672,6 +1656,38 @@ step("v0.51", function()
   assert(not TT.PostTonight(), "not in the next few hours: no row")
   FT.WhenSummary, FT.Port.Rows = realWhen, realRows
   TT.FillMoves()
+end)
+-- v0.52: compact by default (sizes in Settings), Today about you, the market's own lists, lighter
+step("v0.52", function()
+  assert(FT.S.windowSize == "min" or FT.S.windowSize == nil or FT.Compact(), "compact by default")
+  FT.SetWindowSize("max"); assert(FT.WindowMaximized(), "full screen from Settings")
+  FT.SetWindowSize("min"); assert(FT.Compact(), "and back to compact")
+  -- Today: your movers, while you were away
+  local TT = FT.Tabs.today
+  FT.Show("today")
+  local mv = TT.YourMovers()
+  for _, x in ipairs(mv) do assert(x.gold and x.ch1 and math.abs(x.ch1) >= 0.02, "a mover of yours") end
+  FT.Journal.Add("S", 12363, 3, 150000, 7500, time() - 60)
+  FT.Journal.Add("X", 13446, 2, 0, 0, time() - 60)
+  local away, sold = TT.Away()
+  local kinds = {}
+  for _, x in ipairs(away) do kinds[x.id] = true end
+  assert(kinds[12363] and kinds[13446] and sold >= 142500, "while you were away: the sale and what came back")
+  print(string.format("today: %d movers of yours, %d while away (+%s sold)", #mv, #away, FT.Money(sold, "gold")))
+  -- Market's home: most traded, Market Makers, each pair on a switch
+  FT.Tabs.market.Home(); FT.SelectTab("market")
+  local mt = FT.Market.MostTraded(20)
+  for _ = 1, 60 do if mt then break end; mock.run(5, 0.05); mt = FT.Market.MostTraded(20) end
+  -- (by this step the test's market is a handful of made-up items: the list can be short)
+  assert(mt ~= nil, "most traded is worked out")
+  print("most traded: " .. #mt)
+  for i = 2, #mt do assert(mt[i - 1].gold >= mt[i].gold, "most gold a day first") end
+  local ov = FT.Tabs.market.Views()
+  ov.whoSeg.buttons[1].onClick()
+  assert(ov.traded:IsShown() and not ov.makers:IsShown(), "Most traded on its switch")
+  ov.whoSeg.buttons[2].onClick()
+  assert(ov.makers:IsShown() and not ov.traded:IsShown(), "Market Makers on its switch")
+  ov.whoSeg.buttons[1].onClick()
 end)
 step("logout", function() mock.fire("PLAYER_LOGOUT") end)
 '''

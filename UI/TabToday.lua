@@ -1,6 +1,6 @@
 -- Wolf: Today, the first page (v0.42). What everything you own is worth and what the last price update did to it;
--- then two rows on the same three columns: Your top 3, and under them In your bags, Going down today and Going up
--- today (each scrolls). Tried first in Wolf Lab.
+-- then the calendar and your best moves, and under them In your bags, Your movers and While you were away (each
+-- scrolls). Tried first in Wolf Lab.
 local ADDON, FT = ...
 local UI = FT.UI
 local L = FT.L
@@ -78,13 +78,13 @@ local function Box(parent, title)
 end
 
 -- a scrolling list of items: name, price, today's move (or, for your bags, the verdict and worth)
-local function ItemList(box, bags)
+local function ItemList(box, bags, wide)
     local list = UI.List(box, {
         rowHeight = UI.RowH(bags and 28 or 24),
         setup = function(row)
             row.right = UI.Text(row, 13, "text", "RIGHT")
             row.right:SetPoint("RIGHT", -4, 0)
-            row.right:SetWidth(UI.RowH(bags and 72 or 52) + 4 * (tonumber(FT.S.textSize) or 0))
+            row.right:SetWidth(UI.RowH((bags or wide) and 72 or 52) + 4 * (tonumber(FT.S.textSize) or 0))
             row.mid = UI.Text(row, 12, "muted", "RIGHT")
             row.mid:SetPoint("RIGHT", row.right, "LEFT", -8, 0)
             row.mid:SetWidth(UI.RowH(70) + 4 * (tonumber(FT.S.textSize) or 0))
@@ -102,6 +102,16 @@ local function ItemList(box, bags)
                 row.badge:Set(x.signal or "NODATA", nil, x.strength)
                 UI.FitSize(row.name, FT.ItemText(x.id) .. FT.C("dim", " ×" .. FT.Num(x.qty)), 13, 3)
                 row.right:SetText(FT.Money(x.value, "gold"))
+            elseif x.gold then
+                -- (v0.52) your movers: today's move, and what it did to what you hold
+                UI.FitSize(row.name, FT.ItemText(x.id) .. FT.C("dim", " ×" .. FT.Num(x.qty)), 13, 3)
+                row.mid:SetText(FT.C(x.ch1 >= 0 and "up" or "down", FT.An.Pc(x.ch1)))
+                row.right:SetText(FT.C(x.gold >= 0 and "up" or "down", (x.gold >= 0 and "+" or "-") .. FT.Money(math.abs(math.floor(x.gold)), "gold")))
+            elseif x.what then
+                -- (v0.52) while you were away: sold, came back, bought
+                UI.FitSize(row.name, FT.ItemText(x.id) .. FT.C("dim", " ×" .. FT.Num(x.qty)), 13, 3)
+                row.mid:SetText(x.what)
+                row.right:SetText(x.value or "")
             else
                 UI.FitSize(row.name, FT.ItemText(x.id), 13, 3)
                 row.mid:SetText(FT.Money(x.price, "short"))
@@ -302,7 +312,14 @@ function T.FillComing()
                 if #tags < 2 then tags[#tags + 1] = e.short end
             end
         end
-        d.ev:SetText(table.concat(tags, "\n"))
+        -- (four weeks: one short tag a day, and how many more)
+        if four then
+            local e = d.events[1]
+            local tag = e and (e.kind == "bg" and L["PvP"] or e.short) or ""
+            d.ev:SetText(tag .. (#d.events > 1 and (" +" .. (#d.events - 1)) or ""))
+        else
+            d.ev:SetText(table.concat(tags, "\n"))
+        end
         d.evBtn:SetShown(#d.events > 0)
         d.bg:SetColorTexture(1, 1, 1, (c.picked == t) and 0.14 or (#d.events > 0 and 0.07 or 0.03))
     end
@@ -331,8 +348,9 @@ function T.FillComing()
         c.list:SetEmptyText(L["Nothing on the calendar that day."])
     else
         local l = FT.Ahead.Lists(function() if T.coming and T.coming:IsVisible() then T.FillComing() end end)
-        for _, r in ipairs(l and l.farms or {}) do rows[#rows + 1] = r end
-        c.hint:SetText(L["best farms next week · click a day for its events"])
+        -- (v0.52) the top three: the whole list is Farm it's Next week
+        for i, r in ipairs(l and l.farms or {}) do if i <= 3 then rows[#rows + 1] = r end end
+        c.hint:SetText(L["top farms next week (all: Farm it) · click a day for its events"])
         c.list:SetEmptyText(l and L["No call sure enough yet: new prices come every hour."] or L["Working out next week's calls..."])
     end
     c.list:SetItems(rows)
@@ -566,14 +584,66 @@ function T.Build(p)
     T.bagsTotal:SetPoint("TOPRIGHT", -12, -10)
     T.bags.list = ItemList(T.bags, true)
     T.bags.list:SetEmptyText(L["Nothing priced in your bags."])
-    T.down = Box(bottom, L["Going down today"])
-    T.down.list = ItemList(T.down)
-    T.down.list:SetEmptyText(L["Nothing has dropped much today."])
-    T.up = Box(bottom, L["Going up today"])
-    T.up.list = ItemList(T.up)
-    T.up.list:SetEmptyText(L["Nothing has climbed much today."])
+    -- (v0.52) Today is about you: what you own that moved, and what happened while you were away (the market's
+    -- gainers and losers are the Market page's)
+    T.down = Box(bottom, L["Your movers"])
+    T.down.list = ItemList(T.down, false, true)
+    T.down.list:SetEmptyText(L["Nothing you own moved much with the last prices."])
+    T.up = Box(bottom, L["While you were away"])
+    T.awayTotal = UI.Text(T.up, 13, "text", "RIGHT")
+    T.awayTotal:SetPoint("TOPRIGHT", -12, -10)
+    T.up.list = ItemList(T.up, false, true)
+    T.up.list:SetEmptyText(L["Nothing sold or came back since you last played. Sales show once you open your mail."])
     Thirds(bottom, { T.bags, T.down, T.up })
     built = true
+end
+
+-- (v0.52) your movers: what you own (every character) that moved with the last prices, the biggest in gold first
+function T.YourMovers()
+    local out = {}
+    for _, r in ipairs(FT.Port and FT.Port.Rows and (FT.Port.Rows()) or {}) do
+        local ch1 = r.stats and r.stats.ch1
+        if ch1 and math.abs(ch1) >= 0.02 and r.value then
+            local gold = r.value - r.value / (1 + ch1)
+            if math.abs(gold) >= 100 then out[#out + 1] = { id = r.id, qty = r.qty, ch1 = ch1, gold = gold } end
+        end
+    end
+    table.sort(out, function(a, b) return math.abs(a.gold) > math.abs(b.gold) end)
+    while #out > 40 do table.remove(out) end
+    return out
+end
+
+-- (v0.52) while you were away: what your auction mail said since you last played (sold, came back, bought);
+-- the total sold for the title
+local awayFrom
+FT.On("FT_READY", function()
+    local last = FT.db and FT.db.lastSeen
+    awayFrom = (last and last > time() - 14 * 86400) and last or (time() - 86400)
+    -- remembered as you play (a crash keeps the last), so next time knows when you left
+    C_Timer.NewTicker(300, function() FT.db.lastSeen = time() end)
+end)
+FT.On("PLAYER_LOGOUT", function() if FT.db then FT.db.lastSeen = time() end end)
+function T.Away()
+    local from = awayFrom or (time() - 86400)
+    if not (FT.Journal and FT.Journal.Summary) then return {}, 0 end
+    local _, rows = FT.Journal.Summary(from)
+    local out, sold = {}, 0
+    for _, r in ipairs(rows) do
+        if r.id then
+            if r.sold > 0 then
+                out[#out + 1] = { id = r.id, qty = r.sold, what = FT.C("up", L["sold"]), value = FT.C("up", "+" .. FT.Money(math.floor(r.income), "gold")), sort = r.income }
+                sold = sold + r.income
+            end
+            if r.expired > 0 then
+                out[#out + 1] = { id = r.id, qty = r.expired, what = FT.C("dim", L["came back"]), value = "", sort = -1 }
+            end
+            if r.bought > 0 then
+                out[#out + 1] = { id = r.id, qty = r.bought, what = FT.C("muted", L["bought"]), value = FT.Money(math.floor(r.spent), "gold"), sort = -2 }
+            end
+        end
+    end
+    table.sort(out, function(a, b) return a.sort > b.sort end)
+    return out, sold
 end
 
 -- what this character carries, priced, the most valuable first, with what to do with each
@@ -651,8 +721,10 @@ function T.Refresh()
     local bags, total = BagRows()
     T.bags.list:SetItems(bags, true)
     T.bagsTotal:SetText(total > 0 and FT.Money(total, "gold") or "")
-    T.down.list:SetItems(FT.Market.Movers(200, "ch1", false), true)
-    T.up.list:SetItems(FT.Market.Movers(200, "ch1", true), true)
+    T.down.list:SetItems(T.YourMovers(), true)
+    local away, sold = T.Away()
+    T.up.list:SetItems(away, true)
+    T.awayTotal:SetText(sold > 0 and FT.C("up", "+" .. FT.Money(math.floor(sold), "gold")) or "")
 end
 
 T.OnShow = T.Refresh

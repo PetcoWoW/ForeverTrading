@@ -224,8 +224,10 @@ function M.Ink(f)
     local mid = (box[3] + box[4]) / 2
     if f.__wrap and tw > bw + 1 and bw > 0 then
         -- wrapped: lines down from the top of the box
-        local lines = math.min(math.ceil(tw / bw), f.__maxLines or 99)
-        return { box[1], box[2], box[3], box[3] - lines * lh }, false
+        local need = math.ceil(tw / bw)
+        local lines = math.min(need, f.__maxLines or 99)
+        -- (v0.52) more lines than it may show ends in "...": cut too
+        return { box[1], box[2], box[3], box[3] - lines * lh }, f.__maxLines ~= nil and need > f.__maxLines
     end
     return { l, l + w, mid + lh / 2, mid - lh / 2 }, tw > bw + 1 and bw > 0
 end

@@ -443,6 +443,43 @@ function M.Movers(n, field, descending)
     return out
 end
 
+-- (v0.52) most traded: where the most gold changes hands a day (price x sold a day), worked out in the background
+-- once per new prices; nil while it's worked out (FT_TRADED_READY says when)
+local traded, tradedFor, tradedJob
+function M.MostTraded(n)
+    if not rows then return nil end
+    if traded and tradedFor == rows then
+        local out = {}
+        for i = 1, math.min(n or 20, #traded) do out[i] = traded[i] end
+        return out
+    end
+    -- (new prices: the last list while the new one is worked out)
+    local function Last()
+        if not traded then return nil end
+        local out = {}
+        for i = 1, math.min(n or 20, #traded) do out[i] = traded[i] end
+        return out
+    end
+    if tradedJob then return Last() end
+    local list, forRows = {}, rows
+    tradedJob = FT.Job("traded", #forRows, function(k)
+        local r = forRows[k]
+        if r and r.price and not r.gone and not Junk(r) then
+            local s = FT.Sales.Rate(r.id)
+            local per = s and (s.sold or 0) >= 5 and s.perDay or nil
+            if per and per > 0 then
+                list[#list + 1] = { id = r.id, price = r.price, perDay = per, gold = per * r.price, ch1 = r.ch1, ch7 = r.ch7, spark = r.spark }
+            end
+        end
+    end, function()
+        table.sort(list, function(a, b) return a.gold > b.gold end)
+        while #list > 40 do table.remove(list) end
+        traded, tradedFor, tradedJob = list, forRows, nil
+        FT.Fire("FT_TRADED_READY")
+    end, 3)
+    return Last()
+end
+
 -- how far back the prices go: items, items with prices on 3+ days of the last two weeks, items that can be movers
 function M.Depth()
     local deep, movers = 0, 0
