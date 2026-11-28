@@ -17,6 +17,8 @@ namespace WolfPrices
         public long Ready;   // Blizzard's time of the prices on disk
         public long InGame;  // ...of the prices the game loaded last
         public string Error;
+        public string Updated;  // (1.1) Wolf's version put in by this check
+        public string Pending;  // ...or waiting for the game to close
     }
 
     static class Prices
@@ -122,9 +124,10 @@ namespace WolfPrices
             return m.Success ? m.Groups[1].Value : null;
         }
 
-        public static CheckResult Check(Found f)
+        public static CheckResult Check(Found f, Settings settings = null)
         {
             var res = new CheckResult();
+            settings = settings ?? Settings.Load();
             var feed = f.FeedFile;
             try
             {
@@ -153,7 +156,17 @@ namespace WolfPrices
                 }
                 res.Ready = disk.T;
                 res.Ok = true;
-                WriteNote(f, disk);
+                // (1.1) Wolf itself: a newer build swapped in (or waiting for the game to close)
+                var up = AddonUpdate.Run(f, info, settings, AddonUpdate.GameRunning());
+                if (up.Updated != null && up.Updated != settings.Updated)
+                {
+                    settings.Updated = up.Updated;
+                    settings.UpdatedAt = up.UpdatedAt;
+                    settings.Save();
+                }
+                res.Updated = up.Updated;
+                res.Pending = up.Pending;
+                WriteNote(f, disk, settings, up);
             }
             catch (Exception e)
             {
@@ -166,16 +179,25 @@ namespace WolfPrices
         }
 
         // the note for the addon (Data\Companion.lua, in its TOC): read by the game at login and /reload
-        public static void WriteNote(Found f, FeedTimes disk)
+        public static void WriteNote(Found f, FeedTimes disk, Settings s = null, UpdateState up = null)
         {
             var sb = new StringBuilder();
             sb.Append("-- Written by the Wolf prices companion (Windows) every time it checks for new prices: when it last checked, which\n");
             sb.Append("-- prices it put in Data\\Feed.lua, its version. Empty in a fresh copy of the addon: the companion fills it in.\n");
             sb.Append("local ADDON, FT = ...\n");
-            sb.AppendFormat("FT.COMPANION = {{ version = \"{0}\", checked = {1}, built = {2}, t = {3} }}\n",
-                App.Version, Fmt.Now(), disk.Built, disk.T);
+            var extra = new StringBuilder();
+            if (s != null)
+            {
+                extra.Append(s.AutoUpdate ? ", auto = true" : ", auto = false");
+                if (!string.IsNullOrEmpty(s.Updated)) extra.AppendFormat(", updated = \"{0}\", updatedAt = {1}", Lua(s.Updated), s.UpdatedAt);
+            }
+            if (up != null && !string.IsNullOrEmpty(up.Pending)) extra.AppendFormat(", pending = \"{0}\"", Lua(up.Pending));
+            sb.AppendFormat("FT.COMPANION = {{ version = \"{0}\", checked = {1}, built = {2}, t = {3}{4} }}\n",
+                App.Version, Fmt.Now(), disk.Built, disk.T, extra);
             WriteNoteText(f, sb.ToString());
         }
+
+        static string Lua(string v) { return System.Text.RegularExpressions.Regex.Replace(v ?? "", "[^0-9A-Za-z._-]", ""); }
 
         // back to how a fresh copy of the addon has it (uninstalling)
         public static void ClearNote(Found f)

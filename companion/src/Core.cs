@@ -82,6 +82,9 @@ namespace WolfPrices
     {
         public string WowRoot;
         public string Flavor;
+        public bool AutoUpdate = true;   // (1.1) keep Wolf itself up to date
+        public string Updated;           // the last Wolf it put in, and when
+        public long UpdatedAt;
 
         static string File_ { get { return Path.Combine(App.DataDir, "settings.txt"); } }
 
@@ -100,6 +103,9 @@ namespace WolfPrices
                         var v = line.Substring(eq + 1).Trim();
                         if (k == "wowRoot") s.WowRoot = v;
                         else if (k == "flavor") s.Flavor = v;
+                        else if (k == "autoUpdate") s.AutoUpdate = v != "0";
+                        else if (k == "updated") s.Updated = v;
+                        else if (k == "updatedAt") { long n; if (long.TryParse(v, out n)) s.UpdatedAt = n; }
                     }
                 }
                 else
@@ -124,7 +130,8 @@ namespace WolfPrices
         {
             try
             {
-                File.WriteAllLines(File_, new[] { "wowRoot=" + (WowRoot ?? ""), "flavor=" + (Flavor ?? "") }, Encoding.UTF8);
+                File.WriteAllLines(File_, new[] { "wowRoot=" + (WowRoot ?? ""), "flavor=" + (Flavor ?? ""), "autoUpdate=" + (AutoUpdate ? "1" : "0"),
+                    "updated=" + (Updated ?? ""), "updatedAt=" + UpdatedAt }, Encoding.UTF8);
             }
             catch (Exception e) { Log.Write("settings not saved: " + e.Message); }
         }

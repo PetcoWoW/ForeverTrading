@@ -45,8 +45,8 @@ namespace WolfPrices
             var outFile = Path.Combine(root ?? ".", "wolfprices-check.txt");
             if (f == null) { File.WriteAllText(outFile, "addon not found\n"); return 2; }
             var r = Prices.Check(f);
-            File.WriteAllText(outFile, string.Format("ok={0} downloaded={1} ready={2} inGame={3} error={4} version={5}\n",
-                r.Ok, r.Downloaded, r.Ready, r.InGame, r.Error, App.Version));
+            File.WriteAllText(outFile, string.Format("ok={0} downloaded={1} ready={2} inGame={3} error={4} version={5} wolfUpdated={6} wolfPending={7} wolfError={8}\n",
+                r.Ok, r.Downloaded, r.Ready, r.InGame, r.Error, App.Version, r.Updated, r.Pending, AddonUpdate.Last.Error));
             return r.Ok ? 0 : 1;
         }
 

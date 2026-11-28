@@ -12,7 +12,7 @@ namespace WolfPrices
     class Tray : ApplicationContext
     {
         readonly NotifyIcon icon;
-        readonly ToolStripMenuItem status, startup;
+        readonly ToolStripMenuItem status, startup, keepUpdated;
         readonly System.Windows.Forms.Timer every, selfCheck;
         readonly Control ui; // for coming back to the window thread
         readonly Settings settings = Settings.Load();
@@ -36,6 +36,10 @@ namespace WolfPrices
             try { startup.Checked = Installer.StartsWithWindows; } catch { }
             startup.Click += (s, e) => { try { Installer.StartsWithWindows = startup.Checked; } catch (Exception x) { Log.Write("startup: " + x.Message); } };
             menu.Items.Add(startup);
+            // (1.1) Wolf itself, kept up to date: swapped in while you play, a /reload loads it
+            keepUpdated = new ToolStripMenuItem("Keep Wolf updated") { CheckOnClick = true, Checked = settings.AutoUpdate };
+            keepUpdated.Click += (s, e) => { settings.AutoUpdate = keepUpdated.Checked; settings.Save(); };
+            menu.Items.Add(keepUpdated);
             menu.Items.Add(new ToolStripSeparator());
             menu.Items.Add("Quit", null, (s, e) => Quit());
 
@@ -67,9 +71,11 @@ namespace WolfPrices
                     if (found == null) line = "can't find the addon";
                     else
                     {
-                        var r = Prices.Check(found);
+                        var r = Prices.Check(found, settings);
                         var ready = Fmt.Time(r.Ready);
                         if (!r.Ok) line = "offline? prices of " + ready;
+                        else if (r.Updated != null) line = "Wolf " + r.Updated + " is in: /reload";
+                        else if (r.Pending != null) line = "Wolf " + r.Pending + " goes in when the game closes";
                         else if (r.InGame > 0 && r.InGame >= r.Ready) line = "up to date (" + ready + ")";
                         else if (r.InGame > 0) line = "newer prices ready (" + ready + "), /reload";
                         else line = "prices of " + ready;
