@@ -494,8 +494,7 @@ local function Build()
     win:SetScale(FT.S.scale or 1)
     PlaceWindow()
     UI.Skin(win, "window", "bg0")
-    -- the classic look: the game's title banner over the top edge
-    win.banner = UI.TitleBanner(win, "Wolf")
+    -- (v0.53: no title banner over the top edge - the header has the logo, and drags the window)
     table.insert(UISpecialFrames, "WolfOfBootyBayFrame")
 
     -- header
