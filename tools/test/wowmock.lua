@@ -144,7 +144,11 @@ function methods:GetVerticalScroll() return 0 end
 function methods:GetHorizontalScroll() return 0 end
 function methods:GetVerticalScrollRange() return 0 end
 function methods:GetNumber() return tonumber(self.__text) or 0 end
-function methods:HasFocus() return false end
+function methods:HasFocus() return self.__focus == true end
+function methods:SetFocus() self.__focus = true end
+function methods:ClearFocus()
+    if self.__focus then self.__focus = false; local f = self.__scripts and self.__scripts.OnEditFocusLost; if f then f(self) end end
+end
 function methods:GetCursorPosition() return 0 end
 function methods:GetFont() return "Fonts\\FRIZQT__.TTF", 12, "" end
 function methods:SetFont() return true end

@@ -360,6 +360,10 @@ function T.BuildDonut(p)
     box.sub = UI.Text(box, 11, "muted")
     box.sub:SetPoint("TOPLEFT", box.total, "BOTTOMLEFT", 1, -3)
     box.sub:SetPoint("RIGHT", box, "RIGHT", -10, 0)
+    -- (v0.61) your listings someone undercut: a badge by the total, to Sell > My auctions
+    box.undercut = UI.Button(box, "", 10, 20, "default", function() FT.Show("sell") end)
+    box.undercut:SetPoint("TOPRIGHT", -10, -42)
+    box.undercut:SetTip(L["Undercut"], L["Your listings someone listed cheaper since: My auctions has each one, and whether to wait or post it again."])
     box.parts = {}
     for i = 1, MAX_PARTS do
         local r = PartRow(box)
@@ -404,6 +408,15 @@ function T.FillDonut()
     if donutPick and not T.worth.byKey[donutPick] then donutPick = nil end
     T.worth.picked = donutPick
     box.total:SetText(FT.Money(total + gold, "gold"))
+    local under = 0
+    if FT.Owned and FT.Owned.List then
+        for _, a in ipairs((FT.Owned.List()) or {}) do if not a.sold and FT.Owned.Undercut(a) then under = under + 1 end end
+    end
+    box.undercut:SetShown(under > 0)
+    if under > 0 then
+        box.undercut:SetLabel(FT.C("down", string.format(under == 1 and L["%d undercut"] or L["%d undercut"], under)))
+        box.undercut:FitText(16)
+    end
     UI.FitBits(box.sub, L["all you own"] .. FT.C("dim", "  ·  ") .. (gold > 0 and (FT.Money(gold, "gold") .. " " .. L["in coins"]) or L["no coins on you"]))
     for i, r in ipairs(box.parts) do
         local pt = parts[i]

@@ -133,8 +133,6 @@ jobs:
           # of one version don't go there: its rules don't allow a stream of data-only files)
           PREV=$(gh release list --limit 30 --json tagName --jq '[.[] | select(.tagName | startswith("v"))][0].tagName // ""' 2>/dev/null || echo "")
           PREVMAJMIN=$(echo "${PREV#v}" | cut -d. -f1,2)
-          # (a commit that says [no curseforge] - a test build for the companion's updates - stays off CurseForge)
-          if [ "$PREVMAJMIN" != "$MAJMIN" ] && ! git log -1 --format=%B | grep -qi "\[no curseforge\]"; then echo "NEW_VERSION=1" >> "$GITHUB_ENV"; fi
           echo "MAJMIN=$MAJMIN" >> "$GITHUB_ENV"
           # the newest Wolf and prices companion, for the addon's "a newer one is out" line (v0.42): the companion
           # brings this file every hour, so even a friend with nobody online hears of a new version
@@ -145,7 +143,9 @@ jobs:
           # (v0.58) the commit it's built from, for the companion's updates (a new commit: a new Wolf, hotfixes too),
           # and the version in the code as well: a /reload reads new code but not the TOC (the game reads that at
           # launch), so after an update by the companion the code knows its own version
-          COMMIT=$(git rev-parse --short=12 HEAD)
+          # (v0.61) not the commit itself but a fingerprint of the addon's own files: a commit to the companion, the
+          # robots or the docs isn't a new Wolf, so friends don't download the same one again
+          COMMIT=$(git ls-tree -r HEAD | grep -vP '\t(tools/|companion/|\.github/|Data/Feed\.lua$|\.git|\.pkgmeta$|.*\.md$)' | sha256sum | cut -c1-12)
           ( cd dist/WolfOfBootyBay \
             && rm -rf .github tools companion .gitattributes .gitignore .pkgmeta \
             && sed -i "s/^## Version: .*/## Version: $VERSION\n## X-Commit: $COMMIT/" WolfOfBootyBay.toc \
@@ -207,7 +207,9 @@ jobs:
       # not the Core API key). The game version: the repository variable CF_GAME_VERSIONS (ids, comma-separated), else
       # the newest version of CurseForge's WoW Forever version type. A failure here never stops the GitHub release.
       - name: Upload to CurseForge
-        if: steps.feed.outputs.changed != 'false' && ((github.event_name == 'push' && env.NEW_VERSION == '1') || inputs.curseforge == 'true')
+        # (v0.61) two lanes: every build goes to GitHub (the prices companion's friends and WowUp) at once; CurseForge
+        # only gets one when it's released there by hand (Actions > Price feed > Run workflow, "curseforge" true)
+        if: steps.feed.outputs.changed != 'false' && inputs.curseforge == 'true'
         continue-on-error: true
         env:
           CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}

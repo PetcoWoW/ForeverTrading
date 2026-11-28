@@ -182,6 +182,23 @@ step("auto session", function()
   FT.UpdateHUD()
   local hud = _G["WolfOfBootyBaySession"]
   assert(not (hud and hud:IsShown()), "nothing on screen")
+  -- (v0.61) a right-click on the minimap button: the session's card; Show on screen pins the small window, again
+  -- takes it off
+  local mbtn = _G["WolfOfBootyBayMinimapButton"]
+  mock.click(mbtn, "RightButton")
+  local card = _G["WolfOfBootyBaySessionCard"]
+  assert(card and card:IsShown(), "right-click: the session's card")
+  mock.layout.Settle(card)
+  local found, texts = mock.layout.Overlaps(card)
+  for _, o in ipairs(found) do print(string.format("OVERLAP [session card] %q x %q  (%dx%d px)", o[1].text:sub(1, 50), o[2].text:sub(1, 50), o[3], o[4])) end
+  for _, t in ipairs(texts) do if t.cut then print(string.format("CUT [session card] %q", t.text:sub(1, 80))) end end
+  card.show:GetScript("OnClick")(card.show, "LeftButton")
+  hud = _G["WolfOfBootyBaySession"]
+  assert(hud and hud:IsShown(), "Show on screen: the small window")
+  card.show:GetScript("OnClick")(card.show, "LeftButton")
+  assert(not hud:IsShown(), "again: off the screen")
+  print("session card: " .. (card.name.fitText or "") .. ", " .. (card.worth:GetText() or ""))
+  card:Hide()
   for i = 1, 8 do mock.run(60); mock.fire("CHAT_MSG_LOOT", string.format(LOOT_ITEM_SELF, herb)) end
   mock.run(400)
   assert(s.paused and s.idle, "5 quiet minutes: paused")
@@ -267,6 +284,36 @@ step("alerts", function()
   FT.Ver.newest = nil
   FT.db.told.version, FT.db.told.versionAt, FT.db.told.again = nil, nil, nil
   FT.UpdateMinimapDot()
+end)
+-- (v0.61) your buys and sales on an item's chart, and your listing on its page (undercut: by how much, since when)
+step("chart marks and listings", function()
+  local id
+  for _, r in ipairs(FT.Market.Rows() or {}) do if r.price and r.price > 5000 then id = r.id break end end
+  assert(id, "an item with a price")
+  local p = FT.Price(id)
+  FT.Journal.Add("B", id, 80, 80 * math.floor(p * 0.8), 0, time() - 3 * 86400)
+  FT.Journal.Add("S", id, 20, 20 * math.floor(p * 1.1), 0, time() - 86400)
+  FT.OpenItem(id)
+  local ch = FT.Tabs.market.ItemChart()
+  assert(ch and ch.tradeAt and #ch.tradeAt == 2, "a buy and a sale on the chart: " .. tostring(ch and ch.tradeAt and #ch.tradeAt))
+  ch:UpdateLegend(ch.tradeAt[1].i)
+  assert((ch.legendMA:GetText() or ""):find("bought 80", 1, true), "under the mouse: you bought 80")
+  -- a listing of yours, someone under it
+  local saved = FT.db.owned
+  FT.db.owned = { [FT.charKey] = { t = time(), list = { { auctionID = 991, itemID = id, qty = 5, unit = p * 1.3 } } } }
+  FT.db.undercut = nil
+  local news = FT.Owned.CheckSinceLast()
+  assert(#news == 1, "undercut since the last prices: " .. #news)
+  assert(#FT.Owned.CheckSinceLast() == 0, "the same one isn't new again")
+  FT.OpenItem(id)
+  local m = FT.Owned.Mine(id)
+  assert(m and m.low and m.since, "your listing: undercut, since when")
+  FT.ShowSub("you", "portfolio")
+  local box = FT.Tabs.portfolio.donutBox
+  assert(box.undercut:IsShown(), "Holdings: the undercut badge")
+  print("chart marks: 2; your listing undercut by " .. (math.ceil(p * 1.3) - m.low) .. "c; Holdings badge shown")
+  FT.db.owned = saved
+  FT.db.undercut = nil
 end)
 step("recap and pings", function()
   FT.Port.Recap()
@@ -476,10 +523,11 @@ end)
 step("companion", function()
   local C = FT.Companion
   assert(not C.Running(), "no note: not running")
-  -- no companion: one pointer after a real visit, once
+  -- (v0.61) no companion: the addon never points to it (it's for friends, given by hand)
   FT.db.companionHint, FT.db.companionSeen = nil, nil
+  local said0 = #mock.prints
   mock.fire("AUCTION_HOUSE_SHOW"); mock.run(60); mock.fire("AUCTION_HOUSE_CLOSED"); mock.run(12)
-  assert(FT.db.companionHint, "pointer said")
+  for i = said0 + 1, #mock.prints do assert(not mock.prints[i]:find("companion", 1, true), "no pointer to the companion: " .. mock.prints[i]) end
   -- the note: checked just now; the prices loaded were published 2 hours ago
   local realBuilt, realTime = FT.FEED.built, FT.Feed.Time
   FT.COMPANION = { version = "1.0.0", checked = time() }
@@ -617,6 +665,17 @@ step("ms test", function()
   Check("futures: key materials", 20, function() FT.Futures.Materials(10) end)
   Check("craft breakdown (flask)", 10, function() FT.UI.RecipeOf(13510); FT.Craft.Eval(FT.UI.RecipeOf(13510)) end)
   Check("where to farm (window)", 15, function() FT.ShowFarm(4338); _G.WolfOfBootyBayFarm:Hide() end)
+  -- (v0.61) the new ones: the dungeons worked out (every item's sellable share), a dungeon's card, the search's
+  -- results as you type
+  -- (worked out on opening Dungeons, within a page's time; then kept until new prices)
+  Check("dungeons (worked out)", 50, function() FT.Drops.DungeonsNow("full") end)
+  FT.Drops.Dungeons("full")
+  Check("dungeons (again)", 3, function() FT.Drops.Dungeons("full") end)
+  Check("dungeon card", 15, function() local d = FT.Drops.Dungeons("full")[1]; if d then FT.ShowDungeon(d, "full"); _G.WolfOfBootyBayDungeon:Hide() end end)
+  -- (its names are built in the background after new prices: a keystroke only looks)
+  mock.run(5)
+  FT.Tabs.calc.Suggest("Item 1")
+  Check("search results (a keystroke)", 10, function() FT.Tabs.calc.Suggest("Item 1") end)
   Check("farm tip (looking)", 10, function() FT.Farm.BestTip(42) end)
   Check("when it sells (window)", 15, function() FT.ShowWhenSells(12360); _G.WolfOfBootyBayWhenSells:Hide() end)
   local ah = FT.SnipePanel.Get(UIParent)
@@ -1057,6 +1116,15 @@ step("layout", function()
       local d = rows[1].dungeonInfo
       assert(d.steady > d.coin and d.each == d.steady / 5, "a run: steady loot and coin, split five ways; rare drops apart")
       print("dungeons: best " .. d.name .. " " .. math.floor(d.each / 10000) .. "g each a clear, " .. math.floor(d.hour / 10000) .. "g an hour each")
+      -- (v0.61) where a run's gold comes from, for checking it against the guides
+      for _, r in ipairs(rows) do
+        local x = r.dungeonInfo
+        if x.name == "Maraudon" or x.name == "Scarlet Monastery" or x.name:find("SM ") or x.name == "Zul'Farrak" or x.name == "Uldaman" then
+          local bits = {}
+          for i = 1, math.min(8, #x.top) do local t = x.top[i]; bits[#bits + 1] = string.format("%s x%.2f=%dg%s", FT.Name(t.id) or t.id, t.n, math.floor(t.worth / 10000), t.jackpot and "(rare)" or "") end
+          print(string.format("dungeon %s: steady %dg (coin %dg), rare %dg, %d min, mobs %s | %s", x.name, math.floor(x.steady / 10000), math.floor(x.coin / 10000), math.floor(x.jackpot / 10000), x.min, tostring(x.mobs), table.concat(bits, ", ")))
+        end
+      end
     end },
     { "money: dungeons, the trash", "signals", function()
       local view = FT.Tabs.signals.farmKindBar:GetParent()
@@ -1076,16 +1144,40 @@ step("layout", function()
       for _, r in ipairs(rows) do if r.dungeonInfo.hardSolo then hard = hard + 1 end end
       print(string.format("solo dungeons: %d (%d hard), best %s %dg a run, ~%d min", #rows, hard, d.name, math.floor(d.each / 10000), d.min))
       assert(view.hint.__text and view.hint.__text:find("hard", 1, true), "the caveat: it's hard")
+      -- (v0.61) a solo card, with its caveat inside
+      for _, r in ipairs(rows) do
+        if r.dungeonInfo.hardSolo then
+          FT.ShowDungeon(r.dungeonInfo, "solo")
+          local dw = _G.WolfOfBootyBayDungeon
+          mock.layout.Settle(dw)
+          local found, texts = mock.layout.Overlaps(dw)
+          for _, o in ipairs(found) do print(string.format("OVERLAP [dungeon card solo] %q x %q  (%dx%d px)", o[1].text:sub(1, 50), o[2].text:sub(1, 50), o[3], o[4])) end
+          for _, t in ipairs(texts) do if t.cut then print(string.format("CUT [dungeon card solo] %q", t.text:sub(1, 80))) end end
+          assert(dw.card.note:IsShown(), "hard solo: said on the card")
+          dw:Hide()
+          break
+        end
+      end
       for _, b in ipairs(view.trash.buttons) do if b.value == "full" then b.onClick() end end
     end },
     { "money: a dungeon's drops", "signals", function()
       local f = FT.Tabs.signals
       local view = f.farmKindBar:GetParent()
       local rows = f.DungeonRows()
-      -- a click on a dungeon: Drops, that dungeon only
+      -- (v0.61) a click on a dungeon: its card, as tall as what it says; its All its drops: Drops, that dungeon only
       local name = rows[1].dungeonInfo.name
       local click = view.list.opts and view.list.opts.onClick
       if click then click(rows[1], "LeftButton") end
+      local dw = _G.WolfOfBootyBayDungeon
+      assert(dw and dw:IsShown(), "the dungeon's card")
+      mock.layout.Settle(dw)
+      local found, texts = mock.layout.Overlaps(dw)
+      for _, o in ipairs(found) do print(string.format("OVERLAP [dungeon card] %q x %q  (%dx%d px)", o[1].text:sub(1, 50), o[2].text:sub(1, 50), o[3], o[4])) end
+      for _, t in ipairs(texts) do if t.cut then print(string.format("CUT [dungeon card] %q", t.text:sub(1, 80))) end end
+      print(string.format("dungeon card: %s, %dpx tall, %s", name, dw:GetHeight(), dw.card.big:GetText() or ""))
+      assert(dw:GetHeight() < 540, "as tall as what it says: " .. dw:GetHeight())
+      dw.all:GetScript("OnClick")(dw.all, "LeftButton")
+      assert(not dw:IsShown(), "All its drops: the card goes")
       for _, b in ipairs(view.trash.buttons) do if b.value == "full" then b.onClick() end end
       print("a dungeon's drops: " .. name)
     end },
@@ -1120,6 +1212,20 @@ step("layout", function()
     mock.run(1)
     mock.layout.Settle(WolfOfBootyBayFrame)
     local found, texts = mock.layout.Overlaps(WolfOfBootyBayFrame)
+    -- (v0.61) WOLF_SHOTS=<dir>: every text's place on every page, for pictures of how full each one is
+    local shots = os and os.getenv and os.getenv("WOLF_SHOTS")
+    if shots and shots ~= "" then
+      local fh = io.open(shots .. "/" .. key:gsub("[^%w]+", "_") .. ".txt", "w")
+      if fh then
+        local wr = mock.layout.Rect(WolfOfBootyBayFrame)
+        fh:write(string.format("WIN %d %d %d %d\n", wr[1], wr[2], wr[3], wr[4]))
+        for _, t in ipairs(texts) do
+          local r = t.ink
+          fh:write(string.format("T %d %d %d %d %d %s\n", r[1], r[2], r[3], r[4], t.f.__fsize or 12, (t.text:gsub("\n", " "))))
+        end
+        fh:close()
+      end
+    end
     for _, t in ipairs(texts) do
       if t.out and not seen["out|" .. t.text] then
         seen["out|" .. t.text] = true
@@ -1479,14 +1585,30 @@ step("v0.43", function()
   -- opened: Today, whatever page was last
   FT.Show("market"); WolfOfBootyBayFrame:Hide(); FT.Toggle()
   assert(FT.currentTab == "today", "opens on Today: " .. tostring(FT.currentTab))
-  -- the top search: typing on Today takes you to Market with it
+  -- (v0.61) the top search: typing shows what it finds under it, on the page you're on; picking one opens it, and
+  -- Back returns to where you were
   local qs = FT.MainRefs.search
   assert(qs and qs:IsShown(), "the top search shows on Today")
-  qs:SetText("thor")
+  qs:SetFocus()
+  local typed = (FT.Name(FT.Market.Rows()[1].id) or "Item"):sub(1, 6)
+  qs:SetText(typed)
   qs:GetScript("OnTextChanged")(qs, true)
-  assert(FT.currentTab == "market", "typing opens Market: " .. tostring(FT.currentTab))
-  assert(FT.Tabs.market.searchBox:GetText() == "thor", "Market's box has it: " .. tostring(FT.Tabs.market.searchBox:GetText()))
+  mock.run(0.5)
+  assert(FT.currentTab == "today", "typing doesn't leave the page: " .. tostring(FT.currentTab))
+  local d = FT.QuickSearchDrop and FT.QuickSearchDrop()
+  assert(d and d:IsShown() and d.ids and #d.ids > 0, "what it finds shows under the box")
+  local first = d.ids[1]
+  FT.QuickSearchEnter(qs)
+  mock.run(0.1)
+  assert(FT.currentTab == "market" and FT.Tabs.market.CurrentItem() == first, "Enter opens the first")
   assert(not qs:IsShown(), "the top search hides on Market")
+  FT.NavBack()
+  mock.run(0.1)
+  assert(FT.currentTab == "today", "Back: Today again: " .. tostring(FT.currentTab))
+  FT.NavForward()
+  mock.run(0.1)
+  assert(FT.currentTab == "market" and FT.Tabs.market.CurrentItem() == first, "Forward: the item again")
+  print("search and back: " .. (FT.Name(first) or first) .. ", back to Today, forward again")
   FT.Show("today")
   assert(qs:IsShown(), "and comes back elsewhere")
   -- Market: an item, then "< Market" back to its home (the overview); the tab itself opens on the home
@@ -1587,8 +1709,15 @@ step("v0.50", function()
   assert(FT.db.netObj and next(FT.db.netObj), "the nodes are pooled")
 
   -- the version line: once per new version, then quiet - from the network (the version rides on every message)
-  -- and from the price file
+  -- and from the price file. (v0.61: heard from the network only on the companion's lane)
   FT.db.told = {}
+  local realNote = FT.COMPANION
+  FT.COMPANION = { version = "1.1.2", checked = time() - 60, built = time(), t = time() }
+  local said0 = #mock.prints
+  FT.COMPANION = nil
+  mock.fire("CHAT_MSG_ADDON", "WOLFNET1", table.concat({ "S", "1", "otherhouse", enc(1), enc(1), enc(1), enc(1), "v0.97" }, "	"), "GUILD", "Sarge-Realm")
+  assert(#mock.prints == said0, "a CurseForge user doesn't hear a friend's newer build")
+  FT.COMPANION = { version = "1.1.2", checked = time() - 60, built = time(), t = time() }
   local said = #mock.prints
   mock.fire("CHAT_MSG_ADDON", "WOLFNET1", table.concat({ "S", "1", "otherhouse", enc(1), enc(1), enc(1), enc(1), "v0.98" }, "\t"), "GUILD", "Sarge-Realm")
   assert(#mock.prints == said + 1 and mock.prints[#mock.prints]:find("v0.98", 1, true), "a newer version heard: one line")
@@ -1599,6 +1728,7 @@ step("v0.50", function()
   FT.FEED.release = "0.98.202612010000"
   FT.Ver.Remind()
   assert(#mock.prints == said + 1, "the price file's same version: quiet")
+  FT.COMPANION = realNote
   FT.FEED.release = "0.99.202612020000"
   FT.Ver.Remind(); FT.Ver.Remind()
   assert(#mock.prints == said + 2 and mock.prints[#mock.prints]:find("v0.99", 1, true), "a newer one from the price file: one line")

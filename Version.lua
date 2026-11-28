@@ -100,6 +100,10 @@ end
 -- a newer version heard from another Wolf user (this file's version message, or any Wolf network message)
 function V.Heard(theirs)
     if not (theirs and V.Newer(theirs, FT.VERSION)) then return end
+    -- (v0.61) two lanes: friends with the prices companion get every build first, CurseForge gets one when it's
+    -- released there. Without the companion, a friend's newer build isn't news (the CurseForge app says when
+    -- there's one for you)
+    if not (FT.Companion and FT.Companion.Note()) then return end
     if not V.newest or V.Newer(theirs, V.newest) then
         V.newest = theirs
         FT.Fire("FT_NEWER_VERSION", theirs)
@@ -159,8 +163,7 @@ function V.Remind()
     local want, have = FT.FEED.companion, FT.COMPANION and FT.COMPANION.version
     if want and have and V.Newer(want, have) and FT.db.told.companion ~= want .. today then
         FT.db.told.companion = want .. today
-        FT.Print(string.format(L["The prices companion is behind: %s (you have %s). It updates itself when it starts; or get it again: %s"], want, have,
-            FT.ChatLink and FT.ChatLink("get", L["Get it"], "/wolf companion") or "/wolf companion"))
+        FT.Print(string.format(L["The prices companion is behind: %s (you have %s). It updates itself: quit it in the tray and start it again for it now."], want, have))
     end
 end
 

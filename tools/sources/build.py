@@ -536,7 +536,20 @@ def unit(name, base, door, minutes, members):
         coin += g * cnt
         if not boss:
             coin_t += g * cnt
+        # (v0.61) what a kill gives: cMaNGOS's whole loot table (world drops left out: a world green is ~1 in
+        # thousands on any mob, not the 1 in 10 a few recorded kills make it look), and ForeverDB for Forever's new
+        # loot it doesn't know; a world drop from ForeverDB alone isn't counted either
+        pk = cm.per_kill(n) if cm else None
+        pool = cm.world_pool() if cm else set()
+        drops = []
+        if pk is not None:
+            drops += [(i, k * 10000.0) for i, k in pk.items()]
         for i, chance in loot.get(n, []):
+            # (Forever's own changes to old loot - a common drop cMaNGOS hasn't - still count)
+            if pk is not None and (i in pk or i in pool or (i in cm.items and chance < 500)):
+                continue
+            drops.append((i, chance))
+        for i, chance in drops:
             if chance <= 0:
                 unknown.add(i)
                 continue
@@ -547,6 +560,9 @@ def unit(name, base, door, minutes, members):
                 trash[i] += e
     if not mobs:
         return
+    # (v0.61) a full clear takes at least ~1 minute for every 5 mobs (a group's real pace; 537 mobs in 75 minutes
+    # was 7 a minute - only a speed run skipping most of them does that)
+    minutes = max(minutes, int(round(mobs / 5.0)))
     lvs.sort()
     lv = "%d-%d" % (lvs[len(lvs) // 10], lvs[(len(lvs) * 9) // 10]) if lvs else ""
     def enc(c):

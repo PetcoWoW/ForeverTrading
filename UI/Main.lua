@@ -585,12 +585,12 @@ local function Build()
 
     -- v0.43: search from any page. The first letter typed takes you to Market, the rest goes on in its own search
     -- box (hidden on Market itself, which has that box, and while a scan shows its progress here)
-    quickSearch = UI.Input(header, 170, 24, L["Search item..."], function(text)
-        if not text or text == "" then return end
-        quickSearch:SetValue("")
-        quickSearch:ClearFocus()
-        FT.SelectTab("market")
-        if FT.Tabs.market and FT.Tabs.market.TypeIn then FT.Tabs.market.TypeIn(text) end
+    -- (v0.61) no jump: what you type shows the items it finds under the box (Extra\UI2.lua), and only picking one
+    -- opens it - Back returns you to where you were
+    quickSearch = UI.Input(header, 210, 24, L["Search any item..."], function(text)
+        if FT.QuickSearchTyped then FT.QuickSearchTyped(quickSearch, text) end
+    end, function()
+        if FT.QuickSearchEnter then FT.QuickSearchEnter(quickSearch) end
     end)
     quickSearch:SetPoint("RIGHT", gearBtn, "LEFT", -12, 0)
 
@@ -604,6 +604,7 @@ local function Build()
     FT.UpdateScanBox()
     -- what the tour points at
     FT.MainRefs = { nav = nav, pill = pill, house = houseChip, gear = gearBtn, scan = scanBox, search = quickSearch }
+    if FT.BuildNav then FT.BuildNav(header, quickSearch, win) end
 
     -- ticker tape
     ticker = BuildTicker(win)
@@ -721,6 +722,31 @@ end
 
 -- (for the tests) the section bars of a group
 function FT.GroupBarsOf(group) return groupBars[group] end
+
+-- (v0.61) where you are, for Back and Forward (Extra\UI2.lua): the page, its section, the item open on Market,
+-- Farm it's mode; nil while the window is closed
+function FT.Place()
+    if not (win and win:IsShown() and FT.currentTab) then return nil end
+    local tab = FT.currentTab
+    local p = { tab = tab }
+    local g = GROUP_OF[tab]
+    if g then p.group, p.sub = g, groupLast[g] end
+    if tab == "market" and FT.Tabs.market and FT.Tabs.market.CurrentItem then p.item = FT.Tabs.market.CurrentItem() end
+    if tab == "signals" and p.sub == "farm" and FT.Tabs.signals.FarmMode then p.farm = FT.Tabs.signals.FarmMode() end
+    return p
+end
+
+-- a place in words: "Make gold › Farm it › Dungeons", "Market › Arcanite Bar"
+function FT.PlaceName(p)
+    if not p then return "" end
+    local bits = { L[TAB_LABELS[p.group or p.tab] or p.tab] or p.tab }
+    if p.group then
+        for _, e in ipairs(FT.GROUPS[p.group] or {}) do if e[1] == p.sub then bits[#bits + 1] = L[e[2]] end end
+    end
+    if p.farm and FT.Tabs.signals.FarmModeName then bits[#bits + 1] = FT.Tabs.signals.FarmModeName(p.farm) end
+    if p.item then bits[#bits + 1] = FT.Name(p.item) or "?" end
+    return table.concat(bits, " › ")
+end
 
 -- a page's own view changed (from inside it): the group's bars follow
 function FT.GroupShows(group, key)
@@ -1012,7 +1038,7 @@ function FT.BuildAHPill(header)
         elseif FT.Companion.Running() then
             GameTooltip:AddLine(L["New prices come about every hour; the prices companion fetches them and chat says when they're ready."], 0.6, 0.64, 0.7, true)
         else
-            GameTooltip:AddLine(L["New prices come about every hour. The prices companion fetches them (Settings > About > Prices companion); a /reload loads them."], 0.6, 0.64, 0.7, true)
+            GameTooltip:AddLine(L["Blizzard's prices come with each Wolf update; your own scans and Auctionator's keep them fresh in between."], 0.6, 0.64, 0.7, true)
         end
         if FT.Atr and FT.Atr.On() then GameTooltip:AddLine(L["Click: take Auctionator's last scan again."], 0.58, 0.55, 0.5) end
         if FT.ahOpen and ahHidden then GameTooltip:AddLine(L["Right-click: show the game's auction house window."], 0.58, 0.55, 0.5) end
@@ -1041,7 +1067,7 @@ function FT.BuildAHPill(header)
             elseif FT.Companion.Running() then
                 text = text .. "\n\n" .. FT.C("dim", L["New ones come about every hour; the prices companion fetches them, and chat says when there are newer ones to load."])
             else
-                text = text .. "\n\n" .. FT.C("dim", L["New ones come about every hour. The prices companion puts them in your addon folder (Settings > About > Prices companion), then /reload loads them. The game can't see a download until you reload."])
+                text = text .. "\n\n" .. FT.C("dim", L["New ones come with each Wolf update; your own scans and Auctionator's keep them fresh in between."])
             end
         end
         UI.TipText(self, L["API: Blizzard's hourly prices"], text)

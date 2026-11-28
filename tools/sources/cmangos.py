@@ -144,5 +144,36 @@ class CMaNGOS:
                     floor += k * (it["sellprice"] or 0)
         return maps[m], int(resp), int(round(floor)), trade
 
+    def per_kill(self, n):
+        """(v0.61) { item: expected a kill } from a creature's whole loot table - world drops (the shared tables of
+        15+ creatures) left out, quest items too; None: not in cMaNGOS"""
+        c = self.ctpl.get(n)
+        if not c:
+            return None
+        out = {}
+        if c["lootid"]:
+            for i, k in self.counts(self.loot.get(c["lootid"], []), key=("c", c["lootid"])).items():
+                it = self.items.get(i)
+                if it and it["class"] != 12:
+                    out[i] = k
+        return out
+
+    def world_pool(self):
+        """(v0.61) every item in the world drop tables (to keep them out of what a dungeon's mobs give)"""
+        if getattr(self, "_pool", None) is None:
+            pool = set()
+            def walk(r, depth=0):
+                if depth > 6:
+                    return
+                for e in self.ref[r]:
+                    if e["mincountorref"] < 0:
+                        walk(-e["mincountorref"], depth + 1)
+                    else:
+                        pool.add(e["item"])
+            for r in self.world_refs:
+                walk(r)
+            self._pool = pool
+        return self._pool
+
     def spawns_in(self, map_id):
         return [(n, s[1], s[2], s[3]) for n, ss in self.sp.items() for s in ss if s[0] == map_id]

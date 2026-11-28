@@ -38,7 +38,7 @@ local function MinimapTooltip(self)
     end
     if fresh or newer then GameTooltip:AddLine(" ") end
     GameTooltip:AddLine(L["Click: open / close the window"], 0.8, 0.8, 0.8)
-    GameTooltip:AddLine(L["Right-click: sessions, and what's waiting"], 0.8, 0.8, 0.8)
+    GameTooltip:AddLine(s and L["Right-click: your session (see it, show it on screen, stop it)"] or L["Right-click: start a session"], 0.8, 0.8, 0.8)
     GameTooltip:AddLine(L["Drag: move"], 0.8, 0.8, 0.8)
     GameTooltip:Show()
 end
@@ -179,7 +179,9 @@ local function BuildMinimap()
     C_Timer.After(5, FT.UpdateMinimapDot)
     -- a click: the window; right-click: sessions, and what's waiting
     mb:SetScript("OnClick", function(self, button)
-        if button == "RightButton" then FT.ShowMenu(self) else FT.Toggle() end
+        if button ~= "RightButton" then FT.Toggle() return end
+        -- (v0.61) a session running: its card; none: the menu (Start a session, and what's waiting)
+        if FT.Session.Current() and FT.ShowSessionCard then FT.ShowSessionCard(false, self) else FT.ShowMenu(self) end
     end)
     mb:SetScript("OnDragStart", function(self)
         self:SetScript("OnUpdate", function()
@@ -1816,8 +1818,9 @@ end
 function FT.UpdateHUD()
     local S = FT.Session
     local s = S.Current()
-    -- (v0.57) a farming session (it ran by itself) shows nothing on screen
-    if not s or s.auto or FT.S.sessionPanel == false then
+    -- (v0.57) a farming session (it ran by itself) shows nothing on screen; (v0.61) unless it's pinned from the
+    -- minimap's session card - and a session of yours can be taken off the screen there too
+    if not s or not FT.Session.OnScreen(s) then
         if hud then hud:Hide() end
         return
     end

@@ -44,8 +44,17 @@ function UI.PriceChartData(id, tf, ma)
         local from = math.max(1, #candles - keep + 1)
         local shown = {}
         for i = from, #candles do shown[#shown + 1] = candles[i] end
+        -- (v0.61) your own buys and sales of it on the line (the deals journal: the auction house's mail)
+        local trades = {}
+        if FT.Journal and shown[1] then
+            for _, e in ipairs(FT.Journal.Events() or {}) do
+                if e.id == id and (e.k == "B" or e.k == "S") and e.t >= shown[1].t - 86400 and (e.q or 0) > 0 then
+                    trades[#trades + 1] = { t = e.t, unit = e.v / e.q, q = e.q, buy = e.k == "B" }
+                end
+            end
+        end
         return {
-            candles = shown, mode = "line", fmt = MoneyAxis, title = L["Price"], overlays = {}, hourly = hourly,
+            candles = shown, mode = "line", fmt = MoneyAxis, title = L["Price"], overlays = {}, hourly = hourly, trades = trades,
             defaultCount = #shown, emptyTitle = L["No price history"],
             emptyBody = L["No prices for it yet: scan My items or run a full scan at the auction house."],
         }

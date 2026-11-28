@@ -56,18 +56,34 @@ local function Model(id)
             }
         end
     end
+    -- (v0.61) skinning and gathering, in the same terms as drops: how many an hour and gold an hour - skinning a
+    -- mob also gives its own loot; a node about 40 an hour in a good zone, ~2 a node. Only the professions one of your
+    -- characters has can be the answer; the others show as other spots, with what they need
+    local has = FT.Me and FT.Me.Has or function() return true end
+    local NODES_AN_HOUR, PER_NODE, PER_SKIN = 40, 2, 1.4
     for _, x in ipairs(g.skin) do
         local w = x.who
         if w then
-            cands[#cands + 1] = { kind = "skin", name = w.name, where = w.zones and w.zones:match("^[^,]+"), lv = w.lv, chance = x.chance,
-                needs = L["Skinning"], score = -1 }
+            local kph = Dr.KillsAnHour(w)
+            local perHour = (x.chance or 0) > 0 and kph * x.chance / 10000 * PER_SKIN or nil
+            local steady = Dr.MobHour(w)
+            local lo = LowLevel(w.lv)
+            local can = has("Skinning")
+            cands[#cands + 1] = { kind = "skin", who = w, name = w.name, where = w.zones and w.zones:match("^[^,]+"), lv = w.lv, chance = x.chance,
+                needs = "Skinning", can = can, perHour = perHour, steady = steady, kph = kph, high = lo and lo > level + 3,
+                score = (can and 0 or -1e8) + (perHour and perHour * unit or 0) + (steady or 0) * 0.25 - ((lo and lo > level + 3) and 1e9 or 0) }
         end
     end
     for _, x in ipairs(g.nodes) do
         local o = x.who
         if o and not o.chest then
-            cands[#cands + 1] = { kind = (FT.Farm.KindOf(id) == "herb") and "herb" or "node", name = o.name,
-                where = o.zones and o.zones:match("^[^,]+"), chance = x.chance, score = -2 }
+            local herb = FT.Farm.KindOf(id) == "herb"
+            local prof = herb and "Herbalism" or "Mining"
+            local can = has(prof)
+            local perHour = (x.chance or 0) > 0 and NODES_AN_HOUR * x.chance / 10000 * PER_NODE or nil
+            cands[#cands + 1] = { kind = herb and "herb" or "node", name = o.name, needs = prof, can = can,
+                where = o.zones and o.zones:match("^[^,]+"), chance = x.chance, perHour = perHour,
+                score = (can and 0 or -1e8) + (perHour and perHour * unit or 0) }
         end
     end
     local vendor
@@ -141,6 +157,17 @@ local function Model(id)
             if answer.jackpot and answer.jackpot >= 10000 then
                 chips[#chips + 1] = { "+ " .. string.format(L["rare drops ~%s an hour"], FT.Money(math.floor(answer.jackpot), "gold")) }
             end
+        elseif answer and (answer.kind == "skin" or answer.kind == "node" or answer.kind == "herb") and answer.can then
+            card.k = string.format(L["BEST FOR YOU (LEVEL %d)"], level)
+            card.big, card.where = answer.name, answer.where
+            local meta = {}
+            meta[#meta + 1] = L[answer.needs]
+            if answer.lv then meta[#meta + 1] = string.format(L["Level %s"], answer.lv) end
+            if answer.perHour then meta[#meta + 1] = string.format(L["~%s of it an hour"], answer.perHour >= 1 and FT.Num(math.floor(answer.perHour + 0.5)) or string.format("%.1f", answer.perHour)) end
+            local gph = (answer.perHour or 0) * unit + (answer.steady or 0)
+            if gph > 0 then meta[#meta + 1] = FT.C("up", "~" .. FT.Money(math.floor(gph), "gold") .. " " .. L["an hour"]) end
+            card.meta = table.concat(meta, "  ·  ")
+            chips[#chips + 1] = { string.format(L["needs %s"], L[answer.needs]), "solo" }
         elseif answer and answer.kind == "zone" then
             card.k = string.format(L["BEST FOR YOU (LEVEL %d)"], level)
             card.big = answer.name
@@ -168,6 +195,10 @@ local function Model(id)
             if c.kind == "mob" then
                 odds = Dr.Odds(c.chance) or L["odds unknown"]
                 gph = c.steady and (FT.Money(math.floor(c.steady), "gold") .. L["/h"]) or nil
+            elseif c.kind == "skin" or c.kind == "node" or c.kind == "herb" then
+                local g2 = (c.perHour or 0) * unit + (c.steady or 0)
+                odds = c.can and L[c.needs] or FT.C("dim", string.format(L["needs %s"], L[c.needs]))
+                gph = g2 > 0 and (FT.Money(math.floor(g2), "gold") .. L["/h"]) or nil
             elseif c.kind == "zone" then
                 odds = c.lv and string.format(L["level %s"], c.lv) or ""
             else
@@ -442,3 +473,212 @@ FT.FarmModel = Model
 FT.On("FT_FARM_LOGGED", function()
     if win and win:IsShown() and win.itemID then FT.Debounce("farmWin", 1, function() FT.ShowFarm(win.itemID) end) end
 end)
+
+---------------------------------------------------------------------------
+-- (v0.61) A dungeon's card: a click on one in Farm it > Dungeons. The answer first - gold each a run (or yours
+-- alone, solo) and an hour - then what a run is made of in one bar (coin, what vendors pay, what sells, rare drops
+-- apart), its best loot, your own runs there, and for solo the caveat. Its whole drop list is a button away.
+---------------------------------------------------------------------------
+local dwin
+local PARTS = { { "coin", "Coin", "accent" }, { "vendor", "To a vendor", "muted" }, { "trade", "Sells on the AH", "up" }, { "jackpot", "Rare drops", "purple" } }
+
+local function DWin()
+    if dwin then return dwin end
+    UI.ResolveFont()
+    local ts = tonumber(FT.S and FT.S.textSize) or 0
+    local d = CreateFrame("Frame", "WolfOfBootyBayDungeon", UIParent)
+    d:SetWidth(W_BASE + 30 * ts)
+    d:SetPoint("CENTER", 0, 40)
+    d:SetFrameStrata("DIALOG")
+    d:SetToplevel(true)
+    d:EnableMouse(true)
+    d:SetMovable(true)
+    d:SetClampedToScreen(true)
+    d:RegisterForDrag("LeftButton")
+    d:SetScript("OnDragStart", d.StartMoving)
+    d:SetScript("OnDragStop", d.StopMovingOrSizing)
+    UI.Skin(d, "window", "bg1")
+    d.icon = UI.Icon(d, 34)
+    d.icon:SetPoint("TOPLEFT", PAD + 2, -PAD)
+    d.icon:SetIcon("Interface\\Icons\\INV_Misc_Key_13")
+    d.close = UI.CloseButton(d, function() d:Hide() end, 26)
+    d.close:SetPoint("TOPRIGHT", -6, -6)
+    d.all = UI.Button(d, L["All its drops"], 10, 20, "default", function()
+        d:Hide()
+        if d.info and FT.Tabs.signals.ShowDungeonDrops then FT.Tabs.signals.ShowDungeonDrops(d.info.name) end
+    end)
+    d.all:FitText(16)
+    d.all:SetPoint("RIGHT", d.close, "LEFT", -4, 0)
+    d.title = UI.Text(d, 15, "text")
+    d.title:SetPoint("TOPLEFT", d.icon, "TOPRIGHT", 10, -1)
+    d.title:SetPoint("RIGHT", d.all, "LEFT", -8, 0)
+    d.sum = UI.Text(d, 11, "muted")
+    d.sum:SetPoint("TOPLEFT", d.title, "BOTTOMLEFT", 0, -5)
+    d.sum:SetPoint("RIGHT", d, "RIGHT", -PAD, 0)
+    d.card = UI.Panel(d, "bg2", "accent")
+    d.card.k = UI.Text(d.card, 10, "accent")
+    d.card.k:SetPoint("TOPLEFT", 11, -9)
+    d.card.big = UI.Text(d.card, 20, "text")
+    d.card.big:SetPoint("TOPLEFT", d.card.k, "BOTTOMLEFT", 0, -6)
+    d.card.meta = UI.Text(d.card, 12, "muted")
+    d.card.meta:SetPoint("TOPLEFT", d.card.big, "BOTTOMLEFT", 0, -5)
+    d.card.meta:SetPoint("RIGHT", d.card, "RIGHT", -11, 0)
+    d.card.note = UI.Text(d.card, 11, "orange")
+    d.card.note:SetPoint("TOPLEFT", d.card.meta, "BOTTOMLEFT", 0, -6)
+    d.card.note:SetPoint("RIGHT", d.card, "RIGHT", -11, 0)
+    if d.card.note.SetWordWrap then d.card.note:SetWordWrap(true) end
+    -- what a run is made of
+    d.madeHead = UI.Text(d, 12, "accent")
+    d.bar = CreateFrame("Frame", nil, d)
+    d.bar:SetHeight(10)
+    d.bar.seg = {}
+    d.legend = {}
+    for i, pt in ipairs(PARTS) do
+        d.bar.seg[i] = UI.Tex(d.bar, "ARTWORK", pt[3], 1)
+        d.legend[i] = UI.Text(d, 11, "text")
+    end
+    d.lootHead = UI.Text(d, 12, "accent")
+    d.list = UI.Panel(d, "bg1", "line")
+    d.rows = {}
+    for i = 1, 6 do
+        local r = CreateFrame("Frame", nil, d.list)
+        r:SetHeight(UI.RowH(22))
+        r:SetPoint("TOPLEFT", 1, -2 - (i - 1) * UI.RowH(22))
+        r:SetPoint("RIGHT", d.list, "RIGHT", -1, 0)
+        r.icon = UI.Icon(r, 16)
+        r.icon:SetPoint("LEFT", 8, 0)
+        r.val = UI.Text(r, 12, "text", "RIGHT")
+        r.val:SetPoint("RIGHT", -10, 0)
+        r.name = UI.Text(r, 12, "text")
+        r.name:SetPoint("LEFT", r.icon, "RIGHT", 6, 0)
+        r.name:SetPoint("RIGHT", r.val, "LEFT", -8, 0)
+        r:EnableMouse(true)
+        r:SetScript("OnEnter", function(self) if self.id then UI.TipItem(self, self.id) end end)
+        r:SetScript("OnLeave", function() GameTooltip:Hide() end)
+        d.rows[i] = r
+    end
+    d.mine = UI.Text(d, 11, "muted")
+    d.note = UI.Text(d, 10, "dim")
+    tinsert(UISpecialFrames, "WolfOfBootyBayDungeon")
+    d:Hide()
+    dwin = d
+    return d
+end
+
+-- d: a dungeon from FT.Drops.Dungeons(mode); mode: "full", "trash" or "solo"
+function FT.ShowDungeon(info, mode)
+    if not info then return end
+    local d = DWin()
+    d.info = info
+    local width = d:GetWidth()
+    local inner = width - 2 * PAD
+    local solo = info.solo
+    d.title:SetText(info.name)
+    UI.FitBits(d.sum, string.format(L["Level %s"], info.lv) .. FT.C("dim", "  ·  ") .. string.format(L["the door is in %s"], L[info.door] or info.door)
+        .. FT.C("dim", "  ·  ") .. string.format(L["~%d min a run"], info.min))
+    local top = PAD + 34 + 14
+    -- the answer
+    local c = d.card
+    c:ClearAllPoints()
+    c:SetPoint("TOPLEFT", PAD, -top)
+    c:SetPoint("RIGHT", d, "RIGHT", -PAD, 0)
+    c.k:SetText((solo and L["ON YOUR OWN"]) or (mode == "trash" and L["A GROUP OF 5, THE TRASH ONLY"]) or L["A GROUP OF 5, A FULL CLEAR"])
+    c.big:SetText(string.format(solo and L["~%s a run"] or L["~%s each a run"], FT.Money(math.floor(info.each), "gold")))
+    local runs = math.floor(60 / math.max(info.min, 1) + 0.5)
+    c.meta:SetText(string.format(solo and L["~%s an hour"] or L["~%s an hour each"], FT.Money(math.floor(info.hour), "gold"))
+        .. FT.C("dim", "  ·  " .. (runs >= 1 and string.format(L["%d runs an hour"], math.min(runs, 5)) or string.format(L["one run in %d min"], info.min))))
+    local note = nil
+    if solo then
+        note = info.hardSolo and L["Hard solo: under 8 levels below you, its elites hit back. Smaller pulls, and slower."]
+            or L["Solo: for a geared class that holds big pulls (warrior, paladin, druid, warlock, mage)."]
+    end
+    c.note:SetShown(note ~= nil)
+    c.note:SetWidth(inner - 22)
+    c.note:SetText(note or "")
+    local noteH = note and math.max(UI.Size(11) + 2, math.ceil((c.note:GetStringWidth() or 0) / math.max(1, inner - 22)) * (UI.Size(11) + 3)) or 0
+    local cardH = 9 + UI.Size(10) + 6 + UI.Size(20) + 5 + UI.Size(12) + (note and (6 + noteH) or 0) + 12
+    c:SetHeight(cardH)
+    top = top + cardH + 14
+    -- what a run is made of: one bar, then its parts in words
+    local split = solo and 1 or 5
+    local vals = { info.coin / split, (info.vendor or 0) / split, (info.trade or 0) / split, (info.jackpot or 0) / split }
+    local total = 0
+    for _, v in ipairs(vals) do total = total + math.max(0, v) end
+    d.madeHead:ClearAllPoints()
+    d.madeHead:SetPoint("TOPLEFT", PAD + 2, -top)
+    d.madeHead:SetText(solo and L["What a run is made of"] or L["What your share of a run is made of"])
+    top = top + UI.Size(12) + 8
+    d.bar:ClearAllPoints()
+    d.bar:SetPoint("TOPLEFT", PAD, -top)
+    d.bar:SetPoint("RIGHT", d, "RIGHT", -PAD, 0)
+    local x = 0
+    for i, seg in ipairs(d.bar.seg) do
+        local w = total > 0 and inner * math.max(0, vals[i]) / total or 0
+        seg:ClearAllPoints()
+        seg:SetPoint("TOPLEFT", d.bar, "TOPLEFT", x, 0)
+        seg:SetSize(math.max(0.01, w), 10)
+        seg:SetShown(w >= 1)
+        x = x + w
+    end
+    top = top + 10 + 8
+    -- the parts, two to a line
+    local col = inner / 2
+    local n = 0
+    for i, pt in ipairs(PARTS) do
+        local t = d.legend[i]
+        local show = vals[i] >= 1
+        t:SetShown(show)
+        if show then
+            t:ClearAllPoints()
+            t:SetPoint("TOPLEFT", PAD + 2 + (n % 2) * col, -(top + math.floor(n / 2) * (UI.Size(11) + 8)))
+            t:SetWidth(col - 8)
+            t:SetText(FT.C(pt[3], L[pt[2]]) .. "  " .. FT.C("text", FT.Money(math.floor(vals[i]), "gold"))
+                .. (pt[1] == "jackpot" and FT.C("dim", " " .. L["on average"]) or ""))
+            n = n + 1
+        end
+    end
+    top = top + math.ceil(n / 2) * (UI.Size(11) + 8) + 8
+    -- the best loot
+    local items = {}
+    for _, t in ipairs(info.top or {}) do if #items < 6 and t.worth >= 100 then items[#items + 1] = t end end
+    d.lootHead:SetShown(#items > 0)
+    d.list:SetShown(#items > 0)
+    if #items > 0 then
+        d.lootHead:ClearAllPoints()
+        d.lootHead:SetPoint("TOPLEFT", PAD + 2, -top)
+        d.lootHead:SetText(L["Its best loot, a run"])
+        top = top + UI.Size(12) + 6
+        d.list:ClearAllPoints()
+        d.list:SetPoint("TOPLEFT", PAD, -top)
+        d.list:SetPoint("RIGHT", d, "RIGHT", -PAD, 0)
+        local rh = UI.RowH(22)
+        d.list:SetHeight(#items * rh + 4)
+        for i, r in ipairs(d.rows) do
+            local t = items[i]
+            r:SetShown(t ~= nil)
+            if t then
+                r.id = t.id
+                r.icon:SetItem(t.id)
+                local cnt = t.n >= 10 and FT.Num(math.floor(t.n + 0.5)) or string.format("%.1f", t.n)
+                UI.FitBits(r.name, FT.ItemText(t.id, 32) .. FT.C("dim", "  x" .. cnt .. (t.jackpot and ("  ·  " .. L["rare"]) or "")))
+                r.val:SetText(FT.Money(math.floor(t.worth / split), "short") .. (split > 1 and FT.C("dim", " " .. L["each"]) or ""))
+            end
+        end
+        top = top + #items * rh + 4 + 10
+    end
+    -- your own runs, and the small print
+    d.mine:ClearAllPoints()
+    d.mine:SetPoint("TOPLEFT", PAD + 2, -top)
+    d.mine:SetPoint("RIGHT", d, "RIGHT", -PAD, 0)
+    UI.FitBits(d.mine, info.measured and FT.C("up", string.format(L["Your own runs here: %s an hour"], FT.Money(math.floor(info.measured), "gold")))
+        or L["Run it once: the farming tracker measures your own gold an hour here."])
+    top = top + UI.Size(11) + 8
+    d.note:ClearAllPoints()
+    d.note:SetPoint("TOPLEFT", PAD + 2, -top)
+    d.note:SetPoint("RIGHT", d, "RIGHT", -PAD, 0)
+    UI.FitBits(d.note, L["Averages of its loot tables at today's prices: a lucky drop beats it, a dry run doesn't."])
+    top = top + UI.Size(10) + PAD
+    d:SetHeight(top)
+    d:Show()
+    d:Raise()
+end

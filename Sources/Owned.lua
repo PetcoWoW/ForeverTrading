@@ -262,6 +262,64 @@ local function TellUndercuts()
 end
 
 local function SoonTell() FT.Debounce("undercuts", 2, TellUndercuts) end
+
+---------------------------------------------------------------------------
+-- (v0.61) Undercut since when, and since the last prices: your listings (kept away from the auction house too)
+-- against the newest prices - a reload with the prices companion's, a scan of yours or a guildmate's. Each one
+-- undercut keeps the time it was first seen; after a login or /reload, the ones new since last time are one quiet
+-- line in chat with [See them] (Sell > My auctions)
+---------------------------------------------------------------------------
+function O.CheckSinceLast()
+    local l = O.List()
+    local before = FT.db.undercut or {}
+    local now, news = {}, {}
+    for _, a in ipairs(l or {}) do
+        if a.auctionID and not a.sold then
+            local low = O.Undercut(a)
+            if low then
+                local prev = before[a.auctionID]
+                now[a.auctionID] = { low = low, since = prev and prev.since or time() }
+                if not prev then news[#news + 1] = a end
+            end
+        end
+    end
+    FT.db.undercut = now
+    return news
+end
+function O.UndercutSince(a)
+    local x = a and a.auctionID and FT.db and FT.db.undercut and FT.db.undercut[a.auctionID]
+    return x and x.since or nil
+end
+-- your listings of an item now: { qty, unit (the lowest of yours), low (the others' lowest under it), since }
+function O.Mine(itemID)
+    local out
+    for _, a in ipairs((O.List()) or {}) do
+        if a.itemID == itemID and not a.sold and a.unit then
+            out = out or { qty = 0 }
+            out.qty = out.qty + (a.qty or 1)
+            if not out.unit or a.unit < out.unit then out.unit = a.unit end
+            local low = O.Undercut(a)
+            if low and (not out.low or low < out.low) then out.low, out.since = low, O.UndercutSince(a) end
+        end
+    end
+    return out
+end
+
+FT.ChatAction("auctions", function() FT.Show("sell") end)
+local checkedThisLogin = false
+FT.On("FT_MARKET_READY", function()
+    if checkedThisLogin then return end
+    checkedThisLogin = true
+    C_Timer.After(15, function()
+        local news = O.CheckSinceLast()
+        if #news == 0 or FT.S.undercutAlert == false then return end
+        local names = {}
+        for i = 1, math.min(2, #news) do names[i] = news[i].link or FT.ItemText(news[i].itemID, 30) end
+        FT.Print(string.format(#news == 1 and L["Undercut since the last prices: %s. %s"] or L["%d of your auctions undercut since the last prices: %s. %s"],
+            #news == 1 and names[1] or #news, #news == 1 and FT.ChatLink("auctions", L["See it"], L["Sell > My auctions."]) or table.concat(names, ", "),
+            #news > 1 and FT.ChatLink("auctions", L["See them"], L["Sell > My auctions."]) or nil))
+    end)
+end)
 FT.On("FT_OWNED_CHANGED", SoonTell)
 FT.On("FT_SCAN_DONE", SoonTell)
 FT.On("FT_LIVE_UPDATED", function(itemID)

@@ -4,7 +4,7 @@ local L = FT.L
 
 -- The version being released: a copy straight from the repository (not packaged) has no version in its TOC yet
 -- (the packager puts the tag there) and shows this one. Set it with every release.
-local RELEASE = "v0.60"
+local RELEASE = "v0.61"
 local GetMeta = (C_AddOns and C_AddOns.GetAddOnMetadata) or GetAddOnMetadata
 FT.VERSION = (GetMeta and GetMeta(ADDON, "Version")) or RELEASE
 if FT.VERSION == "" or FT.VERSION:find("@", 1, true) then FT.VERSION = RELEASE end
@@ -930,8 +930,6 @@ SlashCmdList.WOLFOFBOOTYBAY = function(msg)
     elseif cmd == "build" then
         -- (v0.58) the build running (a /reload after the companion's update shows the new one) and the companion's note
         FT.Print(string.format(L["This is Wolf %s."], FT.VERSION_TEXT or FT.VERSION))
-        -- a line a spare file (Extra\) can set: proof a /reload loaded code put in while the game ran
-        if FT.SPARE_NOTE then FT.Print(FT.C("up", FT.SPARE_NOTE)) end
         local n = FT.Companion and FT.Companion.Note()
         if n then
             FT.Print(FT.C("dim", string.format(L["Prices companion %s, checked %s%s%s."], n.version or "?", FT.Ago(n.checked),

@@ -1,5 +1,32 @@
 # Wolf
 
+## v0.61 - getting around, honest dungeons, your auctions in place
+
+- **Back and Forward** by the search box, like a browser (the mouse's side buttons too): every page, section,
+  Farm it mode and item you open is a step; their hover says where they go.
+- **The search box doesn't jump:** what you type shows the items it finds right under it, with price and verdict;
+  only picking one opens it.
+- **Right-click the wolf by the minimap:** a session running (yours or one tracking itself) shows its card - where
+  and what, the gold, gold an hour, its best loot - with Show on screen and Stop and save. Nothing running: Start a
+  session.
+- **Farm it:** the sections on one row, the mode's own choice on its own row below ("How you run it: Full clear ·
+  Trash only · Solo"). A click on a dungeon opens its card: gold each a run and an hour, what a run is made of
+  (coin, vendor loot, what sells, rare drops), its best loot, your own runs there.
+- **Dungeon gold checked:** world greens no longer count (Maraudon had ~80g a run of them: 54 Brutish Gauntlets),
+  loot from cMaNGOS's full tables, clear times at least a minute for every 5 mobs, and stacks past what the auction
+  house buys count at a vendor. Maraudon: ~43g a run, ~8.6g each in a group (the guides: ~8g).
+- **Skinning and gathering** in Where to farm it: items and gold an hour like drops, with what they need; only a
+  profession one of your characters has can be the answer.
+- **Your auctions where you look:** an item's page says "your 5 listed at 12g, undercut by 40s since 2 pm" (or the
+  cheapest); Holdings has an "undercut" badge to My auctions; after a login, one line for listings undercut since
+  the last prices.
+- **Your buys and sales on the chart:** a green dot where you bought, gold where you sold, and under the mouse how
+  many at what (from the auction house's mail).
+- **Two lanes:** every build reaches the prices companion's friends at once; CurseForge gets a version when it's
+  released there. Wolf no longer points to the companion, and a CurseForge user isn't told about a friend's newer
+  build. The companion updates only when Wolf's own files change.
+- Make gold's list box says "Filter this list...", apart from the search at the top.
+
 ## v0.60 - a test update (not on CurseForge)
 
 - Only for testing the prices companion's updates: a new version number and a line in a spare file

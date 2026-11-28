@@ -200,6 +200,20 @@ function UI.Chart(parent)
                 end
             end
         end
+        -- (v0.61) your buys and sales in view: their prices in the range too
+        local tradeAt = {}
+        if d.trades and #d.trades > 0 then
+            for _, tr in ipairs(d.trades) do
+                local idx
+                for i = first, last do if candles[i].t <= tr.t then idx = i else break end end
+                if idx and (idx < last or tr.t - candles[last].t < 2 * 86400) then
+                    tradeAt[#tradeAt + 1] = { tr = tr, i = idx }
+                    if tr.unit < lo then lo = tr.unit end
+                    if tr.unit > hi then hi = tr.unit end
+                end
+            end
+        end
+        self.tradeAt = tradeAt
         if d.centerZero then
             -- zero in the middle: the same room above (profit) and below (loss)
             local m = math.max(math.abs(lo), math.abs(hi))
@@ -447,6 +461,30 @@ function UI.Chart(parent)
             end
         end
 
+        -- (v0.61) your buys (green) and sales (gold): a dot each where and at what price, ringed so the line
+        -- never hides it
+        for _, x in ipairs(tradeAt) do
+            local i, tr = x.i, x.tr
+            local nx = candles[i + 1]
+            local frac = (nx and nx.t > candles[i].t) and math.min(1, (tr.t - candles[i].t) / (nx.t - candles[i].t)) or 0
+            local px, py = X(i) + frac * slot, Y(tr.unit)
+            local ring = self.rects:Get()
+            ring:SetTexture("Interface\\AddOns\\WolfOfBootyBay\\media\\round.tga")
+            ring:SetVertexColor(C.bg0[1], C.bg0[2], C.bg0[3], 1)
+            ring:ClearAllPoints()
+            ring:SetPoint("CENTER", self.plot, "BOTTOMLEFT", px, py)
+            ring:SetSize(12, 12)
+            ring:Show()
+            local col = tr.buy and C.up or C.accent
+            local dot = self.rects:Get()
+            dot:SetTexture("Interface\\AddOns\\WolfOfBootyBay\\media\\round.tga")
+            dot:SetVertexColor(col[1], col[2], col[3], 1)
+            dot:ClearAllPoints()
+            dot:SetPoint("CENTER", self.plot, "BOTTOMLEFT", px, py)
+            dot:SetSize(8, 8)
+            dot:Show()
+        end
+
         -- a reference line (zero profit, break-even...)
         if d.baseline and d.baseline > lo and d.baseline < hi then
             local y = Y(d.baseline)
@@ -571,6 +609,13 @@ function UI.Chart(parent)
                 local hex = string.format("%02x%02x%02x", math.floor(col[1] * 255), math.floor(col[2] * 255),
                     math.floor(col[3] * 255))
                 parts[#parts + 1] = "|cff" .. hex .. ov.label .. " " .. Fmt(d, v) .. "|r"
+            end
+        end
+        -- (v0.61) your buys and sales on that day, under the mouse
+        for _, x in ipairs(self.tradeAt or {}) do
+            if x.i == i then
+                parts[#parts + 1] = FT.C(x.tr.buy and "up" or "accent", string.format(x.tr.buy and L["you bought %s at %s"] or L["you sold %s at %s"],
+                    FT.Num(x.tr.q), FT.Money(math.floor(x.tr.unit), "short")))
             end
         end
         self.legendMA:SetText(table.concat(parts, "   "))

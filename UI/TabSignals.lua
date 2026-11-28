@@ -244,6 +244,7 @@ local function BuildDeals(p)
     local box = UI.Panel(f, "bg1", "line")
     box:SetPoint("TOPLEFT", 0, -50)
     box:SetPoint("BOTTOMRIGHT", 0, 0)
+    f.box = box
     f.list = UI.List(box, {
         rowHeight = UI.RowH(46),
         setup = RowSetup,
@@ -489,6 +490,7 @@ local function ListView(p, onClick, onEnter)
     local box = UI.Panel(f, "bg1", "line")
     box:SetPoint("TOPLEFT", 0, -50)
     box:SetPoint("BOTTOMRIGHT", 0, 0)
+    f.box = box
     f.list = UI.List(box, {
         rowHeight = UI.RowH(46),
         setup = RowSetup,
@@ -788,17 +790,15 @@ local function DungeonTip(row, x)
         GameTooltip:AddLine(L["Hard solo: under 8 levels below you, its elites hit back. Smaller pulls, and slower."], 1, 0.6, 0.18, true)
     end
     GameTooltip:AddLine(L["The average of its loot tables: a lucky epic beats it, a dry run doesn't."], 0.6, 0.64, 0.7, true)
-    GameTooltip:AddLine(L["Click: what drops in it, best first"], 0.6, 0.64, 0.7)
+    GameTooltip:AddLine(L["Click: its card - what a run is made of, its best loot"], 0.6, 0.64, 0.7)
     GameTooltip:Show()
 end
 
 local function BuildFarmView(p)
     local f = ListView(p, function(x, button)
         if x.dungeonInfo then
-            -- a dungeon: its drops
-            dropDungeon, farmMode = x.dungeonInfo.name, "drops"
-            if farmView then farmView.kind:SetValue("drops") end
-            T.RefreshFarm()
+            -- (v0.61) a dungeon: its card (its whole drop list is a button there)
+            FT.ShowDungeon(x.dungeonInfo, dungeonMode)
             return
         end
         if button == "RightButton" then UI.WatchMenu(x.id) return end
@@ -824,10 +824,22 @@ local function BuildFarmView(p)
         farmMode = v
         if v ~= "drops" then dropDungeon = nil end
         T.RefreshFarm()
+        if FT.NavNote then FT.NavNote() end
     end, 22)
     f.kind:SetPoint("TOPLEFT", 0, -1)
     f.kind:SetValue(farmMode)
     T.farmKindBar = f.kind
+    -- (v0.61) a dungeon's drops (its card's All its drops)
+    function T.ShowDungeonDrops(name)
+        dropDungeon, farmMode = name, "drops"
+        f.kind:SetValue("drops")
+        T.RefreshFarm()
+        if FT.NavNote then FT.NavNote() end
+    end
+    -- (v0.61) Farm it's mode, for Back and Forward
+    function T.FarmMode() return farmMode end
+    function T.SetFarmMode(v) farmMode = v; if v ~= "drops" then dropDungeon = nil end; f.kind:SetValue(v); T.RefreshFarm(); if FT.NavNote then FT.NavNote() end end
+    function T.FarmModeName(v) for _, k in ipairs(FARM_MODES) do if k[1] == v then return L[k[2]] end end return v end
     -- next to it, the choice of the mode: the kind of material / how drops sort / full clears or the trash
     local mats = {}
     for _, k in ipairs(FARM_KINDS) do mats[#mats + 1] = { k[1], L[k[2]] } end
@@ -835,26 +847,29 @@ local function BuildFarmView(p)
         farmKind = v
         T.RefreshFarm()
     end)
-    f.mat:SetPoint("LEFT", f.kind, "RIGHT", 8, 0)
+    -- (v0.61) the mode's own choice on a second row, with its label: the sections stay alone on the first
+    f.row2 = UI.Text(f, 12, "muted")
+    f.row2:SetPoint("TOPLEFT", 2, -36)
+    f.mat:SetPoint("LEFT", f.row2, "RIGHT", 10, 0)
     f.mat:SetValue(farmKind)
     f.sort = UI.Segmented(f, { { "price", L["Priciest"] }, { "hour", L["Per hour"] } }, function(v)
         dropSort = v
         T.RefreshFarm()
     end, 22)
-    f.sort:SetPoint("LEFT", f.kind, "RIGHT", 8, 0)
+    f.sort:SetPoint("LEFT", f.row2, "RIGHT", 10, 0)
     f.sort:SetValue(dropSort)
     f.trash = UI.Segmented(f, { { "full", L["Full clear"] }, { "trash", L["Trash only"] }, { "solo", L["Solo"] } }, function(v)
         dungeonMode = v
         T.RefreshFarm()
     end, 22)
-    f.trash:SetPoint("LEFT", f.kind, "RIGHT", 8, 0)
+    f.trash:SetPoint("LEFT", f.row2, "RIGHT", 10, 0)
     f.trash:SetValue("full")
     f.allDrops = UI.Button(f, L["All drops"], 80, 22, "default", function()
         dropDungeon = nil
         T.RefreshFarm()
     end)
     f.allDrops:FitText(16)
-    f.allDrops:SetPoint("LEFT", f.sort, "RIGHT", 8, 0)
+    f.allDrops:SetPoint("LEFT", f.sort, "RIGHT", 12, 0)
     f.hint:SetText(L["Raw materials by what one farmer could sell of them a day, best first. Click one: where to farm it for your level."])
     f.list:SetEmptyText(L["No sales seen yet: the price feed fills this over a few hours."])
     return f
@@ -951,6 +966,17 @@ function T.RefreshFarm()
     f.sort:SetShown(farmMode == "drops")
     f.trash:SetShown(farmMode == "dungeons")
     f.allDrops:SetShown(farmMode == "drops" and dropDungeon ~= nil)
+    -- (v0.61) two rows: the sections, then this mode's own choice (Next week has none: the list moves up)
+    local two = farmMode ~= "next"
+    f.row2:SetShown(two)
+    f.row2:SetText((farmMode == "all" and L["What you gather"]) or (farmMode == "drops" and L["Sort by"]) or L["How you run it"])
+    local top = two and 34 or 0
+    f.hint:ClearAllPoints()
+    f.hint:SetPoint("TOPLEFT", 0, -32 - top)
+    f.hint:SetPoint("RIGHT", 0, 0)
+    f.box:ClearAllPoints()
+    f.box:SetPoint("TOPLEFT", 0, -50 - top)
+    f.box:SetPoint("BOTTOMRIGHT", 0, 0)
     f.count:SetText("")
     if farmMode == "next" then
         local rows = NextWeekRows()
@@ -979,7 +1005,7 @@ function T.RefreshFarm()
         elseif dungeonMode == "trash" then
             hint = L["The trash only (no bosses): the steady gold of a run, split five ways."]
         else
-            hint = L["Each run's steady gold at today's prices, split five ways; rare drops apart. Click one: its drops."]
+            hint = L["Each run's steady gold at today's prices, split five ways; rare drops apart. Click one: its card."]
         end
         f.hint:SetText(hint)
         f.list:SetEmptyText(dungeonMode == "solo" and L["No dungeon is far enough under your level to solo yet."] or L["No dungeon found."])
@@ -1033,7 +1059,7 @@ function T.Build(p)
 
     -- the search, next to the title: every column keeps only what matches ("name" in quotes: that name exactly)
     T.search = ""
-    T.searchBox = UI.Input(head, 220, 22, L["Search item..."], function(text)
+    T.searchBox = UI.Input(head, 220, 22, L["Filter this list..."], function(text)
         T.search = text or ""
         FT.Debounce("signalsSearch", 0.25, T.Refresh)
     end)

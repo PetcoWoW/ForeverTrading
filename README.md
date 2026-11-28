@@ -15,12 +15,14 @@ and the words and adds its own features. See `NOTICE`.
 1. **The addon:** [Wolf on CurseForge](https://www.curseforge.com/wow/addons/wolf-ah-stock-market) - install it with the CurseForge app. New
    versions arrive through CurseForge. Or take the newest zip from this repository's **Releases** page and put the
    `WolfOfBootyBay` folder into `World of Warcraft/<your Forever client>/Interface/AddOns/`.
-2. **Hourly prices (Windows):** [WolfPricesSetup.exe](https://github.com/PetcoWoW/ForeverTrading/releases/download/companion/WolfPricesSetup.exe), the Wolf prices companion. Run it, click Install.
-   In game: Settings > About > Prices companion.
+2. Wolf works with Auctionator: its scans and yours keep the prices fresh, and Wolf users in your guild share theirs.
+
+**Two lanes (v0.61):** every build goes to this repository's releases at once (the prices companion below, and
+WowUp); CurseForge gets a version when it's released there, after it's been played with for a while.
 
 Restart the game fully the first time (new addon files load at launch, not on `/reload`), then type `/wolf`.
 
-## The window (v0.59)
+## The window (v0.61)
 
 Four tabs: **Today** (what you own and what the last prices did to it, a calendar of what's coming, your best moves,
 your bags, your movers, and what happened while you were away), **Market** (search any item: the verdict first, one chart, when it
@@ -47,8 +49,8 @@ with new files (the game reads the file list only at launch) waits until you clo
 spare files in its list (Extra\, Data\Extra*.lua) for new code to go into. Off: "Keep Wolf
 updated" in its tray menu. A copy made with git is never touched.
 
-- **Download:** [WolfPricesSetup.exe](https://github.com/PetcoWoW/ForeverTrading/releases/download/companion/WolfPricesSetup.exe). Setup finds World of Warcraft and the addon, installs for your
-  Windows user only (no admin rights) and starts with Windows if you leave that ticked.
+- **Getting it:** handed out by the author to friends and guildmates. Setup finds World of Warcraft and the addon,
+  installs for your Windows user only (no admin rights) and starts with Windows if you leave that ticked.
 - **What it touches:** the addon's price file (`Interface/AddOns/WolfOfBootyBay/Data/Feed.lua`), a one-line note
   beside it (`Data/Companion.lua`: when it last checked), its settings and log in `%APPDATA%\WolfPrices`, and
   itself in `%LOCALAPPDATA%\Programs\WolfPrices`. Nothing else: no accounts, no game memory, no data sent anywhere.

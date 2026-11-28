@@ -525,6 +525,30 @@ local function AutoName(s)
     return string.format("%s · %s, %d min", s.zone or "?", L[best], math.floor((s.secs or 0) / 60 + 0.5))
 end
 
+-- (v0.61) what a session is called while it runs: its zone, and for a farming one what it's mostly ("Felwood · herbs")
+function Ses.Label(s)
+    s = s or FT.db.session
+    if not s then return nil end
+    if s.auto then return (AutoName(s):gsub(", %d+ min$", "")) end
+    return s.zone or "?"
+end
+
+-- (v0.61) on screen: the small session window. Yours by Settings (Session panel), a farming one only when pinned;
+-- the minimap's session card pins or unpins either
+function Ses.OnScreen(s)
+    s = s or FT.db.session
+    if not s then return false end
+    if s.pinned ~= nil then return s.pinned end
+    return not s.auto and FT.S.sessionPanel ~= false
+end
+function Ses.SetOnScreen(on)
+    local s = FT.db.session
+    if not s then return end
+    s.pinned = on and true or false
+    FT.Fire("FT_SESSION_CHANGED")
+    if FT.UpdateHUD then FT.UpdateHUD() end
+end
+
 local AUTO_MIN_SECS, AUTO_MIN_LOOTS = 300, 3
 function Ses.Stop()
     local s = FT.db.session

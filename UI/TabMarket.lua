@@ -1451,6 +1451,18 @@ function T.ShowItem(id, keepView)
     end
     local own = FT.Port.Count(id)
     if own > 0 then parts[#parts + 1] = FT.C("text", string.format(L["you have %s"], FT.Num(own))) end
+    -- (v0.61) your listing of it, first: undercut (by how much, since when) or the cheapest
+    local mine = FT.Owned and FT.Owned.Mine and FT.Owned.Mine(id)
+    if mine then
+        local bit = string.format(L["your %s listed at %s"], FT.Num(mine.qty), FT.Money(math.ceil(mine.unit), "short"))
+        if mine.low then
+            bit = FT.C("down", bit .. ", " .. string.format(L["undercut by %s"], FT.Money(math.ceil(mine.unit) - mine.low, "short"))
+                .. (mine.since and (" " .. string.format(L["since %s"], FT.TimeOfDay(mine.since))) or ""))
+        else
+            bit = FT.C("up", bit .. ", " .. L["the cheapest"])
+        end
+        table.insert(parts, 1, bit)
+    end
     local s = FT.An.Stats(id)
     local head = UI.RiskHead(s)
     for i = #head, 1, -1 do table.insert(parts, 1, head[i]) end
@@ -1851,6 +1863,12 @@ function T.ClearSelection()
 end
 
 -- back to the market's home: the overview (mood, listed value, the week, what's moving)
+-- (v0.61) the item page's chart (for the tests)
+function T.ItemChart() return itemView and itemView.chart end
+
+-- (v0.61) the item open (nil: the market's home), for Back and Forward
+function T.CurrentItem() return (not state.home) and state.selected or nil end
+
 function T.Home()
     state.selected, state.home = nil, true
     if list then list:Refresh() end

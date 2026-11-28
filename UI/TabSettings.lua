@@ -219,7 +219,7 @@ function T.Build(p)
     -- sources
     local so = Section(left, L["Sources"], 3)
     Check(so, "useFeed", L["Price feed"],
-        L["Prices of every auction house, built hourly from Blizzard's own auction data and shipped with each update: prices before your first scan, and charts for the days you didn't scan. New ones about every hour: the prices companion (Settings > About) downloads them, /reload loads them."],
+        L["Prices of every auction house, built hourly from Blizzard's own auction data and shipped with each update: prices before your first scan, and charts for the days you didn't scan. Newer ones come with each Wolf update."],
         function() FT.Fire("FT_SOURCES_CHANGED"); if FT.Feed then FT.Feed.Take() end end)
     Check(so, "scanWithAuctionator", L["One scan for both"],
         L["Full scan runs Auctionator's scan when Auctionator is installed: one scan, and both addons get the prices."])
@@ -235,14 +235,18 @@ function T.Build(p)
         L["Bars from ore, cloth bolts from cloth...: when one of your characters knows the recipe and it costs less than buying."])
 
     -- alerts
-    local al = Section(left, L["Alerts"], 8)
+    -- (v0.61) the companion's setting only where it runs (it's for friends, given by hand)
+    local hasCompanion = FT.Companion and FT.Companion.Note() ~= nil
+    local al = Section(left, L["Alerts"], hasCompanion and 8 or 7)
     Check(al, "eyeChat", L["The wolf's notes in chat"], L["At login and /reload: your portfolio, what moved in what you hold most and watch since you were last told, and up to three moves (sell, buy, craft, gather). After a scan of yours: what moved. Only what matters; never anything on screen."])
     Check(al, "sessionPanel", L["Session panel"], L["The small panel on screen while a session runs: time, worth, gold an hour, your best loot."],
         function() FT.UpdateHUD() end)
     Check(al, "autoSession", L["Track farming by itself"],
         L["Your first gather or loot out of town starts a session quietly; 5 minutes without loot pauses it (that time doesn't count), 30 ends it. Saved in You > Sessions. Your own sessions stay as they are."])
-    Check(al, "autoLoad", L["Load fresh prices when the auction house opens"],
-        L["When the prices companion has newer prices waiting, Wolf reloads the moment you open the auction house (a few seconds), before you shop. Off: a chat line and the minimap dot say so, and you choose."])
+    if hasCompanion then
+        Check(al, "autoLoad", L["Load fresh prices when the auction house opens"],
+            L["When the prices companion has newer prices waiting, Wolf reloads the moment you open the auction house (a few seconds), before you shop. Off: a chat line and the minimap dot say so, and you choose."])
+    end
     Check(al, "meme", L["Meme mode"],
         L["TO THE MOON and RUG PULL names on the Terminal, WHALE ALERT when one seller holds most of an item, APE IN on the strongest buys."])
     Check(al, "watchLive", L["Watchlist deals at the auction house"],
@@ -370,12 +374,6 @@ function T.Build(p)
     local tour = UI.Button(ab, L["Take the tour again"], 10, 24, "default", function() FT.Tour.Start() end)
     tour:FitText(28)
     tour:SetPoint("LEFT", news, "RIGHT", 8, 0)
-    -- the companion app: fresh prices every 15 minutes, whatever installed the addon (Windows)
-    local comp = UI.Button(ab, L["Prices companion"], 10, 24, "default", function()
-        FT.ShowLink(L["Wolf prices companion (Windows)"], FT.Companion.Pitch(), FT.Companion.URL)
-    end)
-    comp:FitText(28)
-    comp:SetPoint("LEFT", gh, "RIGHT", 8, 0)
 
     -- every chat command, for reference (all of them have a button somewhere: these are the rare way)
     local cm = Section(right, L["Chat commands"], #FT.COMMANDS + 1)

@@ -41,25 +41,67 @@ T.FindItem = FindItem
 
 -- (v0.54) what the item box suggests as you type: up to 8 items on the market with every word of it in their name,
 -- those whose name starts with it first, then the busiest
+-- (v0.61) every market item's folded name, kept per market build (folding 7,000 names a keystroke was ~50 ms)
+local names, namesFor = nil, nil
+local function Names()
+    local rows = FT.Market.Rows() or {}
+    if namesFor ~= rows or not names then
+        names, namesFor = {}, rows
+        for _, r in ipairs(rows) do
+            local n = r.id and FT.Name(r.id)
+            if n then names[#names + 1] = { id = r.id, name = FT.Fold(n), v = r.qty or 0 } end
+        end
+    end
+    return names
+end
+
+-- built in the background a few hundred names a frame after new prices, so a keystroke never waits for it
+local function Warm()
+    local rows = FT.Market.Rows() or {}
+    local fresh = {}
+    FT.Job("searchNames", #rows, function(k)
+        local r = rows[k]
+        local n = r and r.id and FT.Name(r.id)
+        if n then fresh[#fresh + 1] = { id = r.id, name = FT.Fold(n), v = r.qty or 0 } end
+    end, function() names, namesFor = fresh, rows end)
+end
+FT.On("FT_MARKET_READY", function() FT.Debounce("searchNames", 3, Warm) end)
+FT.On("FT_ITEMS_LOADED", function() FT.Debounce("searchNames", 3, Warm) end)
+
 local function Suggest(text)
     local q = FT.Fold(text or ""):gsub("^%s+", ""):gsub("%s+$", "")
     if #q < 2 then return {} end
-    local match = FT.NameMatcher(text)
-    if not match then return {} end
-    local found = {}
-    for _, r in ipairs(FT.Market.Rows() or {}) do
-        if r.id and match(r.id) then
-            local name = FT.Fold(FT.Name(r.id) or "")
-            found[#found + 1] = { id = r.id, starts = name:sub(1, #q) == q, v = (r.qty or 0), name = name }
-        end
-    end
-    table.sort(found, function(a, b)
+    local words = {}
+    for w in q:gsub('"', ""):gmatch("%S+") do words[#words + 1] = w end
+    if #words == 0 then return {} end
+    -- the best 8 kept while looking (those starting with it first, then the busiest): no sort of every match
+    local best = {}
+    local function Better(a, b)
         if a.starts ~= b.starts then return a.starts end
         if a.v ~= b.v then return a.v > b.v end
         return a.name < b.name
-    end)
+    end
+    local w1, nw = words[1], #words
+    for _, x in ipairs(Names()) do
+        local name = x.name
+        if name:find(w1, 1, true) then
+            local ok = true
+            for k = 2, nw do if not name:find(words[k], 1, true) then ok = false break end end
+            if ok then
+                local starts = name:find(q, 1, true) == 1
+                local last = best[8]
+                -- (a table only for one that gets in)
+                if not last or (starts and not last.starts) or (starts == last.starts and (x.v > last.v or (x.v == last.v and name < last.name))) then
+                    local c = { id = x.id, starts = starts, v = x.v, name = name }
+                    local i = math.min(#best + 1, 8)
+                    while i > 1 and Better(c, best[i - 1]) do best[i] = best[i - 1]; i = i - 1 end
+                    best[i] = c
+                end
+            end
+        end
+    end
     local out = {}
-    for i = 1, math.min(8, #found) do out[i] = found[i].id end
+    for i = 1, math.min(8, #best) do out[i] = best[i].id end
     return out
 end
 T.Suggest = Suggest

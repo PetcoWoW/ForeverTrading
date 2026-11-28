@@ -246,13 +246,24 @@ local SOLO_SLOW = { easy = 1.4, hard = 2.2 }
 D.SOLO_CLASSES = { WARRIOR = true, PALADIN = true, DRUID = true, WARLOCK = true, MAGE = true }
 local function HighLevel(lv) local a, b = tostring(lv or ""):match("^(%d+)%-?(%d*)") return tonumber(b ~= "" and b or a) end
 
+local dngCache, dngFor = {}, nil
 function D.Dungeons(mode)
     if mode == true then mode = "trash" end
     mode = mode or "full"
+    -- (v0.61) worked out once per market build, your level and the mode (every item's price and sales a run is
+    -- ~30 ms: not on every refresh)
+    local rows = FT.Market.Rows()
+    if dngFor ~= rows then dngCache, dngFor = {}, rows end
+    local ck = mode .. "|" .. (FT.Me and FT.Me.Level() or 60)
+    if dngCache[ck] then return dngCache[ck] end
+    local result = D.DungeonsNow(mode)
+    dngCache[ck] = result
+    return result
+end
+
+-- one dungeon worked out (out: the list it goes into)
+local function OneDungeon(d, mode, me, out)
     local trashOnly, solo = mode == "trash", mode == "solo"
-    local me = FT.Me and FT.Me.Level() or 60
-    local out = {}
-    for _, d in ipairs(FT.DNG or {}) do
       local hi = HighLevel(d.lv)
       local gap = hi and (me - hi) or 0
       if not solo or gap >= SOLO_HARD then
@@ -260,13 +271,33 @@ function D.Dungeons(mode)
         parsed[key] = parsed[key] or Parse(trashOnly and d.trash or d.items)
         local coin = trashOnly and d.coinT or d.coin
         local steady, jackpot, top = coin, 0, {}
+        local vendorPart, tradePart = 0, 0
+        -- (v0.61) what one player can sell: past what the auction house takes in a few days of runs (a fifth of a
+        -- day's sales a run), the rest of a stack goes to a vendor - 50 of an item that sells 3 a day isn't 50 sold
+        local runsADay = 3
         for _, x in ipairs(parsed[key]) do
-            local unit = Worth(x[1])
-            local w = unit * x[2]
+            local p, via = FT.Session.UnitValue(x[1])
+            local n = x[2]
+            local ah, toVendor = 0, 0
+            if p and via == "ah" then
+                local rate = FT.Sales.Rate(x[1])
+                local sellable = n
+                if rate and rate.perDay then sellable = math.min(n, math.max(0.2, rate.perDay * 0.2 * 5 / runsADay)) end
+                ah = sellable * p * (1 - FT.Cut())
+                toVendor = (n - sellable) * (FT.VendorSell(x[1]) or 0)
+            elseif p then
+                toVendor = n * p
+            end
+            local w = ah + toVendor
             if w > 0 then
-                local jp = x[3] and unit >= JACKPOT
-                if jp then jackpot = jackpot + w else steady = steady + w end
-                top[#top + 1] = { id = x[1], n = x[2], worth = w, jackpot = jp }
+                local jp = x[3] and w / n >= JACKPOT
+                if jp then
+                    jackpot = jackpot + w
+                else
+                    steady = steady + w
+                    tradePart, vendorPart = tradePart + ah, vendorPart + toVendor
+                end
+                top[#top + 1] = { id = x[1], n = n, worth = w, jackpot = jp }
             end
         end
         table.sort(top, function(a, b)
@@ -283,15 +314,37 @@ function D.Dungeons(mode)
         local low = LowLevel(d.lv)
         out[#out + 1] = {
             name = d.n, base = d.b or d.n, door = d.door, lv = d.lv, min = min, mobs = d.mobs, bosses = d.bosses,
-            coin = coin, steady = steady, jackpot = jackpot, value = steady, each = each, hour = each * runs,
+            coin = coin, vendor = vendorPart, trade = tradePart, steady = steady, jackpot = jackpot, value = steady, each = each, hour = each * runs,
             jackpotEach = jackpot / split, measured = measured, top = top, solo = solo, hardSolo = hard,
             unknown = d.u ~= "" and d.u or nil, high = (low and low > me + 3) or hard,
         }
       end
-    end
+end
+
+local function SortDungeons(out)
     table.sort(out, function(a, b)
         if a.high ~= b.high then return not a.high end
         return a.each > b.each
     end)
     return out
 end
+
+function D.DungeonsNow(mode)
+    local me = FT.Me and FT.Me.Level() or 60
+    local out = {}
+    for _, d in ipairs(FT.DNG or {}) do OneDungeon(d, mode, me, out) end
+    return SortDungeons(out)
+end
+
+-- (v0.61) after new prices, the usual list (a full clear) is worked out in the background, a dungeon a frame: opening
+-- Dungeons doesn't wait for it
+function D.WarmDungeons()
+    local rows = FT.Market.Rows()
+    local me = FT.Me and FT.Me.Level() or 60
+    local out, list = {}, FT.DNG or {}
+    FT.Job("dungeons", #list, function(k) OneDungeon(list[k], "full", me, out) end, function()
+        if dngFor ~= rows then dngCache, dngFor = {}, rows end
+        dngCache["full|" .. me] = SortDungeons(out)
+    end)
+end
+FT.On("FT_MARKET_READY", function() FT.Debounce("warmDungeons", 6, D.WarmDungeons) end)

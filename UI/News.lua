@@ -12,6 +12,12 @@ FT.News = N
 -- start, after the files are read (a table made with them would keep the English)
 local function News()
     return {
+        ["v0.61"] = {
+            { L["Back and Forward"], L["By the search box, like a browser: back to where you were. The search shows what it finds under it; only picking one opens it."], nil },
+            { L["Right-click the wolf"], L["By the minimap, while a session runs: its card, with Show on screen and Stop and save."], nil },
+            { L["Dungeons, checked"], L["Click a dungeon in Farm it: its card, what a run is made of. Its gold now matches what players see."], function() FT.ShowSub("make", "farm") end },
+            { L["Your auctions, where you look"], L["An item's page says when your listing is undercut; your buys and sales show on its chart."], nil },
+        },
         ["v0.58"] = {
             { L["Wolf updates itself"], L["The prices companion now keeps Wolf up to date: a new one comes in while you play, and your next /reload loads it."], nil },
         },

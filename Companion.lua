@@ -4,14 +4,13 @@
 -- see a download - but with the note it knows the companion is running, and the price robot publishes hourly: an
 -- hour and a quarter after the prices it loaded were published, newer ones are on disk. Then, and only then:
 -- one chat line when you open the auction house ("[Load them]" reloads), and the API chip says so.
--- With no companion: once ever, after a real auction house visit, one line on where to get it.
+-- (v0.61) The companion is for friends, given by hand: the addon never points to it.
 local ADDON, FT = ...
 local L = FT.L
 
 local C = {}
 FT.Companion = C
 
-C.URL = "https://github.com/PetcoWoW/ForeverTrading/releases/download/companion/WolfPricesSetup.exe"
 local CHECK = 15 * 60       -- the companion's check
 local HOURLY = 60 * 60      -- the price robot
 local loadedAt = time()
@@ -74,14 +73,6 @@ local Link = FT.ChatLink
 
 actions.reload = function() ReloadUI() end
 actions.news = function() if FT.News then FT.News.Show() end end
-actions.get = function()
-    FT.ShowLink(L["Wolf prices companion (Windows)"], C.Pitch(), C.URL)
-end
-
-function C.Pitch()
-    return L["A small app by the clock. Every 15 minutes it puts the newest prices in your addon folder, without a sound or a pop-up; the addon tells you in chat when there are newer ones to load. Download, run it, done:"]
-end
-
 local function Quiet()
     if InCombatLockdown and InCombatLockdown() then return true end
     if IsInInstance then
@@ -110,18 +101,4 @@ end
 FT.On("AUCTION_HOUSE_SHOW", function() C_Timer.After(1, function() C.Moment("ah") end) end)
 FT.On("MAIL_SHOW", function() C_Timer.After(1, function() C.Moment("mail") end) end)
 
--- no companion: once ever, after a real visit
-local openedAt
-FT.On("AUCTION_HOUSE_SHOW", function() openedAt = GetTime() end)
-FT.On("AUCTION_HOUSE_CLOSED", function()
-    if not FT.db or not openedAt or GetTime() - openedAt < 45 then return end
-    openedAt = nil
-    if C.Note() then FT.db.companionSeen = true end
-    if FT.db.companionSeen or FT.db.companionHint or not (FT.Feed and FT.Feed.On()) then return end
-    FT.db.companionHint = true
-    C_Timer.After(10, function()
-        FT.Print(string.format(L["Fresh prices every hour, without updating anything: the Wolf prices companion (Windows). %s"],
-            Link("get", L["Get it"], L["Settings > About > Prices companion."])))
-    end)
-end)
 FT.On("FT_LOGIN", function() if C.Note() and FT.db then FT.db.companionSeen = true end end)
