@@ -3,7 +3,7 @@ local ADDON, FT = ...
 local UI = FT.UI
 local L = FT.L
 
-local ICON = "Interface\\AddOns\\WolfOfBootyBay\\media\\logo"
+local ICON = FT.LOGO
 
 ---------------------------------------------------------------------------
 -- Minimap button (and a launcher for broker bars when one is loaded)
@@ -128,6 +128,7 @@ local function BuildMinimap()
     local icon = mb:CreateTexture(nil, "ARTWORK")
     icon:SetSize(20, 20)
     icon:SetTexture(ICON)
+    icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
     if icon.SetMask then icon:SetMask("Interface\\CharacterFrame\\TempPortraitAlphaMask") end
     icon:SetPoint("CENTER")
     local border = mb:CreateTexture(nil, "OVERLAY")

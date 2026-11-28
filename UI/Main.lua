@@ -494,7 +494,7 @@ local function Build()
     win:SetScale(FT.S.scale or 1)
     PlaceWindow()
     UI.Skin(win, "window", "bg0")
-    -- (v0.53: no title banner over the top edge - the header has the logo, and drags the window)
+    -- (v0.53: no title banner over the top edge - the header has the logo (the game's black wolf icon), and drags the window)
     table.insert(UISpecialFrames, "WolfOfBootyBayFrame")
 
     -- header
@@ -518,8 +518,8 @@ local function Build()
     hl:SetPoint("BOTTOMRIGHT")
 
     -- the classic look: a round portrait with the gold ring
-    local logo = UI.Classic() and UI.Portrait(header, 22, "Interface\\AddOns\\WolfOfBootyBay\\media\\logo") or UI.Icon(header, 24)
-    logo:SetIcon("Interface\\AddOns\\WolfOfBootyBay\\media\\logo")
+    local logo = UI.Classic() and UI.Portrait(header, 22, FT.LOGO) or UI.Icon(header, 24)
+    logo:SetIcon(FT.LOGO)
     logo:SetPoint("LEFT", UI.Classic() and 10 or 14, 0)
     local brand1 = UI.Text(header, 15, "accent")
     brand1:SetPoint("LEFT", logo, "RIGHT", UI.Classic() and 18 or 10, 0)

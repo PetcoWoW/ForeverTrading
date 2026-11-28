@@ -7,7 +7,7 @@
 ## X-License: Apache-2.0
 ## SavedVariables: WolfOfBootyBayDB
 ## OptionalDeps: Auctionator
-## IconTexture: Interface\AddOns\WolfOfBootyBay\media\logo
+## IconTexture: Interface\Icons\Ability_Mount_BlackDireWolf
 ## Category: Auction/Economy
 ## X-Category: Auction/Economy
 

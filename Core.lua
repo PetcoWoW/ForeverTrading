@@ -10,6 +10,8 @@ FT.VERSION = (GetMeta and GetMeta(ADDON, "Version")) or RELEASE
 if FT.VERSION == "" or FT.VERSION:find("@", 1, true) then FT.VERSION = RELEASE end
 FT.VERSION_TEXT = FT.VERSION:match("^%d") and ("v" .. FT.VERSION) or FT.VERSION
 FT.MEDIA = "Interface\\AddOns\\" .. ADDON .. "\\media\\"
+-- Wolf's logo: the game's own black wolf icon (nothing to ship)
+FT.LOGO = "Interface\\Icons\\Ability_Mount_BlackDireWolf"
 FT.URL_SUPPORT = "https://github.com/thewoolfi/ForeverTrading"
 FT.URL_GITHUB = "https://github.com/PetcoWoW/ForeverTrading"
 FT.URL_CURSEFORGE = "https://www.curseforge.com/wow/addons/wolf-ah-stock-market"
