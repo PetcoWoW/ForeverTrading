@@ -12,6 +12,10 @@ FT.News = N
 -- start, after the files are read (a table made with them would keep the English)
 local function News()
     return {
+        ["v0.55"] = {
+            { L["Drops"], L["Make gold > Farm it > Drops: what mobs drop that sells - patterns, gear, rare reagents - with the mob, its level and the odds. Priciest first, or gold a kill."], function() FT.ShowSub("make", "farm") end },
+            { L["Dungeons"], L["Farm it > Dungeons: which dungeon pays best, a full clear or the trash, at today's prices, split five ways. Click one: what drops in it."], function() FT.ShowSub("make", "farm") end },
+        },
         ["v0.54"] = {
             { L["Calculator suggests"], L["Type a few letters of an item: pick it from the list. Buying and selling use today's price, even when your last scan is older."], function() FT.SelectTab("calc") end },
             { L["Where your items sit"], L["You's donut is a solid ring of your items; hover a slice for its numbers in the middle. Your coins sit in the middle with the total."], function() FT.ShowSub("you", "portfolio") end },

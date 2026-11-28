@@ -20,7 +20,8 @@ local function Npc(id)
     local s = FT.SRC_N and FT.SRC_N[id]
     if not s then return nil end
     local p = Split(s, "|")
-    return { id = id, name = p[1], zones = p[2] ~= "" and p[2] or nil, lv = p[3] ~= "" and p[3] or nil, fac = p[4] ~= "" and p[4] or nil }
+    return { id = id, name = p[1], zones = p[2] ~= "" and p[2] or nil, lv = p[3] ~= "" and p[3] or nil, fac = p[4] ~= "" and p[4] or nil,
+        rank = p[5] ~= "" and p[5] or nil } -- rank (v0.55): 1 elite, 2 rare elite, 3 boss, 4 rare
 end
 
 local function Obj(id)

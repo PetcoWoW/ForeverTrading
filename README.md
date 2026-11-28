@@ -20,12 +20,12 @@ and the words and adds its own features. See `NOTICE`.
 
 Restart the game fully the first time (new addon files load at launch, not on `/reload`), then type `/wolf`.
 
-## The window (v0.54)
+## The window (v0.55)
 
 Four tabs: **Today** (what you own and what the last prices did to it, a calendar of what's coming, your best moves,
 your bags, your movers, and what happened while you were away), **Market** (search any item: the verdict first, one chart, when it
 sells, the market with a buy/sell calculator, what it makes or costs to make, where it comes from), **Make gold**
-(Flip it, Craft it, Farm it, Raids, PvP), **You** (Holdings with a donut of where your items sit, Sessions,
+(Flip it, Craft it, Farm it with Drops and Dungeons, Raids, PvP), **You** (Holdings with a donut of where your items sit, Sessions,
 Characters, Journal) and **Calculator** (sums with a cheat sheet; the item box suggests as you type). Every call is one of six verdicts: BUY, SELL, HOLD, WAIT, CRAFT, FARM. The search box at the top
 works from any page. Today's calendar shows what's coming; Farm it's Next week, Raids and PvP say how sure Wolf is. **Craft it** has Level it up and Worth learning. Every item that trades says where it comes from (ForeverDB and
 Wolf's notes on Forever's new items).

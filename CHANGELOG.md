@@ -1,5 +1,19 @@
 # Wolf
 
+## v0.55 - Drops and Dungeons
+
+- **Farm it > Drops:** what mobs drop that sells for a gold or more - patterns, gear, rare reagents (the gathered
+  staples stay in Materials) - each with the mob that drops it best, its zone, level and odds ("1 in 60"), and
+  **rate unknown** for new Forever loot no one has counted yet (it still shows: being early is where it pays).
+  Priciest first, or gold a kill. Tagged SOLO or GROUP (a dungeon or an elite). No world bosses, raids or
+  battlegrounds; mobs well above your level sink. A price down 15% in a week says so: others found it.
+- **Farm it > Dungeons:** every 5-man dungeon's average full clear (or the trash only) - its every mob, their loot
+  tables and coin, from ForeverDB - priced with today's market (loot that can't be traded at what a vendor pays) and
+  split five ways. The tooltip has what pays in it, the coin and a rough hour; run it with the session tracker on
+  and your own gold an hour there replaces the guess. Click a dungeon: Drops, that dungeon only.
+- Farm it's bar: Materials (their kind in a dropdown), Drops, Dungeons, Next week.
+- The daily sources build (tools/sources/build.py) also writes Data/Dungeons.lua, and creatures carry their rank.
+
 ## v0.54 - small fixes
 
 - **Calculator:** the item box suggests items as you type (the busiest first; Enter takes the top one). Buying and

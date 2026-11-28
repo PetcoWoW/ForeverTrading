@@ -494,9 +494,9 @@ local function ListView(p, onClick, onEnter)
         setup = RowSetup,
         update = function(row, x)
             row.icon:SetItem(x.id)
-            row.name:SetText(FT.ItemText(x.id, 40) .. (x.qty and FT.C("dim", "  x" .. FT.Num(x.qty)) or ""))
+            row.name:SetText(x.title or (FT.ItemText(x.id, 40) .. (x.qty and FT.C("dim", "  x" .. FT.Num(x.qty)) or "")))
             row.reason.fitText = nil -- (not a deal line fitted before)
-            row.reason:SetText(x.reason or "")
+            if x.fit then UI.FitBits(row.reason, x.reason or "") else row.reason:SetText(x.reason or "") end
             row.value:SetText(x.value or "")
             row.badge:Set(x.signal, x.label, x.strength or 2)
         end,
@@ -565,9 +565,13 @@ end
 -- The Farm Board: raw materials ranked by the gold the market pays for them a day (price x how many sell a
 -- day), with the week's move. Where to farm them is up to you: right-click gives a Wowhead link.
 local FARM_KINDS = {
-    { "all", "All" }, { "ore", "Ore & stone" }, { "herb", "Herbs" }, { "leather", "Leather" }, { "cloth", "Cloth" },
-    { "elemental", "Elemental" }, { "gem", "Gems" }, { "next", "Next week" },
+    { "all", "All materials" }, { "ore", "Ore & stone" }, { "herb", "Herbs" }, { "leather", "Leather" }, { "cloth", "Cloth" },
+    { "elemental", "Elemental" }, { "gem", "Gems" },
 }
+-- (v0.55) what Farm it shows: materials (their kind in a dropdown), Drops, Dungeons, Next week
+local FARM_MODES = { { "all", "Materials" }, { "drops", "Drops" }, { "dungeons", "Dungeons" }, { "next", "Next week" } }
+local farmMode = "all"
+local dropSort, dropDungeon, dungeonTrash = "price", nil, false
 local FARM_CLASS = FT.Farm.CLASS -- the item classes and subclasses of each (FT.Farm)
 local farmKind = "all"
 
@@ -752,34 +756,150 @@ local function BuildSellView(p)
     return f
 end
 
+-- (v0.55) a dungeon's tooltip: what pays in it, the coin, the time
+local function DungeonTip(row, x)
+    local d = x.dungeonInfo
+    GameTooltip:SetOwner(row, "ANCHOR_RIGHT")
+    GameTooltip:AddLine(d.name, 1, 0.82, 0)
+    GameTooltip:AddLine(string.format(L["Level %s  ·  the door is in %s"], d.lv, L[d.door] or d.door), 0.85, 0.87, 0.9)
+    GameTooltip:AddLine(" ")
+    GameTooltip:AddDoubleLine(dungeonTrash and L["A clear of the trash"] or L["A full clear"], FT.Money(math.floor(d.value), "gold"), 0.85, 0.87, 0.9, 1, 1, 1)
+    GameTooltip:AddDoubleLine(string.format(L["Each, in a group of %d"], 5), FT.Money(math.floor(d.each), "gold"), 0.85, 0.87, 0.9, 0.12, 1, 0.12)
+    GameTooltip:AddDoubleLine(L["Of it, coin"], FT.Money(math.floor(d.coin), "gold"), 0.6, 0.64, 0.7, 0.6, 0.64, 0.7)
+    for _, t in ipairs(d.top) do
+        local n = t.n >= 10 and FT.Num(math.floor(t.n + 0.5)) or string.format("%.1f", t.n)
+        GameTooltip:AddDoubleLine(FT.ItemText(t.id, 32) .. FT.C("dim", "  x" .. n), FT.Money(math.floor(t.worth), "short"), 1, 1, 1, 0.85, 0.87, 0.9)
+    end
+    GameTooltip:AddLine(" ")
+    if d.measured then
+        GameTooltip:AddLine(string.format(L["Your own runs here: %s an hour"], FT.Money(math.floor(d.measured), "gold")), 0.12, 1, 0.12, true)
+    else
+        GameTooltip:AddLine(string.format(L["About %d min a full clear of every wing: ~%s an hour each. Run it with the session tracker on and Wolf measures it."],
+            d.min, FT.Money(math.floor(d.hour), "gold")), 0.6, 0.64, 0.7, true)
+    end
+    GameTooltip:AddLine(L["The average of its loot tables: a lucky epic beats it, a dry run doesn't."], 0.6, 0.64, 0.7, true)
+    GameTooltip:AddLine(L["Click: what drops in it, best first"], 0.6, 0.64, 0.7)
+    GameTooltip:Show()
+end
+
 local function BuildFarmView(p)
     local f = ListView(p, function(x, button)
+        if x.dungeonInfo then
+            -- a dungeon: its drops
+            dropDungeon, farmMode = x.dungeonInfo.name, "drops"
+            if farmView then farmView.kind:SetValue("drops") end
+            T.RefreshFarm()
+            return
+        end
         if button == "RightButton" then UI.WatchMenu(x.id) return end
         if UI.ItemClick(x.id) then return end
         FT.ShowFarm(x.id)
     end, function(row, x)
+        if x.dungeonInfo then DungeonTip(row, x) return end
         UI.TipItem(row, x.id)
         GameTooltip:AddLine(" ")
         if x.call then
             GameTooltip:AddLine(string.format(L["How sure: %d%% (right %d of %d weeks on its last 30 days)"], x.call.sure, x.call.hits, x.call.weeks), 0.85, 0.87, 0.9, true)
             if x.call.event then GameTooltip:AddLine(string.format(L["%s is on the calendar: a known pull."], x.call.event.name), 0.75, 0.78, 0.82, true) end
         end
+        if x.drop and x.drop.others > 0 then
+            GameTooltip:AddLine(string.format(L["%d more mobs drop it: its page lists them."], x.drop.others), 0.75, 0.78, 0.82, true)
+        end
         GameTooltip:AddLine(L["Click: where to farm it || Right-click: watchlist"], 0.6, 0.64, 0.7)
         GameTooltip:Show()
     end)
-    local items = {}
-    for _, k in ipairs(FARM_KINDS) do items[#items + 1] = { k[1], L[k[2]] } end
-    f.kind = UI.Segmented(f, items, function(v)
-        farmKind = v
+    local modes = {}
+    for _, k in ipairs(FARM_MODES) do modes[#modes + 1] = { k[1], L[k[2]] } end
+    f.kind = UI.Segmented(f, modes, function(v)
+        farmMode = v
+        if v ~= "drops" then dropDungeon = nil end
         T.RefreshFarm()
     end, 22)
     f.kind:SetPoint("TOPLEFT", 0, -1)
-    f.kind:SetValue(farmKind)
+    f.kind:SetValue(farmMode)
     T.farmKindBar = f.kind
+    -- next to it, the choice of the mode: the kind of material / how drops sort / full clears or the trash
+    local mats = {}
+    for _, k in ipairs(FARM_KINDS) do mats[#mats + 1] = { k[1], L[k[2]] } end
+    f.mat = UI.Dropdown(f, 130, mats, function(v)
+        farmKind = v
+        T.RefreshFarm()
+    end)
+    f.mat:SetPoint("LEFT", f.kind, "RIGHT", 8, 0)
+    f.mat:SetValue(farmKind)
+    f.sort = UI.Segmented(f, { { "price", L["Priciest"] }, { "kill", L["Per kill"] } }, function(v)
+        dropSort = v
+        T.RefreshFarm()
+    end, 22)
+    f.sort:SetPoint("LEFT", f.kind, "RIGHT", 8, 0)
+    f.sort:SetValue(dropSort)
+    f.trash = UI.Segmented(f, { { "full", L["Full clear"] }, { "trash", L["Trash only"] } }, function(v)
+        dungeonTrash = v == "trash"
+        T.RefreshFarm()
+    end, 22)
+    f.trash:SetPoint("LEFT", f.kind, "RIGHT", 8, 0)
+    f.trash:SetValue("full")
+    f.allDrops = UI.Button(f, L["All drops"], 80, 22, "default", function()
+        dropDungeon = nil
+        T.RefreshFarm()
+    end)
+    f.allDrops:FitText(16)
+    f.allDrops:SetPoint("LEFT", f.sort, "RIGHT", 8, 0)
     f.hint:SetText(L["Raw materials by what one farmer could sell of them a day, best first. Click one: where to farm it for your level."])
     f.list:SetEmptyText(L["No sales seen yet: the price feed fills this over a few hours."])
     return f
 end
+
+-- (v0.55) Drops: mob drops that sell, with the mob, its zone and level, and the odds
+local function DropRows()
+    local list = FT.Drops.List(function() if farmView and farmView:IsShown() and farmMode == "drops" then T.RefreshFarm() end end)
+    if not list then return nil end
+    local out = {}
+    for _, e in ipairs(FT.Drops.Shown(list, dropSort, dropDungeon, FT.NameMatcher(T.search))) do
+        local w = e.who
+        local bits = { w.name }
+        local where = e.dungeon or (w.zones and w.zones:match("^[^,]+"))
+        if where then bits[#bits + 1] = L[where] or where end
+        if w.lv then bits[#bits + 1] = string.format(L["level %s"], w.lv) end
+        bits[#bits + 1] = FT.Drops.Odds(e.chance) or FT.C("accent", L["rate unknown"])
+        if (e.ch7 or 0) <= -0.15 then bits[#bits + 1] = FT.C("down", FT.Pct(e.ch7) .. " " .. L["this week"]) end
+        local value
+        if dropSort == "kill" then
+            value = e.perKill and (FT.C("up", "~" .. FT.Money(math.floor(e.perKill + 0.5), "short")) .. FT.C("dim", " " .. L["a kill"]))
+                or FT.C("dim", FT.Money(e.price, "short") .. " " .. L["each"])
+        else
+            value = FT.C("up", FT.Money(e.price, "short")) .. FT.C("dim", " " .. L["each"])
+        end
+        out[#out + 1] = {
+            id = e.id, drop = e, fit = true, reason = table.concat(bits, FT.C("dim", "  ·  ")), value = value,
+            signal = "FARM", label = e.group and L["GROUP"] or L["SOLO"], strength = e.chance > 0 and 2 or 1,
+        }
+    end
+    return out
+end
+
+-- (v0.55) Dungeons: each one's average clear at today's prices, split five ways
+local function DungeonRows()
+    local q = (T.search or ""):lower()
+    local out = {}
+    for _, d in ipairs(FT.Drops.Dungeons(dungeonTrash)) do
+        if q == "" or d.name:lower():find(q, 1, true) then
+            local names = {}
+            for i = 1, math.min(3, #d.top) do names[#names + 1] = FT.Name(d.top[i].id) or "?" end
+            local bits = { string.format(L["level %s"], d.lv), L[d.door] or d.door,
+                "~" .. FT.Money(math.floor(d.value), "gold") .. " " .. (dungeonTrash and L["the trash"] or L["a clear"]) }
+            if #names > 0 then bits[#bits + 1] = table.concat(names, ", ") end
+            out[#out + 1] = {
+                id = d.top[1] and d.top[1].id, title = FT.C("text", d.name), dungeonInfo = d, fit = true,
+                reason = table.concat(bits, FT.C("dim", "  ·  ")),
+                value = FT.C("up", "~" .. FT.Money(math.floor(d.each), "gold")) .. FT.C("dim", " " .. L["each"]),
+                signal = "FARM", label = string.format(L["~%d MIN"], d.min), strength = d.high and 1 or 2,
+            }
+        end
+    end
+    return out
+end
+T.DropRows, T.DungeonRows = DropRows, DungeonRows
 
 function T.RefreshSell()
     if not (sellView and sellView:IsShown()) then return end
@@ -798,7 +918,7 @@ end
 
 -- (v0.51) Next week: the best farms for next week, each with how sure Wolf is (from Coming up, which came apart)
 local function NextWeekRows()
-    local l = FT.Ahead.Lists(function() if farmView and farmView:IsShown() and farmKind == "next" then T.RefreshFarm() end end)
+    local l = FT.Ahead.Lists(function() if farmView and farmView:IsShown() and farmMode == "next" then T.RefreshFarm() end end)
     if not l then return nil end
     local out = {}
     for _, r in ipairs(l.farms) do
@@ -815,15 +935,39 @@ end
 
 function T.RefreshFarm()
     if not (farmView and farmView:IsShown()) then return end
-    if farmKind == "next" then
+    local f = farmView
+    f.mat:SetShown(farmMode == "all")
+    f.sort:SetShown(farmMode == "drops")
+    f.trash:SetShown(farmMode == "dungeons")
+    f.allDrops:SetShown(farmMode == "drops" and dropDungeon ~= nil)
+    f.count:SetText("")
+    if farmMode == "next" then
         local rows = NextWeekRows()
-        farmView.hint:SetText(L["Next week's best farms, and how sure Wolf is: its record on each item's last 30 days. Under 40% isn't shown."])
-        farmView.list:SetEmptyText(rows and L["No call sure enough yet: new prices come every hour."] or L["Working out next week's calls..."])
-        farmView.list:SetItems(rows or {}, true)
+        f.hint:SetText(L["Next week's best farms, and how sure Wolf is: its record on each item's last 30 days. Under 40% isn't shown."])
+        f.list:SetEmptyText(rows and L["No call sure enough yet: new prices come every hour."] or L["Working out next week's calls..."])
+        f.list:SetItems(rows or {}, true)
         return
     end
-    farmView.hint:SetText(L["Raw materials by what one farmer could sell of them a day, best first. Click one: where to farm it for your level."])
-    farmView.list:SetEmptyText(L["No sales seen yet: the price feed fills this over a few hours."])
+    if farmMode == "drops" then
+        local rows = DropRows()
+        f.hint:SetText(dropDungeon and string.format(L["What drops in %s and sells, best first."], dropDungeon)
+            or L["Mob drops that sell, and the mob. Rate unknown: new loot no one has counted yet."])
+        f.list:SetEmptyText(rows and L["No drop sells for a gold or more yet: the price feed fills this over a few hours."] or L["Working out the drops..."])
+        f.count:SetText(rows and #rows > 0 and string.format(L["%d drops"], #rows) or "")
+        f.list:SetItems(rows or {}, true)
+        return
+    end
+    if farmMode == "dungeons" then
+        local rows = DungeonRows()
+        f.hint:SetText(dungeonTrash and L["The trash only (no bosses): each dungeon at today's prices, split five ways."]
+            or L["A full clear of each dungeon at today's prices, split five ways. Click one: what drops in it."])
+        f.list:SetEmptyText(L["No dungeon found."])
+        f.count:SetText(string.format(L["%d dungeons"], #rows))
+        f.list:SetItems(rows, true)
+        return
+    end
+    f.hint:SetText(L["Raw materials by what one farmer could sell of them a day, best first. Click one: where to farm it for your level."])
+    f.list:SetEmptyText(L["No sales seen yet: the price feed fills this over a few hours."])
     local list = FarmRows()
     local matches = FT.NameMatcher(T.search)
     if matches then
@@ -831,8 +975,9 @@ function T.RefreshFarm()
         for _, x in ipairs(list) do if matches(x.id) then kept[#kept + 1] = x end end
         list = kept
     end
-    farmView.list:SetItems(list, true)
+    f.list:SetItems(list, true)
 end
+FT.On("FT_DROPS_READY", function() if farmMode == "drops" then T.RefreshFarm() end end)
 
 -- the best deal there is right now, for the line under the title
 local function BestMove()

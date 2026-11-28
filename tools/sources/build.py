@@ -129,7 +129,8 @@ def npc_ref(n):
         lv = ""
         if v.get(3):
             lv = str(v[3]) if v.get(3) == v.get(4) or not v.get(4) else "%s-%s" % (v[3], v[4])
-        npcs[n] = "|".join([v.get(1) or "?", ",".join(zones("c%d" % n)), lv, nfac.get(n, "")])
+        rank = v.get(5)
+        npcs[n] = "|".join([v.get(1) or "?", ",".join(zones("c%d" % n)), lv, nfac.get(n, "")] + ([str(rank)] if rank else []))
     return n
 # a chest, box or crate (not a node you gather): Wolf shows these only when nothing else gives the item
 CHESTY = re.compile(r"(?i)chest|box|crate|cache|strongbox|footlocker|coffer|trunk|basket|barrel|sack|\bbag\b|locker|stash|bundle|cask|urn\b|reliquary|container|treasure|supplies|pile of")
@@ -300,7 +301,8 @@ out.append("-- From ForeverDB (github.com/foreverfraddons/forever-db, GPL-3.0; d
 out.append("-- github.com/valcheffnet/DropTables, CC BY-SA 4.0) and Wolf's own Forever notes (tools/sources/hand.json).")
 out.append("-- FT.SRC[item] = \"kind=...;kind=...\": d drops (npc:chance per 10000), s skinning, o objects and nodes,")
 out.append("-- i containers (item:chance), f Merchant's Favor vendors, v vendors, q quest rewards, w world drop from level.")
-out.append("-- FT.SRC_N[npc] = \"name|zones|levels|A/H\"; FT.SRC_O[object] = \"name|zones\"; FT.SRC_Q[quest] = \"title|level\".")
+out.append("-- FT.SRC_N[npc] = \"name|zones|levels|A/H|rank\" (rank: 1 elite, 2 rare elite, 3 boss, 4 rare); FT.SRC_O[object] = \"name|zones\";")
+out.append("-- FT.SRC_Q[quest] = \"title|level\".")
 out.append("local ADDON, FT = ...")
 out.append("FT.SRC_BUILT = %s" % lstr(str(T(D.meta).get("build"))))
 out.append("FT.SRC = {")
@@ -346,3 +348,108 @@ with open(GAPS, "w", encoding="utf-8") as g:
         g.write("%d\t%s\tclass %s.%s\n" % (i, v.get(1), v.get(5), v.get(6)))
 print("%d notes; %d items placed (%s), %d creatures, %d objects, %d quests, %d dead recipes, %d gaps -> %s (%d KB)" % (
     len(notes), len(lines), dict(kinds), len(npcs), len(objs), len(quests), len(dead), len(gaps), OUT, os.path.getsize(OUT) // 1024))
+
+
+# ---- the dungeons (v0.55): what a full clear drops on average, from every mob in it ----------------------
+# Data/Dungeons.lua: per 5-man dungeon, each item's expected count a clear (thousandths) - all of it and the trash
+# only - and the coin. Wolf prices them in game with today's market (or what a vendor pays).
+DUNGEONS = {  # map: (name, where the door is, minutes for a full clear of every wing - a rough guide)
+    389: ("Ragefire Chasm", "Orgrimmar", 20), 36: ("The Deadmines", "Westfall", 40), 43: ("Wailing Caverns", "The Barrens", 45),
+    33: ("Shadowfang Keep", "Silverpine Forest", 35), 48: ("Blackfathom Deeps", "Ashenvale", 40), 34: ("The Stockade", "Stormwind", 25),
+    90: ("Gnomeregan", "Dun Morogh", 60), 47: ("Razorfen Kraul", "The Barrens", 45), 189: ("Scarlet Monastery", "Tirisfal Glades", 90),
+    129: ("Razorfen Downs", "The Barrens", 45), 70: ("Uldaman", "Badlands", 60), 209: ("Zul'Farrak", "Tanaris", 50),
+    349: ("Maraudon", "Desolace", 75), 109: ("Sunken Temple", "Swamp of Sorrows", 60), 230: ("Blackrock Depths", "Blackrock Mountain", 120),
+    229: ("Blackrock Spire", "Blackrock Mountain", 90), 429: ("Dire Maul", "Feralas", 120), 289: ("Scholomance", "Western Plaguelands", 75),
+    329: ("Stratholme", "Eastern Plaguelands", 90),
+}
+GD = F.gold if F.gold is not None else D.gold
+gold = {int(k): T(v) for k, v in GD.items()} if GD is not None else {}
+# coin a kill when no kill was counted: the median of counted mobs of that level and kind (normal / elite)
+by = collections.defaultdict(list)
+for n, g in gold.items():
+    v = T(D.npc[n]) or {}
+    if g.get(1) and v.get(3):
+        by[(min(int(v[3]), 63), 1 if (v.get(5) or 0) in (1, 2) else 0)].append(g[1])
+def coin_guess(lv, elite):
+    for d in range(0, 6):
+        for l2 in (lv - d, lv + d):
+            xs = by.get((l2, elite)) or (by.get((l2, 0)) and [x * 2 for x in by[(l2, 0)]] if elite else None)
+            if xs:
+                xs = sorted(xs)
+                return xs[len(xs) // 2]
+    return 0
+enc_names = collections.defaultdict(set)
+for _, e in D.enc.items():
+    e = T(e)
+    if e.get(2):
+        enc_names[int(e[2])].add(e.get(1))
+# every creature's spawns, by map
+spawns = collections.defaultdict(dict)   # map -> npc -> count
+SP = D.spw
+for k, v in SP.items():
+    k = str(k)
+    if not k.startswith("c"):
+        continue
+    n = int(k[1:])
+    for _, pt in v.items():
+        pt = T(pt)
+        m = pt.get(1)
+        if m in DUNGEONS:
+            spawns[m][n] = spawns[m].get(n, 0) + (len(pt) - 1) // 2
+want_npcs = set(n for m in spawns.values() for n in m)
+loot = collections.defaultdict(list)     # npc -> [(item, chance per 10000)]
+DROP = F.drop if F.drop is not None else D.drop
+for i, rows in DROP.items():
+    i = int(i)
+    if not real(i):
+        continue
+    for npc, chance in pairs_list(rows):
+        if npc in want_npcs and item[i].get(5) != 12:   # quest items sell for nothing
+            loot[npc].append((i, chance))
+dng = []
+for m, (name, door, minutes) in sorted(DUNGEONS.items(), key=lambda x: x[1][0]):
+    allx, trash, unknown = collections.Counter(), collections.Counter(), set()
+    coin = coin_t = mobs = bosses = 0
+    lvs = []
+    for n, cnt in spawns[m].items():
+        v = T(D.npc[n]) or {}
+        if not loot.get(n) and n not in gold:
+            continue                     # no loot, no coin: a friendly or a decoration
+        # a boss: in the encounter list, or one of a kind with a blue-or-better drop at 5% or more (a boss's table)
+        boss = v.get(1) in enc_names[m] or (cnt == 1 and any(chance >= 500 and (item.get(i, {}).get(2) or 0) >= 3
+                                                             for i, chance in loot.get(n, [])))
+        mobs += cnt
+        bosses += 1 if boss else 0
+        if v.get(3):
+            lvs += [int(v[3])] * cnt
+        g = gold.get(n, {}).get(1) or coin_guess(int(v.get(3) or 1), 1 if (v.get(5) or 0) in (1, 2) else 0)
+        coin += g * cnt
+        if not boss:
+            coin_t += g * cnt
+        for i, chance in loot.get(n, []):
+            if chance <= 0:
+                unknown.add(i)
+                continue
+            e = cnt * chance / 10000.0
+            allx[i] += e
+            if not boss:
+                trash[i] += e
+    if not mobs:
+        continue
+    lvs.sort()
+    lv = "%d-%d" % (lvs[len(lvs) // 10], lvs[(len(lvs) * 9) // 10]) if lvs else ""
+    def enc(c):
+        top = [(i, e) for i, e in c.most_common() if e >= 0.005][:110]
+        return ",".join("%d:%d" % (i, max(1, round(e * 1000))) for i, e in top)
+    dng.append("{n=%s,door=%s,lv=%s,min=%d,mobs=%d,bosses=%d,coin=%d,coinT=%d,items=%s,trash=%s,u=%s}," % (
+        lstr(name), lstr(door), lstr(lv), minutes, mobs, bosses, coin, coin_t, lstr(enc(allx)), lstr(enc(trash)),
+        lstr(",".join(str(i) for i in sorted(unknown)[:60]))))
+DOUT = os.path.join(ROOT, "Data", "Dungeons.lua")
+open(DOUT, "w", encoding="utf-8").write("\n".join([
+    "-- What a full clear of each 5-man dungeon drops on average (generated by tools/sources/build.py - don't edit by hand).",
+    "-- From ForeverDB (spawns, loot tables, coin counts; GPL-3.0, Drop Tables counts CC BY-SA 4.0). items/trash:",
+    "-- \"item:thousandths of one a clear\" (trash leaves the bosses out); coin in copper; u: drops of unknown rate;",
+    "-- min: a rough full clear of every wing, for a guide - Wolf's sessions measure the real one.",
+    "local ADDON, FT = ...",
+    "FT.DNG = {"] + dng + ["}"]) + "\n")
+print("%d dungeons -> %s (%d KB)" % (len(dng), DOUT, os.path.getsize(DOUT) // 1024))

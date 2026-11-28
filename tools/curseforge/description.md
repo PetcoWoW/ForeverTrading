@@ -4,17 +4,30 @@ Wolf watches every price on the WoW Forever auction house and tells you, in plai
 
 ---
 
-## Install (two steps)
+## ⬇️ Start here: get the Wolf prices app (Windows)
 
-**1. The addon.** Install Wolf with the CurseForge app (or WowUp). Updates arrive on their own.
+### **[👉 Download WolfPricesSetup.exe](https://github.com/PetcoWoW/ForeverTrading/releases/download/companion/WolfPricesSetup.exe)**
 
-**2. Hourly prices (Windows, recommended).** Get the Wolf prices companion: [WolfPricesSetup.exe](https://github.com/PetcoWoW/ForeverTrading/releases/download/companion/WolfPricesSetup.exe). Run it and click **Install**. It keeps Wolf's prices fresh every hour, even for items you never scanned.
+**Why you need it:** addons can't use the internet, so on its own Wolf only knows the prices you scan yourself. This small app fetches every price on your realm from Blizzard and hands them to Wolf, so Wolf is up to date the moment you log in.
 
-- Windows may say "Windows protected your PC" the first time: click **More info**, then **Run anyway**.
-- It installs for your Windows user only (no admin rights) and starts with Windows if you leave that ticked.
-- Not on Windows? Wolf still works: your own scans and other Wolf users in your guild keep the prices fresh.
+**How:**
 
-Restart the game fully the first time (new addons load at launch, not on `/reload`), then type `/wolf`.
+1. Download it and open it.
+2. Click **Install**. That's it.
+3. You never open it again. It runs quietly by your clock and checks for new prices every 15 minutes.
+4. In game, when newer prices are waiting, a chat line at the auction house says so: click **Load them**.
+
+If Windows says **"Windows protected your PC"**, click **More info**, then **Run anyway** (it's a new app, so Windows doesn't know it yet).
+
+No admin rights, no account, nothing on screen while you play. Remove it any time in Windows Settings > Apps.
+
+*Not on Windows? Wolf still works: it uses your own scans and prices from other Wolf users in your guild.*
+
+---
+
+## Then: the addon
+
+Install Wolf here with the CurseForge app (or WowUp). Restart the game fully the first time (new addons load at launch, not on `/reload`), then type `/wolf`.
 
 ---
 
@@ -28,7 +41,7 @@ Restart the game fully the first time (new addons load at launch, not on `/reloa
 
 - **Flip it**: deals worth buying and relisting.
 - **Craft it**: what your recipes make in profit, a craft queue with the shopping list, the cheapest way to level a profession, and recipes worth learning (with where to get them).
-- **Farm it**: the best things to farm for your level and professions, and where; Next week shows the best farms ahead.
+- **Farm it**: the best materials to farm for your level and professions, and where. **Drops**: what mobs drop that sells (patterns, gear, rare reagents), the mob, its level and the odds, even for new Forever loot no one has counted yet. **Dungeons**: which dungeon pays best, a full clear (or just the trash) at today's prices, split five ways. Next week shows the best farms ahead.
 - **Raids**: what raiders will burn through, ranked, with your move on each and how sure Wolf is (High, Medium, Low) from its own track record.
 - **PvP**: the battleground kit (potions, bombs anyone can throw, their materials), and when to stock up before a battleground week.
 
@@ -63,7 +76,7 @@ No pop-ups, no sounds. Wolf only ever speaks in a chat line: a deal from your gu
 
 - `/wolf` opens the window (compact; Standard and Full screen are in Settings). `/wolf news` shows what's new.
 - Don't run ForeverTrading at the same time: two scanners do the same work twice.
-- The prices companion only touches Wolf's own price file. No accounts, no game memory, nothing sent anywhere. Remove it in Windows Settings > Apps > Wolf prices.
+- The Wolf prices app only touches Wolf's own price file. No accounts, no game memory, nothing sent anywhere. Remove it in Windows Settings > Apps > Wolf prices.
 
 ---
 

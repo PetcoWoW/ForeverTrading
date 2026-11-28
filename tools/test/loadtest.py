@@ -897,6 +897,49 @@ step("layout", function()
       local f = FT.Tabs.signals
       for _, b in ipairs(f.farmKindBar and f.farmKindBar.buttons or {}) do if b.value == "next" then b.onClick() end end
     end },
+    { "money: farm drops", "signals", function()
+      local f = FT.Tabs.signals
+      for _, b in ipairs(f.farmKindBar and f.farmKindBar.buttons or {}) do if b.value == "drops" then b.onClick() end end
+      FT.Drops.List(); mock.run(60, 0.05); f.RefreshFarm()
+      local rows = f.DropRows()
+      assert(rows and #rows > 0, "drops listed: " .. tostring(rows and #rows))
+      print("drops: " .. #rows .. ", top " .. (FT.Name(rows[1].id) or "?") .. " | " .. (rows[1].reason or ""):gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", ""))
+      for _, x in ipairs(rows) do
+        assert(FT.Drops.Killable(x.drop.who), "no world boss or raid mob: " .. tostring(x.drop.who.name))
+      end
+    end },
+    { "money: drops per kill", "signals", function()
+      local f = FT.Tabs.signals
+      f.RefreshFarm()
+      local bar = FT.Tabs.signals
+      for _, b in ipairs((bar.farmKindBar and bar.farmKindBar:GetParent().sort or {}).buttons or {}) do if b.value == "kill" then b.onClick() end end
+      local rows = f.DropRows()
+      assert(rows[1] and rows[1].drop.perKill, "per kill: the known rates first")
+    end },
+    { "money: dungeons", "signals", function()
+      local f = FT.Tabs.signals
+      for _, b in ipairs(f.farmKindBar and f.farmKindBar.buttons or {}) do if b.value == "dungeons" then b.onClick() end end
+      local rows = f.DungeonRows()
+      assert(#rows >= 15, "the dungeons: " .. #rows)
+      local d = rows[1].dungeonInfo
+      assert(d.value > d.coin and d.each == d.value / 5, "a clear: loot and coin, split five ways")
+      print("dungeons: best " .. d.name .. " " .. math.floor(d.each / 10000) .. "g each a clear, " .. math.floor(d.hour / 10000) .. "g an hour each")
+    end },
+    { "money: dungeons, the trash", "signals", function()
+      local view = FT.Tabs.signals.farmKindBar:GetParent()
+      for _, b in ipairs(view.trash.buttons) do if b.value == "trash" then b.onClick() end end
+    end },
+    { "money: a dungeon's drops", "signals", function()
+      local f = FT.Tabs.signals
+      local view = f.farmKindBar:GetParent()
+      local rows = f.DungeonRows()
+      -- a click on a dungeon: Drops, that dungeon only
+      local name = rows[1].dungeonInfo.name
+      local click = view.list.opts and view.list.opts.onClick
+      if click then click(rows[1], "LeftButton") end
+      for _, b in ipairs(view.trash.buttons) do if b.value == "full" then b.onClick() end end
+      print("a dungeon's drops: " .. name)
+    end },
     { "money: farm again", "signals", function()
       local f = FT.Tabs.signals
       for _, b in ipairs(f.farmKindBar and f.farmKindBar.buttons or {}) do if b.value == "all" then b.onClick() end end

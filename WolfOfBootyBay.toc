@@ -1,7 +1,7 @@
 ## Interface: 16001
 ## Title: |cfff0b90bWolf|r
 ## Notes: The auction house as a stock market for WoW Forever: a ticker tape, 7-day trend lines, what to buy, sell and craft, your portfolio and farming sessions. Works with Auctionator.
-## Version: 0.54
+## Version: 0.55
 ## Author: PetcoWoW
 ## X-Website: https://github.com/PetcoWoW/ForeverTrading
 ## X-License: Apache-2.0
@@ -21,6 +21,7 @@ Data\Recipes.lua
 Data\Sources.lua
 Data\Futures.lua
 Data\FarmSpots.lua
+Data\Dungeons.lua
 Data\Companion.lua
 Sources\Scanner.lua
 Sources\Auctionator.lua
@@ -44,6 +45,7 @@ Farm.lua
 Where.lua
 Me.lua
 Calc.lua
+Drops.lua
 Ahead.lua
 Queue.lua
 Sources\Share.lua
